@@ -53,6 +53,7 @@ node {
 
 // `npm ci` installs the locked dependencies reproducibly; cached on package.json/lock.
 val frontendInstall by tasks.registering(NpmTask::class) {
+    description = "Installs the frontend's locked npm dependencies (npm ci)."
     args.set(listOf("ci"))
     inputs.files(
         rootProject.file("frontend/package.json"),
@@ -63,6 +64,7 @@ val frontendInstall by tasks.registering(NpmTask::class) {
 
 // `npm run build` produces frontend/dist/frontend/browser; cached on the sources.
 val frontendBuild by tasks.registering(NpmTask::class) {
+    description = "Builds the Angular SPA bundled into the boot jar (npm run build)."
     dependsOn(frontendInstall)
     args.set(listOf("run", "build"))
     inputs.dir(rootProject.file("frontend/src"))
