@@ -9,6 +9,7 @@ import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
+import org.springframework.test.web.servlet.client.returnResult
 
 /**
  * System tests for the member self-service consumption and profile flow, authenticated by the
@@ -24,7 +25,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
             .accept(MediaType.APPLICATION_JSON)
             .withMember(member)
             .exchange()
-            .returnResult(ConsumptionDto::class.java)
+            .returnResult<ConsumptionDto>()
             .responseBody!!
 
     private fun change(delta: Int) =
@@ -48,7 +49,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
 
     @Test
     fun `incrementing the count returns 200 with the new total`() {
-        val result = change(1).returnResult(ConsumptionDto::class.java)
+        val result = change(1).returnResult<ConsumptionDto>()
 
         assertThat(result.status.value()).isEqualTo(200)
         assertThat(result.responseBody!!.total).isEqualTo(1)
@@ -83,7 +84,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
                 .accept(MediaType.APPLICATION_JSON)
                 .withMember(member)
                 .exchange()
-                .returnResult(UserDto::class.java)
+                .returnResult<UserDto>()
                 .responseBody!!
 
         assertThat(profile.loginName).isEqualTo(member)
@@ -98,7 +99,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
                 .uri("/api/profile/qr.png")
                 .withMember(member)
                 .exchange()
-                .returnResult(ByteArray::class.java)
+                .returnResult<ByteArray>()
 
         assertThat(result.status.value()).isEqualTo(200)
         assertThat(result.responseHeaders.contentType.toString()).isEqualTo(MediaType.IMAGE_PNG_VALUE)

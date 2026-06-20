@@ -10,6 +10,7 @@ import io.cucumber.java.en.When
 import org.assertj.core.api.Assertions.assertThat
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.client.EntityExchangeResult
+import org.springframework.test.web.servlet.client.returnResult
 import tools.jackson.databind.ObjectMapper
 
 /**
@@ -55,6 +56,6 @@ class CucumberConsumptionSteps(
                 .body(ConsumptionDeltaDto(delta))
                 .withMember(member)
                 .exchange()
-                .returnResult(ByteArray::class.java)
+                .returnResult<ByteArray>()
     }
 }
