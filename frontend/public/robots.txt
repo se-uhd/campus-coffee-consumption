@@ -1,0 +1,4 @@
+# Keep crawlers out of the capability-URL entry point so a secret coffee link is never indexed
+# (per the W3C "Good Practices for Capability URLs"). The path is listed, never individual tokens.
+User-agent: *
+Disallow: /coffee/

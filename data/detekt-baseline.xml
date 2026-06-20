@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ThrowsCount:CrudDataServiceImpl.kt:CrudDataServiceImpl$override fun upsert: DOMAIN</ID>
+  </CurrentIssues>
+</SmellBaseline>
