@@ -1,0 +1,39 @@
+# Qodana configuration — JetBrains' code-quality scanner, which runs the IntelliJ inspection engine
+# headlessly. It complements (does not replace) the fast ktlint/detekt gates in `gradle build`: it catches
+# the idiomatic-Kotlin issues that live only in the IDE inspections — a redundant SAM constructor, a lambda
+# that belongs outside the parentheses, a redundant `public` modifier, unused symbols — none of which
+# ktlint (formatting) or detekt (its default ruleset plus our custom KDoc rules) reports.
+#
+# The CI job is .github/workflows/qodana.yml. Locally: `qodana scan` (needs the Qodana CLI and Docker).
+version: "1.0"
+
+# The free JVM Community linter, which bundles the Java and Kotlin inspections. Pinned to a release tag
+# (not :latest) so a new linter version cannot silently change the findings on an unrelated commit; bump it
+# deliberately, like the other tool pins in the repository.
+linter: jetbrains/qodana-jvm-community:2026.1
+
+# Use the broad `recommended` profile, NOT Qodana's default `starter` profile. `starter` is a curated subset
+# aimed at probable bugs and high-severity issues; the redundant-SAM / move-lambda / redundant-visibility
+# cleanups this job exists to catch are Warning-level style inspections that only `recommended` (which
+# mirrors the IDE's own default profile) enables.
+profile:
+  name: qodana.recommended
+
+# The project targets JDK 25 (the single source of truth is gradle/libs.versions.toml; mise.toml pins the
+# same). Open and resolve the Gradle model with a matching JDK so the type-resolution-dependent inspections
+# actually run — e.g. the redundant SAM-constructor check must know that IdGenerator is a `fun interface`.
+projectJDK: "25"
+
+# --- Enforcement -----------------------------------------------------------------------------------------
+# `failThreshold: 0` makes Qodana a blocking gate: the job exits non-zero when ANY problem is reported above
+# the baseline. This mirrors the repository's detekt-baseline approach (only NEW findings break the build),
+# but it behaves that way only once a baseline is committed:
+#   1. run the job once (the workflow's manual "Run workflow" trigger); it fails the threshold but still
+#      uploads the `qodana-sarif` artifact,
+#   2. download that artifact and commit its `qodana.sarif.json` at the repo root as `qodana.sarif.baseline`,
+#   3. uncomment the `args: --baseline,...` line in the Qodana Scan step of .github/workflows/qodana.yml,
+#      so only problems NOT in the baseline count toward the threshold.
+# Until the baseline is committed, the threshold counts every pre-existing finding, so the first run is red
+# by design. Per-inspection tuning (include/exclude by inspection id, read from the first report) also goes
+# here.
+failThreshold: 0
