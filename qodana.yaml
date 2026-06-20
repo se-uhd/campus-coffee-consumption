@@ -25,15 +25,26 @@ profile:
 projectJDK: "25"
 
 # --- Enforcement -----------------------------------------------------------------------------------------
-# `failThreshold: 0` makes Qodana a blocking gate: the job exits non-zero when ANY problem is reported above
-# the baseline. This mirrors the repository's detekt-baseline approach (only NEW findings break the build),
-# but it behaves that way only once a baseline is committed:
-#   1. run the job once (the workflow's manual "Run workflow" trigger); it fails the threshold but still
-#      uploads the `qodana-sarif` artifact,
-#   2. download that artifact and commit its `qodana.sarif.json` at the repo root as `qodana.sarif.baseline`,
-#   3. uncomment the `args: --baseline,...` line in the Qodana Scan step of .github/workflows/qodana.yml,
-#      so only problems NOT in the baseline count toward the threshold.
-# Until the baseline is committed, the threshold counts every pre-existing finding, so the first run is red
-# by design. Per-inspection tuning (include/exclude by inspection id, read from the first report) also goes
-# here.
+# `failThreshold: 0` makes Qodana a blocking gate: the job fails if ANY problem is reported. With the
+# false-positive inspections excluded below, a clean tree reports zero problems and the job passes, so no
+# baseline is needed. If you later prefer to grandfather a batch of findings instead of excluding a whole
+# inspection, commit a baseline: run the workflow, download the `qodana-sarif` artifact, commit its
+# `qodana.sarif.json` at the repo root as `qodana.sarif.baseline`, and uncomment the `args: --baseline,...`
+# line in the Qodana Scan step of .github/workflows/qodana.yml so only NEW problems count.
 failThreshold: 0
+
+# --- Suppressions (false positives) ----------------------------------------------------------------------
+# The first run reported only these two inspections, both systematic false positives for this project, so
+# they are disabled (rather than grandfathered in a baseline) to keep new occurrences quiet going forward:
+#
+# - UnusedSymbol: the Community linter has no Spring/JPA awareness, so it does not recognize @RestController
+#   endpoint handlers, @Bean factory methods, @Configuration/@ConfigurationProperties classes, or the JPA
+#   @PrePersist/@PreUpdate callbacks as framework entry points, and reported all ~45 of them as "never
+#   used". IntelliJ Ultimate (with the Spring plugin) does not flag these, so disabling the inspection makes
+#   this scan match the IDE. The idiomatic-Kotlin inspections this job exists for are a different rule set
+#   and stay active.
+# - UnstableApiUsage: every occurrence is the Gradle Kotlin DSL's own @Incubating API used in the build
+#   scripts (settings.gradle.kts, build.gradle.kts), which is expected and unavoidable.
+exclude:
+  - name: UnusedSymbol
+  - name: UnstableApiUsage

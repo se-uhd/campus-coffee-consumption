@@ -5,7 +5,11 @@
 # Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
 version: 2
 updates:
-  # Workflow actions in .github/workflows/ (actions/checkout, actions/upload-artifact, jdx/mise-action).
+  # Workflow actions in .github/workflows/ (actions/checkout, actions/upload-artifact, jdx/mise-action,
+  # JetBrains/qodana-action). The wildcard group already covers every `uses:` action, qodana-action
+  # included. Caveat: dependabot bumps the action only — the Qodana linter image pinned in qodana.yaml
+  # (jetbrains/qodana-jvm-community) is not a manifest dependabot parses, so bump that tag by hand to keep
+  # it on the same Qodana release as the action.
   - package-ecosystem: github-actions
     directory: /
     schedule:
