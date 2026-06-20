@@ -1,0 +1,101 @@
+# Version catalog for the CampusCoffeeConsumption Gradle build. Entries without a version are managed by
+# the Spring Boot BOM (imported in campuscoffee.java-conventions).
+[versions]
+# Java major version: the single source of truth for the toolchain. The convention plugins resolve
+# it for the Gradle toolchain and the Kotlin jvmTarget; mise.toml and the Dockerfile pin the same
+# major, and scripts/check-toolchain-versions.sh (run in CI) fails the build if they drift.
+java = "25"
+spring-boot = "4.1.0"
+junit = "6.1.0"
+springdoc = "3.0.3"
+mapstruct = "1.6.3"
+cucumber = "7.34.3"
+archunit = "1.4.2"
+# ZXing for backend QR-code generation (the member capability URL codes); not in the Boot BOM.
+zxing = "3.5.3"
+# Cloud SQL Java connector (postgres socket factory) for the prod datasource URL; not in the Boot BOM.
+cloud-sql = "1.21.0"
+# Testcontainers is not managed by the Boot 4 BOM at these coordinates, so pin it explicitly.
+testcontainers = "1.21.4"
+jacoco = "0.8.13"
+pitest-tool = "1.25.1"
+pitest-junit5 = "1.2.3"
+# Kotlin: >= 2.3.0 is required for jvmTarget 25; overrides the Boot 4 BOM's managed Kotlin stdlib.
+# Pinned to 2.4.0 to match detekt 2.0.0-alpha.5, which requires the exact Kotlin version it was built against.
+kotlin = "2.4.0"
+# Kotlin-friendly Mockito wrappers (whenever, reified any/mock); not managed by the Boot BOM.
+mockito-kotlin = "6.3.0"
+# Gradle plugins
+dependency-management = "1.1.7"
+pitest-plugin = "1.19.0"
+# ktlint: the jlleitschuh Gradle plugin and the ktlint engine version it runs.
+ktlint-plugin = "12.1.2"
+ktlint-tool = "1.5.0"
+# detekt static analysis: the 2.0 alpha is pinned to match the Kotlin version, and gated via `check`.
+detekt = "2.0.0-alpha.5"
+
+[libraries]
+# BOM-managed (version omitted on purpose)
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+# OAuth2 resource server: the JWT (bearer-token) support, including the Nimbus JOSE encoder/decoder.
+spring-boot-starter-oauth2-resource-server = { module = "org.springframework.boot:spring-boot-starter-oauth2-resource-server" }
+# Boot 4 split autoconfiguration into per-technology modules; Flyway's is not pulled by data-jpa.
+spring-boot-flyway = { module = "org.springframework.boot:spring-boot-flyway" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+spring-tx = { module = "org.springframework:spring-tx" }
+# Spring Security crypto: the BCrypt/delegating password encoder. A small, dependency-free artifact used
+# by the data layer's PasswordHasher adapter; version managed by the Boot BOM.
+spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
+postgresql = { module = "org.postgresql:postgresql" }
+flyway-core = { module = "org.flywaydb:flyway-core" }
+flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
+jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin" }
+# Jackson 3 (tools.jackson) Kotlin module for the event sourcing JSON bodies; version from the Jackson 3 BOM.
+jackson3-module-kotlin = { module = "tools.jackson.module:jackson-module-kotlin" }
+assertj-core = { module = "org.assertj:assertj-core" }
+junit-platform-suite = { module = "org.junit.platform:junit-platform-suite" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+mockito-core = { module = "org.mockito:mockito-core" }
+mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version.ref = "mockito-kotlin" }
+
+# Explicitly versioned (not in the BOMs)
+springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+mapstruct = { module = "org.mapstruct:mapstruct", version.ref = "mapstruct" }
+mapstruct-processor = { module = "org.mapstruct:mapstruct-processor", version.ref = "mapstruct" }
+cucumber-java = { module = "io.cucumber:cucumber-java", version.ref = "cucumber" }
+cucumber-junit = { module = "io.cucumber:cucumber-junit", version.ref = "cucumber" }
+cucumber-junit-platform-engine = { module = "io.cucumber:cucumber-junit-platform-engine", version.ref = "cucumber" }
+cucumber-spring = { module = "io.cucumber:cucumber-spring", version.ref = "cucumber" }
+archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
+# ZXing QR-code generation: core builds the bit matrix, javase writes it to a PNG via ImageIO.
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+zxing-javase = { module = "com.google.zxing:javase", version.ref = "zxing" }
+# Cloud SQL connector: TLS + IAM auth for the prod Cloud SQL datasource (the socketFactory in the URL).
+cloud-sql-postgres = { module = "com.google.cloud.sql:postgres-socket-factory", version.ref = "cloud-sql" }
+testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
+
+# Plugin artifacts build-logic depends on so the convention plugins can apply them by id
+spring-boot-gradle-plugin = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "spring-boot" }
+dependency-management-plugin = { module = "io.spring.gradle:dependency-management-plugin", version.ref = "dependency-management" }
+pitest-gradle-plugin = { module = "info.solidsoft.gradle.pitest:gradle-pitest-plugin", version.ref = "pitest-plugin" }
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlin-allopen = { module = "org.jetbrains.kotlin:kotlin-allopen", version.ref = "kotlin" }
+kotlin-noarg = { module = "org.jetbrains.kotlin:kotlin-noarg", version.ref = "kotlin" }
+ktlint-gradle-plugin = { module = "org.jlleitschuh.gradle:ktlint-gradle", version.ref = "ktlint-plugin" }
+detekt-gradle-plugin = { module = "dev.detekt:detekt-gradle-plugin", version.ref = "detekt" }
+
+# detekt rule-authoring API: detekt-api compiles the custom rules in :detekt-rules, detekt-test-utils
+# compiles Kotlin snippets to PSI for their unit tests. Same version as the detekt plugin. (We use
+# detekt-test-utils rather than detekt-test because the latter's alpha metadata requires a detekt-api
+# test-fixtures variant that is not published.)
+detekt-api = { module = "dev.detekt:detekt-api", version.ref = "detekt" }
+detekt-test-utils = { module = "dev.detekt:detekt-test-utils", version.ref = "detekt" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+dependency-management = { id = "io.spring.dependency-management", version.ref = "dependency-management" }

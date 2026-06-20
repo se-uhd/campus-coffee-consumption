@@ -1,0 +1,45 @@
+name: Build CampusCoffeeConsumption
+
+on:
+  push:
+    branches: [ "**" ] # every branch
+
+  pull_request:
+    branches: [ "main" ]
+
+# The build executes third-party Gradle plugins and annotation processors; restrict the token to
+# read-only so a compromised dependency cannot push or modify the repository.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false # no step pushes back to the repository
+
+      - uses: jdx/mise-action@v4
+
+      # Fail fast if the Java major version drifts across the version catalog, mise.toml, and the
+      # Dockerfile before spending time on the full build.
+      - name: Check toolchain versions are consistent
+        run: ./scripts/check-toolchain-versions.sh
+
+      # `gradle build` runs `check`: ktlint, detekt, the tests, and the coverage aggregate report and gate.
+      - name: Build with Gradle
+        run: gradle build
+
+      # Upload even when the build fails, so a failed coverage gate still leaves the report to inspect.
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-coverage-reports
+          path: |
+            coverage/build/reports/jacoco/testCodeCoverageReport/
+            */build/reports/jacoco/
+          if-no-files-found: warn

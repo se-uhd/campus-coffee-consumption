@@ -1,0 +1,104 @@
+spring:
+  application:
+    name: campus-coffee-consumption
+  datasource:
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: true
+    hibernate:
+      # Flyway owns the schema; Hibernate only validates that the entities match it at startup.
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+  web:
+    error:
+      whitelabel:
+        enabled: false
+logging:
+  file:
+    name: campus-coffee-consumption.log
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+# Custom properties; documented in their @ConfigurationProperties classes (AppProperties, IdProperties,
+# JwtProperties, FixturesProperties, CorsProperties, BootstrapAdminProperties), not here.
+campus-coffee:
+  app:
+    # Public origin used to build the capability URLs and QR codes; https in prod (the token never travels
+    # over plain HTTP).
+    base-url: ${CAMPUS_COFFEE_APP_BASE_URL:http://localhost:8080}
+  id:
+    entity-seed: ${CAMPUS_COFFEE_ID_ENTITY_SEED:42}
+    event-seed: ${CAMPUS_COFFEE_ID_EVENT_SEED:100}
+  persistence:
+    events-to-data-on-startup: ${CAMPUS_COFFEE_EVENTS_TO_DATA_ON_STARTUP:false}
+  jwt:
+    secret: ${JWT_SECRET:dev-only-insecure-jwt-secret-change-me-in-production}
+  fixtures:
+    load-on-startup: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:postgresql://localhost:5432/postgres
+    username: postgres
+    password: postgres
+  web:
+    error:
+      include-message: always
+      include-binding-errors: always
+management: # https://docs.spring.io/spring-boot/reference/actuator/endpoints.html
+  # Exposing an endpoint only makes it reachable; the access rules live in SecurityConfig.
+  endpoints:
+    web:
+      exposure:
+        include: health, metrics, env
+  metrics:
+    enable:
+      all: true
+springdoc:
+  api-docs:
+    enabled: true
+    path: /api/api-docs
+  swagger-ui:
+    enabled: true
+    path: /api/swagger-ui.html
+campus-coffee:
+  fixtures:
+    load-on-startup: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    # Cloud SQL via the Java connector (TLS + IAM done by the socket factory; no authorized-networks setup).
+    # The named socket factory ships in the com.google.cloud.sql:postgres-socket-factory runtime dependency
+    # (declared in application/build.gradle.kts).
+    url: "jdbc:postgresql:///postgres?cloudSqlInstance=se-uhd:europe-west3:campus-coffee-consumption&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD} # Secret Manager
+campus-coffee:
+  jwt:
+    secret: ${JWT_SECRET} # required, no fallback
+  fixtures:
+    load-on-startup: false # prod has real members, not fixtures
+  bootstrap-admin: # create one admin on first startup if none exists
+    login-name: ${BOOTSTRAP_ADMIN_LOGIN:}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+    email-address: ${BOOTSTRAP_ADMIN_EMAIL:admin@se.uni-heidelberg.de}
+management:
+  # env is not exposed in prod: even with sensitive values masked it reveals the configuration
+  # structure and property-source names.
+  endpoints:
+    web:
+      exposure:
+        include: health, metrics

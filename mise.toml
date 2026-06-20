@@ -1,0 +1,6 @@
+[tools]
+java = 'temurin-25'
+gradle = '9.5'
+node = '22' # builds the Angular frontend (the Gradle node integration uses this node)
+gcloud = 'latest'
+python = '3.13' # required by some gcloud components
