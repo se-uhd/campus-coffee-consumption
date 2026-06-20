@@ -1,6 +1,6 @@
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
-import de.seuhd.campuscoffee.domain.model.objects.DomainModel
+import de.seuhd.campuscoffee.domain.model.DomainModel
 import de.seuhd.campuscoffee.domain.ports.IdGenerator
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime

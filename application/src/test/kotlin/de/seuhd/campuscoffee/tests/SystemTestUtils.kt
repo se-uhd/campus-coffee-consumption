@@ -2,7 +2,7 @@ package de.seuhd.campuscoffee.tests
 
 import de.seuhd.campuscoffee.api.dtos.TokenRequestDto
 import de.seuhd.campuscoffee.api.dtos.TokenResponseDto
-import de.seuhd.campuscoffee.domain.model.objects.Role
+import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import org.assertj.core.api.Assertions.assertThat
 import org.springframework.http.HttpHeaders

@@ -1,4 +1,4 @@
-package de.seuhd.campuscoffee.domain.model.objects
+package de.seuhd.campuscoffee.domain.model
 
 import java.time.LocalDateTime
 import java.util.UUID

@@ -4,10 +4,10 @@ import de.seuhd.campuscoffee.data.implementations.CoffeeConsumptionDataServiceIm
 import de.seuhd.campuscoffee.data.implementations.UserDataServiceImpl
 import de.seuhd.campuscoffee.domain.exceptions.DuplicationException
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
-import de.seuhd.campuscoffee.domain.model.objects.CoffeeConsumption
-import de.seuhd.campuscoffee.domain.model.objects.Role
-import de.seuhd.campuscoffee.domain.model.objects.User
-import de.seuhd.campuscoffee.domain.model.objects.persistedId
+import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
+import de.seuhd.campuscoffee.domain.model.Role
+import de.seuhd.campuscoffee.domain.model.User
+import de.seuhd.campuscoffee.domain.model.persistedId
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test

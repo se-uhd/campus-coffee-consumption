@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.data.mapper
 
 import de.seuhd.campuscoffee.data.persistence.entities.Entity
-import de.seuhd.campuscoffee.domain.model.objects.DomainModel
+import de.seuhd.campuscoffee.domain.model.DomainModel
 import org.mapstruct.MappingTarget
 
 /**

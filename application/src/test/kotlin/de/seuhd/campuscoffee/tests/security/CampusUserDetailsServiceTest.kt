@@ -1,8 +1,8 @@
 package de.seuhd.campuscoffee.tests.security
 
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
-import de.seuhd.campuscoffee.domain.model.objects.Role
-import de.seuhd.campuscoffee.domain.model.objects.User
+import de.seuhd.campuscoffee.domain.model.Role
+import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.security.CampusUserDetailsService
 import org.assertj.core.api.Assertions.assertThat

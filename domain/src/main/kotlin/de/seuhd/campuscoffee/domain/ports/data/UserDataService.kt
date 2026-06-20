@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.domain.ports.data
 
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
-import de.seuhd.campuscoffee.domain.model.objects.User
+import de.seuhd.campuscoffee.domain.model.User
 import java.util.UUID
 
 /**

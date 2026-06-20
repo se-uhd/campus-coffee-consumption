@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.api.mapper
 
 import de.seuhd.campuscoffee.api.dtos.Dto
-import de.seuhd.campuscoffee.domain.model.objects.DomainModel
+import de.seuhd.campuscoffee.domain.model.DomainModel
 
 /**
  * Generic mapper interface for converting between domain models and DTOs (bidirectional).

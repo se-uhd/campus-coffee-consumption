@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
 import de.seuhd.campuscoffee.data.configuration.IdGeneratorConfiguration
-import de.seuhd.campuscoffee.domain.model.objects.DomainModel
+import de.seuhd.campuscoffee.domain.model.DomainModel
 import de.seuhd.campuscoffee.domain.ports.ActorProvider
 import de.seuhd.campuscoffee.domain.ports.ChangeNoteContext
 import de.seuhd.campuscoffee.domain.ports.IdGenerator

@@ -2,7 +2,7 @@ package de.seuhd.campuscoffee.domain.ports.data
 
 import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
-import de.seuhd.campuscoffee.domain.model.objects.DomainModel
+import de.seuhd.campuscoffee.domain.model.DomainModel
 
 /**
  * Generic port interface for CRUD (Create, Read, Update, Delete) data operations.
