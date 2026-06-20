@@ -1,0 +1,51 @@
+package de.seuhd.campuscoffee.data.persistence.eventsourcing
+
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+import java.util.UUID
+
+/**
+ * Repository for the append-only event log.
+ */
+interface EventRepository : JpaRepository<EventEntity, UUID> {
+    /** All events in append order (by the monotonic [EventEntity.seq]), for replaying the whole log. */
+    fun findAllByOrderBySeqAsc(): List<EventEntity>
+
+    /**
+     * Returns the events for one domain object (matched by the id embedded in the body) of a given type,
+     * newest first, for reading an entity's history from the log. A native query because the match is on
+     * the `jsonb` body's `id` (indexed by `idx_events_body_id`), which JPQL cannot express.
+     *
+     * @param entityType the entity type label (the domain class's simple name)
+     * @param bodyId     the domain object's id as it appears in the body (its string form)
+     * @param limit      the maximum number of events to return
+     * @param offset     the number of events to skip from the newest (for paging)
+     */
+    @Query(
+        value =
+            "SELECT * FROM events WHERE entity_type = :entityType AND body ->> 'id' = :bodyId " +
+                "ORDER BY seq DESC LIMIT :limit OFFSET :offset",
+        nativeQuery = true
+    )
+    fun findHistory(
+        @Param("entityType") entityType: String,
+        @Param("bodyId") bodyId: String,
+        @Param("limit") limit: Int,
+        @Param("offset") offset: Int
+    ): List<EventEntity>
+
+    /**
+     * Whether the log already holds at least one event for the given domain type, so the import can skip it.
+     *
+     * @param entityType the entity type label (the domain class's simple name)
+     */
+    fun existsByEntityType(entityType: String): Boolean
+
+    /**
+     * Removes every event for the given domain type, when clearing that type's data.
+     *
+     * @param entityType the entity type label (the domain class's simple name)
+     */
+    fun deleteByEntityType(entityType: String)
+}

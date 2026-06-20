@@ -1,0 +1,38 @@
+# Dependabot keeps the GitHub Actions, Gradle (Kotlin/Java) dependencies, and the Dockerfile base
+# images current. Most versions live in the gradle/libs.versions.toml catalog, which the gradle
+# ecosystem updates (BOM-managed dependencies without an explicit version follow the Spring Boot BOM
+# and are not bumped here).
+# Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
+version: 2
+updates:
+  # Workflow actions in .github/workflows/ (actions/checkout, actions/upload-artifact, jdx/mise-action).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # Gradle dependencies and plugins, resolved from the version catalog (covers the root build and
+  # the build-logic convention plugins, which reference the same catalog).
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Bundle minor and patch bumps into one PR; major upgrades get their own PR for careful review.
+      gradle-minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # Dockerfile base images. Only the build-stage jdxcode/mise image is bumped here; its version is the
+  # mise tool version, independent of the bundled JDK. The runtime stage's eclipse-temurin tag is the
+  # hand-maintained Java pin (kept in sync with the version catalog and mise.toml by
+  # scripts/check-toolchain-versions.sh), so it is ignored to keep that single source of truth intact.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: eclipse-temurin

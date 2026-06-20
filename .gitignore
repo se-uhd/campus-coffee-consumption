@@ -1,0 +1,94 @@
+######################
+# OS generated files #
+######################
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+#Icon?
+ehthumbs.db
+Thumbs.db
+
+##############
+# Java/Scala #
+##############
+*.class
+
+##########################
+# Webstorm/IntelliJ IDEA #
+##########################
+.idea/
+*.iml
+# IntelliJ compile output, and where `gcloud run compose up` writes the generated Cloud Run service manifest
+out/
+
+######################
+# Visual Studio Code #
+######################
+.vscode/
+
+#########
+# Excel #
+#########
+~$*
+
+###########
+# RStudio #
+###########
+.Rhistory
+.RData
+
+#########
+# Maven #
+##########
+target/
+
+##########
+# Gradle #
+##########
+.gradle/
+build/
+# Gradle is provisioned via mise, not a wrapper; ignore IDE-generated wrapper files.
+gradlew
+gradlew.bat
+gradle/wrapper/
+
+####################
+# Node.js, Angular #
+####################
+
+# Compiled output
+#frontend/dist
+#application/src/main/resources/static
+
+# Node
+#frontend/node
+#frontend/node_modules
+#frontend/npm-debug.log
+
+# Angular
+#frontend/.angular/cache
+
+###############
+# Claude Code #
+###############
+.claude/
+
+########
+# Misc #
+########
+*.log
+*.log.*
+*.lck
+campus-coffee-service.yaml
+
+#############
+# AI slop   #
+#############
+ai-slop-report.md
+
+# Cloud Run deploy secrets (local, never committed)
+deploy.env
+.env

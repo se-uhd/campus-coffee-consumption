@@ -1,0 +1,14 @@
+# Keep the Docker build context small and reproducible: the image builds the app from source with
+# Gradle, so local build outputs, caches, VCS, IDE, and docs are not needed.
+.git
+.gitignore
+.gradle
+**/.gradle
+build
+**/build
+.idea
+*.iml
+doc
+*.log
+deploy.env
+.env

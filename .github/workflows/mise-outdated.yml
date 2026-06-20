@@ -1,0 +1,57 @@
+# Dependabot has no mise ecosystem, so this checks the mise-managed tools (the JDK, Gradle, gcloud, and
+# python pinned in mise.toml): each week it runs `mise outdated` and opens (or updates) an issue when a
+# tool is behind. It only notifies; bump the pins in mise.toml by hand.
+name: mise outdated
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC
+  workflow_dispatch: {} # allow manual runs
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  outdated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: jdx/mise-action@v4
+        with:
+          install: false # only mise itself is needed; `mise outdated` does not need the tools installed
+
+      - name: Report outdated tools as an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # capture the exit code explicitly: a failing `mise outdated` (network error, regression in a
+          # newer mise) must fail the workflow visibly instead of being mistaken for "all up to date"
+          set +e
+          report="$(mise outdated)"
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ] && [ -z "$report" ]; then
+            echo "::error::mise outdated failed with exit code $status and produced no report."
+            exit 1
+          fi
+          if [ -z "$report" ]; then
+            echo "All mise tools are up to date."
+            exit 0
+          fi
+          echo "Outdated tools:"
+          echo "$report"
+
+          gh label create mise-outdated --color FBCA04 \
+            --description "Outdated mise-managed tools" --force
+
+          body="$(printf '`mise outdated` reports tools behind their latest versions:\n\n```\n%s\n```\n\nBump the pins in `mise.toml`, then run `mise install`. This issue is refreshed weekly.' "$report")"
+
+          existing="$(gh issue list --label mise-outdated --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body "$body"
+            echo "Updated issue #$existing"
+          else
+            gh issue create --title "mise: outdated tools" --label mise-outdated --body "$body"
+          fi
