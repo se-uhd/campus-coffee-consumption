@@ -60,7 +60,7 @@ object SystemTestUtils {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(TokenRequestDto(loginName, password))
                 .exchange()
-                .returnResult(TokenResponseDto::class.java)
+                .returnResult<TokenResponseDto>()
         assertThat(result.status.value()).isEqualTo(200)
         return result.responseBody!!.token
     }

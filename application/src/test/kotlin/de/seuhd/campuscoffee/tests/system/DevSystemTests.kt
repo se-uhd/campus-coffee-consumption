@@ -41,7 +41,7 @@ class DevSystemTests {
             .get()
             .uri("/api/dev/data")
             .exchange()
-            .returnResult(DevSummaryDto::class.java)
+            .returnResult<DevSummaryDto>()
             .responseBody!!
 
     @Test
@@ -59,7 +59,7 @@ class DevSystemTests {
                 .put()
                 .uri("/api/dev/data")
                 .exchange()
-                .returnResult(DevSummaryDto::class.java)
+                .returnResult<DevSummaryDto>()
 
         assertThat(result.status.value()).isEqualTo(200)
         assertThat(result.responseBody!!.users).isEqualTo(5)
@@ -81,7 +81,7 @@ class DevSystemTests {
                 .get()
                 .uri("/api/api-docs")
                 .exchange()
-                .returnResult(String::class.java)
+                .returnResult<String>()
 
         assertThat(result.status.value()).isEqualTo(200)
         assertThat(result.responseBody!!).contains("openapi").contains("/consumption")

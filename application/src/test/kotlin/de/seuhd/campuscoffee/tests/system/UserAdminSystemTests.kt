@@ -10,6 +10,7 @@ import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
+import org.springframework.test.web.servlet.client.returnResult
 import java.util.UUID
 
 /**
@@ -26,7 +27,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
             .accept(MediaType.APPLICATION_JSON)
             .withAdmin()
             .exchange()
-            .returnResult(ConsumptionDto::class.java)
+            .returnResult<ConsumptionDto>()
             .responseBody!!
 
     @Test
@@ -49,7 +50,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .body(body)
                 .withAdmin()
                 .exchange()
-                .returnResult(UserDto::class.java)
+                .returnResult<UserDto>()
 
         assertThat(result.status.value()).isEqualTo(201)
         assertThat(result.responseBody!!.capabilityUrl).contains("/coffee/")
@@ -74,7 +75,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .body(body)
                 .withAdmin()
                 .exchange()
-                .returnResult(UserDto::class.java)
+                .returnResult<UserDto>()
                 .responseBody!!
 
         // delete succeeds (the user_id FK cascades the member's consumption row away)
@@ -84,7 +85,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .uri("/api/users/{id}", created.persistedId)
                 .withAdmin()
                 .exchange()
-                .returnResult(Void::class.java)
+                .returnResult<Void>()
         assertThat(delete.status.value()).isEqualTo(204)
 
         // the member is gone
@@ -95,7 +96,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .accept(MediaType.APPLICATION_JSON)
                 .withAdmin()
                 .exchange()
-                .returnResult(UserDto::class.java)
+                .returnResult<UserDto>()
         assertThat(afterGet.status.value()).isEqualTo(404)
     }
 
@@ -108,7 +109,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .accept(MediaType.APPLICATION_JSON)
                 .withAdmin()
                 .exchange()
-                .returnResult(Array<UserDto>::class.java)
+                .returnResult<Array<UserDto>>()
 
         assertThat(result.status.value()).isEqualTo(200)
         assertThat(result.responseBody!!).hasSize(5)
@@ -123,7 +124,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .accept(MediaType.APPLICATION_JSON)
                 .withAdmin()
                 .exchange()
-                .returnResult(UserDto::class.java)
+                .returnResult<UserDto>()
 
         assertThat(result.responseBody!!.loginName).isEqualTo("jane_doe")
     }
@@ -150,7 +151,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .body(body)
                 .withAdmin()
                 .exchange()
-                .returnResult(UserDto::class.java)
+                .returnResult<UserDto>()
 
         assertThat(result.status.value()).isEqualTo(200)
         assertThat(result.responseBody!!.active).isFalse()
@@ -166,7 +167,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .accept(MediaType.APPLICATION_JSON)
                 .withAdmin()
                 .exchange()
-                .returnResult(UserDto::class.java)
+                .returnResult<UserDto>()
                 .responseBody!!
                 .capabilityUrl
 
@@ -176,7 +177,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .uri("/api/users/{id}/link/rotate", id)
                 .withAdmin()
                 .exchange()
-                .returnResult(UserDto::class.java)
+                .returnResult<UserDto>()
                 .responseBody!!
                 .capabilityUrl
 
@@ -192,7 +193,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .uri("/api/users/{id}/qr.png", memberId())
                 .withAdmin()
                 .exchange()
-                .returnResult(ByteArray::class.java)
+                .returnResult<ByteArray>()
 
         assertThat(result.status.value()).isEqualTo(200)
         assertThat(result.responseHeaders.contentType.toString()).isEqualTo(MediaType.IMAGE_PNG_VALUE)
@@ -210,7 +211,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .body(ConsumptionDeltaDto(1))
                 .withAdmin()
                 .exchange()
-                .returnResult(ConsumptionDto::class.java)
+                .returnResult<ConsumptionDto>()
 
         assertThat(result.responseBody!!.total).isEqualTo(1)
     }
@@ -233,7 +234,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .body(ConsumptionDeltaDto(-1))
                 .withAdmin()
                 .exchange()
-                .returnResult(ConsumptionDto::class.java)
+                .returnResult<ConsumptionDto>()
                 .responseBody!!
 
         assertThat(afterDecrement.total).isEqualTo(0)
