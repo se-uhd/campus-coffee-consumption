@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.api.dtos
 
 import com.fasterxml.jackson.annotation.JsonProperty
-import de.seuhd.campuscoffee.domain.model.objects.Role
+import de.seuhd.campuscoffee.domain.model.Role
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Pattern
@@ -12,7 +12,7 @@ import java.util.UUID
 /**
  * DTO for user metadata. Properties are nullable, so a request body that omits a field deserializes and
  * is then rejected by bean validation; the controller validates the DTO before it is mapped to a
- * [de.seuhd.campuscoffee.domain.model.objects.User].
+ * [de.seuhd.campuscoffee.domain.model.User].
  *
  * [password] is write-only and applies only to an admin: it is required (at least 8 characters) when
  * creating or promoting an admin, and a member (USER) never has one — a member authenticates solely with

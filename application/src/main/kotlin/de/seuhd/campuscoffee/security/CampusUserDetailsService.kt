@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.security
 
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
-import de.seuhd.campuscoffee.domain.model.objects.Role
+import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.userdetails.UserDetails

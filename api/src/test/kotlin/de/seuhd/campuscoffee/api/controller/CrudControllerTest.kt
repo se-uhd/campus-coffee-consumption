@@ -2,7 +2,7 @@ package de.seuhd.campuscoffee.api.controller
 
 import de.seuhd.campuscoffee.api.dtos.Dto
 import de.seuhd.campuscoffee.api.mapper.DtoMapper
-import de.seuhd.campuscoffee.domain.model.objects.DomainModel
+import de.seuhd.campuscoffee.domain.model.DomainModel
 import de.seuhd.campuscoffee.domain.ports.api.CrudService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy

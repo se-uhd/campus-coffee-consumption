@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.data.mapper
 
 import de.seuhd.campuscoffee.data.persistence.entities.UserEntity
-import de.seuhd.campuscoffee.domain.model.objects.User
+import de.seuhd.campuscoffee.domain.model.User
 import org.mapstruct.Mapper
 import org.mapstruct.Mapping
 import org.mapstruct.MappingTarget

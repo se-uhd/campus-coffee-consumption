@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
-import de.seuhd.campuscoffee.domain.model.objects.CoffeeConsumption
-import de.seuhd.campuscoffee.domain.model.objects.ConsumptionChange
+import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
+import de.seuhd.campuscoffee.domain.model.ConsumptionChange
 import de.seuhd.campuscoffee.domain.ports.data.ConsumptionHistoryDataService
 import org.springframework.stereotype.Service
 import java.util.UUID
