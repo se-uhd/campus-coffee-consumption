@@ -28,7 +28,7 @@ jobs:
       checks: write        # publish findings as check-run annotations (used on push, where there is no PR)
       actions: read        # let the action read this workflow run for its status report (telemetry)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # Qodana diffs the change against the base ref to label problems as new vs. pre-existing, so it
           # needs full history, mirroring build.yml.
