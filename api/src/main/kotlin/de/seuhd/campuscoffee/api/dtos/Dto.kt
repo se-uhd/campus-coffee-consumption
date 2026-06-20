@@ -1,6 +1,6 @@
 package de.seuhd.campuscoffee.api.dtos
 
-import de.seuhd.campuscoffee.domain.model.objects.Identifiable
+import de.seuhd.campuscoffee.domain.model.Identifiable
 
 /**
  * Marker interface for Data Transfer Objects (DTOs) that have an identifier. Extends [Identifiable]

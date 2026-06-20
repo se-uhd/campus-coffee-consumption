@@ -1,8 +1,8 @@
 package de.seuhd.campuscoffee
 
 import de.seuhd.campuscoffee.configuration.BootstrapAdminProperties
-import de.seuhd.campuscoffee.domain.model.objects.Role
-import de.seuhd.campuscoffee.domain.model.objects.User
+import de.seuhd.campuscoffee.domain.model.Role
+import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import org.junit.jupiter.api.Test

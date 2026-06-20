@@ -1,6 +1,6 @@
 package de.seuhd.campuscoffee.api.capability
 
-import de.seuhd.campuscoffee.domain.model.objects.User
+import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.QrCodeGenerator
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity

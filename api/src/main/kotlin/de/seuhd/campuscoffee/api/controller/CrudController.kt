@@ -2,8 +2,8 @@ package de.seuhd.campuscoffee.api.controller
 
 import de.seuhd.campuscoffee.api.dtos.Dto
 import de.seuhd.campuscoffee.api.mapper.DtoMapper
-import de.seuhd.campuscoffee.domain.model.objects.DomainModel
-import de.seuhd.campuscoffee.domain.model.objects.persistedId
+import de.seuhd.campuscoffee.domain.model.DomainModel
+import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.CrudService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder

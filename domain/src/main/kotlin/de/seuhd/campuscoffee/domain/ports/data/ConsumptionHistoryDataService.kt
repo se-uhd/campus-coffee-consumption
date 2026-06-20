@@ -1,6 +1,6 @@
 package de.seuhd.campuscoffee.domain.ports.data
 
-import de.seuhd.campuscoffee.domain.model.objects.ConsumptionChange
+import de.seuhd.campuscoffee.domain.model.ConsumptionChange
 import java.util.UUID
 
 /**

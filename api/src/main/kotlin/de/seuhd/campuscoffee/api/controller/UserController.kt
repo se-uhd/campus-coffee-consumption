@@ -15,8 +15,8 @@ import de.seuhd.campuscoffee.api.openapi.Operation.GET_BY_ID
 import de.seuhd.campuscoffee.api.openapi.Operation.UPDATE
 import de.seuhd.campuscoffee.api.openapi.Resource.USER
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
-import de.seuhd.campuscoffee.domain.model.objects.User
-import de.seuhd.campuscoffee.domain.model.objects.persistedId
+import de.seuhd.campuscoffee.domain.model.User
+import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.CrudService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import io.swagger.v3.oas.annotations.Operation

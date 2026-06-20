@@ -29,6 +29,10 @@ jobs:
       - name: Check toolchain versions are consistent
         run: ./scripts/check-toolchain-versions.sh
 
+      # Fail fast if the Gradle build version drifts from the latest CHANGELOG.md version.
+      - name: Check version is in sync with the changelog
+        run: ./scripts/check-version-sync.sh
+
       # `gradle build` runs `check`: ktlint, detekt, the tests, and the coverage aggregate report and gate.
       - name: Build with Gradle
         run: gradle build
