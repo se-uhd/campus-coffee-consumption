@@ -1,0 +1,6 @@
+# Angular / Node build artifacts (the Gradle build runs npm and copies dist into the backend static dir)
+/node_modules
+/dist
+/out-tsc
+/.angular
+npm-debug.log

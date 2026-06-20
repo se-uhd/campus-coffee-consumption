@@ -1,0 +1,47 @@
+name: campus-coffee-consumption
+
+services:
+  app:
+    # `gcloud beta run compose up` builds this from source via Cloud Build (no prebuilt image to
+    # pull); local `docker compose up` builds the same context from the Dockerfile.
+    build:
+      context: .
+    container_name: campus-coffee-consumption-app-dev
+    networks:
+      - campus-coffee-net
+    ports:
+      - '8080:8080'
+    # wait until Postgres accepts connections: the app runs Flyway at startup and exits permanently
+    # when the database is still initializing (typical on the first `docker compose up`)
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+    environment:
+      # DB_HOST defaults to localhost for Cloud Run: `gcloud run compose up` deploys the app and db as
+      # sidecar containers in one service that share a network namespace and talk over localhost (no
+      # service-name DNS, unlike Docker Compose). Local Docker Compose reaches the db by its service
+      # name, so run it as: DB_HOST=db docker compose up
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://${DB_HOST:-localhost}:5432/postgres
+      - SPRING_PROFILES_ACTIVE=dev
+      # Event sourcing is the only persistence mode; this opt-in flag rebuilds the read tables from the log.
+      - CAMPUS_COFFEE_EVENTS_TO_DATA_ON_STARTUP=${CAMPUS_COFFEE_EVENTS_TO_DATA_ON_STARTUP:-false}
+
+  db:
+    image: 'postgres:18-alpine'
+    container_name: db
+    networks:
+      - campus-coffee-net
+    ports:
+      - '5432:5432'
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+networks:
+  campus-coffee-net:
