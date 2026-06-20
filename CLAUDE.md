@@ -258,6 +258,21 @@ Dependencies and tools are kept current automatically:
   dependencies and plugins (resolved from the `libs.versions.toml` catalog).
 - A weekly **`mise-outdated`** workflow opens or updates an issue when the mise-managed tools fall behind.
 
+## Versioning and Releases
+
+The project follows [Semantic Versioning](https://semver.org/) and keeps a [Keep a Changelog](https://keepachangelog.com/)-style `CHANGELOG.md`.
+
+- **Every notable change updates `CHANGELOG.md`** under the appropriate version header (`Added` / `Changed` /
+  `Fixed` / etc.). Patch bump for tooling, CI, and internal cleanups; minor for features; major for
+  breaking changes.
+- **`version` in the root `gradle.properties` is the single source of truth** (applied to every module's
+  `project.version`). The newest `## [x.y.z]` release header in `CHANGELOG.md` must equal it — enforced by
+  `scripts/check-version-sync.sh`, a `build.yml` CI step that fails the build on drift.
+- **Every released version is tagged.** Create an annotated git tag `vX.Y.Z` on the release commit (the one
+  that sets the version and adds the changelog entry) and push it: `git tag -a vX.Y.Z -m "vX.Y.Z" && git
+  push origin vX.Y.Z`. Add the matching `[x.y.z]: …/releases/tag/vX.Y.Z` link reference at the bottom of
+  `CHANGELOG.md`. No workflow triggers on tags, so pushing a tag does not run CI.
+
 ## Database
 
 - **Database**: PostgreSQL 18.

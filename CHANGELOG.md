@@ -11,6 +11,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Qodana CI job (`.github/workflows/qodana.yml`), a separate workflow from the Gradle build that runs
+  JetBrains Qodana — the free JVM Community linter with the `qodana.recommended` profile — to catch the
+  idiomatic-Kotlin issues the IDE's default inspections flag but ktlint and detekt do not. It opens the
+  project with JDK 25, fails on any problem (`failThreshold: 0`), uploads the report as a `qodana-sarif`
+  artifact, and suppresses two systematic false positives for this project: `UnusedSymbol` (the Community
+  linter does not recognize Spring/JPA framework entry points) and `UnstableApiUsage` (the Gradle Kotlin
+  DSL's `@Incubating` API in the build scripts).
 - Project-version drift guard. A new `scripts/check-version-sync.sh` (mirroring
   `scripts/check-toolchain-versions.sh`) fails the build when the latest `## [x.y.z]` header in this
   changelog disagrees with the Gradle build version; it runs as a CI step in `build.yml` before the
@@ -25,6 +32,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Flatten the `de.seuhd.campuscoffee.domain.model.objects` package into `de.seuhd.campuscoffee.domain.model`.
   The `objects` subpackage was vestigial — the counterpart of the upstream CampusCoffee `model.enums`
   subpackage, which this project dropped — so the domain model objects now live directly in `domain.model`.
+- Apply idiomatic-Kotlin cleanups in the test sources: reified `returnResult<T>()` instead of
+  `returnResult(T::class.java)`, and trailing lambdas instead of a redundant SAM constructor and a
+  parenthesized lambda argument.
+- Give the frontend `npm` Gradle tasks (`frontendInstall`, `frontendBuild`) descriptions so they appear
+  in `gradle tasks`.
+- Document the versioning and release process in `CLAUDE.md` (SemVer, the `CHANGELOG.md` ↔
+  `gradle.properties` version sync, and a `vX.Y.Z` git tag per release).
+- Bump dependencies: ZXing 3.5.3 → 3.5.4 and the Cloud SQL connector 1.21.0 → 1.28.4 (Dependabot), and
+  the `actions/checkout` GitHub Action v6 → v7.
 
 ## [0.1.0] - 2026-06-20
 
@@ -69,4 +85,5 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.1.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.1.1
 [0.1.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.1.0
