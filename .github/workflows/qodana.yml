@@ -24,8 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write   # let the action post the inspection summary as a PR comment
-      security-events: write # upload the SARIF report to the repository's Code scanning tab
+      pull-requests: write # post the inspection summary as a PR comment (when triggered by a PR)
+      checks: write        # publish findings as check-run annotations (used on push, where there is no PR)
+      actions: read        # let the action read this workflow run for its status report (telemetry)
     steps:
       - uses: actions/checkout@v6
         with:
@@ -46,20 +47,16 @@ jobs:
           # Qodana Cloud and enables its server-side quality gate; the PR comment and SARIF work without it.
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
 
-      - name: Upload Qodana results to code scanning
-        # Upload even when the scan reports problems, so the findings always reach the Security tab. Needs
-        # GitHub code scanning, which is free for public repositories (GHAS for private ones); drop this
-        # step if code scanning is unavailable — the PR summary comment still reports the findings.
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
+      # No code-scanning upload: this is a private repo without GitHub Advanced Security, so
+      # github/codeql-action/upload-sarif cannot push to the Security tab (it 403s with "Resource not
+      # accessible by integration"). Qodana surfaces findings as check-run annotations (the checks: write
+      # permission) and the full report is kept as the artifact below. If GHAS is enabled later, re-add that
+      # step with `security-events: write` — and use codeql-action@v4 (v3 is deprecated and runs on Node 20).
 
       - name: Upload Qodana SARIF as an artifact
-        # Makes the SARIF downloadable from the run as a file (not just the Security tab). Run this workflow
-        # manually (the Run workflow button), download the `qodana-sarif` artifact, and commit it at the repo
-        # root as qodana.sarif.baseline to seed the baseline (see qodana.yaml). `if: always()` so the first,
-        # threshold-failing run still yields the file.
+        # Keeps the full SARIF report downloadable from the run for inspection (and to seed a baseline later
+        # if you choose to grandfather findings instead of excluding an inspection; see qodana.yaml).
+        # `if: always()` so a run that fails the threshold still yields the file.
         if: always()
         uses: actions/upload-artifact@v7
         with:
