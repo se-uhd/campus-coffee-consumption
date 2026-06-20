@@ -5,9 +5,9 @@ import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
-import de.seuhd.campuscoffee.domain.model.objects.CoffeeConsumption
-import de.seuhd.campuscoffee.domain.model.objects.ConsumptionChange
-import de.seuhd.campuscoffee.domain.model.objects.User
+import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
+import de.seuhd.campuscoffee.domain.model.ConsumptionChange
+import de.seuhd.campuscoffee.domain.model.User
 import java.util.UUID
 
 /**

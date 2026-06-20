@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.domain.implementation
 
 import de.seuhd.campuscoffee.domain.exceptions.DuplicationException
-import de.seuhd.campuscoffee.domain.model.objects.DomainModel
+import de.seuhd.campuscoffee.domain.model.DomainModel
 import de.seuhd.campuscoffee.domain.ports.api.CrudService
 import de.seuhd.campuscoffee.domain.ports.data.CrudDataService
 import org.slf4j.LoggerFactory

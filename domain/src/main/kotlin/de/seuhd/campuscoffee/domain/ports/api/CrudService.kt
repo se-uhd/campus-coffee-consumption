@@ -3,7 +3,7 @@ package de.seuhd.campuscoffee.domain.ports.api
 import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
 import de.seuhd.campuscoffee.domain.exceptions.DuplicationException
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
-import de.seuhd.campuscoffee.domain.model.objects.DomainModel
+import de.seuhd.campuscoffee.domain.model.DomainModel
 
 /**
  * Generic service interface providing common CRUD operations.

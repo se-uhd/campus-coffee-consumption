@@ -2,9 +2,9 @@ package de.seuhd.campuscoffee.domain.implementation
 
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.MissingFieldException
-import de.seuhd.campuscoffee.domain.model.objects.Role
-import de.seuhd.campuscoffee.domain.model.objects.User
-import de.seuhd.campuscoffee.domain.model.objects.persistedId
+import de.seuhd.campuscoffee.domain.model.Role
+import de.seuhd.campuscoffee.domain.model.User
+import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.CapabilityTokenGenerator
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.UserService

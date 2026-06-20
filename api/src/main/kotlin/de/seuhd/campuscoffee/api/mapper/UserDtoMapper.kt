@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.api.mapper
 
 import de.seuhd.campuscoffee.api.dtos.UserDto
-import de.seuhd.campuscoffee.domain.model.objects.User
+import de.seuhd.campuscoffee.domain.model.User
 import org.mapstruct.Mapper
 import org.mapstruct.Mapping
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean

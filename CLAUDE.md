@@ -461,7 +461,7 @@ Custom OpenAPI annotations in `api/.../openapi/`: `@CrudOperation` for common CR
 
 ### Adding a New Entity
 
-1. Create the domain model in `domain/.../model/objects/`.
+1. Create the domain model in `domain/.../model/`.
 2. Create the service interface in `domain/.../ports/api/` (extend `CrudService<DOMAIN, ID>`).
 3. Create the data service interface in `domain/.../ports/data/` (extend `CrudDataService<DOMAIN, ID>`).
 4. Create the service implementation in `domain/.../implementation/` (extend `CrudServiceImpl<DOMAIN, ID>`).

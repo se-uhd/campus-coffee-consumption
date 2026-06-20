@@ -13,7 +13,7 @@ import org.springframework.web.filter.OncePerRequestFilter
 
 /**
  * Authenticates a member by their secret capability token. Reads the `X-Coffee-Token` header, resolves it
- * to a [de.seuhd.campuscoffee.domain.model.objects.User] via [UserService.findByCapabilityToken], and on a
+ * to a [de.seuhd.campuscoffee.domain.model.User] via [UserService.findByCapabilityToken], and on a
  * match sets a `ROLE_USER` principal (the member's login name) on the security context. The capability
  * principal is **always** `ROLE_USER`, never `ROLE_ADMIN`, so an admin's own token grants only
  * self-service, and admin operations require the JWT instead.

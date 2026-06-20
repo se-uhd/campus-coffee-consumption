@@ -2,7 +2,7 @@ package de.seuhd.campuscoffee.api.mapper
 
 import de.seuhd.campuscoffee.api.dtos.ConsumptionChangeDto
 import de.seuhd.campuscoffee.api.dtos.ConsumptionDto
-import de.seuhd.campuscoffee.domain.model.objects.ConsumptionChange
+import de.seuhd.campuscoffee.domain.model.ConsumptionChange
 import org.mapstruct.Mapper
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 

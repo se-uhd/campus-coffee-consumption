@@ -15,10 +15,9 @@ plugins {
 val libs = the<VersionCatalogsExtension>().named("libs")
 val javaVersion = libs.findVersion("java").get().requiredVersion
 
-group = "de.seuhd.campuscoffee"
-// 0.1.0 is the initial CampusCoffeeConsumption release (a new project derived from CampusCoffee, with
-// its own changelog line starting at 0.1.0).
-version = "0.1.0"
+// project.group and project.version come from the root gradle.properties (`group`/`version`); that
+// version is the source of truth, and the latest CHANGELOG.md release header must match it, enforced by
+// scripts/check-version-sync.sh in CI.
 
 // Align the Kotlin stdlib/reflect with the Kotlin plugin version (Boot 4 manages an older stdlib;
 // the plugin needs >= 2.3 for jvmTarget 25).

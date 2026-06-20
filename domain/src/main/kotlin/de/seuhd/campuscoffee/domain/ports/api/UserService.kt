@@ -2,7 +2,7 @@ package de.seuhd.campuscoffee.domain.ports.api
 
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
-import de.seuhd.campuscoffee.domain.model.objects.User
+import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import java.util.UUID
 
@@ -70,7 +70,7 @@ interface UserService : CrudService<User, UUID> {
     /**
      * Creates a new user on behalf of an admin [actingUser]. The service assigns a fresh, unguessable
      * capability token, honors the requested [User.role], and creates the user's
-     * [de.seuhd.campuscoffee.domain.model.objects.CoffeeConsumption] at `count = 0`. A password applies
+     * [de.seuhd.campuscoffee.domain.model.CoffeeConsumption] at `count = 0`. A password applies
      * only to an admin: creating an `ADMIN` requires one (it is hashed), while a member (`USER`) gets none
      * and authenticates solely with their capability token (any password sent for a member is ignored).
      *

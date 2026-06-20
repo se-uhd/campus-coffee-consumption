@@ -1,4 +1,4 @@
-package de.seuhd.campuscoffee.domain.model.objects
+package de.seuhd.campuscoffee.domain.model
 
 /**
  * Authorization role a user holds. The consumption tracker needs only two levels (CampusCoffee's

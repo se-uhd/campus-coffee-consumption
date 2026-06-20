@@ -1,4 +1,4 @@
-package de.seuhd.campuscoffee.domain.model.objects
+package de.seuhd.campuscoffee.domain.model
 
 /**
  * Domain objects and DTOs that carry an identifier. Enables generic CRUD operations in the base

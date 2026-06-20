@@ -1,6 +1,6 @@
 package de.seuhd.campuscoffee.data.persistence.entities
 
-import de.seuhd.campuscoffee.domain.model.objects.Role
+import de.seuhd.campuscoffee.domain.model.Role
 import jakarta.persistence.Column
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated

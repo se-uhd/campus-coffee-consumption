@@ -5,7 +5,7 @@ import de.seuhd.campuscoffee.data.mapper.CoffeeConsumptionEntityMapper
 import de.seuhd.campuscoffee.data.persistence.entities.CoffeeConsumptionEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeConsumptionRepository
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
-import de.seuhd.campuscoffee.domain.model.objects.CoffeeConsumption
+import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.ports.IdGenerator
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import org.springframework.stereotype.Service

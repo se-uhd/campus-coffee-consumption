@@ -1,8 +1,8 @@
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import de.seuhd.campuscoffee.domain.model.objects.CoffeeConsumption
-import de.seuhd.campuscoffee.domain.model.objects.User
+import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
+import de.seuhd.campuscoffee.domain.model.User
 import tools.jackson.core.JsonGenerator
 import tools.jackson.databind.SerializationContext
 import tools.jackson.databind.ValueSerializer

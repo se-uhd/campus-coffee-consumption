@@ -5,6 +5,27 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.1.1] - 2026-06-21
+
+### Added
+
+- Project-version drift guard. A new `scripts/check-version-sync.sh` (mirroring
+  `scripts/check-toolchain-versions.sh`) fails the build when the latest `## [x.y.z]` header in this
+  changelog disagrees with the Gradle build version; it runs as a CI step in `build.yml` before the
+  Gradle build.
+
+### Changed
+
+- Move the project `group` and `version` to the root `gradle.properties` (Gradle's `project.group` /
+  `project.version`, applied to every module) and out of the `java-conventions` build-logic plugin. The
+  `version` in `gradle.properties` is the single source of truth, and the latest changelog release header
+  must match it (enforced by `scripts/check-version-sync.sh`).
+- Flatten the `de.seuhd.campuscoffee.domain.model.objects` package into `de.seuhd.campuscoffee.domain.model`.
+  The `objects` subpackage was vestigial — the counterpart of the upstream CampusCoffee `model.enums`
+  subpackage, which this project dropped — so the domain model objects now live directly in `domain.model`.
+
 ## [0.1.0] - 2026-06-20
 
 Initial release of CampusCoffeeConsumption, the coffee-consumption tracker for SE@UHD. The app was derived

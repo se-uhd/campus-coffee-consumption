@@ -4,7 +4,7 @@ import de.seuhd.campuscoffee.api.dtos.ConsumptionDeltaDto
 import de.seuhd.campuscoffee.api.dtos.ConsumptionDto
 import de.seuhd.campuscoffee.api.dtos.ConsumptionOverrideDto
 import de.seuhd.campuscoffee.api.dtos.UserDto
-import de.seuhd.campuscoffee.domain.model.objects.persistedId
+import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
 import org.assertj.core.api.Assertions.assertThat

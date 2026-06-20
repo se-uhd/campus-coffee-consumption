@@ -5,8 +5,8 @@ import de.seuhd.campuscoffee.api.capability.CapabilityUrlFactory
 import de.seuhd.campuscoffee.api.dtos.UserDto
 import de.seuhd.campuscoffee.api.mapper.UserDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
-import de.seuhd.campuscoffee.domain.model.objects.User
-import de.seuhd.campuscoffee.domain.model.objects.persistedId
+import de.seuhd.campuscoffee.domain.model.User
+import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
