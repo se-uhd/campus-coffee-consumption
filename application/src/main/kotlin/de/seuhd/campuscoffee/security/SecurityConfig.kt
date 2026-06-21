@@ -71,10 +71,19 @@ class SecurityConfig {
                 authorize("/actuator/metrics", hasRole("ADMIN"))
                 authorize("/actuator/metrics/**", hasRole("ADMIN"))
                 // Member self-service: the capability token principal (ROLE_USER). The domain enforces that
-                // a member acts only on their own count and that a deactivated member is read-only.
+                // a member acts only on their own data and that a deactivated member is read-only. A member
+                // sees the price and the kitty balance through their own /summary, never the admin reads.
                 authorize("/api/consumption/**", hasRole("USER"))
                 authorize("/api/profile/**", hasRole("USER"))
-                // Member management is admin-only (JWT, ROLE_ADMIN).
+                authorize("/api/summary/**", hasRole("USER"))
+                authorize("/api/ledger/**", hasRole("USER"))
+                authorize("/api/expenses/**", hasRole("USER"))
+                // Admin-only money management (JWT, ROLE_ADMIN): the price, the kitty, and settlements.
+                authorize("/api/price", hasRole("ADMIN"))
+                authorize("/api/price/**", hasRole("ADMIN"))
+                authorize("/api/payments/**", hasRole("ADMIN"))
+                authorize("/api/kitty/**", hasRole("ADMIN"))
+                // Member management and the per-member admin views are admin-only (JWT, ROLE_ADMIN).
                 authorize("/api/users/**", hasRole("ADMIN"))
                 // No anonymous access to any other API endpoint.
                 authorize("/api/**", authenticated)

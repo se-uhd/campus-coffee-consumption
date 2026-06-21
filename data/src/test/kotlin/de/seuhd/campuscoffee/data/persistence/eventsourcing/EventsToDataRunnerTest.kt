@@ -1,5 +1,8 @@
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
+import de.seuhd.campuscoffee.data.persistence.repositories.CoffeePriceRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.ExpenseRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.PaymentRepository
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
@@ -16,8 +19,25 @@ class EventsToDataRunnerTest : AbstractEventSourcingDataIntegrationTest() {
     @Autowired
     private lateinit var readModelProjector: ReadModelProjector
 
+    @Autowired
+    private lateinit var coffeePriceRepository: CoffeePriceRepository
+
+    @Autowired
+    private lateinit var expenseRepository: ExpenseRepository
+
+    @Autowired
+    private lateinit var paymentRepository: PaymentRepository
+
     private fun runner(): EventsToDataRunner =
-        EventsToDataRunner(eventRepository, readModelProjector, userRepository, coffeeConsumptionRepository)
+        EventsToDataRunner(
+            eventRepository,
+            readModelProjector,
+            userRepository,
+            coffeeConsumptionRepository,
+            coffeePriceRepository,
+            expenseRepository,
+            paymentRepository
+        )
 
     @Test
     fun `rebuilding from the log restores the read rows after the tables are cleared`() {

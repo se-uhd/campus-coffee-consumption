@@ -1,8 +1,10 @@
 package de.seuhd.campuscoffee
 
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
+import de.seuhd.campuscoffee.domain.model.CoffeePrice
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
@@ -19,18 +21,21 @@ import org.mockito.kotlin.whenever
 class FixtureStartupLoaderTest {
     private val userService = mock<UserService>()
     private val coffeeConsumptionService = mock<CoffeeConsumptionService>()
-    private val loader = FixtureStartupLoader(userService, coffeeConsumptionService)
+    private val coffeePriceService = mock<CoffeePriceService>()
+    private val loader = FixtureStartupLoader(userService, coffeeConsumptionService, coffeePriceService)
 
     @Test
     fun `loadOnStartup seeds the fixtures when the database is empty`() {
         whenever(userService.getAll()).thenReturn(emptyList())
         whenever(userService.upsert(any())).thenAnswer { it.arguments[0] as User }
         whenever(coffeeConsumptionService.createForUser(any())).thenReturn(mock<CoffeeConsumption>())
+        whenever(coffeePriceService.ensureInitialPrice(any())).thenReturn(mock<CoffeePrice>())
 
         loader.loadOnStartup()
 
         verify(userService, atLeastOnce()).upsert(any())
         verify(coffeeConsumptionService, atLeastOnce()).createForUser(any())
+        verify(coffeePriceService, atLeastOnce()).ensureInitialPrice(any())
     }
 
     @Test

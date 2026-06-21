@@ -36,6 +36,35 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
     ): List<EventEntity>
 
     /**
+     * Returns every event of the given type in append order, for reading a whole stream (e.g. the price
+     * history, or one side of the kitty ledger).
+     *
+     * @param entityType the entity type label (the [LoggedEntityType] label)
+     */
+    fun findByEntityTypeOrderBySeqAsc(entityType: String): List<EventEntity>
+
+    /**
+     * Returns a member's full unified-ledger stream in append order: their consumption events, the expenses
+     * they bought, and the settlements they paid. Keyed on the owning user id embedded in each body
+     * (`userId` for consumptions and payments, `buyerUserId` for expenses), so it survives a consumption row
+     * being recreated. A native query because the match is on the `jsonb` body (the V7 owner-key indexes).
+     *
+     * @param userId the owning member's id (its string form)
+     */
+    @Query(
+        value =
+            "SELECT * FROM events WHERE " +
+                "(entity_type = 'CoffeeConsumption' AND body ->> 'userId' = :userId) OR " +
+                "(entity_type = 'Expense' AND body ->> 'buyerUserId' = :userId) OR " +
+                "(entity_type = 'Payment' AND body ->> 'userId' = :userId) " +
+                "ORDER BY seq ASC",
+        nativeQuery = true
+    )
+    fun findMemberLedger(
+        @Param("userId") userId: String
+    ): List<EventEntity>
+
+    /**
      * Whether the log already holds at least one event for the given domain type, so the import can skip it.
      *
      * @param entityType the entity type label (the domain class's simple name)
