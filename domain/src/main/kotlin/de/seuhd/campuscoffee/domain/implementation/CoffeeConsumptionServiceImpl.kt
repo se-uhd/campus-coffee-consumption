@@ -3,6 +3,7 @@ package de.seuhd.campuscoffee.domain.implementation
 import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
+import de.seuhd.campuscoffee.domain.model.CancellableIncrement
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.ConsumptionChange
 import de.seuhd.campuscoffee.domain.model.Role
@@ -13,8 +14,14 @@ import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.ConsumptionHistoryDataService
 import de.seuhd.campuscoffee.domain.ports.data.CrudDataService
+import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
+import de.seuhd.campuscoffee.domain.ports.data.UserDataService
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Duration
+import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.UUID
 
 /**
@@ -25,11 +32,15 @@ import java.util.UUID
  * may act on anyone, the absolute override is admin-only, a deactivated member is read-only, and the count
  * never goes negative.
  */
+@Suppress("TooManyFunctions")
 @Service
 class CoffeeConsumptionServiceImpl(
     private val coffeeConsumptionDataService: CoffeeConsumptionDataService,
     private val consumptionHistoryDataService: ConsumptionHistoryDataService,
-    private val changeNoteContext: ChangeNoteContext
+    private val ledgerDataService: LedgerDataService,
+    private val userDataService: UserDataService,
+    private val changeNoteContext: ChangeNoteContext,
+    @param:Value("\${campus-coffee.consumption.cancel-grace-period:5m}") private val cancelGracePeriod: Duration
 ) : CrudServiceImpl<CoffeeConsumption, UUID>(CoffeeConsumption::class.java),
     CoffeeConsumptionService {
     override fun dataService(): CrudDataService<CoffeeConsumption, UUID> = coffeeConsumptionDataService
@@ -91,8 +102,58 @@ class CoffeeConsumptionServiceImpl(
     }
 
     @Transactional
+    @Suppress("ThrowsCount") // each guard is a distinct, user-facing failure reason
+    override fun cancel(
+        userId: UUID,
+        actingUser: User
+    ): CoffeeConsumption {
+        // a cancel must be recorded by the owner, so its event is attributed to the member and the ledger
+        // credits it at the original increment's price; an admin corrects a count with setTotal instead
+        if (actingUser.persistedId != userId) {
+            throw ForbiddenException("Only the owner may undo their own coffee; an admin adjusts the count instead.")
+        }
+        if (actingUser.active != true) {
+            throw ForbiddenException("A deactivated member is read-only and cannot undo a coffee.")
+        }
+        val candidate =
+            ledgerDataService.lastCancellableIncrement(userId, actingUser.loginName)
+                ?: throw ConflictException("There is no recent coffee to undo.")
+        if (candidate.createdAt.isBefore(graceCutoff())) {
+            throw ConflictException(
+                "The grace period to undo this coffee has passed; ask an admin to adjust your count."
+            )
+        }
+        val current = coffeeConsumptionDataService.getByUserId(userId)
+        if (current.count <= 0) {
+            throw ConflictException("There is no coffee to undo.")
+        }
+        return coffeeConsumptionDataService.upsert(current.copy(count = current.count - 1))
+    }
+
+    override fun cancellableIncrement(
+        userId: UUID,
+        actingUser: User
+    ): CancellableIncrement? {
+        requireMayView(userId, actingUser)
+        val ownerLogin = userDataService.getById(userId).loginName
+        return cancellableWithinGrace(userId, ownerLogin)
+    }
+
+    @Transactional
     override fun createForUser(user: User): CoffeeConsumption =
         coffeeConsumptionDataService.upsert(CoffeeConsumption(user = user, count = 0))
+
+    /** The member's most recent own increment if it is still within the grace period to undo, else null. */
+    private fun cancellableWithinGrace(
+        userId: UUID,
+        ownerLogin: String
+    ): CancellableIncrement? {
+        val candidate = ledgerDataService.lastCancellableIncrement(userId, ownerLogin) ?: return null
+        return if (candidate.createdAt.isBefore(graceCutoff())) null else candidate
+    }
+
+    /** The cutoff time before which a coffee can no longer be undone (now minus the grace period). */
+    private fun graceCutoff(): LocalDateTime = LocalDateTime.now(ZoneId.of("UTC")).minus(cancelGracePeriod)
 
     /** Allows a read only when [actingUser] owns the consumption of [userId] or is an admin. */
     private fun requireMayView(

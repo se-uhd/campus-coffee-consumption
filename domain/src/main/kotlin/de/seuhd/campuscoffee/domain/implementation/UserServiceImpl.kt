@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.domain.implementation
 
+import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.MissingFieldException
 import de.seuhd.campuscoffee.domain.model.Role
@@ -8,8 +9,11 @@ import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.CapabilityTokenGenerator
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.CrudDataService
+import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
 import de.seuhd.campuscoffee.domain.ports.data.PasswordHasher
+import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -22,15 +26,37 @@ import java.util.UUID
  * state or rotate a capability token. Passwords are hashed via the [PasswordHasher] port and never read
  * back.
  */
+@Suppress("TooManyFunctions")
 @Service
 class UserServiceImpl(
     private val userDataService: UserDataService,
     private val passwordHasher: PasswordHasher,
     private val capabilityTokenGenerator: CapabilityTokenGenerator,
-    private val coffeeConsumptionService: CoffeeConsumptionService
+    private val coffeeConsumptionService: CoffeeConsumptionService,
+    private val coffeeConsumptionDataService: CoffeeConsumptionDataService,
+    private val expenseDataService: ExpenseDataService,
+    private val paymentDataService: PaymentDataService
 ) : CrudServiceImpl<User, UUID>(User::class.java),
     UserService {
     override fun dataService(): CrudDataService<User, UUID> = userDataService
+
+    /**
+     * Refuses to hard-delete a member who has any financial footprint — a non-zero coffee count, or any
+     * expense or settlement — so the financial history is preserved (an admin deactivates them instead).
+     * A pristine member (count zero, no money records) is deleted, cascading their zeroed consumption row.
+     *
+     * @throws DeletionConflictException if the member has financial history
+     */
+    @Transactional
+    override fun delete(id: UUID) {
+        val hasConsumed = coffeeConsumptionDataService.getByUserId(id).count != 0
+        val hasExpenses = expenseDataService.getAllByBuyer(id).isNotEmpty()
+        val hasPayments = paymentDataService.getAllByUser(id).isNotEmpty()
+        if (hasConsumed || hasExpenses || hasPayments) {
+            throw DeletionConflictException(User::class.java, id)
+        }
+        super.delete(id)
+    }
 
     /**
      * Normalizes a user's server-owned secrets before persisting, enforcing the invariant that **a

@@ -3,6 +3,7 @@ package de.seuhd.campuscoffee.domain.implementation
 import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
+import de.seuhd.campuscoffee.domain.model.CancellableIncrement
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.ConsumptionChange
 import de.seuhd.campuscoffee.domain.model.Role
@@ -10,6 +11,8 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.ChangeNoteContext
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.ConsumptionHistoryDataService
+import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
+import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -20,17 +23,23 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import java.time.Duration
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.UUID
 
 /**
  * Unit tests for CoffeeConsumptionServiceImpl, mocking the data ports. A real ChangeNoteContext is used
- * (it is a dependency-free thread-local holder) so the note-recording path runs unchanged.
+ * (it is a dependency-free thread-local holder) so the note-recording path runs unchanged. A five-minute
+ * grace period is configured so a freshly recorded increment is within it.
  */
 class CoffeeConsumptionServiceTest {
     private val dataService: CoffeeConsumptionDataService = mock()
     private val historyService: ConsumptionHistoryDataService = mock()
+    private val ledgerDataService: LedgerDataService = mock()
+    private val userDataService: UserDataService = mock()
     private val changeNoteContext = ChangeNoteContext()
+    private val gracePeriod: Duration = Duration.ofMinutes(5)
 
     private lateinit var service: CoffeeConsumptionServiceImpl
 
@@ -67,9 +76,19 @@ class CoffeeConsumptionServiceTest {
             count = count
         )
 
+    private fun now(): LocalDateTime = LocalDateTime.now(ZoneId.of("UTC"))
+
     @BeforeEach
     fun setUp() {
-        service = CoffeeConsumptionServiceImpl(dataService, historyService, changeNoteContext)
+        service =
+            CoffeeConsumptionServiceImpl(
+                dataService,
+                historyService,
+                ledgerDataService,
+                userDataService,
+                changeNoteContext,
+                gracePeriod
+            )
     }
 
     @Test
@@ -181,5 +200,73 @@ class CoffeeConsumptionServiceTest {
 
         assertThat(result.count).isEqualTo(0)
         assertThat(result.user).isEqualTo(member)
+    }
+
+    @Test
+    fun `cancel by the owner within the grace period decrements the count by one`() {
+        whenever(ledgerDataService.lastCancellableIncrement(memberId, "max"))
+            .thenReturn(CancellableIncrement(seq = 10L, createdAt = now(), priceCents = 50))
+        whenever(dataService.getByUserId(memberId)).thenReturn(consumption(3))
+        whenever(dataService.upsert(any())).thenAnswer { it.arguments[0] as CoffeeConsumption }
+
+        val result = service.cancel(memberId, member)
+
+        assertThat(result.count).isEqualTo(2)
+    }
+
+    @Test
+    fun `cancel by an admin throws ForbiddenException`() {
+        assertThrows<ForbiddenException> { service.cancel(memberId, admin) }
+        verify(dataService, never()).upsert(any())
+    }
+
+    @Test
+    fun `cancel by a deactivated owner throws ForbiddenException`() {
+        val deactivated = member.copy(active = false)
+
+        assertThrows<ForbiddenException> { service.cancel(memberId, deactivated) }
+        verify(dataService, never()).upsert(any())
+    }
+
+    @Test
+    fun `cancel with no recent coffee to undo throws ConflictException`() {
+        whenever(ledgerDataService.lastCancellableIncrement(memberId, "max")).thenReturn(null)
+
+        assertThrows<ConflictException> { service.cancel(memberId, member) }
+        verify(dataService, never()).upsert(any())
+    }
+
+    @Test
+    fun `cancel of a coffee whose grace period has passed throws ConflictException`() {
+        whenever(ledgerDataService.lastCancellableIncrement(memberId, "max"))
+            .thenReturn(CancellableIncrement(seq = 10L, createdAt = now().minusHours(1), priceCents = 50))
+
+        assertThrows<ConflictException> { service.cancel(memberId, member) }
+        verify(dataService, never()).upsert(any())
+    }
+
+    @Test
+    fun `cancellableIncrement returns the candidate within the grace period`() {
+        val candidate = CancellableIncrement(seq = 10L, createdAt = now(), priceCents = 50)
+        whenever(userDataService.getById(memberId)).thenReturn(member)
+        whenever(ledgerDataService.lastCancellableIncrement(memberId, "max")).thenReturn(candidate)
+
+        assertThat(service.cancellableIncrement(memberId, member)).isEqualTo(candidate)
+    }
+
+    @Test
+    fun `cancellableIncrement returns null once the grace period has passed`() {
+        whenever(userDataService.getById(memberId)).thenReturn(member)
+        whenever(ledgerDataService.lastCancellableIncrement(memberId, "max"))
+            .thenReturn(CancellableIncrement(seq = 10L, createdAt = now().minusHours(1), priceCents = 50))
+
+        assertThat(service.cancellableIncrement(memberId, member)).isNull()
+    }
+
+    @Test
+    fun `cancellableIncrement by a non-owner non-admin throws ForbiddenException`() {
+        val other = member.copy(id = UUID(0L, 7L), loginName = "other")
+
+        assertThrows<ForbiddenException> { service.cancellableIncrement(memberId, other) }
     }
 }

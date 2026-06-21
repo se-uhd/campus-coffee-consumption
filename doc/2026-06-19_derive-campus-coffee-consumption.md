@@ -6,7 +6,7 @@ CampusCoffee is a Spring Boot / Kotlin app (hexagonal architecture, four Gradle 
 persistence, Spring Security with Basic + JWT) for managing Points of Sale and reviews. We are deriving a
 new app, **CampusCoffeeConsumption**, into this repo (`campus-coffee-consumption`).
 
-The app is the coffee-consumption tracker for **SE@UHD** (the Software Engineering Group at Heidelberg
+The app is the coffee consumption tracker for **SE@UHD** (the Software Engineering Group at Heidelberg
 University — hence the `de.seuhd` package). Each group member has a running coffee count. Members bump
 their own count via a **capability URL** (a secret per-user URL) printed as a **QR code on the wall**;
 scanning it opens a small mobile-first web app where they tap **+** / **−**. Admins create and manage

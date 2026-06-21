@@ -3,6 +3,9 @@ package de.seuhd.campuscoffee.tests.system
 import de.seuhd.campuscoffee.Application
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
+import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
+import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import de.seuhd.campuscoffee.tests.SystemTestUtils.configureClient
@@ -33,6 +36,15 @@ abstract class AbstractSystemTest {
     @Autowired
     protected lateinit var coffeeConsumptionService: CoffeeConsumptionService
 
+    @Autowired
+    protected lateinit var coffeePriceService: CoffeePriceService
+
+    @Autowired
+    protected lateinit var expenseService: ExpenseService
+
+    @Autowired
+    protected lateinit var paymentService: PaymentService
+
     @LocalServerPort
     private var port: Int = 0
 
@@ -46,6 +58,8 @@ abstract class AbstractSystemTest {
         // consumptions at zero, so a member can authenticate by token and an admin by JWT
         seededUsers = TestFixtures.createUserFixtures(userService)
         TestFixtures.createConsumptionFixtures(coffeeConsumptionService, seededUsers)
+        // seed the initial price after the users/consumptions, so a price is in effect before any coffee
+        TestFixtures.createPriceFixture(coffeePriceService)
         configureClient(port)
     }
 
@@ -57,10 +71,14 @@ abstract class AbstractSystemTest {
     /** The seeded user with the given login name. */
     protected fun seededUser(loginName: String): User = seededUsers.first { it.loginName == loginName }
 
-    // Clears in foreign key order: consumptions reference users.
+    // Clears in foreign key order: expenses and payments reference users (RESTRICT), consumptions cascade;
+    // so clear the money children, then consumptions, then users, then the independent price.
     private fun clearAll() {
+        expenseService.clear()
+        paymentService.clear()
         coffeeConsumptionService.clear()
         userService.clear()
+        coffeePriceService.clear()
     }
 
     protected companion object {

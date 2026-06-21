@@ -6,7 +6,9 @@ import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
+import org.hibernate.annotations.Generated
 import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.generator.EventType
 import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
 
@@ -22,15 +24,20 @@ import java.time.LocalDateTime
  *
  * Two metadata columns sit alongside the body rather than inside it: [createdBy] (the actor's login name —
  * a member, an admin, or `"system"`) makes a member's changes retrievable and displayable without parsing
- * the JSON, and [note] holds an admin's optional reason for a count override/reset.
+ * the JSON, and [note] holds an admin's optional reason for a count override, a settlement, or a kitty
+ * adjustment.
  */
 @Entity
 @Table(name = "events")
 class EventEntity : PersistableEntity() {
     /**
      * Append order, assigned by the database (a strictly increasing identity column). Read-only here: it
-     * defines the order the log is replayed in, because the UUID id is not monotonic.
+     * defines the order the log is replayed in, because the UUID id is not monotonic. Annotated
+     * [Generated] on INSERT so Hibernate reads the database-generated value back after the insert,
+     * populating this field on the managed entity (otherwise a read-after-write in the same session sees a
+     * null seq).
      */
+    @field:Generated(event = [EventType.INSERT])
     @field:Column(name = "seq", insertable = false, updatable = false)
     var seq: Long? = null
 

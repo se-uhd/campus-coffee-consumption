@@ -18,10 +18,10 @@ describe('ConsumptionService', () => {
 
   afterEach(() => httpMock.verify());
 
-  it('GETs the member own consumption with the limit and offset params', async () => {
+  it('GETs a member consumption by id with the limit and offset params', async () => {
     const expected: ConsumptionDto = { total: 3, changes: [] };
-    const promise = service.getOwn(5, 0);
-    const req = httpMock.expectOne((r) => r.url === '/api/consumption');
+    const promise = service.getForUser('user-1', 5, 0);
+    const req = httpMock.expectOne((r) => r.url === '/api/users/user-1/consumption');
     expect(req.request.method).toBe('GET');
     expect(req.request.params.get('limit')).toBe('5');
     expect(req.request.params.get('offset')).toBe('0');
@@ -29,17 +29,17 @@ describe('ConsumptionService', () => {
     expect(await promise).toEqual(expected);
   });
 
-  it('POSTs a +1 delta to apply a single-step change', async () => {
+  it('POSTs a +1 delta to apply a single-step change for a member', async () => {
     const expected: ConsumptionDto = { total: 4, changes: [] };
-    const promise = service.changeOwn(1);
-    const req = httpMock.expectOne('/api/consumption');
+    const promise = service.changeForUser('user-1', 1);
+    const req = httpMock.expectOne('/api/users/user-1/consumption');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ delta: 1 });
     req.flush(expected);
     expect(await promise).toEqual(expected);
   });
 
-  it('PUTs an absolute override with a note for an admin reset', async () => {
+  it('PUTs an absolute override with a note for an admin', async () => {
     const expected: ConsumptionDto = { total: 0, changes: [] };
     const promise = service.overrideForUser('user-1', 0, 'Paid');
     const req = httpMock.expectOne('/api/users/user-1/consumption');

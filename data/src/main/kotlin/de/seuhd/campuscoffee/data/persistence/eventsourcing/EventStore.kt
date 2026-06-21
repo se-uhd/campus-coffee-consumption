@@ -50,15 +50,28 @@ class EventStore(
         append(ChangeType.UPDATE, entityTypeOf(domain), toBody(domain))
 
     /**
-     * Appends a DELETE event carrying only the id of the removed domain object.
+     * Appends a DELETE event carrying the id of the removed domain object, plus any [ownerKeys] that the
+     * member/kitty ledger reads key on (a deleted expense or settlement must still be matched to its owner so
+     * the ledger reverses it; the projection ignores everything but the id). Each value is stored as its
+     * string form to match the way the body flattens references.
      *
      * @param domainType the domain type of the removed object
      * @param id the id of the removed domain object
+     * @param ownerKeys extra body fields (e.g. `buyerUserId`, `userId`) so a member-ledger query still
+     *   matches the DELETE event; a null value is omitted
      */
     fun appendDelete(
         domainType: KClass<out DomainModel<*>>,
-        id: UUID
-    ): EventEntity = append(ChangeType.DELETE, entityTypeOf(domainType), mapOf("id" to id.toString()))
+        id: UUID,
+        ownerKeys: Map<String, Any?> = emptyMap()
+    ): EventEntity {
+        val body =
+            buildMap {
+                put("id", id.toString())
+                ownerKeys.forEach { (key, value) -> value?.let { put(key, it.toString()) } }
+            }
+        return append(ChangeType.DELETE, entityTypeOf(domainType), body)
+    }
 
     /**
      * Removes every event for the given domain type; its read table is cleared separately.
@@ -75,19 +88,19 @@ class EventStore(
     fun hasEventsFor(entityType: String): Boolean = eventRepository.existsByEntityType(entityType)
 
     /**
-     * The event's entity type label, the domain class's simple name (`User`, `CoffeeConsumption`).
+     * The event's entity type label, looked up from [LoggedEntityType] (e.g. `User`, `CoffeeConsumption`).
      *
      * @param domain the domain object whose type label is derived
      */
     fun entityTypeOf(domain: DomainModel<*>): String = entityTypeOf(domain::class)
 
     /**
-     * The entity type label for a domain type, its simple name (`User`, `CoffeeConsumption`).
+     * The entity type label for a domain type, looked up from [LoggedEntityType] (a type that is not a
+     * logged entity fails loudly rather than being stored under an arbitrary name).
      *
      * @param domainType the domain type whose label is derived
      */
-    fun entityTypeOf(domainType: KClass<out DomainModel<*>>): String =
-        requireNotNull(domainType.simpleName) { "A domain type used for an event must have a simple name." }
+    fun entityTypeOf(domainType: KClass<out DomainModel<*>>): String = LoggedEntityType.of(domainType).label
 
     /** Builds the event, assigns its own id, version, and timestamp, and flushes it before the projection. */
     private fun append(

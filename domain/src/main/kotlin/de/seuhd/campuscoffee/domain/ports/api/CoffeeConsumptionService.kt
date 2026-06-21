@@ -5,6 +5,7 @@ import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
+import de.seuhd.campuscoffee.domain.model.CancellableIncrement
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.ConsumptionChange
 import de.seuhd.campuscoffee.domain.model.User
@@ -18,8 +19,8 @@ import java.util.UUID
  * — which the event-sourced data adapter records as a full-state event. There is deliberately no new
  * ledger machinery: the count advances through the same upsert path a review's approval count did.
  *
- * Authorization is by [User.role] and ownership: a member may view and `+1`/`-1` only their own count, an
- * admin may act on anyone, and the absolute override ([setTotal], which also covers reset-after-payment)
+ * Authorization is by [User.role] and ownership: a member may add a coffee or undo a recent one only on
+ * their own count, an admin may act on anyone, and the absolute override ([setTotal], an admin correction)
  * is admin-only. A deactivated member is authenticated read-only, so their mutations are rejected.
  *
  * Extends [CrudService] for the generic operations the fixtures, dev endpoint, and event-sourcing
@@ -61,8 +62,8 @@ interface CoffeeConsumptionService : CrudService<CoffeeConsumption, UUID> {
     ): CoffeeConsumption
 
     /**
-     * Sets the count of the user with [userId] to an explicit value (admin override / edit mode; a value
-     * of zero is the reset after payment). An optional [note] documents the change in the event log.
+     * Sets the count of the user with [userId] to an explicit value (an admin correction; any non-negative
+     * value, including zero). An optional [note] documents the change in the event log.
      *
      * @param userId     the id of the user whose count to set
      * @param total      the new, non-negative count
@@ -96,6 +97,37 @@ interface CoffeeConsumptionService : CrudService<CoffeeConsumption, UUID> {
         offset: Int,
         actingUser: User
     ): List<ConsumptionChange>
+
+    /**
+     * Undoes the calling member's most recent coffee within the grace period (only the owner may do this;
+     * an admin uses [setTotal] instead). It reverts the most recent un-cancelled own increment, crediting
+     * exactly the price it was charged at, so undoing nets to zero.
+     *
+     * @param userId     the id of the member undoing a coffee (must be [actingUser])
+     * @param actingUser the authenticated member
+     * @return the updated consumption
+     * @throws ForbiddenException if [actingUser] is not the owner, or is deactivated
+     * @throws ConflictException if there is no recent coffee to undo or the grace period has passed
+     * @throws ConcurrentUpdateException if a concurrent change won the optimistic-locking race
+     */
+    fun cancel(
+        userId: UUID,
+        actingUser: User
+    ): CoffeeConsumption
+
+    /**
+     * Returns the member's most recent coffee that is still within the grace period to undo, or null if
+     * there is none — used to show or hide the undo affordance. Subject to the same self-or-admin read rule
+     * as [getByUserId].
+     *
+     * @param userId     the id of the member whose cancellable coffee to check
+     * @param actingUser the authenticated user attempting the read
+     * @throws ForbiddenException if [actingUser] is neither that member nor an admin
+     */
+    fun cancellableIncrement(
+        userId: UUID,
+        actingUser: User
+    ): CancellableIncrement?
 
     /**
      * Creates the consumption for a freshly created [user] at `count = 0`. Invoked internally when a user
