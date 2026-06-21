@@ -1,6 +1,5 @@
 package de.seuhd.campuscoffee.tests.system
 
-import de.seuhd.campuscoffee.api.dtos.ConsumptionDeltaDto
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.COFFEE_TOKEN_HEADER
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
@@ -22,7 +21,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
         val status =
             client()
                 .get()
-                .uri("/api/consumption")
+                .uri("/api/summary")
                 .exchange()
                 .statusCode()
 
@@ -34,7 +33,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
         val status =
             client()
                 .get()
-                .uri("/api/consumption")
+                .uri("/api/summary")
                 .header(COFFEE_TOKEN_HEADER, "not-a-real-token")
                 .exchange()
                 .statusCode()
@@ -43,7 +42,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a deactivated member is read-only and cannot change their count`() {
+    fun `a deactivated member is read-only and cannot add a coffee`() {
         val admin = seededUser("jane_doe")
         val max = seededUser(member)
         userService.update(max.copy(active = false), admin)
@@ -52,7 +51,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
         val readStatus =
             client()
                 .get()
-                .uri("/api/consumption")
+                .uri("/api/summary")
                 .withMember(member)
                 .exchange()
                 .statusCode()
@@ -60,8 +59,6 @@ class AuthorizationSystemTests : AbstractSystemTest() {
             client()
                 .post()
                 .uri("/api/consumption")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(ConsumptionDeltaDto(1))
                 .withMember(member)
                 .exchange()
                 .statusCode()
@@ -95,7 +92,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
         val status =
             client()
                 .get()
-                .uri("/api/consumption")
+                .uri("/api/summary")
                 .withMember(member)
                 .exchange()
                 .statusCode()

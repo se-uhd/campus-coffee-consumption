@@ -3,7 +3,7 @@ package de.seuhd.campuscoffee.domain.ports
 import org.springframework.stereotype.Component
 
 /**
- * Carries an admin's optional free-text note from a consumption override/reset down to the `EventStore`,
+ * Carries an admin's optional free-text note from a consumption override down to the `EventStore`,
  * which records it as the event's `note` metadata. The note is not part of the consumption's full-state
  * body, and the generic mutator/decorator `upsert` signatures must stay untouched, so it travels
  * out-of-band on a thread-local for the duration of the one upsert that records it.

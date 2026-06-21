@@ -5,9 +5,9 @@ import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
 
 /**
- * Request body for an admin absolute count override (`PUT /api/users/{id}/consumption`, edit mode): the
- * new, non-negative [total] to set directly (a [total] of zero is the reset after payment), plus an
- * optional [note] documenting the reason, recorded with the change in the event log.
+ * Request body for an admin absolute count override (`PUT /api/users/{id}/consumption`): the new,
+ * non-negative [total] to set directly (any value, an admin correction), plus an optional [note]
+ * documenting the reason, recorded with the change in the event log.
  */
 data class ConsumptionOverrideDto(
     @field:NotNull(message = "Total is required.")

@@ -3,6 +3,9 @@ package de.seuhd.campuscoffee.api.controller
 import de.seuhd.campuscoffee.api.dtos.DevSummaryDto
 import de.seuhd.campuscoffee.domain.ports.IdGenerator
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
+import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
+import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import io.swagger.v3.oas.annotations.Operation
@@ -25,6 +28,9 @@ import org.springframework.web.bind.annotation.RequestMapping
 class DevController(
     private val userService: UserService,
     private val coffeeConsumptionService: CoffeeConsumptionService,
+    private val coffeePriceService: CoffeePriceService,
+    private val expenseService: ExpenseService,
+    private val paymentService: PaymentService,
     private val idGenerator: IdGenerator
 ) {
     /** Reports the current number of users and coffee consumptions. */
@@ -40,7 +46,7 @@ class DevController(
         // restart the id sequence so a reload assigns the fixtures the same ids
         idGenerator.reset()
         clearAll()
-        val (users, consumptions) = TestFixtures.loadAll(userService, coffeeConsumptionService)
+        val (users, consumptions) = TestFixtures.loadAll(userService, coffeeConsumptionService, coffeePriceService)
         return ResponseEntity.ok(DevSummaryDto(users, consumptions))
     }
 
@@ -52,9 +58,15 @@ class DevController(
         return ResponseEntity.noContent().build()
     }
 
-    /** Clears all data, deleting consumptions first because of their foreign key to users. */
+    /**
+     * Clears all data in foreign key order: the children that reference users (expenses and payments are
+     * RESTRICT, consumptions CASCADE) before the users, then the independent price.
+     */
     private fun clearAll() {
+        expenseService.clear()
+        paymentService.clear()
         coffeeConsumptionService.clear()
         userService.clear()
+        coffeePriceService.clear()
     }
 }

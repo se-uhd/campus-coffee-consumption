@@ -1,13 +1,19 @@
 package de.seuhd.campuscoffee.domain.implementation
 
+import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.MissingFieldException
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
+import de.seuhd.campuscoffee.domain.model.Expense
+import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.CapabilityTokenGenerator
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
+import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
 import de.seuhd.campuscoffee.domain.ports.data.PasswordHasher
+import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -30,6 +36,9 @@ class UserServiceTest {
     private val passwordHasher: PasswordHasher = mock()
     private val capabilityTokenGenerator: CapabilityTokenGenerator = mock()
     private val coffeeConsumptionService: CoffeeConsumptionService = mock()
+    private val coffeeConsumptionDataService: CoffeeConsumptionDataService = mock()
+    private val expenseDataService: ExpenseDataService = mock()
+    private val paymentDataService: PaymentDataService = mock()
 
     private lateinit var service: UserServiceImpl
 
@@ -66,7 +75,16 @@ class UserServiceTest {
 
     @BeforeEach
     fun setUp() {
-        service = UserServiceImpl(userDataService, passwordHasher, capabilityTokenGenerator, coffeeConsumptionService)
+        service =
+            UserServiceImpl(
+                userDataService,
+                passwordHasher,
+                capabilityTokenGenerator,
+                coffeeConsumptionService,
+                coffeeConsumptionDataService,
+                expenseDataService,
+                paymentDataService
+            )
     }
 
     @Test
@@ -361,5 +379,136 @@ class UserServiceTest {
         whenever(userDataService.findByCapabilityToken("unknown")).thenReturn(null)
 
         assertThat(service.findByCapabilityToken("unknown")).isNull()
+    }
+
+    @Test
+    fun `upsert of an existing admin keeps the supplied capability token and the stored hash`() {
+        whenever(userDataService.getById(adminId)).thenReturn(admin)
+        whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+
+        // an update carrying an explicit token keeps that token (the elvis does not fall through)
+        val saved = service.upsert(admin.copy(capabilityToken = "KEEP-THIS", password = null))
+
+        assertThat(saved.capabilityToken).isEqualTo("KEEP-THIS")
+        assertThat(saved.passwordHash).isEqualTo("ADMIN-HASH")
+    }
+
+    @Test
+    fun `upsert of an existing member with no incoming role or active falls back to the stored values`() {
+        whenever(userDataService.getById(memberId)).thenReturn(storedMember)
+        whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+
+        // an update with role and active both null falls back to the stored role/active (the elvis chain)
+        val saved =
+            service.upsert(
+                storedMember.copy(role = null, active = null, capabilityToken = null, firstName = "Maximilian")
+            )
+
+        assertThat(saved.role).isEqualTo(Role.USER)
+        assertThat(saved.active).isTrue()
+        assertThat(saved.capabilityToken).isEqualTo("OLD-TOKEN")
+        assertThat(saved.firstName).isEqualTo("Maximilian")
+    }
+
+    @Test
+    fun `upsert of a brand-new admin with a supplied token and password hashes the password and keeps the token`() {
+        whenever(passwordHasher.hash("raw")).thenReturn("HASHED")
+        whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+
+        // role, token, and password all supplied: each elvis short-circuits on the first branch
+        val saved =
+            service.upsert(
+                User(
+                    loginName = "freshadmin",
+                    emailAddress = "freshadmin@se.de",
+                    firstName = "Fresh",
+                    lastName = "Admin",
+                    role = Role.ADMIN,
+                    active = true,
+                    capabilityToken = "SUPPLIED",
+                    password = "raw"
+                )
+            )
+
+        assertThat(saved.role).isEqualTo(Role.ADMIN)
+        assertThat(saved.capabilityToken).isEqualTo("SUPPLIED")
+        assertThat(saved.passwordHash).isEqualTo("HASHED")
+    }
+
+    @Test
+    fun `upsert of a brand-new member without a token generates one`() {
+        whenever(capabilityTokenGenerator.newToken()).thenReturn("GENERATED")
+        whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+
+        val saved =
+            service.upsert(
+                User(
+                    loginName = "fresh",
+                    emailAddress = "fresh@se.de",
+                    firstName = "Fresh",
+                    lastName = "Member",
+                    role = Role.USER,
+                    active = false,
+                    capabilityToken = null
+                )
+            )
+
+        assertThat(saved.capabilityToken).isEqualTo("GENERATED")
+        // an explicit active flag is preserved on a create
+        assertThat(saved.active).isFalse()
+    }
+
+    @Test
+    fun `delete of a pristine member removes the user`() {
+        whenever(coffeeConsumptionDataService.getByUserId(memberId))
+            .thenReturn(CoffeeConsumption(user = storedMember, count = 0))
+        whenever(expenseDataService.getAllByBuyer(memberId)).thenReturn(emptyList())
+        whenever(paymentDataService.getAllByUser(memberId)).thenReturn(emptyList())
+
+        service.delete(memberId)
+
+        verify(userDataService).delete(memberId)
+    }
+
+    @Test
+    fun `delete of a member with a non-zero count throws DeletionConflictException`() {
+        whenever(coffeeConsumptionDataService.getByUserId(memberId))
+            .thenReturn(CoffeeConsumption(user = storedMember, count = 3))
+
+        assertThrows<DeletionConflictException> { service.delete(memberId) }
+        verify(userDataService, never()).delete(any())
+    }
+
+    @Test
+    fun `delete of a member with an expense throws DeletionConflictException`() {
+        whenever(coffeeConsumptionDataService.getByUserId(memberId))
+            .thenReturn(CoffeeConsumption(user = storedMember, count = 0))
+        whenever(expenseDataService.getAllByBuyer(memberId))
+            .thenReturn(
+                listOf(
+                    Expense(
+                        buyer = storedMember,
+                        weightGrams = 1,
+                        amountCents = 1,
+                        privateAmountCents = 1,
+                        kittyAmountCents = 0
+                    )
+                )
+            )
+
+        assertThrows<DeletionConflictException> { service.delete(memberId) }
+        verify(userDataService, never()).delete(any())
+    }
+
+    @Test
+    fun `delete of a member with a settlement throws DeletionConflictException`() {
+        whenever(coffeeConsumptionDataService.getByUserId(memberId))
+            .thenReturn(CoffeeConsumption(user = storedMember, count = 0))
+        whenever(expenseDataService.getAllByBuyer(memberId)).thenReturn(emptyList())
+        whenever(paymentDataService.getAllByUser(memberId))
+            .thenReturn(listOf(Payment(user = storedMember, amountCents = 100)))
+
+        assertThrows<DeletionConflictException> { service.delete(memberId) }
+        verify(userDataService, never()).delete(any())
     }
 }

@@ -2,19 +2,28 @@ package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
 import de.seuhd.campuscoffee.data.implementations.CrudDataServiceImpl
 import de.seuhd.campuscoffee.data.mapper.CoffeeConsumptionEntityMapper
+import de.seuhd.campuscoffee.data.mapper.CoffeePriceEntityMapper
 import de.seuhd.campuscoffee.data.mapper.EntityMapper
+import de.seuhd.campuscoffee.data.mapper.ExpenseEntityMapper
+import de.seuhd.campuscoffee.data.mapper.PaymentEntityMapper
 import de.seuhd.campuscoffee.data.mapper.UserEntityMapper
 import de.seuhd.campuscoffee.data.persistence.entities.CoffeeConsumptionEntity
 import de.seuhd.campuscoffee.data.persistence.entities.Entity
 import de.seuhd.campuscoffee.data.persistence.entities.UserEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeConsumptionRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.CoffeePriceRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.ExpenseRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.PaymentRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.UserRepository
 import de.seuhd.campuscoffee.domain.exceptions.ConcurrentUpdateException
 import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
 import de.seuhd.campuscoffee.domain.exceptions.DuplicationException
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
+import de.seuhd.campuscoffee.domain.model.CoffeePrice
 import de.seuhd.campuscoffee.domain.model.DomainModel
+import de.seuhd.campuscoffee.domain.model.Expense
+import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.User
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
@@ -36,21 +45,28 @@ import kotlin.reflect.KClass
  * foreign key, or optimistic locking violation here rolls the whole transaction back (so the log never
  * keeps an invalid event) and surfaces as the same domain exception the relational adapter would throw.
  *
- * The user of a [CoffeeConsumption] arrives as an id (the body is flattened); it is resolved against the
- * already-projected user read model, which is why the log records a user before the consumption that
- * references it.
+ * A reference is stored in the body as an id (the body is flattened): a consumption and a payment carry a
+ * `userId`, an expense a `buyerUserId`. The id is resolved against the already-projected user read model,
+ * which is why the log records a user before anything that references it. A pure kitty adjustment carries a
+ * null `userId` and resolves to no user.
  *
- * The shared steps (writing a row, loading-and-updating one, deleting one, translating violations) are
- * extracted into helpers; the dispatch stays per type because the repository, the mapper, and (for a
- * consumption) the reference resolution differ by type. Hence the `TooManyFunctions` suppression.
+ * The dispatch is a `when` over [LoggedEntityType], so the compiler forces a branch for every logged type;
+ * the shared steps (writing a row, loading-and-updating one, deleting one, translating violations) are
+ * extracted into helpers. Hence the `TooManyFunctions` suppression.
  */
 @Suppress("TooManyFunctions")
 @Component
 class ReadModelProjector(
     private val userRepository: UserRepository,
     private val coffeeConsumptionRepository: CoffeeConsumptionRepository,
+    private val coffeePriceRepository: CoffeePriceRepository,
+    private val expenseRepository: ExpenseRepository,
+    private val paymentRepository: PaymentRepository,
     private val userMapper: UserEntityMapper,
-    private val coffeeConsumptionMapper: CoffeeConsumptionEntityMapper
+    private val coffeeConsumptionMapper: CoffeeConsumptionEntityMapper,
+    private val coffeePriceMapper: CoffeePriceEntityMapper,
+    private val expenseMapper: ExpenseEntityMapper,
+    private val paymentMapper: PaymentEntityMapper
 ) {
     /**
      * Applies a stored event to the read tables, unwrapping its fields, which are always populated.
@@ -64,86 +80,143 @@ class ReadModelProjector(
      * Applies one event (its change type, entity type, and JSON body) to the read tables.
      *
      * @param changeType the change type (INSERT, UPDATE, or DELETE)
-     * @param entityType the entity type label (the domain class's simple name)
+     * @param entityType the entity type label (resolved to a [LoggedEntityType])
      * @param body the JSON body of the event
      */
     fun apply(
         changeType: ChangeType,
         entityType: String,
         body: Map<String, Any?>
-    ) = translatingViolations(changeType, entityType, body) {
-        when (changeType) {
-            ChangeType.INSERT -> insert(entityType, body)
-            ChangeType.UPDATE -> update(entityType, body)
-            ChangeType.DELETE -> delete(entityType, body)
+    ) {
+        val type = LoggedEntityType.ofLabel(entityType)
+        translatingViolations(changeType, type, body) {
+            when (changeType) {
+                ChangeType.INSERT -> insert(type, body)
+                ChangeType.UPDATE -> update(type, body)
+                ChangeType.DELETE -> delete(type, body)
+            }
         }
     }
 
-    /** Inserts a new read model row for the event's entity type, mapping the body to the entity. */
+    /** Inserts a new read model row for the event's type, mapping the body to the entity. */
     private fun insert(
-        entityType: String,
+        type: LoggedEntityType,
         body: Map<String, Any?>
-    ) {
-        when (entityType) {
-            USER -> insertRow(userRepository, userMapper.toEntity(convert(body, User::class)), body)
-            COFFEE_CONSUMPTION ->
-                insertRow(
-                    coffeeConsumptionRepository,
-                    coffeeConsumptionMapper.toEntity(reconstructCoffeeConsumption(body)),
-                    body
-                )
-            else -> unsupported(ChangeType.INSERT, entityType)
-        }
+    ) = when (type) {
+        LoggedEntityType.USER ->
+            insertRow(userRepository, userMapper.toEntity(convert(body, User::class)), body)
+        LoggedEntityType.COFFEE_CONSUMPTION ->
+            insertRow(coffeeConsumptionRepository, coffeeConsumptionMapper.toEntity(reconstructConsumption(body)), body)
+        LoggedEntityType.COFFEE_PRICE ->
+            insertRow(coffeePriceRepository, coffeePriceMapper.toEntity(convert(body, CoffeePrice::class)), body)
+        LoggedEntityType.EXPENSE ->
+            insertRow(expenseRepository, expenseMapper.toEntity(reconstructExpense(body)), body)
+        LoggedEntityType.PAYMENT ->
+            insertRow(paymentRepository, paymentMapper.toEntity(reconstructPayment(body)), body)
     }
 
-    /** Updates the existing read model row for the event's entity type from the body. */
+    /** Updates the existing read model row for the event's type from the body. */
     private fun update(
-        entityType: String,
+        type: LoggedEntityType,
         body: Map<String, Any?>
-    ) {
-        when (entityType) {
-            USER -> updateRow(userRepository, userMapper, convert(body, User::class), body, User::class.java)
-            COFFEE_CONSUMPTION ->
-                updateRow(
-                    coffeeConsumptionRepository,
-                    coffeeConsumptionMapper,
-                    reconstructCoffeeConsumption(body),
-                    body,
-                    CoffeeConsumption::class.java
-                )
-            else -> unsupported(ChangeType.UPDATE, entityType)
-        }
+    ) = when (type) {
+        LoggedEntityType.USER ->
+            updateRow(userRepository, userMapper, convert(body, User::class), body, User::class.java)
+        LoggedEntityType.COFFEE_CONSUMPTION ->
+            updateRow(
+                coffeeConsumptionRepository,
+                coffeeConsumptionMapper,
+                reconstructConsumption(body),
+                body,
+                CoffeeConsumption::class.java
+            )
+        LoggedEntityType.COFFEE_PRICE ->
+            updateRow(
+                coffeePriceRepository,
+                coffeePriceMapper,
+                convert(body, CoffeePrice::class),
+                body,
+                CoffeePrice::class.java
+            )
+        LoggedEntityType.EXPENSE ->
+            updateRow(expenseRepository, expenseMapper, reconstructExpense(body), body, Expense::class.java)
+        LoggedEntityType.PAYMENT ->
+            updateRow(paymentRepository, paymentMapper, reconstructPayment(body), body, Payment::class.java)
     }
 
-    /** Removes the read model row identified by the body's id for the event's entity type. */
+    /** Removes the read model row identified by the body's id for the event's type. */
     private fun delete(
-        entityType: String,
+        type: LoggedEntityType,
         body: Map<String, Any?>
     ) {
         val id = requireNotNull(idOrNull(body)) { "A DELETE event must carry an id." }
-        when (entityType) {
-            USER -> deleteRow(userRepository, id)
-            COFFEE_CONSUMPTION -> deleteRow(coffeeConsumptionRepository, id)
-            else -> unsupported(ChangeType.DELETE, entityType)
+        return when (type) {
+            LoggedEntityType.USER -> deleteUserRow(id)
+            LoggedEntityType.COFFEE_CONSUMPTION -> deleteRow(coffeeConsumptionRepository, id)
+            LoggedEntityType.COFFEE_PRICE -> deleteRow(coffeePriceRepository, id)
+            LoggedEntityType.EXPENSE -> deleteRow(expenseRepository, id)
+            LoggedEntityType.PAYMENT -> deleteRow(paymentRepository, id)
         }
     }
 
+    /**
+     * Deletes a user read row, first removing the dependent consumption read row (the database FK is
+     * `ON DELETE CASCADE`). Removing the consumption explicitly keeps the read model consistent and, in a
+     * read-after-load session, avoids a flush of a managed consumption entity that would still reference the
+     * just-deleted user. A foreign key violation from an expense or payment that still references the user
+     * surfaces here as a [DeletionConflictException].
+     */
+    private fun deleteUserRow(id: UUID) {
+        coffeeConsumptionRepository.findByUserId(id)?.let { coffeeConsumptionRepository.delete(it) }
+        deleteRow(userRepository, id)
+    }
+
     /** Rebuilds a [CoffeeConsumption] from its flattened body, resolving the user id against the read model. */
-    private fun reconstructCoffeeConsumption(body: Map<String, Any?>): CoffeeConsumption {
+    private fun reconstructConsumption(body: Map<String, Any?>): CoffeeConsumption {
         val payload = convert(body, CoffeeConsumptionEventPayload::class)
-        val user =
-            userMapper.fromEntity(
-                userRepository.findByIdOrNull(payload.userId)
-                    ?: throw NotFoundException(User::class.java, payload.userId)
-            )
         return CoffeeConsumption(
             id = payload.id,
             createdAt = payload.createdAt,
             updatedAt = payload.updatedAt,
-            user = user,
+            user = requireUser(payload.userId),
             count = payload.count
         )
     }
+
+    /** Rebuilds an [Expense] from its flattened body, resolving the buyer id against the read model. */
+    private fun reconstructExpense(body: Map<String, Any?>): Expense {
+        val payload = convert(body, ExpenseEventPayload::class)
+        return Expense(
+            id = payload.id,
+            createdAt = payload.createdAt,
+            updatedAt = payload.updatedAt,
+            buyer = requireUser(payload.buyerUserId),
+            weightGrams = payload.weightGrams,
+            amountCents = payload.amountCents,
+            privateAmountCents = payload.privateAmountCents,
+            kittyAmountCents = payload.kittyAmountCents,
+            note = payload.note
+        )
+    }
+
+    /** Rebuilds a [Payment] from its body, resolving the user id (null for a pure kitty adjustment). */
+    private fun reconstructPayment(body: Map<String, Any?>): Payment {
+        val payload = convert(body, PaymentEventPayload::class)
+        return Payment(
+            id = payload.id,
+            createdAt = payload.createdAt,
+            updatedAt = payload.updatedAt,
+            user = payload.userId?.let { requireUser(it) },
+            amountCents = payload.amountCents,
+            note = payload.note
+        )
+    }
+
+    /** Resolves a user id against the already-projected user read model, failing if the user is missing. */
+    private fun requireUser(userId: UUID): User =
+        userMapper.fromEntity(
+            userRepository.findByIdOrNull(userId) ?: throw NotFoundException(User::class.java, userId)
+        )
 
     /** Saves a new row, writing the id and both timestamps from the body and stopping the `@PrePersist` callback. */
     private fun <E : Entity> insertRow(
@@ -200,16 +273,16 @@ class ReadModelProjector(
      */
     private fun translatingViolations(
         changeType: ChangeType,
-        entityType: String,
+        type: LoggedEntityType,
         body: Map<String, Any?>,
         block: () -> Unit
     ) {
         try {
             block()
         } catch (e: OptimisticLockingFailureException) {
-            throw ConcurrentUpdateException(domainClassFor(entityType), idOrNull(body), e)
+            throw ConcurrentUpdateException(type.domainClass.java, idOrNull(body), e)
         } catch (e: DataIntegrityViolationException) {
-            throw integrityExceptionFor(changeType, entityType, body, e)
+            throw integrityExceptionFor(changeType, type, body, e)
         }
     }
 
@@ -220,12 +293,12 @@ class ReadModelProjector(
      */
     private fun integrityExceptionFor(
         changeType: ChangeType,
-        entityType: String,
+        type: LoggedEntityType,
         body: Map<String, Any?>,
         exception: DataIntegrityViolationException
     ): RuntimeException =
         if (changeType == ChangeType.DELETE) {
-            DeletionConflictException(domainClassFor(entityType), idOrNull(body), exception)
+            DeletionConflictException(type.domainClass.java, idOrNull(body), exception)
         } else {
             duplicationOrNull(exception, body) ?: exception
         }
@@ -240,10 +313,6 @@ class ReadModelProjector(
         return DuplicationException(rule.domainClass, rule.field, rule.valueOf(body))
     }
 
-    /** The domain class for an entity type label, used when building a translated exception. */
-    private fun domainClassFor(entityType: String): Class<out DomainModel<*>> =
-        DOMAIN_CLASSES[entityType] ?: error("Unknown entity type '$entityType'.")
-
     /** The body's id parsed to a [UUID], or null when the body carries none. */
     private fun idOrNull(body: Map<String, Any?>): UUID? = body["id"]?.let { UUID.fromString(it.toString()) }
 
@@ -256,12 +325,6 @@ class ReadModelProjector(
         body: Map<String, Any?>,
         key: String
     ): LocalDateTime = LocalDateTime.parse(requireNotNull(body[key]) { "An event body must carry $key." }.toString())
-
-    /** Fails for a change type and entity type with no projection defined. */
-    private fun unsupported(
-        changeType: ChangeType,
-        entityType: String
-    ): Nothing = error("No projection defined for a $changeType of '$entityType'.")
 
     /** Maps a violated unique-constraint name to the domain class, field, and a value read from the body. */
     private class DuplicationRule(
@@ -279,18 +342,30 @@ class ReadModelProjector(
         val count: Int
     )
 
+    /** The flattened payload of an expense event (its buyer is stored as an id). */
+    private data class ExpenseEventPayload(
+        val id: UUID,
+        val createdAt: LocalDateTime,
+        val updatedAt: LocalDateTime,
+        val buyerUserId: UUID,
+        val weightGrams: Int,
+        val amountCents: Int,
+        val privateAmountCents: Int,
+        val kittyAmountCents: Int,
+        val note: String?
+    )
+
+    /** The flattened payload of a payment event (its user is stored as a nullable id). */
+    private data class PaymentEventPayload(
+        val id: UUID,
+        val createdAt: LocalDateTime,
+        val updatedAt: LocalDateTime,
+        val userId: UUID?,
+        val amountCents: Int,
+        val note: String?
+    )
+
     private companion object {
-        // the event entity type labels, derived from the domain class names so they match EventStore
-        private val USER = requireNotNull(User::class.simpleName)
-        private val COFFEE_CONSUMPTION = requireNotNull(CoffeeConsumption::class.simpleName)
-
-        // the domain class for each entity type label, for building the translated exceptions
-        private val DOMAIN_CLASSES: Map<String, Class<out DomainModel<*>>> =
-            mapOf(
-                USER to User::class.java,
-                COFFEE_CONSUMPTION to CoffeeConsumption::class.java
-            )
-
         // the unique constraints whose violation maps to a DuplicationException, keyed by lowercase name
         private val DUPLICATION_RULES: Map<String, DuplicationRule> =
             mapOf(

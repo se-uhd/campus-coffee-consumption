@@ -25,7 +25,8 @@ springdoc:
   swagger-ui:
     enabled: false
 # Custom properties; documented in their @ConfigurationProperties classes (AppProperties, IdProperties,
-# JwtProperties, FixturesProperties, CorsProperties, BootstrapAdminProperties), not here.
+# JwtProperties, FixturesProperties, CorsProperties, BootstrapAdminProperties, CoffeePriceProperties,
+# ConsumptionProperties), not here.
 campus-coffee:
   app:
     # Public origin used to build the capability URLs and QR codes; https in prod (the token never travels
@@ -40,6 +41,10 @@ campus-coffee:
     secret: ${JWT_SECRET:dev-only-insecure-jwt-secret-change-me-in-production}
   fixtures:
     load-on-startup: false
+  price:
+    initial-cents: ${CAMPUS_COFFEE_PRICE_INITIAL_CENTS:50}
+  consumption:
+    cancel-grace-period: ${CAMPUS_COFFEE_CANCEL_GRACE_PERIOD:5m}
 
 ---
 spring:

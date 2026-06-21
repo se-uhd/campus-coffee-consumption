@@ -7,6 +7,55 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-21
+
+A communal-fund accounting model on top of the consumption tracker: a price per cup, member-recorded bean
+purchases, a shared kitty, per-member balances, and a unified ledger. Built entirely on the existing
+event-sourcing machinery (append a full-state event, project it in one transaction); no change to that
+machinery. See `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`.
+
+### Added
+
+- **Global coffee price**, admin-set and event-sourced like every other entity, so the append-only log is
+  the full price history. Stored in integer euro cents. Endpoints: `PUT /api/price`, `GET /api/price/history`
+  (admin); the current price reaches members through their landing summary. Seeded at 50 cents on first
+  startup (`campus-coffee.price.initial-cents`).
+- **Bean-purchase expenses** (`Expense`), event-sourced. A member records their own purchase
+  (`POST /api/expenses`), always booked 100% from their own pocket — the buyer and split are server-derived,
+  so a member cannot attribute a purchase to someone else or fund it from the kitty. An admin lists,
+  records, corrects, and deletes a member's purchases with an explicit kitty/private split and buyer
+  attribution (`GET`/`POST`/`PUT`/`DELETE /api/users/{id}/expenses`); the split must sum to the total, and
+  a correction cannot change the buyer (delete and re-record to move one).
+- **Communal kitty and settlements** (`Payment`), admin-managed and event-sourced. A settlement records a
+  member paying money in (credits their balance, feeds the kitty); a kitty adjustment changes the kitty
+  alone (an initial float or a correction). Endpoints: `POST /api/payments/settlement`,
+  `POST /api/payments/adjustment`, `GET /api/kitty/ledger` (admin). Members see only the kitty *balance*,
+  in their summary.
+- **Per-member balance** (a prepaid-card figure — negative means the member owes the fund), valuing each cup
+  at the price in effect when it was consumed. The valuation is an "as-of" join over the event log keyed on
+  append order (`seq`), not on a wall-clock timestamp.
+- **Unified ledger** per member (`GET /api/ledger`, and the landing `GET /api/summary`): one chronological
+  view of coffees, the member's own purchases, and their settlements, each with a running balance. The
+  admin kitty ledger and a per-member overview (`GET /api/users/overview`, `GET /api/users/{id}/ledger`)
+  follow the same read-side walk over the log; new owner-key event indexes keep it efficient.
+- **Undo a recent coffee.** A member adds one coffee at a time (`POST /api/consumption`) and may undo the
+  most recent one within a grace period (`POST /api/consumption/cancel`, default 5 minutes,
+  `campus-coffee.consumption.cancel-grace-period`); the undo credits the exact price the coffee was charged
+  at, so it nets to zero. A member no longer has a free `−1`.
+- **`LoggedEntityType`** enum as the `events.entity_type` discriminator, making the read-model projector's
+  dispatch exhaustive so a new logged entity cannot be forgotten.
+- Flyway migrations `V4`–`V7`: `coffee_prices`, `expenses` (with a split-sum CHECK), `payments`, and the
+  owner-key event indexes.
+
+### Changed
+
+- **Reset removed.** Settling up is now a settlement (real money into the kitty); an admin count change is
+  just a correction (`PUT /api/users/{id}/consumption` stays). The member self-service `−1` is replaced by
+  the grace-period undo, and the member `GET`/`POST /api/consumption` shapes changed (the landing reads
+  `GET /api/summary`; `POST /api/consumption` adds one coffee and returns the summary).
+- **Deleting a member with financial history is refused** (409); an admin deactivates them instead, so the
+  audit trail is preserved. `expenses` and `payments` reference `users` with `RESTRICT`.
+
 ## [0.1.1] - 2026-06-21
 
 ### Added
@@ -44,7 +93,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.1.0] - 2026-06-20
 
-Initial release of CampusCoffeeConsumption, the coffee-consumption tracker for SE@UHD. The app was derived
+Initial release of CampusCoffeeConsumption, the coffee consumption tracker for SE@UHD. The app was derived
 from the CampusCoffee teaching project, reusing its hexagonal architecture, event sourcing machinery,
 build, test, and security scaffolding, and replacing the points-of-sale / review / OpenStreetMap domain
 with the consumption domain.
@@ -85,5 +134,6 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.2.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.2.0
 [0.1.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.1.1
 [0.1.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.1.0
