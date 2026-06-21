@@ -126,7 +126,12 @@ export class AdminUsersComponent implements OnInit {
     this.error = '';
     this.createdLink = '';
     try {
-      const created = await this.userService.create({ ...this.draft, role: this.draft.role ?? 'USER' });
+      const role: Role = this.draft.role ?? 'USER';
+      // a member authenticates with their capability link and has no password; only an admin sends one
+      // (the backend rejects a non-admin password, and `@Size(min=8)` would reject an empty one)
+      const { password, ...rest } = this.draft;
+      const payload: UserDto = role === 'ADMIN' ? { ...rest, role, password } : { ...rest, role };
+      const created = await this.userService.create(payload);
       this.createdLink = created.capabilityUrl ?? '';
       this.draft = this.emptyDraft();
       await this.reload();
@@ -167,6 +172,6 @@ export class AdminUsersComponent implements OnInit {
   }
 
   private emptyDraft(): UserDto {
-    return { loginName: '', emailAddress: '', firstName: '', lastName: '', password: '', role: 'USER' as Role };
+    return { loginName: '', emailAddress: '', firstName: '', lastName: '', role: 'USER' as Role };
   }
 }

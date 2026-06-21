@@ -24,10 +24,10 @@ import java.util.UUID
 
 /**
  * Admin controller for viewing and adjusting any member's coffee consumption by user id (the admin
- * landing, edit mode, and reset after payment). The resource is admin-only (gated in the security
- * configuration); the absolute override ([overrideTotal]) is the admin-only mutation a regular member
- * cannot perform on their own count, and a `total` of zero is the reset. Every view and mutation returns
- * the composite [ConsumptionDto] (current total plus a page of recent changes).
+ * landing and count corrections). The resource is admin-only (gated in the security configuration); the
+ * absolute override ([overrideTotal]) is the admin-only correction a regular member cannot perform on
+ * their own count. Every view and mutation returns the composite [ConsumptionDto] (current total plus a
+ * page of recent changes).
  */
 @Tag(name = "User consumption (admin)", description = "Admin view and adjustment of any member's coffee consumption.")
 @Controller
@@ -76,13 +76,13 @@ class AdminConsumptionController(
     }
 
     /**
-     * Overrides the count of the member with [userId] to an explicit value (edit mode); a `total` of zero
-     * is the reset after payment. An optional note documents the reason.
+     * Overrides the count of the member with [userId] to an explicit value (an admin correction; any
+     * non-negative total). An optional note documents the reason.
      *
      * @param userId the id of the member whose count to set
      * @param dto    the new, non-negative total and an optional note
      */
-    @Operation(summary = "Override a member's coffee count to an explicit value (edit mode / reset).")
+    @Operation(summary = "Override a member's coffee count to an explicit value (admin correction).")
     @PutMapping("")
     fun overrideTotal(
         @Parameter(description = "Unique identifier of the member.", required = true)

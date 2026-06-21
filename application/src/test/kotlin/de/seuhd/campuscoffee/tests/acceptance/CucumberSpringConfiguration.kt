@@ -1,6 +1,9 @@
 package de.seuhd.campuscoffee.tests.acceptance
 
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
+import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
+import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import de.seuhd.campuscoffee.tests.SystemTestUtils.configureClient
@@ -25,7 +28,10 @@ import org.testcontainers.containers.PostgreSQLContainer
 @CucumberContextConfiguration
 class CucumberSpringConfiguration(
     private val userService: UserService,
-    private val coffeeConsumptionService: CoffeeConsumptionService
+    private val coffeeConsumptionService: CoffeeConsumptionService,
+    private val coffeePriceService: CoffeePriceService,
+    private val expenseService: ExpenseService,
+    private val paymentService: PaymentService
 ) {
     @LocalServerPort
     private var port: Int = 0
@@ -35,6 +41,7 @@ class CucumberSpringConfiguration(
         clearAll()
         val users = TestFixtures.createUserFixtures(userService)
         TestFixtures.createConsumptionFixtures(coffeeConsumptionService, users)
+        TestFixtures.createPriceFixture(coffeePriceService)
         configureClient(port)
     }
 
@@ -44,9 +51,13 @@ class CucumberSpringConfiguration(
     }
 
     private fun clearAll() {
-        // consumptions reference users via a foreign key, so they must be cleared first
+        // money children reference users (RESTRICT) and consumptions cascade, so clear them before users;
+        // the price is independent
+        expenseService.clear()
+        paymentService.clear()
         coffeeConsumptionService.clear()
         userService.clear()
+        coffeePriceService.clear()
     }
 
     companion object {

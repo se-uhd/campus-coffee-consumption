@@ -34,6 +34,24 @@ export const routes: Routes = [
       import('./pages/admin-users/admin-users.component').then((m) => m.AdminUsersComponent)
   },
   {
+    path: 'admin/price',
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./pages/admin-price/admin-price.component').then((m) => m.AdminPriceComponent)
+  },
+  {
+    path: 'admin/expenses',
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./pages/admin-expenses/admin-expenses.component').then((m) => m.AdminExpensesComponent)
+  },
+  {
+    path: 'admin/kitty',
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./pages/admin-kitty/admin-kitty.component').then((m) => m.AdminKittyComponent)
+  },
+  {
     path: 'profile',
     canActivate: [adminGuard],
     loadComponent: () =>

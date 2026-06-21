@@ -1,10 +1,16 @@
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
 import de.seuhd.campuscoffee.data.mapper.CoffeeConsumptionEntityMapper
+import de.seuhd.campuscoffee.data.mapper.CoffeePriceEntityMapper
+import de.seuhd.campuscoffee.data.mapper.ExpenseEntityMapper
+import de.seuhd.campuscoffee.data.mapper.PaymentEntityMapper
 import de.seuhd.campuscoffee.data.mapper.UserEntityMapper
 import de.seuhd.campuscoffee.data.persistence.entities.CoffeeConsumptionEntity
 import de.seuhd.campuscoffee.data.persistence.entities.UserEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeConsumptionRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.CoffeePriceRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.ExpenseRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.PaymentRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.UserRepository
 import de.seuhd.campuscoffee.domain.exceptions.ConcurrentUpdateException
 import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
@@ -32,11 +38,28 @@ import java.util.UUID
 class ReadModelProjectorExceptionMappingTest {
     private val userRepository = mock<UserRepository>()
     private val coffeeConsumptionRepository = mock<CoffeeConsumptionRepository>()
+    private val coffeePriceRepository = mock<CoffeePriceRepository>()
+    private val expenseRepository = mock<ExpenseRepository>()
+    private val paymentRepository = mock<PaymentRepository>()
     private val userMapper = mock<UserEntityMapper>()
     private val coffeeConsumptionMapper = mock<CoffeeConsumptionEntityMapper>()
+    private val coffeePriceMapper = mock<CoffeePriceEntityMapper>()
+    private val expenseMapper = mock<ExpenseEntityMapper>()
+    private val paymentMapper = mock<PaymentEntityMapper>()
 
     private val projector =
-        ReadModelProjector(userRepository, coffeeConsumptionRepository, userMapper, coffeeConsumptionMapper)
+        ReadModelProjector(
+            userRepository,
+            coffeeConsumptionRepository,
+            coffeePriceRepository,
+            expenseRepository,
+            paymentRepository,
+            userMapper,
+            coffeeConsumptionMapper,
+            coffeePriceMapper,
+            expenseMapper,
+            paymentMapper
+        )
 
     private fun integrityViolation(constraintName: String?): DataIntegrityViolationException {
         val hibernate = mock<ConstraintViolationException>()

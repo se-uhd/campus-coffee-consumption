@@ -1,0 +1,118 @@
+package de.seuhd.campuscoffee.tests.system
+
+import de.seuhd.campuscoffee.api.dtos.MemberExpenseDto
+import de.seuhd.campuscoffee.api.dtos.PriceUpdateDto
+import de.seuhd.campuscoffee.api.dtos.SettlementRequestDto
+import de.seuhd.campuscoffee.domain.model.persistedId
+import de.seuhd.campuscoffee.tests.SystemTestUtils.client
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.http.MediaType
+import tools.jackson.databind.ObjectMapper
+import javax.sql.DataSource
+
+/**
+ * System tests that assert the append-only event log records each money change as a full-state event of the
+ * right entity_type, carrying the expected body fields and the acting user's login in created_by. The log is
+ * read straight from the `events` table (entity_type, body jsonb, created_by, note) over a plain JDBC
+ * connection from the application's DataSource, avoiding a dependency on the data layer's event types.
+ */
+class AccountingEventLogSystemTests : AbstractSystemTest() {
+    @Autowired
+    private lateinit var dataSource: DataSource
+
+    private val objectMapper = ObjectMapper()
+
+    private val member = "maxmustermann"
+
+    private data class EventRow(
+        val body: Map<String, Any?>,
+        val createdBy: String?,
+        val note: String?
+    )
+
+    private fun eventsOf(entityType: String): List<EventRow> {
+        val rows = mutableListOf<EventRow>()
+        dataSource.connection.use { connection ->
+            connection
+                .prepareStatement("SELECT body, created_by, note FROM events WHERE entity_type = ? ORDER BY seq ASC")
+                .use { statement ->
+                    statement.setString(1, entityType)
+                    statement.executeQuery().use { rs ->
+                        while (rs.next()) {
+                            @Suppress("UNCHECKED_CAST")
+                            val body =
+                                objectMapper.readValue(
+                                    rs.getString("body"),
+                                    Map::class.java
+                                ) as Map<String, Any?>
+                            rows += EventRow(body, rs.getString("created_by"), rs.getString("note"))
+                        }
+                    }
+                }
+        }
+        return rows
+    }
+
+    @Test
+    fun `setting the price appends a CoffeePrice event with the new amount and the admin login`() {
+        client()
+            .put()
+            .uri("/api/price")
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(PriceUpdateDto(70))
+            .withAdmin()
+            .exchange()
+
+        val priceEvents = eventsOf("CoffeePrice")
+        // the seeded price (50) plus the just-set 70
+        assertThat(priceEvents.map { (it.body["amountCents"] as Number).toInt() }).contains(50, 70)
+        val latest = priceEvents.last()
+        assertThat((latest.body["amountCents"] as Number).toInt()).isEqualTo(70)
+        assertThat(latest.createdBy).isEqualTo("jane_doe")
+    }
+
+    @Test
+    fun `a member purchase appends an Expense event with the buyer and amounts and the member login`() {
+        client()
+            .post()
+            .uri("/api/expenses")
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(MemberExpenseDto(weightGrams = 1000, amountCents = 900, note = "beans"))
+            .withMember(member)
+            .exchange()
+
+        val expenseEvents = eventsOf("Expense")
+        assertThat(expenseEvents).hasSize(1)
+        val event = expenseEvents.first()
+        assertThat(event.body["buyerUserId"]).isEqualTo(seededUser(member).persistedId.toString())
+        assertThat((event.body["amountCents"] as Number).toInt()).isEqualTo(900)
+        assertThat((event.body["privateAmountCents"] as Number).toInt()).isEqualTo(900)
+        assertThat((event.body["kittyAmountCents"] as Number).toInt()).isEqualTo(0)
+        assertThat(event.createdBy).isEqualTo(member)
+    }
+
+    @Test
+    fun `a settlement appends a Payment event with the member and amount and the admin login`() {
+        client()
+            .post()
+            .uri("/api/payments/settlement")
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(SettlementRequestDto(userId = seededUser(member).persistedId, amountCents = 1000, note = "paid"))
+            .withAdmin()
+            .exchange()
+
+        val paymentEvents = eventsOf("Payment")
+        assertThat(paymentEvents).hasSize(1)
+        val event = paymentEvents.first()
+        assertThat(event.body["userId"]).isEqualTo(seededUser(member).persistedId.toString())
+        assertThat((event.body["amountCents"] as Number).toInt()).isEqualTo(1000)
+        // a settlement's note is carried in the full-state body (the event note column is the admin
+        // override/reset reason, set only by the consumption service); the actor login is the admin
+        assertThat(event.body["note"]).isEqualTo("paid")
+        assertThat(event.createdBy).isEqualTo("jane_doe")
+    }
+}

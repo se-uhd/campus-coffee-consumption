@@ -2,6 +2,7 @@ package de.seuhd.campuscoffee
 
 import de.seuhd.campuscoffee.domain.ports.StartupTask
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import org.slf4j.LoggerFactory
@@ -21,7 +22,8 @@ import org.springframework.stereotype.Component
 @ConditionalOnProperty("campus-coffee.fixtures.load-on-startup", havingValue = "true")
 class FixtureStartupLoader(
     private val userService: UserService,
-    private val coffeeConsumptionService: CoffeeConsumptionService
+    private val coffeeConsumptionService: CoffeeConsumptionService,
+    private val coffeePriceService: CoffeePriceService
 ) : StartupTask {
     override val order = ORDER
 
@@ -35,7 +37,7 @@ class FixtureStartupLoader(
             log.info("Skipping the fixture load: the database already has users.")
             return
         }
-        val (users, consumptions) = TestFixtures.loadAll(userService, coffeeConsumptionService)
+        val (users, consumptions) = TestFixtures.loadAll(userService, coffeeConsumptionService, coffeePriceService)
         log.info("Loaded the fixture data on startup: {} users, {} consumptions.", users, consumptions)
     }
 

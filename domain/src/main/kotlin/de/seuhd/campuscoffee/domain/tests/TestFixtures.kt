@@ -1,9 +1,11 @@
 package de.seuhd.campuscoffee.domain.tests
 
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
+import de.seuhd.campuscoffee.domain.model.CoffeePrice
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import java.time.LocalDateTime
 import java.util.UUID
@@ -15,6 +17,9 @@ import java.util.UUID
  */
 object TestFixtures {
     private val DATE_TIME: LocalDateTime = LocalDateTime.of(2025, 10, 29, 12, 0, 0)
+
+    /** The initial coffee price the fixtures seed, in euro cents (50 cents per cup). */
+    const val INITIAL_PRICE_CENTS = 50
 
     /**
      * Builds a deterministic UUID for a fixture. UUID(long mostSigBits, long leastSigBits) is the JDK
@@ -146,18 +151,31 @@ object TestFixtures {
     ): List<CoffeeConsumption> = createdUsers.map { coffeeConsumptionService.createForUser(it) }
 
     /**
-     * Loads the users and their (zeroed) consumptions into the given services and returns the counts
-     * (users, consumptions). Used by the dev endpoint and the optional startup loader.
+     * Seeds the initial coffee price ([INITIAL_PRICE_CENTS]) if none exists yet, and returns it. Seeded
+     * after the users and consumptions so it does not perturb their deterministic ids, and so a price is in
+     * effect before any real coffee is added.
+     *
+     * @param coffeePriceService the service used to seed the price
+     */
+    fun createPriceFixture(coffeePriceService: CoffeePriceService): CoffeePrice =
+        coffeePriceService.ensureInitialPrice(INITIAL_PRICE_CENTS)
+
+    /**
+     * Loads the users, their (zeroed) consumptions, and the initial price into the given services and
+     * returns the counts (users, consumptions). Used by the dev endpoint and the optional startup loader.
      *
      * @param userService              the service used to persist the users
      * @param coffeeConsumptionService the service used to create the consumptions
+     * @param coffeePriceService       the service used to seed the initial price
      */
     fun loadAll(
         userService: UserService,
-        coffeeConsumptionService: CoffeeConsumptionService
+        coffeeConsumptionService: CoffeeConsumptionService,
+        coffeePriceService: CoffeePriceService
     ): Pair<Int, Int> {
         val users = createUserFixtures(userService)
         val consumptions = createConsumptionFixtures(coffeeConsumptionService, users)
+        createPriceFixture(coffeePriceService)
         return users.size to consumptions.size
     }
 }

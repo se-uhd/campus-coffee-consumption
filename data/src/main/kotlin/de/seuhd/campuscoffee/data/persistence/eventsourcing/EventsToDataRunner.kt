@@ -1,6 +1,9 @@
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeConsumptionRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.CoffeePriceRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.ExpenseRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.PaymentRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.UserRepository
 import de.seuhd.campuscoffee.domain.ports.StartupTask
 import org.slf4j.LoggerFactory
@@ -25,7 +28,10 @@ class EventsToDataRunner(
     private val eventRepository: EventRepository,
     private val projector: ReadModelProjector,
     private val userRepository: UserRepository,
-    private val coffeeConsumptionRepository: CoffeeConsumptionRepository
+    private val coffeeConsumptionRepository: CoffeeConsumptionRepository,
+    private val coffeePriceRepository: CoffeePriceRepository,
+    private val expenseRepository: ExpenseRepository,
+    private val paymentRepository: PaymentRepository
 ) : StartupTask {
     override val order = ORDER
 
@@ -49,10 +55,16 @@ class EventsToDataRunner(
         log.info("Rebuilt the read model from {} events in the log.", events.size)
     }
 
-    /** Empties the read tables in foreign key order (consumptions, which reference users, then users). */
+    /**
+     * Empties the read tables in foreign key order: the children that reference users (consumptions,
+     * expenses, payments) before users; the price is independent and is cleared too.
+     */
     private fun clearReadTables() {
         coffeeConsumptionRepository.deleteAllInBatch()
+        expenseRepository.deleteAllInBatch()
+        paymentRepository.deleteAllInBatch()
         userRepository.deleteAllInBatch()
+        coffeePriceRepository.deleteAllInBatch()
     }
 
     companion object {

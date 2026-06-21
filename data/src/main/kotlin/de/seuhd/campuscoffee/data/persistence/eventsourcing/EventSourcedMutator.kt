@@ -75,17 +75,23 @@ class EventSourcedMutator(
      * appends the DELETE event and projects the removal (a still-referenced row throws
      * [DeletionConflictException][de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException]).
      *
+     * The DELETE event carries the id, plus any owner-key body fields [ownerKeys] derives from the loaded
+     * object, so a deleted expense or settlement is still matched to its owner by the member/kitty ledger
+     * reads (which key on `buyerUserId`/`userId`) and the deletion is reversed there.
+     *
      * @param domainType the domain type of the object to delete
      * @param id the id of the object to delete
      * @param loadForExistence loads the object by id first, so a missing one throws before the DELETE is appended
+     * @param ownerKeys derives the owner-key body fields from the loaded object (none by default)
      */
-    fun delete(
+    fun <D : Any> delete(
         domainType: KClass<out DomainModel<*>>,
         id: UUID,
-        loadForExistence: (UUID) -> Any?
+        loadForExistence: (UUID) -> D,
+        ownerKeys: (D) -> Map<String, Any?> = { emptyMap() }
     ) {
-        loadForExistence(id)
-        project(eventStore.appendDelete(domainType, id))
+        val loaded = loadForExistence(id)
+        project(eventStore.appendDelete(domainType, id, ownerKeys(loaded)))
     }
 
     /**
