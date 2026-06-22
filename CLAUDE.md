@@ -526,9 +526,9 @@ controllers map paths relative to the resource.
 
 ### Member self-service (auth: `X-Coffee-Token` header; principal = the token's member)
 
-- `GET  /summary?ledgerLimit=10&ledgerOffset=0`: the member landing in one call (`MemberSummaryDto`):
+- `GET  /summary?limit=10&offset=0`: the member landing in one call (`MemberSummaryDto`):
   current total, balance, the current price, the kitty balance, whether the most recent coffee is still
-  `cancellable`, and the first page of the unified `ledger` (`ledgerLimit` defaults to 10).
+  `cancellable`, and the first page of the unified `ledger` (`limit` defaults to 10).
 - `POST /consumption` (no body): add one coffee, returns the summary.
 - `POST /consumption/cancel`: undo the most recent un-cancelled own coffee within the grace period (nothing
   to undo / past the grace period → 409).
