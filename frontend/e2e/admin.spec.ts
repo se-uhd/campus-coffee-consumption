@@ -161,7 +161,7 @@ test.describe('admin flow', () => {
   test('an expense with a kitty share draws on a funded kitty', async ({ page }) => {
     const token = await adminToken(api);
     // fund the kitty so the kitty portion of the purchase does not overdraw it
-    const float = await api.post('/api/payments/adjustment', {
+    const float = await api.post('/api/kitty/adjustment', {
       headers: { Authorization: `Bearer ${token}` },
       data: { amountCents: 1000 }
     });

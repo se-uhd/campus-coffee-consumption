@@ -120,7 +120,7 @@ class AccountingEventLogSystemTests : AbstractSystemTest() {
     fun `a settlement appends a Payment event with the member and amount and the admin login`() {
         client()
             .post()
-            .uri("/api/payments/settlement")
+            .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
             .body(SettlementRequestDto(userId = seededUser(member).persistedId, amountCents = 1000, note = "paid"))
             .withAdmin()

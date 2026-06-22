@@ -38,7 +38,7 @@ class AccountingAuthorizationSystemTests : AbstractSystemTest() {
         val status =
             client()
                 .get()
-                .uri("/api/kitty/ledger")
+                .uri("/api/kitty/history")
                 .accept(MediaType.APPLICATION_JSON)
                 .withMember(member)
                 .exchange()

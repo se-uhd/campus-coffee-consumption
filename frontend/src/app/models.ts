@@ -35,6 +35,7 @@ export type { AdminExpenseDto as AdminExpenseRequest } from './api/model/adminEx
 export type { PriceUpdateDto as PriceUpdateRequest } from './api/model/priceUpdateDto';
 export type { SettlementRequestDto as SettlementRequest } from './api/model/settlementRequestDto';
 export type { AdjustmentRequestDto as AdjustmentRequest } from './api/model/adjustmentRequestDto';
+export type { ProfileUpdateDto as ProfileUpdateRequest } from './api/model/profileUpdateDto';
 
 // --- Inline-enum unions surfaced as standalone aliases ------------------------------------------
 // openapi-generator emits these enums namespaced on their owning DTO (`UserDto.RoleEnum`,

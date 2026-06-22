@@ -500,9 +500,8 @@ Two authentication mechanisms, one per audience; there is **no HTTP Basic**:
   self-service. A missing, unknown, or rotated token leaves the request unauthenticated → 401. A
   deactivated member is still authenticated (reads work), but the domain rejects their mutations → 403.
 
-The access rules gate the API by audience (`/api/users/**`, `/api/price/**`, `/api/payments/**`, and
-`/api/kitty/**` → `ROLE_ADMIN`; `/api/consumption/**`, `/api/expenses/**`, `/api/profile/**`,
-`/api/summary`, and `/api/ledger` → `ROLE_USER`; `/api/auth/token`, actuator health, Swagger, dev
+The access rules gate the API by audience (`/api/users/**`, `/api/price/**`, and `/api/kitty/**` → `ROLE_ADMIN`; `/api/consumption/**`, `/api/expenses/**`, `/api/profile/**`,
+`/api/summary`, and `/api/activity` → `ROLE_USER`; `/api/auth/token`, actuator health, Swagger, dev
 endpoints, and the SPA routes are public); the finer ownership rules live in the domain services.
 `ActorProvider` returns the
 current principal's login for `created_by`; `CurrentUserProvider` resolves the principal to a domain
@@ -524,7 +523,7 @@ controllers map paths relative to the resource.
 - `POST /consumption` (no body): add one coffee, returns the summary.
 - `POST /consumption/cancel`: undo the most recent un-cancelled own coffee within the grace period (nothing
   to undo / past the grace period → 409).
-- `GET  /ledger?limit=20&offset=0`: own unified ledger (coffees, own purchases, settlements) newest-first,
+- `GET  /activity?limit=20&offset=0`: own unified ledger (coffees, own purchases, settlements) newest-first,
   each entry with a running balance.
 - `POST /expenses` `{ amountCents, weightGrams, note? }`: record an own bean purchase (booked 100% private
   to the member; the buyer and split are server-derived).
@@ -544,15 +543,15 @@ controllers map paths relative to the resource.
 - `GET /users/qr.zip`: a streamed ZIP of every member's QR code as `<loginName>.png` (capped at 1000
   members; powers the admin "Download all QR codes" button).
 - `GET  /users/{id}/consumption?limit=5&offset=0`: a member's total plus a page of the change log.
-- `GET  /users/{id}/ledger?limit=20&offset=0`: a member's unified ledger.
+- `GET  /users/{id}/activity?limit=20&offset=0`: a member's unified ledger.
 - `POST /users/{id}/consumption` `{ delta: 1 | -1 }`: a single-step change.
 - `PUT  /users/{id}/consumption` `{ total, note? }`: the absolute count correction (`note` is the optional admin reason, ≤ 500 chars).
 - `POST/PUT/DELETE /users/{id}/expenses` `{ amountCents, privateAmountCents, kittyAmountCents, weightGrams, note? }`: record / correct / delete a member's bean purchase with an explicit private/kitty split (must sum to the total) attributed to the member as buyer.
 - `GET /price`: read the current global price (admin-only; members receive it through their landing summary).
 - `PUT /price` `{ amountCents }`: set the global price; `GET /price/history` reads the full price history from the log.
-- `POST /payments/settlement` `{ userId, amountCents, note? }`: a member pays money into the kitty (credits the member, feeds the kitty).
-- `POST /payments/adjustment` `{ amountCents, note? }`: a pure kitty adjustment (an initial float or a correction).
-- `GET /kitty/ledger?limit=50&offset=0`: the kitty ledger (settlements and admin expenses, with the running kitty balance).
+- `POST /kitty/deposit` `{ userId, amountCents, note? }`: a member pays money into the kitty (credits the member, feeds the kitty).
+- `POST /kitty/adjustment` `{ amountCents, note? }`: a pure kitty adjustment (an initial float or a correction).
+- `GET /kitty/history?limit=50&offset=0`: the kitty ledger (settlements and admin expenses, with the running kitty balance).
 
 ### Auth and dev
 

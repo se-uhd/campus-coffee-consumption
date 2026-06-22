@@ -350,7 +350,7 @@ export class AdminLandingComponent implements OnInit {
   /** Refreshes the global price and the kitty balance shown in the balance summary. */
   private async refreshFund(): Promise<void> {
     // read just the current price (one GET), not the whole history, since only the latest value is shown
-    const [price, kitty] = await Promise.all([this.priceService.current(), this.kittyService.ledger(1, 0)]);
+    const [price, kitty] = await Promise.all([this.priceService.current(), this.kittyService.history(1, 0)]);
     this.priceCents = price.amountCents;
     this.kittyBalanceCents = kitty.balanceCents;
   }
@@ -400,7 +400,7 @@ export class AdminLandingComponent implements OnInit {
    * @param requestedId the member id captured when the load was started
    */
   private async loadLedger(requestedId: string = this.selectedId): Promise<void> {
-    const ledger = await this.accountingService.memberLedger(requestedId, LEDGER_PAGE_SIZE, 0);
+    const ledger = await this.accountingService.memberActivity(requestedId, LEDGER_PAGE_SIZE, 0);
     if (requestedId !== this.selectedId) {
       return;
     }
@@ -414,7 +414,7 @@ export class AdminLandingComponent implements OnInit {
     const requestedId = this.selectedId;
     this.loadingMore = true;
     try {
-      const next = await this.accountingService.memberLedger(
+      const next = await this.accountingService.memberActivity(
         requestedId,
         LEDGER_PAGE_SIZE,
         this.ledger.length
