@@ -2,7 +2,7 @@ package de.seuhd.campuscoffee.api.capability
 
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.QrCodeGenerator
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.http.ContentDisposition
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -50,12 +50,10 @@ class CapabilityQrResponder(
         val withToken = users.filter { it.capabilityToken != null }
         val bundled =
             if (withToken.size > MAX_MEMBERS) {
-                log.warn(
-                    "Capping the QR ZIP at {} members (requested {}); bundling only the first {}.",
-                    MAX_MEMBERS,
-                    withToken.size,
-                    MAX_MEMBERS
-                )
+                log.warn {
+                    "Capping the QR ZIP at $MAX_MEMBERS members (requested ${withToken.size}); " +
+                        "bundling only the first $MAX_MEMBERS."
+                }
                 withToken.take(MAX_MEMBERS)
             } else {
                 withToken
@@ -101,7 +99,7 @@ class CapabilityQrResponder(
     private fun safeName(loginName: String): String = UNSAFE_NAME_CHARS.replace(loginName, "_").ifEmpty { "member" }
 
     private companion object {
-        private val log = LoggerFactory.getLogger(CapabilityQrResponder::class.java)
+        private val log = KotlinLogging.logger {}
         private const val PNG_SIZE_PX = 1024
         private const val MAX_MEMBERS = 1000
 

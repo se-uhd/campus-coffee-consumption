@@ -9,6 +9,9 @@ spring-boot = "4.1.0"
 junit = "6.1.0"
 springdoc = "3.0.3"
 mapstruct = "1.6.3"
+# kotlin-logging: idiomatic Kotlin logging over SLF4J. Log calls take a lambda (built only when the level
+# is enabled) and the logger derives its name from the enclosing class.
+kotlin-logging = "8.0.4"
 cucumber = "7.34.3"
 archunit = "1.4.2"
 # ZXing for backend QR-code generation (the member capability URL codes); not in the Boot BOM.
@@ -65,6 +68,7 @@ mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version.ref = "
 
 # Explicitly versioned (not in the BOMs)
 springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
 mapstruct = { module = "org.mapstruct:mapstruct", version.ref = "mapstruct" }
 mapstruct-processor = { module = "org.mapstruct:mapstruct-processor", version.ref = "mapstruct" }
 cucumber-java = { module = "io.cucumber:cucumber-java", version.ref = "cucumber" }

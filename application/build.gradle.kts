@@ -21,6 +21,8 @@ dependencies {
 
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.actuator)
+    // The startup data loaders log via KotlinLogging.logger {} (a Kotlin facade over SLF4J).
+    implementation(libs.kotlin.logging)
     // Spring Security (the filter chain and the capability token filter) and OAuth2 resource server (JWT
     // bearer tokens). The starter ships a working-but-permissive setup; the security config tightens it.
     implementation(libs.spring.boot.starter.security)
@@ -159,6 +161,25 @@ tasks.named("jar") {
 // dev default in application.yaml (and of any secret a real deployment supplies).
 tasks.test {
     systemProperty("campus-coffee.jwt.secret", "test-only-hs256-secret-not-used-outside-the-test-suite")
+
+    // Run the system, acceptance, and architecture tests across several JVM processes. Process-level
+    // forking is the only safe form of parallelism here: SystemTestUtils is an `object` with shared
+    // mutable state (the RestTestClient) and the test bases wipe the whole database between tests with
+    // clearAll(), so two tests must never run concurrently against the same JVM or database. Each fork is
+    // a separate JVM, so it gets its own SystemTestUtils and its own Testcontainers PostgreSQL instance
+    // (the container lives in AbstractSystemTest's companion object, one per JVM), and JUnit runs the
+    // classes within a fork serially, so two tests never touch the shared client at once and clearAll()
+    // never wipes a running test's data. Leaving forkEvery at its default (0) reuses each fork JVM across
+    // the classes it runs, so Spring's per-JVM context cache still pays off within the fork. Each
+    // concurrent fork boots a Spring context and starts a PostgreSQL container, both of which cost memory,
+    // so the fork count is capped; override it with -PtestForks=N (1 disables parallelism, e.g. on a small
+    // CI runner).
+    maxParallelForks =
+        (project.findProperty("testForks") as String?)?.toInt()
+            ?: (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 4)
+
+    // Cap each fork's heap so the forks cannot collectively overcommit memory.
+    maxHeapSize = "1g"
 }
 
 // Cross-module mutation: mutate the api and data classes against this module's system and
