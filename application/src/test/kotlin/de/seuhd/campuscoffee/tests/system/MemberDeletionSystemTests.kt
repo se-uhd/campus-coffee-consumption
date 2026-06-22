@@ -96,7 +96,7 @@ class MemberDeletionSystemTests : AbstractSystemTest() {
         val id = createMember("hassettlement")
         client()
             .post()
-            .uri("/api/payments/settlement")
+            .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
             .body(SettlementRequestDto(userId = id, amountCents = 500, note = null))
             .withAdmin()

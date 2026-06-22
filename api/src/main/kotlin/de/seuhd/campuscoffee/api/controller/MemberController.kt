@@ -19,32 +19,33 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestParam
 
 /**
- * Member self-service read controller (capability token). `GET /summary` returns everything the landing
- * page needs in one call; `GET /ledger` pages through the member's full unified ledger.
+ * The authenticated member's own self-service reads (capability token). `GET /summary` returns everything
+ * the landing page needs in one call; `GET /activity` pages through the member's full activity feed (their
+ * unified ledger of coffees, purchases, and settlements, newest first).
  */
-@Tag(name = "Summary", description = "A member's landing summary and unified ledger (X-Coffee-Token).")
+@Tag(name = "Member", description = "The authenticated member's own landing summary and activity (X-Coffee-Token).")
 @Validated
 @Controller
-class SummaryController(
+class MemberController(
     private val accountingService: AccountingService,
     private val accountingDtoMapper: AccountingDtoMapper,
     private val currentUserProvider: CurrentUserProvider
 ) {
     /**
      * Returns the authenticated member's landing summary (count, price, balance, kitty balance, whether
-     * the latest coffee is cancellable, and the first page of their ledger).
+     * the latest coffee is cancellable, and the first page of their activity).
      *
-     * @param ledgerLimit  the number of ledger entries on the first page
-     * @param ledgerOffset the number of newest ledger entries to skip
+     * @param ledgerLimit  the number of activity entries on the first page
+     * @param ledgerOffset the number of newest activity entries to skip
      */
     @Operation(summary = "Get the authenticated member's landing summary.")
     @GetMapping("/summary")
     fun summary(
-        @Parameter(description = "Number of ledger entries on the first page.")
+        @Parameter(description = "Number of activity entries on the first page.")
         @RequestParam(defaultValue = "10")
         @Positive
         @Max(MAX_PAGE_LIMIT) ledgerLimit: Int,
-        @Parameter(description = "Number of newest ledger entries to skip.")
+        @Parameter(description = "Number of newest activity entries to skip.")
         @RequestParam(defaultValue = "0")
         @Min(0) ledgerOffset: Int
     ): ResponseEntity<MemberSummaryDto> {
@@ -57,14 +58,14 @@ class SummaryController(
     }
 
     /**
-     * Returns a page of the authenticated member's unified ledger (newest first).
+     * Returns a page of the authenticated member's activity feed (their unified ledger, newest first).
      *
      * @param limit  the maximum number of entries to return
      * @param offset the number of newest entries to skip
      */
-    @Operation(summary = "Get a page of the authenticated member's unified ledger.")
-    @GetMapping("/ledger")
-    fun ledger(
+    @Operation(summary = "Get a page of the authenticated member's activity.")
+    @GetMapping("/activity")
+    fun activity(
         @Parameter(description = "Maximum number of entries to return.")
         @RequestParam(defaultValue = "20")
         @Positive

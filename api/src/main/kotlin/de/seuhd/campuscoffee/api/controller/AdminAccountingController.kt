@@ -47,15 +47,15 @@ class AdminAccountingController(
     }
 
     /**
-     * Returns a page of the given member's unified ledger (newest first).
+     * Returns a page of the given member's activity feed (their unified ledger, newest first).
      *
-     * @param userId the member whose ledger to read
+     * @param userId the member whose activity to read
      * @param limit  the maximum number of entries to return
      * @param offset the number of newest entries to skip
      */
-    @Operation(summary = "Get a page of a member's unified ledger.")
-    @GetMapping("/{userId}/ledger")
-    fun memberLedger(
+    @Operation(summary = "Get a page of a member's activity.")
+    @GetMapping("/{userId}/activity")
+    fun memberActivity(
         @PathVariable userId: UUID,
         @Parameter(description = "Maximum number of entries to return.")
         @RequestParam(defaultValue = "20")
@@ -67,8 +67,8 @@ class AdminAccountingController(
     ): ResponseEntity<List<LedgerEntryDto>> {
         val admin = currentUserProvider.currentUser()
         return ResponseEntity.ok(
-            // the admin-by-id ledger exposes the kitty-funded portion of a split expense (the member-serving
-            // /api/ledger does not, see AccountingService.memberLedger)
+            // the admin-by-id activity exposes the kitty-funded portion of a split expense (the member-serving
+            // /api/activity does not, see AccountingService.memberLedger)
             accountingDtoMapper.toEntryDtos(
                 accountingService.memberLedger(userId, limit, offset, admin, includeKittyPortion = true)
             )

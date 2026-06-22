@@ -274,7 +274,7 @@ export class CoffeeLandingComponent implements OnInit {
   async loadMore(): Promise<void> {
     this.loadingMore = true;
     try {
-      const next = await this.summaryService.getLedger(LEDGER_PAGE_SIZE, this.ledger.length);
+      const next = await this.summaryService.getActivity(LEDGER_PAGE_SIZE, this.ledger.length);
       const { entries, appended } = appendLedgerPage(this.ledger, next);
       this.ledger = entries;
       // base "Load more" on the rows actually gained: a full page that collapsed to fewer new rows (its
