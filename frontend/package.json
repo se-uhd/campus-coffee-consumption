@@ -1,6 +1,9 @@
 {
   "name": "campus-coffee-consumption-frontend",
   "version": "0.1.0",
+  "engines": {
+    "node": ">=24.15.0"
+  },
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
