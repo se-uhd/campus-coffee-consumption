@@ -109,7 +109,7 @@ test.describe('admin flow', () => {
     await expect(balanceCard.locator('.display')).toHaveText('0.00 €');
 
     // record a 5.00 € deposit for the first member in the select
-    await page.getByLabel('Member').click();
+    await page.getByRole('combobox', { name: 'Member' }).click();
     await page.getByRole('option').first().click();
     await page.getByLabel('Amount (€)').first().fill('5.00');
     await page.getByRole('button', { name: 'Record deposit' }).click();
@@ -226,7 +226,7 @@ test.describe('admin member-selection history', () => {
     await expect(page).toHaveURL(/\/admin$/);
 
     // pick a different member; the URL gains the member id as a query param (a pushed history entry)
-    await page.getByLabel('Member').click();
+    await page.getByRole('combobox', { name: 'Member' }).click();
     await page.getByRole('option', { name: /maxmustermann/ }).click();
     await expect(page).toHaveURL(/\/admin\?member=[0-9a-f-]+$/);
 
@@ -241,7 +241,7 @@ test.describe('admin member-selection history', () => {
 
   test('the selected member carries across admin pages and back', async ({ page }) => {
     await loginAsAdmin(page);
-    await page.getByLabel('Member').click();
+    await page.getByRole('combobox', { name: 'Member' }).click();
     await page.getByRole('option', { name: /maxmustermann/ }).click();
     await expect(page).toHaveURL(/\/admin\?member=([0-9a-f-]+)$/);
     const memberId = new URL(page.url()).searchParams.get('member');

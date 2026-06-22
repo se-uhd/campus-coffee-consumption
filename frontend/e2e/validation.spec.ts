@@ -61,7 +61,7 @@ test.describe('validation and error states', () => {
     const amount = page.getByLabel('Total amount (€)');
     await amount.fill('4.');
     await amount.blur();
-    await expect(page.getByText('Enter a valid amount.')).toBeVisible();
+    await expect(page.getByText('Enter a valid amount (e.g. 8.50).')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Record purchase' })).toBeDisabled();
   });
 
@@ -76,6 +76,9 @@ test.describe('validation and error states', () => {
     });
     // the freshly reseeded fixture kitty is empty, so any negative adjustment overdraws it
     await expect(balanceCard.locator('.display')).toHaveText('0.00 €');
+
+    // the direct-adjustment form is collapsed by default (a rare operation); expand it before use
+    await page.getByRole('button', { name: 'Toggle kitty adjustment form' }).click();
 
     // a negative adjustment is well-formed (the pattern allows a leading minus) but overdraws the empty kitty
     await page.getByLabel('Amount (€, may be negative)').fill('-1.00');
