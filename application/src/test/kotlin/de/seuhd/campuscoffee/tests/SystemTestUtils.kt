@@ -46,6 +46,9 @@ object SystemTestUtils {
         registry.add("spring.datasource.url", postgresContainer::getJdbcUrl)
         registry.add("spring.datasource.username", postgresContainer::getUsername)
         registry.add("spring.datasource.password", postgresContainer::getPassword)
+        // The default profile no longer carries a JWT-secret fallback (only dev does), so the boot-time
+        // JwtProperties validation needs a test secret; supply a fixed >= 32-byte one for every system test.
+        registry.add("campus-coffee.jwt.secret") { "test-only-insecure-jwt-secret-at-least-32-bytes-long" }
     }
 
     /** Mints a JWT for the given credentials via the token endpoint and returns the bearer value. */
