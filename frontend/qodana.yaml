@@ -1,4 +1,4 @@
-# Qodana configuration for the Angular SPA — the JS/TS counterpart to the backend's root qodana.yaml.
+# Qodana configuration for the Angular SPA: the JS/TS counterpart to the backend's root qodana.yaml.
 # It runs the WebStorm/IntelliJ JavaScript inspection engine headlessly so CI catches the idiomatic
 # TypeScript/Angular issues that live in the IDE inspections, complementing (not replacing) the fast
 # ESLint + Stylelint gate that `npm run lint` (and the Gradle `frontendLint` task) runs.

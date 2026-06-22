@@ -13,7 +13,7 @@ const prettier = require('eslint-config-prettier');
 module.exports = defineConfig([
   {
     // Build output, dependencies, the generated OpenAPI DTOs (src/app/api, produced by
-    // openapi-generator and re-exported through src/app/models.ts — not hand-written, so the app's
+    // openapi-generator and re-exported through src/app/models.ts, not hand-written, so the app's
     // stylistic rules do not apply), and the Playwright e2e suite (linted by its own
     // tsconfig/Playwright, not part of the Angular app graph) are out of scope for the app lint.
     ignores: ['dist/**', 'node_modules/**', '.angular/**', 'out-tsc/**', 'e2e/**', 'src/app/api/**'],
@@ -58,7 +58,7 @@ module.exports = defineConfig([
     extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility],
     rules: {
       // Keep strict equality, but allow the idiomatic `x == null` / `x != null` nullish check (which
-      // intentionally matches both null and undefined) — turning those into `===`/`!==` would change
+      // intentionally matches both null and undefined); turning those into `===`/`!==` would change
       // semantics. Mirrors typescript-eslint's eqeqeq `{ null: 'ignore' }`.
       '@angular-eslint/template/eqeqeq': ['error', { allowNullOrUndefined: true }],
     },
