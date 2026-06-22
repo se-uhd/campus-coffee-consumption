@@ -31,8 +31,8 @@ test.describe('member flow', () => {
     await page.goto(MEMBER_URL);
     await expect(page.getByText('Signed in as maxmustermann')).toBeVisible();
     // the big count card and its price subline
-    await expect(page.getByText(/cups · .* € each/)).toBeVisible();
-    await expect(page.getByText('Balance', { exact: true })).toBeVisible();
+    await expect(page.getByText(/cups \(.* € each\)/)).toBeVisible();
+    await expect(page.getByText('Personal balance')).toBeVisible();
   });
 
   test('adding a coffee increments the count, makes the balance negative, and undo reverts it', async ({
@@ -50,7 +50,7 @@ test.describe('member flow', () => {
     await expect(balance).toHaveText(/-\d+\.\d{2} €/);
 
     // the undo control appears within the grace period and reverts the coffee
-    const undo = page.getByRole('button', { name: 'Undo last coffee' });
+    const undo = page.getByRole('button', { name: 'Undo last cup' });
     await expect(undo).toBeVisible();
     await undo.click();
 

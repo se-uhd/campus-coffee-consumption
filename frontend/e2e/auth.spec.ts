@@ -25,7 +25,7 @@ test.describe('auth and routing', () => {
 
     await expect(page).toHaveURL(/\/admin$/);
     // the landing mirrors the member page: a member selector, the big count, and the recent-activity block
-    await expect(page.getByLabel('Member')).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Member' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent activity' })).toBeVisible();
     await expect(page.getByText('Personal balance')).toBeVisible();
   });

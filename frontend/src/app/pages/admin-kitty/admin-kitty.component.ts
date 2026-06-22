@@ -15,6 +15,7 @@ import { EurosPipe } from '../../pipes/euros.pipe';
 import { LedgerListComponent } from '../../components/ledger-list/ledger-list.component';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { CollapsibleCardComponent } from '../../components/collapsible-card/collapsible-card.component';
+import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import { KittyDto, LedgerEntryDto, UserDto } from '../../models';
 import { euroInputError, toCents } from '../../util/money';
 import { appendLedgerPage } from '../../util/ledger';
@@ -41,7 +42,8 @@ const PAGE_SIZE = 20;
     EurosPipe,
     LedgerListComponent,
     AppHeaderComponent,
-    CollapsibleCardComponent
+    CollapsibleCardComponent,
+    EuroAmountDirective
   ],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
@@ -89,6 +91,7 @@ const PAGE_SIZE = 20;
                 name="settlementAmount"
                 #settlementModel="ngModel"
                 [(ngModel)]="settlementEuros"
+                ccEuroAmount
                 required
               />
               <mat-hint>Use a comma or a point, e.g. 5,00 or 5.00.</mat-hint>
@@ -148,6 +151,7 @@ const PAGE_SIZE = 20;
                 name="adjustmentAmount"
                 #adjustmentModel="ngModel"
                 [(ngModel)]="adjustmentEuros"
+                ccEuroAmount
                 required
               />
               <mat-hint>Use a comma or a point, e.g. 5,00 or 5.00 (zero is not allowed).</mat-hint>
