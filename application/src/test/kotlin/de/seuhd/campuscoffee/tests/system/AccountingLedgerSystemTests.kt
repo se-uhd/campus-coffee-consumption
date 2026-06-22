@@ -16,6 +16,8 @@ import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.client.returnResult
 import java.util.UUID
@@ -103,15 +105,59 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
             .responseBody!!
             .toList()
 
-    @Test
-    fun `requesting a member's activity with an over-cap limit returns 400 Bad Request`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["limit=101", "limit=0", "offset=-1"])
+    fun `a paged read with an out-of-range PageQuery returns 400 Bad Request`(query: String) {
         // The paged reads share the PageQuery object, validated via @Valid binding (no class-level
-        // @Validated). This asserts its @Max(100) bound on the limit surfaces as a 400.
+        // @Validated): @Max(100) and @Positive on the limit and @Min(0) on the offset all surface as a 400.
         val status =
             client()
                 .get()
-                .uri("/api/users/{id}/activity?limit=101", memberId())
+                .uri("/api/users/{id}/activity?$query", memberId())
                 .accept(MediaType.APPLICATION_JSON)
+                .withAdmin()
+                .exchange()
+                .statusCode()
+        assertThat(status).isEqualTo(400)
+    }
+
+    @Test
+    fun `a deposit with no member returns 400 Bad Request`() {
+        val status =
+            client()
+                .post()
+                .uri("/api/kitty/deposit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(SettlementRequestDto(userId = null, amountCents = 500, note = null))
+                .withAdmin()
+                .exchange()
+                .statusCode()
+        assertThat(status).isEqualTo(400)
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0, -1])
+    fun `a deposit with a non-positive amount returns 400 Bad Request`(amountCents: Int) {
+        val status =
+            client()
+                .post()
+                .uri("/api/kitty/deposit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(SettlementRequestDto(userId = memberId(), amountCents = amountCents, note = null))
+                .withAdmin()
+                .exchange()
+                .statusCode()
+        assertThat(status).isEqualTo(400)
+    }
+
+    @Test
+    fun `a kitty adjustment of zero returns 400 Bad Request`() {
+        val status =
+            client()
+                .post()
+                .uri("/api/kitty/adjustment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(AdjustmentRequestDto(amountCents = 0, note = null))
                 .withAdmin()
                 .exchange()
                 .statusCode()

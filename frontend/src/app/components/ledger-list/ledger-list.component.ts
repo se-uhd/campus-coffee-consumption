@@ -53,7 +53,7 @@ type LedgerFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
     }
 
     <mat-list>
-      @for (entry of visibleEntries(); track entry.seq) {
+      @for (entry of visibleEntries(); track entry.id) {
         <mat-list-item lines="3">
           <mat-icon matListItemIcon>{{ iconFor(entry.type) }}</mat-icon>
           <div matListItemTitle class="cc-ledger-title">

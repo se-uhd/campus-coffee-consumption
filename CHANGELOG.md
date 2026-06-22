@@ -104,6 +104,16 @@ rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
   which builds the message only when the level is enabled. kotlin-logging is a thin Kotlin layer over SLF4J,
   so the backend stays Logback (via the Spring Boot starters) and the resolved logger names and message
   text are unchanged.
+- A second adversarial review (run after all the changes above) confirmed the renames and refactors
+  introduced no behavioral regressions, and its findings were fixed: the event-store `seq` also leaked
+  through the unified-ledger `LedgerEntry`/`LedgerEntryDto`, which now expose a stable per-entry `id`
+  sourced from the event (not the append position, which stays inside the data-layer walk); `CLAUDE.md`'s
+  `/summary` paging parameters were stale (two `V3` migration comments are also stale, but editing an
+  already-applied migration would break its Flyway checksum on any migrated database, so they were left as
+  is); the admin member-create form's name fields gained field-specific validation copy; HTTP-level tests
+  were added for the `PageQuery` bounds
+  (`limit` `@Max`/`@Positive`, `offset` `@Min`) and the kitty deposit/adjustment validation; and
+  `frontend/package.json` now declares a Node `engines` floor.
 
 ### Added
 
@@ -307,7 +317,7 @@ machinery. See `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`
   at, so it nets to zero. A member no longer has a free `−1`.
 - **`LoggedEntityType`** enum as the `events.entity_type` discriminator, making the read-model projector's
   dispatch exhaustive so a new logged entity cannot be forgotten.
-- Flyway migrations `V4`–`V7`: `coffee_prices`, `expenses` (with a split-sum CHECK), `payments`, and the
+- Flyway migrations `V4`-`V7`: `coffee_prices`, `expenses` (with a split-sum CHECK), `payments`, and the
   owner-key event indexes.
 
 ### Changed

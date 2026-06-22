@@ -11,7 +11,7 @@
 
 export interface LedgerEntryDto { 
     type: LedgerEntryDto.TypeEnum;
-    seq: number;
+    id: string;
     createdAt: string;
     createdBy: string;
     note?: string | null;

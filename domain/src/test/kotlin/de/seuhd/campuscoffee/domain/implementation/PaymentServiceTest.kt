@@ -131,7 +131,7 @@ class PaymentServiceTest {
         listOf(
             LedgerEntry(
                 type = LedgerEntryType.KITTY_ADJUSTMENT,
-                seq = 1L,
+                id = UUID.fromString("00000000-0000-0000-0000-000000000001"),
                 createdAt = LocalDateTime.of(2026, 1, 1, 0, 0),
                 createdBy = "system",
                 note = null,
