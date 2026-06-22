@@ -156,7 +156,7 @@ const LEDGER_PAGE_SIZE = 10;
           <button
             mat-fab
             class="cc-fab-neutral"
-            (click)="editMode = !editMode"
+            (click)="toggleEdit()"
             aria-label="Edit total"
             matTooltip="Correct coffee count"
           >
@@ -434,6 +434,14 @@ export class AdminLandingComponent implements OnInit {
     }
   }
 
+  /** Toggles the count-correction form, seeding the New total field from the current count when it opens. */
+  toggleEdit(): void {
+    this.editMode = !this.editMode;
+    if (this.editMode && this.consumption) {
+      this.newTotal = this.consumption.total;
+    }
+  }
+
   /**
    * Applies a +1/-1 to the selected member, optimistically then reconciling to the server total. The member
    * id is captured up front and every state write is guarded on it still being the current selection, so a
@@ -455,6 +463,9 @@ export class AdminLandingComponent implements OnInit {
         return;
       }
       this.consumption = updated;
+      // keep the absolute-correction field in step with the count so opening Edit after a +/- does not
+      // pre-fill a stale total that, if Set without retyping, would silently revert the change
+      this.newTotal = updated.total;
       await this.loadLedger(id);
       await this.refreshFund();
     } catch (error) {

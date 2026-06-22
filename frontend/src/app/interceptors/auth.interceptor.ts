@@ -41,27 +41,29 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (ADMIN_PREFIXES.some((prefix) => req.url.startsWith(prefix))) {
     const jwt = auth.token;
-    if (jwt) {
-      return next(req.clone({ setHeaders: { Authorization: `Bearer ${jwt}` } })).pipe(
-        tap((event) => {
-          // a successful admin response means the session is valid again, so defensively clear the redirect
-          // guard — it cannot stay wedged even if an earlier redirect navigation never settled its `finally`
-          if (event instanceof HttpResponse) {
-            redirectingToAdminLogin = false;
-          }
-        }),
-        catchError((error: unknown) => {
-          // an expired or invalid admin session: drop the token and return to the login form, but only
-          // redirect once even when several requests 401 at the same time (the parallel landing reloads)
-          if (error instanceof HttpErrorResponse && error.status === 401 && !redirectingToAdminLogin) {
-            redirectingToAdminLogin = true;
-            auth.logout();
-            void router.navigate(['/admin/login']).finally(() => (redirectingToAdminLogin = false));
-          }
-          return throwError(() => error);
-        })
-      );
-    }
+    // attach the JWT when present; a token-less admin request (e.g. the JWT was cleared in another tab and an
+    // open admin page then fires a request) still flows through the same 401 handler below, so it redirects
+    // to the login form instead of silently staying put
+    const adminReq = jwt ? req.clone({ setHeaders: { Authorization: `Bearer ${jwt}` } }) : req;
+    return next(adminReq).pipe(
+      tap((event) => {
+        // a successful admin response means the session is valid again, so defensively clear the redirect
+        // guard — it cannot stay wedged even if an earlier redirect navigation never settled its `finally`
+        if (event instanceof HttpResponse) {
+          redirectingToAdminLogin = false;
+        }
+      }),
+      catchError((error: unknown) => {
+        // an expired, invalid, or missing admin session: drop the token and return to the login form, but
+        // only redirect once even when several requests 401 at the same time (the parallel landing reloads)
+        if (error instanceof HttpErrorResponse && error.status === 401 && !redirectingToAdminLogin) {
+          redirectingToAdminLogin = true;
+          auth.logout();
+          void router.navigate(['/admin/login']).finally(() => (redirectingToAdminLogin = false));
+        }
+        return throwError(() => error);
+      })
+    );
   } else if (MEMBER_PREFIXES.some((prefix) => req.url.startsWith(prefix))) {
     const token = capability.token;
     if (token) {

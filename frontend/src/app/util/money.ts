@@ -1,3 +1,7 @@
+// Money is displayed in the English number format (a period decimal, a comma thousands separator) on
+// purpose: the whole UI is in English, so a single, consistent format reads better than mixing English copy
+// with German-formatted figures. The euro input separately accepts a comma OR a point as the decimal
+// separator (see parseEurosToCents), so a German user can still type "4,20"; only the display is normalised.
 const EUROS_FORMAT = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2
@@ -118,11 +122,20 @@ export const AMBIGUOUS_SEPARATOR_MESSAGE =
  *
  * @param input the entered euro amount as typed (a text input model)
  * @param example a short valid example to show in the generic message, e.g. `4.20` or `0.50`
+ * @param allowNegative whether a negative amount is valid (true only for a kitty adjustment); when false
+ *   (the default, for a price/expense/deposit) a parseable negative value is flagged inline
  * @returns the message to display, or `null` when the value is empty or already valid
  */
-export function euroInputError(input: string | null | undefined, example: string): string | null {
+export function euroInputError(
+  input: string | null | undefined,
+  example: string,
+  allowNegative = false
+): string | null {
   const result = parseEurosToCents(input);
-  if (result.ok || result.error === 'empty') {
+  if (result.ok) {
+    return !allowNegative && result.cents < 0 ? `Enter a non-negative amount (e.g. ${example}).` : null;
+  }
+  if (result.error === 'empty') {
     return null;
   }
   if (result.error === 'ambiguous-separator') {

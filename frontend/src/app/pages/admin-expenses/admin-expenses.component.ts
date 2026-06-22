@@ -95,6 +95,7 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                 matInput
                 type="number"
                 min="0"
+                step="1"
                 name="weight"
                 #weightModel="ngModel"
                 [(ngModel)]="weightGrams"
@@ -426,11 +427,12 @@ export class AdminExpensesComponent implements OnInit {
     if (
       weightGrams == null ||
       weightGrams < 0 ||
+      !Number.isInteger(weightGrams) ||
       amountCents == null ||
       privateAmountCents == null ||
       kittyAmountCents == null
     ) {
-      this.error = 'Enter the weight, total, and both shares.';
+      this.error = 'Enter a whole-gram weight, a total, and both shares.';
       return null;
     }
     if (privateAmountCents + kittyAmountCents !== amountCents) {

@@ -375,3 +375,16 @@ table.mat-mdc-table {
 .mat-mdc-paginator {
   background: transparent;
 }
+
+// Respect an operating-system "reduce motion" preference: drop the Material transitions/animations to a
+// near-instant duration rather than playing them (WCAG 2.3.3).
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

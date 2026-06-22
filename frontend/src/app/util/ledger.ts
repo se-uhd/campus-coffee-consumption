@@ -19,6 +19,11 @@ export interface AppendedLedgerPage {
  * its boundary row was a duplicate of the last-seen entry, a raw-length check would leave a phantom "Load
  * more" that fetches nothing new.
  *
+ * Known limitation (offset paging): each row keeps the running balance the server computed at its fetch
+ * time, so a money movement made by someone else between page fetches is not reflected in already-loaded
+ * rows; it self-heals on the next reload or local action. Switch to a seq-cursor with a summary refresh if
+ * exact live balances on an open, long-scrolled ledger ever matter.
+ *
  * @param existing the entries already loaded (newest first, as the API returns them)
  * @param next the next page just fetched
  * @returns the merged entries and the de-duplicated count of rows appended

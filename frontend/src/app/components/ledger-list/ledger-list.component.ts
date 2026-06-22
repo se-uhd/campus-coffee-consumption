@@ -76,7 +76,7 @@ type LedgerFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
           <div matListItemLine class="muted">
             new balance {{ entry.runningBalanceCents | euros }}
             @if (entry.count != null) {
-              · Σ {{ entry.count }} cups
+              · total {{ entry.count }} cups
               @if (deltaLabel(entry); as dl) {
                 ({{ dl }})
               }
@@ -206,7 +206,7 @@ export class LedgerListComponent {
       case 'CONSUMPTION':
         return 'Coffee cup';
       case 'CONSUMPTION_CANCEL':
-        return 'Canceled transaction';
+        return 'Coffee undone';
       case 'PRIVATE_EXPENSE':
         return 'Expense';
       case 'KITTY_EXPENSE':

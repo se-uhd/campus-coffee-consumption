@@ -538,7 +538,7 @@ export class AdminUsersComponent implements OnInit {
       await this.reload();
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 409) {
-        this.notifications.error(error, 'This member has financial history — deactivate them instead.');
+        this.notifications.error(error, 'This member has financial history. Deactivate them instead.');
       } else {
         this.notifications.error(error, 'Could not delete the member.');
       }
