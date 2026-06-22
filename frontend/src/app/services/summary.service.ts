@@ -18,10 +18,10 @@ export class SummaryService {
     return firstValueFrom(this.http.get<MemberSummaryDto>('/api/summary', { params }));
   }
 
-  /** A page of the member's own unified ledger (newest first). */
-  getLedger(limit = 20, offset = 0): Promise<LedgerEntryDto[]> {
+  /** A page of the member's own activity feed (their unified ledger, newest first). */
+  getActivity(limit = 20, offset = 0): Promise<LedgerEntryDto[]> {
     const params = new HttpParams().set('limit', limit).set('offset', offset);
-    return firstValueFrom(this.http.get<LedgerEntryDto[]>('/api/ledger', { params }));
+    return firstValueFrom(this.http.get<LedgerEntryDto[]>('/api/activity', { params }));
   }
 
   /** Records one coffee for the member, returning the refreshed summary. */

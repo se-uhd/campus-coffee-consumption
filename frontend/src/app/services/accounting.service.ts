@@ -5,7 +5,7 @@ import { LedgerEntryDto, MemberBalanceDto } from '../models';
 
 /**
  * The admin accounting overview against `/api/users` (the interceptor adds the JWT): the per-member balance
- * overview and a member's unified ledger by id.
+ * overview and a member's activity feed by id.
  */
 @Injectable({ providedIn: 'root' })
 export class AccountingService {
@@ -16,9 +16,9 @@ export class AccountingService {
     return firstValueFrom(this.http.get<MemberBalanceDto[]>('/api/users/overview'));
   }
 
-  /** A page of a member's unified ledger by id (newest first). */
-  memberLedger(userId: string, limit = 20, offset = 0): Promise<LedgerEntryDto[]> {
+  /** A page of a member's activity feed by id (their unified ledger, newest first). */
+  memberActivity(userId: string, limit = 20, offset = 0): Promise<LedgerEntryDto[]> {
     const params = new HttpParams().set('limit', limit).set('offset', offset);
-    return firstValueFrom(this.http.get<LedgerEntryDto[]>(`/api/users/${userId}/ledger`, { params }));
+    return firstValueFrom(this.http.get<LedgerEntryDto[]>(`/api/users/${userId}/activity`, { params }));
   }
 }

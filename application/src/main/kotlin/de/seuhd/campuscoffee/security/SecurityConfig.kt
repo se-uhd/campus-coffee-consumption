@@ -76,12 +76,12 @@ class SecurityConfig {
                 authorize("/api/consumption/**", hasRole("USER"))
                 authorize("/api/profile/**", hasRole("USER"))
                 authorize("/api/summary/**", hasRole("USER"))
-                authorize("/api/ledger/**", hasRole("USER"))
+                authorize("/api/activity/**", hasRole("USER"))
                 authorize("/api/expenses/**", hasRole("USER"))
-                // Admin-only money management (JWT, ROLE_ADMIN): the price, the kitty, and settlements.
+                // Admin-only money management (JWT, ROLE_ADMIN): the price and the kitty (its history, member
+                // deposits, and adjustments all live under /api/kitty).
                 authorize("/api/price", hasRole("ADMIN"))
                 authorize("/api/price/**", hasRole("ADMIN"))
-                authorize("/api/payments/**", hasRole("ADMIN"))
                 authorize("/api/kitty/**", hasRole("ADMIN"))
                 // Member management and the per-member admin views are admin-only (JWT, ROLE_ADMIN).
                 authorize("/api/users/**", hasRole("ADMIN"))

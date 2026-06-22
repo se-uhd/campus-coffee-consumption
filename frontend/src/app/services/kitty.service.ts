@@ -1,16 +1,29 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { KittyDto } from '../models';
+import { AdjustmentRequest, KittyDto, PaymentDto, SettlementRequest } from '../models';
 
-/** The admin kitty-ledger call against `/api/kitty` (the interceptor adds the JWT). */
+/**
+ * The admin kitty calls against `/api/kitty` (the interceptor adds the JWT): the balance and history, a
+ * member deposit (a member paid money in), and a kitty adjustment (a float or correction, may be negative).
+ */
 @Injectable({ providedIn: 'root' })
 export class KittyService {
   constructor(private readonly http: HttpClient) {}
 
-  /** The kitty balance plus a page of its movements (newest first). */
-  ledger(limit = 50, offset = 0): Promise<KittyDto> {
+  /** The kitty balance plus a page of its history (newest first). */
+  history(limit = 50, offset = 0): Promise<KittyDto> {
     const params = new HttpParams().set('limit', limit).set('offset', offset);
-    return firstValueFrom(this.http.get<KittyDto>('/api/kitty/ledger', { params }));
+    return firstValueFrom(this.http.get<KittyDto>('/api/kitty/history', { params }));
+  }
+
+  /** Records that a member paid money into the kitty (a positive amount in euro cents). */
+  deposit(request: SettlementRequest): Promise<PaymentDto> {
+    return firstValueFrom(this.http.post<PaymentDto>('/api/kitty/deposit', request));
+  }
+
+  /** Adjusts the kitty without a member (a signed amount in euro cents; may be negative). */
+  adjustment(request: AdjustmentRequest): Promise<PaymentDto> {
+    return firstValueFrom(this.http.post<PaymentDto>('/api/kitty/adjustment', request));
   }
 }

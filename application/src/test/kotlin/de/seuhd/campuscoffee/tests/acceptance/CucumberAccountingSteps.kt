@@ -68,7 +68,7 @@ class CucumberAccountingSteps(
         val id = userService.getByLoginName(member).id!!
         client()
             .post()
-            .uri("/api/payments/settlement")
+            .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
             .body(SettlementRequestDto(userId = id, amountCents = amountCents, note = null))
             .withAdmin()
