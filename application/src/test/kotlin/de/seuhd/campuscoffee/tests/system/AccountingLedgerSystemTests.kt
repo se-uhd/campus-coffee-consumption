@@ -104,6 +104,21 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
             .toList()
 
     @Test
+    fun `requesting a member's activity with an over-cap limit returns 400 Bad Request`() {
+        // The paged reads share the PageQuery object, validated via @Valid binding (no class-level
+        // @Validated). This asserts its @Max(100) bound on the limit surfaces as a 400.
+        val status =
+            client()
+                .get()
+                .uri("/api/users/{id}/activity?limit=101", memberId())
+                .accept(MediaType.APPLICATION_JSON)
+                .withAdmin()
+                .exchange()
+                .statusCode()
+        assertThat(status).isEqualTo(400)
+    }
+
+    @Test
     fun `correcting an expense re-credits the member by the new private portion`() {
         // fund the kitty with a 1000 float so the kitty-funded portions (500, then 300) stay non-negative
         fundKitty(1000)
