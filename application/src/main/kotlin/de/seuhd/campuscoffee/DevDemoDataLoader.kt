@@ -8,7 +8,7 @@ import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 
@@ -90,7 +90,7 @@ class DevDemoDataLoader(
     fun loadDemoData() {
         val existingLogins = userService.getAll().mapTo(HashSet()) { it.loginName }
         if (DEMO_MEMBERS.first().loginName in existingLogins) {
-            log.info("Skipping the dev demo data: the demo members already exist.")
+            log.info { "Skipping the dev demo data: the demo members already exist." }
             return
         }
         val admin = userService.getByLoginName(ADMIN_LOGIN)
@@ -130,16 +130,12 @@ class DevDemoDataLoader(
         seedPrimaryDemoMemberAdminExpenses(admin)
         // an extra active member with no history at all, to demo the empty ledger/change-log state
         createMember(EMPTY_DEMO_MEMBER)
-        log.info(
-            "Seeded the dev demo data: {} extra members, {} coffees, {} own purchases, {} settlements, " +
-                "one kitty float, plus varied histories for {} other fixture users and one empty member ({}).",
-            DEMO_MEMBERS.size,
-            coffeeTotal,
-            expenseTotal,
-            settlementTotal,
-            ENRICHED_FIXTURE_LOGINS.size,
-            EMPTY_DEMO_LOGIN
-        )
+        log.info {
+            "Seeded the dev demo data: ${DEMO_MEMBERS.size} extra members, $coffeeTotal coffees, " +
+                "$expenseTotal own purchases, $settlementTotal settlements, one kitty float, plus varied " +
+                "histories for ${ENRICHED_FIXTURE_LOGINS.size} other fixture users and one empty member " +
+                "($EMPTY_DEMO_LOGIN)."
+        }
     }
 
     /**
@@ -231,7 +227,7 @@ class DevDemoDataLoader(
             expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", member)
         }
         paymentService.recordSettlement(member.persistedId, PRIMARY_DEMO_SETTLEMENT_CENTS, "demo deposit", admin)
-        log.info("Seeded the primary demo member ({}) with a full demo ledger.", PRIMARY_DEMO_LOGIN)
+        log.info { "Seeded the primary demo member ($PRIMARY_DEMO_LOGIN) with a full demo ledger." }
     }
 
     /**
@@ -260,15 +256,10 @@ class DevDemoDataLoader(
                 note = variant.note,
                 actingUser = admin
             )
-            log.info(
-                "Seeded an admin {} expense for the primary demo member ({}): {}c total = {}c private + {}c " +
-                    "kitty.",
-                variant.label,
-                PRIMARY_DEMO_LOGIN,
-                variant.totalCents,
-                variant.privateCents,
-                variant.kittyCents
-            )
+            log.info {
+                "Seeded an admin ${variant.label} expense for the primary demo member ($PRIMARY_DEMO_LOGIN): " +
+                    "${variant.totalCents}c total = ${variant.privateCents}c private + ${variant.kittyCents}c kitty."
+            }
         }
     }
 
@@ -362,7 +353,7 @@ class DevDemoDataLoader(
                 settlementCents = null
             )
 
-        private val log = LoggerFactory.getLogger(DevDemoDataLoader::class.java)
+        private val log = KotlinLogging.logger {}
 
         // nine extra members with German names: a mix of roles (two admins) and active states (two
         // inactive), most with a little consumption, purchase, and settlement history so the lists paginate

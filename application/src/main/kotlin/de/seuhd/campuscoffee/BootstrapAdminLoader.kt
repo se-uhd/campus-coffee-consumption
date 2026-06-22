@@ -6,7 +6,7 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.StartupTask
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 
 /**
@@ -33,11 +33,11 @@ class BootstrapAdminLoader(
         val loginName = bootstrapAdminProperties.loginName
         val password = bootstrapAdminProperties.password
         if (loginName.isNullOrBlank() || password.isNullOrBlank()) {
-            log.info("Skipping the bootstrap admin: no bootstrap-admin credentials configured.")
+            log.info { "Skipping the bootstrap admin: no bootstrap-admin credentials configured." }
             return
         }
         if (userService.getAll().any { it.role == Role.ADMIN }) {
-            log.info("Skipping the bootstrap admin: an admin already exists.")
+            log.info { "Skipping the bootstrap admin: an admin already exists." }
             return
         }
         val created =
@@ -53,12 +53,12 @@ class BootstrapAdminLoader(
                 )
             )
         coffeeConsumptionService.createForUser(created)
-        log.info("Created the bootstrap admin '{}'.", loginName)
+        log.info { "Created the bootstrap admin '$loginName'." }
     }
 
     private companion object {
         // runs after the fixture loader (200), so a seeded admin in dev makes this a no-op
         private const val ORDER = 300
-        private val log = LoggerFactory.getLogger(BootstrapAdminLoader::class.java)
+        private val log = KotlinLogging.logger {}
     }
 }

@@ -2,10 +2,10 @@ package de.seuhd.campuscoffee.api.controller
 
 import de.seuhd.campuscoffee.api.dtos.TokenRequestDto
 import de.seuhd.campuscoffee.api.dtos.TokenResponseDto
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -53,7 +53,7 @@ class AuthController(
         @RequestBody
         @Valid request: TokenRequestDto
     ): ResponseEntity<TokenResponseDto> {
-        log.info("Token requested for login name '{}'.", request.loginName)
+        log.info { "Token requested for login name '${request.loginName}'." }
         // authenticate the credentials; wrong credentials raise an AuthenticationException that the
         // global exception handler renders as a JSON 401 (the endpoint never returns a token for them)
         val authentication =
@@ -87,7 +87,7 @@ class AuthController(
             .map { it.removePrefix(ROLE_PREFIX) }
 
     private companion object {
-        private val log = LoggerFactory.getLogger(AuthController::class.java)
+        private val log = KotlinLogging.logger {}
         private const val TOKEN_TTL_HOURS = 10L
         private const val ROLE_PREFIX = "ROLE_"
     }
