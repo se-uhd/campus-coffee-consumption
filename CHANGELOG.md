@@ -113,7 +113,8 @@ rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
   is); the admin member-create form's name fields gained field-specific validation copy; HTTP-level tests
   were added for the `PageQuery` bounds
   (`limit` `@Max`/`@Positive`, `offset` `@Min`) and the kitty deposit/adjustment validation; and
-  `frontend/package.json` now declares a Node `engines` floor.
+  `frontend/package.json` now declares a Node `engines` floor. The Gradle daemon's `MaxMetaspaceSize` was
+  also raised to 768m (the growing test suite exhausted 384m during the CI coverage aggregation pass).
 
 ### Added
 
