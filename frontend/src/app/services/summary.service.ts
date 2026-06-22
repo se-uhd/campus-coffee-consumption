@@ -13,8 +13,8 @@ export class SummaryService {
   constructor(private readonly http: HttpClient) {}
 
   /** The member's count, price, balance, kitty balance, cancellability, and the first page of the ledger. */
-  getSummary(ledgerLimit = 10, ledgerOffset = 0): Promise<MemberSummaryDto> {
-    const params = new HttpParams().set('ledgerLimit', ledgerLimit).set('ledgerOffset', ledgerOffset);
+  getSummary(limit = 10, offset = 0): Promise<MemberSummaryDto> {
+    const params = new HttpParams().set('limit', limit).set('offset', offset);
     return firstValueFrom(this.http.get<MemberSummaryDto>('/api/summary', { params }));
   }
 
