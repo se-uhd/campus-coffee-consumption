@@ -64,12 +64,12 @@ class SecurityConfig {
                 authorize("/api/swagger-ui/**", permitAll)
                 authorize("/api/api-docs/**", permitAll)
                 authorize("/api/dev/**", permitAll)
-                // Actuator: health is public (only UP/DOWN); metrics is admin-only. These precede the SPA
-                // catch-all below, which would otherwise make them anonymous.
+                // Actuator: health is public (only UP/DOWN); every other actuator endpoint is admin-only.
+                // The catch-all `/actuator/**` rule must precede the SPA GET catch-all below, which would
+                // otherwise make any exposed endpoint (e.g. /actuator/env, /actuator/metrics) anonymous.
                 authorize("/actuator/health", permitAll)
                 authorize("/actuator/health/**", permitAll)
-                authorize("/actuator/metrics", hasRole("ADMIN"))
-                authorize("/actuator/metrics/**", hasRole("ADMIN"))
+                authorize("/actuator/**", hasRole("ADMIN"))
                 // Member self-service: the capability token principal (ROLE_USER). The domain enforces that
                 // a member acts only on their own data and that a deactivated member is read-only. A member
                 // sees the price and the kitty balance through their own /summary, never the admin reads.

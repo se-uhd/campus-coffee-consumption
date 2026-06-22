@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { AdminSelectionService } from './admin-selection.service';
 import { TokenRequestDto, TokenResponseDto } from '../models';
 
 /**
@@ -11,14 +12,15 @@ import { TokenRequestDto, TokenResponseDto } from '../models';
 export class AuthService {
   private static readonly TOKEN_KEY = 'campus-coffee-jwt';
 
-  constructor(private readonly http: HttpClient) {}
+  constructor(
+    private readonly http: HttpClient,
+    private readonly selection: AdminSelectionService
+  ) {}
 
   /** Logs an admin in, storing the returned JWT. */
   async login(loginName: string, password: string): Promise<void> {
     const request: TokenRequestDto = { loginName, password };
-    const response = await firstValueFrom(
-      this.http.post<TokenResponseDto>('/api/auth/token', request)
-    );
+    const response = await firstValueFrom(this.http.post<TokenResponseDto>('/api/auth/token', request));
     localStorage.setItem(AuthService.TOKEN_KEY, response.token);
   }
 
@@ -32,8 +34,9 @@ export class AuthService {
     return this.token !== null;
   }
 
-  /** Clears the stored JWT. */
+  /** Clears the stored JWT and the shared admin selection so neither leaks into the next admin session. */
   logout(): void {
     localStorage.removeItem(AuthService.TOKEN_KEY);
+    this.selection.reset();
   }
 }

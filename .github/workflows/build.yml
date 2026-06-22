@@ -47,3 +47,72 @@ jobs:
             coverage/build/reports/jacoco/testCodeCoverageReport/
             */build/reports/jacoco/
           if-no-files-found: warn
+
+  # End-to-end coverage: launches the real application jar under the JaCoCo agent against a PostgreSQL and
+  # drives it with the Playwright suite, collecting BOTH backend JVM coverage (coverage/build/jacoco/e2e.exec,
+  # mergeable into the JaCoCo gate) and frontend browser coverage (frontend/coverage-e2e/, the SPA TypeScript
+  # the JaCoCo agent can never see). Kept as a separate job so it does not slow the core `build` gate and a
+  # flaky browser run never blocks the merge gate.
+  e2e:
+    runs-on: ubuntu-latest
+
+    # The dev profile's datasource expects PostgreSQL at localhost:5432 (user/password postgres). A service
+    # container provides it; the health-check gates the job until it accepts connections.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: jdx/mise-action@v4 # provisions Node 24 and Java 25 from mise.toml
+
+      # Install the locked frontend deps and Playwright's chromium (with its OS deps) before the run.
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # Builds the source-mapped SPA + jar, launches it under the JaCoCo agent, waits for /actuator/health,
+      # runs the Playwright e2e (PW_COVERAGE=1), then stops the app so the agent flushes e2e.exec. This is the
+      # :coverage:runE2eCoverage task wrapping scripts/run-e2e-coverage.sh.
+      - name: Run e2e with backend + frontend coverage
+        run: gradle :coverage:runE2eCoverage
+
+      # The backend e2e exec (Part C): fold into the JaCoCo gate by re-running it now that e2e.exec exists.
+      # The aggregate report/gate include build/jacoco/e2e.exec when present, so this gates on the combined
+      # unit + system + acceptance + e2e coverage.
+      - name: Merge e2e coverage into the JaCoCo gate
+        run: gradle :coverage:coverageGate
+
+      # Upload both coverage artifacts (and the raw e2e.exec for offline merging) even on failure, so a
+      # failed e2e or gate still leaves the evidence to inspect.
+      - name: Upload e2e coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-coverage
+          path: |
+            coverage/build/jacoco/e2e.exec
+            coverage/build/jacoco/e2e-app.log
+            coverage/build/reports/jacoco/testCodeCoverageReport/
+            frontend/coverage-e2e/
+            frontend/playwright-report/
+          if-no-files-found: warn

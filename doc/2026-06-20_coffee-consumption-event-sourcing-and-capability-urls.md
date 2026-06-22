@@ -83,7 +83,7 @@ the log.
 
 A member authenticates only with a secret **capability URL** — a per-member URL that grants the holder the
 ability to change that member's coffee count. It is encoded in a wall QR code as
-`https://<host>/coffee/{token}`. The scheme follows the W3C TAG finding
+`https://<host>/login/{token}`. The scheme follows the W3C TAG finding
 [Good Practices for Capability URLs](https://www.w3.org/TR/capability-urls/) (2014), with one deliberate
 deviation.
 
@@ -98,15 +98,15 @@ deviation.
   on admin **rotation / revocation** instead (one token per user; rotating issues a new URL and invalidates
   the old QR). A rotated or unknown token fails authentication (401); a deactivated member is read-only
   (mutations return 403, but reads still work, so the account is kept rather than deleted).
-- **Permissions, not actions; no side effects on GET (§5.1).** Opening `/coffee/{token}` (the SPA route)
+- **Permissions, not actions; no side effects on GET (§5.1).** Opening `/login/{token}` (the SPA route)
   only loads the page; every data change is a `POST`/`PUT` API call, so scanning or opening the URL never
   mutates anything.
-- **Minimize leakage (§5.1).** The token appears in a URL only at the SPA entry point (`/coffee/{token}`),
+- **Minimize leakage (§5.1).** The token appears in a URL only at the SPA entry point (`/login/{token}`),
   never in an API path — the SPA forwards it as the `X-Coffee-Token` header — so it stays out of API server
   and proxy access logs. The token page should avoid third-party scripts and assets and send
   `Referrer-Policy: no-referrer` (and `rel="noreferrer"` on outbound links) so the URL cannot leak via the
   `Referer` header, and should be kept out of analytics.
-- **Keep crawlers out (§5.1).** Disallow the `/coffee/` path in `robots.txt` and send `X-Robots-Tag:
+- **Keep crawlers out (§5.1).** Disallow the `/login/` path in `robots.txt` and send `X-Robots-Tag:
   noindex` on the token page (list the path, never individual URLs).
 - **Tell users the risk (§5.3).** The profile page presents the URL as "your coffee link" with a
   plain-language note that anyone holding it can change the member's coffee count, so it should not be

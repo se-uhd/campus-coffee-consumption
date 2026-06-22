@@ -1,5 +1,14 @@
 # CampusCoffee → CampusCoffeeConsumption (SE@UHD)
 
+> **SUPERSEDED historical record (2026-06-19).** This is the original derivation plan, kept verbatim as a
+> dated record. Many specifics here are now out of date — the member route is `/login/{token}` (not
+> `/coffee/{token}`), the admin routes are consolidated under `/admin/**`, the `+`/`−` step and the reset
+> were replaced by add-one-coffee plus a grace-period undo and an absolute count correction, and the
+> frontend toolchain is Vitest + Playwright (not Karma/Jasmine/Cypress). For the current design and
+> behavior, see the later records
+> `doc/2026-06-20_coffee-consumption-event-sourcing-and-capability-urls.md` and
+> `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`, and `CLAUDE.md` / `README.md`.
+
 ## Context
 
 CampusCoffee is a Spring Boot / Kotlin app (hexagonal architecture, four Gradle modules, event sourcing

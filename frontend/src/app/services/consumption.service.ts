@@ -14,9 +14,7 @@ export class ConsumptionService {
   /** A member's total and recent changes, by user id (admin). */
   getForUser(userId: string, limit = 5, offset = 0): Promise<ConsumptionDto> {
     const params = new HttpParams().set('limit', limit).set('offset', offset);
-    return firstValueFrom(
-      this.http.get<ConsumptionDto>(`/api/users/${userId}/consumption`, { params })
-    );
+    return firstValueFrom(this.http.get<ConsumptionDto>(`/api/users/${userId}/consumption`, { params }));
   }
 
   /** Applies a +1/-1 change to a member's count, by user id (admin). */
@@ -27,7 +25,8 @@ export class ConsumptionService {
 
   /** Overrides a member's total to an absolute value with an optional note (edit mode, admin). */
   overrideForUser(userId: string, total: number, note?: string): Promise<ConsumptionDto> {
-    const body: ConsumptionOverrideDto = { total, note };
+    // an untouched (empty) note records null, matching the expense paths, rather than an empty string
+    const body: ConsumptionOverrideDto = { total, note: note || undefined };
     return firstValueFrom(this.http.put<ConsumptionDto>(`/api/users/${userId}/consumption`, body));
   }
 }

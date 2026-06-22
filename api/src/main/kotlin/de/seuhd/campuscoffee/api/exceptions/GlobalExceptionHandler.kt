@@ -8,6 +8,7 @@ import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.MissingFieldException
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
+import jakarta.validation.ConstraintViolationException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -84,7 +85,33 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
     }
 
     /**
-     * Fallback handler for unexpected exceptions, returning HTTP 500.
+     * Maps a method-parameter constraint violation (a `@Validated` query/path-param bound, such as the paging
+     * `@Max`/`@Min`/`@Positive` limits) to 400. Without this, a `ConstraintViolationException` would fall
+     * through to the generic 500 handler even though an out-of-range parameter is a client error.
+     *
+     * @param exception the constraint violation raised for an out-of-range request parameter
+     * @param request   the current web request
+     */
+    @ExceptionHandler(ConstraintViolationException::class)
+    fun handleConstraintViolation(
+        exception: ConstraintViolationException,
+        request: WebRequest
+    ): ResponseEntity<ErrorResponse> {
+        val message =
+            exception.constraintViolations.joinToString("; ") {
+                "${it.propertyPath.toString().substringAfterLast('.')} ${it.message}"
+            }
+        log.warn("Constraint violation: {}", message)
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(errorBody(exception, HttpStatus.BAD_REQUEST, request, message))
+    }
+
+    /**
+     * Fallback handler for unexpected exceptions, returning HTTP 500. The unmapped invariant guards
+     * (`IllegalStateException`, raised by Kotlin `error(...)`/`check(...)`) land here; the body is already
+     * clean — the response message is the fixed "An unexpected error occurred." string, not the exception
+     * message, so no internal detail leaks (the full exception is logged server-side only).
      *
      * @param exception the unexpected exception
      * @param request   the current web request

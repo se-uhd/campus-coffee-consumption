@@ -84,6 +84,9 @@ class CoffeeConsumptionServiceImpl(
             throw ValidationException("The coffee count cannot be negative.")
         }
         val current = coffeeConsumptionDataService.getByUserId(userId)
+        // the override is authoritative: it writes an absolute count, so it intentionally supersedes any
+        // concurrent self-scan (a +1 landing between this read and write is overwritten by design — the
+        // admin asserts a value, not an adjustment), which is why this write is not guarded against that race
         // expose the admin's note to the event store for the duration of this one recording upsert
         return changeNoteContext.runWithNote(note) {
             coffeeConsumptionDataService.upsert(current.copy(count = total))

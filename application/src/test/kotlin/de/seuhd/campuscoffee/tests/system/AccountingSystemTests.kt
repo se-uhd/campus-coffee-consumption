@@ -70,6 +70,18 @@ class AccountingSystemTests : AbstractSystemTest() {
             .returnResult<KittyDto>()
             .responseBody!!
 
+    // Funds the kitty with an admin adjustment so a later kitty-funded admin expense does not drive the
+    // kitty balance below zero (the guard rejects that with 409). A pure kitty adjustment has no member,
+    // so it never touches a member balance.
+    private fun fundKitty(amountCents: Int) =
+        client()
+            .post()
+            .uri("/api/payments/adjustment")
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(AdjustmentRequestDto(amountCents = amountCents, note = "float"))
+            .withAdmin()
+            .exchange()
+
     @Test
     fun `each coffee is valued at the price in effect when it was consumed`() {
         // price 50, add a coffee; raise to 70, add a coffee -> balance owes 50 + 70 = 120 cents
@@ -83,6 +95,22 @@ class AccountingSystemTests : AbstractSystemTest() {
         assertThat(summary.count).isEqualTo(2)
         assertThat(summary.priceCents).isEqualTo(70)
         assertThat(summary.balanceCents).isEqualTo(-120)
+    }
+
+    @Test
+    fun `an admin reads the current price returns 200`() {
+        val result =
+            client()
+                .get()
+                .uri("/api/price")
+                .accept(MediaType.APPLICATION_JSON)
+                .withAdmin()
+                .exchange()
+                .returnResult<PriceDto>()
+
+        assertThat(result.status.value()).isEqualTo(200)
+        // the price seeded on startup (campus-coffee.price.initial-cents default)
+        assertThat(result.responseBody!!.amountCents).isEqualTo(50)
     }
 
     @Test
@@ -210,6 +238,9 @@ class AccountingSystemTests : AbstractSystemTest() {
 
     @Test
     fun `correcting an expense with the same buyer returns 200`() {
+        // fund the kitty so the kitty-funded portions (500, then 300) have somewhere to come from
+        fundKitty(1000)
+
         val expenseId =
             client()
                 .post()
@@ -251,6 +282,9 @@ class AccountingSystemTests : AbstractSystemTest() {
 
     @Test
     fun `correcting an expense to a different buyer returns 400 Bad Request`() {
+        // fund the kitty so recording the kitty-funded expense (500) succeeds
+        fundKitty(1000)
+
         val expenseId =
             client()
                 .post()
@@ -293,6 +327,9 @@ class AccountingSystemTests : AbstractSystemTest() {
 
     @Test
     fun `an admin lists a member's expenses with their ids and amounts`() {
+        // fund the kitty so the second expense's kitty-funded portion (500) has somewhere to come from
+        fundKitty(1000)
+
         val first =
             client()
                 .post()
@@ -418,5 +455,46 @@ class AccountingSystemTests : AbstractSystemTest() {
         val max = overview.first { it.loginName == member }
         assertThat(max.count).isEqualTo(1)
         assertThat(max.balanceCents).isEqualTo(-50)
+    }
+
+    @Test
+    fun `an admin expense whose kitty portion exceeds the kitty balance returns 409 Conflict`() {
+        // fund the kitty with only 300; an expense with a 500 kitty portion would overdraw it
+        fundKitty(300)
+
+        val status =
+            client()
+                .post()
+                .uri("/api/users/{id}/expenses", memberId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(
+                    AdminExpenseDto(
+                        weightGrams = 1000,
+                        amountCents = 900,
+                        privateAmountCents = 400,
+                        kittyAmountCents = 500,
+                        note = null
+                    )
+                ).withAdmin()
+                .exchange()
+                .statusCode()
+        assertThat(status).isEqualTo(409)
+    }
+
+    @Test
+    fun `a kitty adjustment that would overdraw the kitty returns 409 Conflict`() {
+        // fund the kitty with 500; a -800 adjustment would drive the balance below zero
+        fundKitty(500)
+
+        val status =
+            client()
+                .post()
+                .uri("/api/payments/adjustment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(AdjustmentRequestDto(amountCents = -800, note = "overdraw"))
+                .withAdmin()
+                .exchange()
+                .statusCode()
+        assertThat(status).isEqualTo(409)
     }
 }

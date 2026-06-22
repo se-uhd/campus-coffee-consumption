@@ -49,6 +49,18 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
         ).withAdmin()
         .exchange()
 
+    // Funds the kitty with an admin adjustment so a later kitty-funded admin expense does not drive the
+    // kitty balance below zero (the guard rejects that with 409). A pure kitty adjustment has no member,
+    // so it never touches a member balance.
+    private fun fundKitty(amountCents: Int) =
+        client()
+            .post()
+            .uri("/api/payments/adjustment")
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(AdjustmentRequestDto(amountCents = amountCents, note = "float"))
+            .withAdmin()
+            .exchange()
+
     private fun memberSummary(): MemberSummaryDto =
         client()
             .get()
@@ -80,8 +92,22 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
             .responseBody!!
             .toList()
 
+    private fun ownMemberLedger(): List<LedgerEntryDto> =
+        client()
+            .get()
+            .uri("/api/ledger")
+            .accept(MediaType.APPLICATION_JSON)
+            .withMember(member)
+            .exchange()
+            .returnResult<Array<LedgerEntryDto>>()
+            .responseBody!!
+            .toList()
+
     @Test
     fun `correcting an expense re-credits the member by the new private portion`() {
+        // fund the kitty with a 1000 float so the kitty-funded portions (500, then 300) stay non-negative
+        fundKitty(1000)
+
         val expenseId =
             adminExpense(amountCents = 900, privateAmountCents = 400, kittyAmountCents = 500)
                 .returnResult<ExpenseDto>()
@@ -107,19 +133,23 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
 
         // the member's balance reflects the corrected private portion (the full state, not a double count)
         assertThat(memberSummary().balanceCents).isEqualTo(700)
-        // the kitty reflects the corrected kitty portion (-300, not -500)
-        assertThat(kitty().balanceCents).isEqualTo(-300)
+        // the kitty reflects the corrected kitty portion (1000 float - 300, not - 500)
+        assertThat(kitty().balanceCents).isEqualTo(700)
     }
 
     @Test
     fun `deleting an expense returns 204 and reverses its effect on the balance and kitty`() {
+        // fund the kitty with a 1000 float so the kitty-funded portion (500) stays non-negative
+        fundKitty(1000)
+
         val expenseId =
             adminExpense(amountCents = 900, privateAmountCents = 400, kittyAmountCents = 500)
                 .returnResult<ExpenseDto>()
                 .responseBody!!
                 .id
         assertThat(memberSummary().balanceCents).isEqualTo(400)
-        assertThat(kitty().balanceCents).isEqualTo(-500)
+        // the float (1000) minus the kitty-funded portion (500)
+        assertThat(kitty().balanceCents).isEqualTo(500)
 
         val deleteStatus =
             client()
@@ -130,9 +160,10 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
                 .statusCode()
         assertThat(deleteStatus).isEqualTo(204)
 
-        // the DELETE event carries the buyer id, so both the member ledger and the kitty reverse it
+        // the DELETE event carries the buyer id, so both the member ledger and the kitty reverse it:
+        // the member balance returns to 0 and the kitty returns to the float (1000)
         assertThat(memberSummary().balanceCents).isEqualTo(0)
-        assertThat(kitty().balanceCents).isEqualTo(0)
+        assertThat(kitty().balanceCents).isEqualTo(1000)
     }
 
     @Test
@@ -190,6 +221,10 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
 
     @Test
     fun `a member buys then an admin attributes a split purchase building the full ledger`() {
+        // fund the kitty so the admin split purchase's kitty-funded portion (500) stays non-negative;
+        // a pure kitty adjustment has no member, so the member balance assertion below is unaffected
+        fundKitty(1000)
+
         // a member's own purchase (100% private), an admin split purchase, a coffee, and a settlement
         client()
             .post()
@@ -220,5 +255,39 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
             LedgerEntryType.CONSUMPTION,
             LedgerEntryType.SETTLEMENT
         )
+    }
+
+    @Test
+    fun `an admin sees the kitty split on a member's expense but the member's own ledger does not`() {
+        // fund the kitty so the split purchase's kitty-funded portion (500) stays non-negative
+        fundKitty(1000)
+        // an admin records a split bean purchase on the member: 900 = 400 private + 500 kitty
+        adminExpense(amountCents = 900, privateAmountCents = 400, kittyAmountCents = 500)
+
+        // the admin-by-id ledger breaks the split out: the private portion is the balance effect, and both
+        // portions are carried alongside on the PRIVATE_EXPENSE entry
+        val adminEntry = adminMemberLedger().first { it.type == LedgerEntryType.PRIVATE_EXPENSE }
+        assertThat(adminEntry.amountCents).isEqualTo(400)
+        assertThat(adminEntry.privateAmountCents).isEqualTo(400)
+        assertThat(adminEntry.kittyAmountCents).isEqualTo(500)
+
+        // the admin kitty ledger's KITTY_EXPENSE entry carries the same split breakdown (so the kitty history
+        // can render the identical `private + kitty` footer); its own effect is the negative kitty draw
+        val kittyEntry = kitty().entries.first { it.type == LedgerEntryType.KITTY_EXPENSE }
+        assertThat(kittyEntry.amountCents).isEqualTo(-500)
+        assertThat(kittyEntry.privateAmountCents).isEqualTo(400)
+        assertThat(kittyEntry.kittyAmountCents).isEqualTo(500)
+
+        // the SAME member's own ledger never exposes the kitty split (it is admin-only): the entry is still
+        // there with the private amount, but both split portions are null
+        val ownEntry = ownMemberLedger().first { it.type == LedgerEntryType.PRIVATE_EXPENSE }
+        assertThat(ownEntry.amountCents).isEqualTo(400)
+        assertThat(ownEntry.privateAmountCents).isNull()
+        assertThat(ownEntry.kittyAmountCents).isNull()
+
+        // and the member's summary ledger (the landing-page view) likewise strips it
+        val summaryEntry = memberSummary().ledger.first { it.type == LedgerEntryType.PRIVATE_EXPENSE }
+        assertThat(summaryEntry.privateAmountCents).isNull()
+        assertThat(summaryEntry.kittyAmountCents).isNull()
     }
 }

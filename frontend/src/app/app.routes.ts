@@ -8,21 +8,21 @@ import { adminGuard } from './guards/admin.guard';
  */
 export const routes: Routes = [
   {
-    path: 'login',
-    loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent)
-  },
-  {
-    path: 'coffee/:token',
+    path: 'login/:token',
     loadComponent: () =>
       import('./pages/coffee-landing/coffee-landing.component').then((m) => m.CoffeeLandingComponent)
   },
   {
-    path: 'coffee/:token/profile',
+    path: 'login/:token/profile',
     loadComponent: () =>
       import('./pages/member-profile/member-profile.component').then((m) => m.MemberProfileComponent)
   },
   {
-    path: '',
+    path: 'admin/login',
+    loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent)
+  },
+  {
+    path: 'admin',
     canActivate: [adminGuard],
     loadComponent: () =>
       import('./pages/admin-landing/admin-landing.component').then((m) => m.AdminLandingComponent)
@@ -52,10 +52,11 @@ export const routes: Routes = [
       import('./pages/admin-kitty/admin-kitty.component').then((m) => m.AdminKittyComponent)
   },
   {
-    path: 'profile',
+    path: 'admin/profile',
     canActivate: [adminGuard],
     loadComponent: () =>
       import('./pages/member-profile/member-profile.component').then((m) => m.MemberProfileComponent)
   },
-  { path: '**', redirectTo: '' }
+  { path: '', redirectTo: 'admin', pathMatch: 'full' },
+  { path: '**', redirectTo: 'admin' }
 ];

@@ -17,9 +17,9 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 
 /**
- * Admin controller for the global coffee price (JWT, admin only): set the price and read its history. The
- * current price reaches members through their landing summary, and the newest history entry is the current
- * price, so there is no separate member price read here.
+ * Admin controller for the global coffee price (JWT, admin only): set the price, read the current price
+ * (`GET /api/price`, consumed by the admin landing), and read its history. Members do not call this
+ * resource; the current price reaches them through their landing summary (`GET /api/summary`).
  */
 @Tag(name = "Price", description = "Setting and inspecting the global coffee price (admin only).")
 @Controller
@@ -43,6 +43,12 @@ class PriceController(
         val price = coffeePriceService.setPrice(requireNotNull(dto.amountCents), admin)
         return ResponseEntity.ok(PriceDto(price.amountCents))
     }
+
+    /** Returns the current global price per cup. */
+    @Operation(summary = "Get the current global coffee price per cup.")
+    @GetMapping("")
+    fun getCurrent(): ResponseEntity<PriceDto> =
+        ResponseEntity.ok(PriceDto(coffeePriceService.getCurrent().amountCents))
 
     /** Returns the global price history, newest first. */
     @Operation(summary = "Get the global coffee price history (newest first).")

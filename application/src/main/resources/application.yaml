@@ -78,6 +78,8 @@ springdoc:
 campus-coffee:
   fixtures:
     load-on-startup: true
+    # dev: clear + reseed every start so a persisted database can't collide with the restarted seeded ids
+    reset-on-startup: true
 
 ---
 spring:

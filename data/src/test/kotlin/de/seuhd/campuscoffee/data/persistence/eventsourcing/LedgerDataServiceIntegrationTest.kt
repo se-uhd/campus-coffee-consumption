@@ -236,6 +236,57 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
     }
 
     @Test
+    fun `a split expense carries both portions on the member and the kitty ledger entry`() {
+        val member = seedMember()
+        seedPrice(50)
+        expenseDataService.upsert(
+            Expense(
+                buyer = member,
+                weightGrams = 1000,
+                amountCents = 900,
+                privateAmountCents = 400,
+                kittyAmountCents = 500
+            )
+        )
+
+        val memberEntry =
+            ledgerDataService.memberLedger(member.persistedId, systemActor).first {
+                it.type == LedgerEntryType.PRIVATE_EXPENSE
+            }
+        assertThat(memberEntry.amountCents).isEqualTo(400)
+        assertThat(memberEntry.privateAmountCents).isEqualTo(400)
+        assertThat(memberEntry.kittyAmountCents).isEqualTo(500)
+
+        val kittyEntry = ledgerDataService.kittyLedger().first { it.type == LedgerEntryType.KITTY_EXPENSE }
+        // the kitty entry's own effect is the negative kitty draw, but it carries the same split breakdown
+        assertThat(kittyEntry.amountCents).isEqualTo(-500)
+        assertThat(kittyEntry.privateAmountCents).isEqualTo(400)
+        assertThat(kittyEntry.kittyAmountCents).isEqualTo(500)
+    }
+
+    @Test
+    fun `a private-only expense carries no split on the member ledger entry`() {
+        val member = seedMember()
+        seedPrice(50)
+        expenseDataService.upsert(
+            Expense(
+                buyer = member,
+                weightGrams = 500,
+                amountCents = 300,
+                privateAmountCents = 300,
+                kittyAmountCents = 0
+            )
+        )
+
+        val memberEntry =
+            ledgerDataService.memberLedger(member.persistedId, systemActor).first {
+                it.type == LedgerEntryType.PRIVATE_EXPENSE
+            }
+        assertThat(memberEntry.privateAmountCents).isNull()
+        assertThat(memberEntry.kittyAmountCents).isNull()
+    }
+
+    @Test
     fun `a settlement credits the member and feeds the kitty`() {
         val member = seedMember()
         seedPrice(50)
