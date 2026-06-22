@@ -24,7 +24,7 @@ import { appendLedgerPage } from '../../util/ledger';
 const PAGE_SIZE = 20;
 
 /**
- * Admin kitty page: shows the communal kitty balance and history, and offers two money movements — a member
+ * Admin kitty page: shows the communal kitty balance and history, and offers two money movements: a member
  * deposit (a member paid money in) and a kitty adjustment (a direct change to the kitty balance, which may
  * be negative). Euro inputs are converted to integer cents on submit, never via float math.
  */

@@ -65,7 +65,7 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         )
 
     // The price is a single global row (a unique singleton guard rejects a second insert), so a price change
-    // updates the existing row in place — mirroring the production CoffeePriceServiceImpl — rather than
+    // updates the existing row in place (mirroring the production CoffeePriceServiceImpl) rather than
     // inserting a new one. The append-only log still records each change, so the price history is preserved.
     private fun seedPrice(amountCents: Int) =
         coffeePriceDataService.upsert(

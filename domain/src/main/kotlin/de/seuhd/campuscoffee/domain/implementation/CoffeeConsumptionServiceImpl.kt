@@ -26,7 +26,7 @@ import java.util.UUID
 
 /**
  * Domain implementation of [CoffeeConsumptionService]. Each `+1`/`-1` ([applyDelta]) and admin override
- * ([setTotal]) loads the member's consumption, applies the new count, and upserts it — recorded by the
+ * ([setTotal]) loads the member's consumption, applies the new count, and upserts it, recorded by the
  * event-sourced data adapter as a full-state event, reusing the same upsert path a review's approval
  * count used. Enforces the authorization rules: a member may view and step only their own count, an admin
  * may act on anyone, the absolute override is admin-only, a deactivated member is read-only, and the count
@@ -176,8 +176,8 @@ class CoffeeConsumptionServiceImpl(
     }
 
     /**
-     * Allows a `+1`/`-1` only when [actingUser] owns the consumption of [userId] or is an admin, and — for
-     * the owner — only while the account is active (a deactivated member is authenticated read-only).
+     * Allows a `+1`/`-1` only when [actingUser] owns the consumption of [userId] or is an admin, and, for
+     * the owner, only while the account is active (a deactivated member is authenticated read-only).
      */
     private fun requireMaySelfMutate(
         userId: UUID,

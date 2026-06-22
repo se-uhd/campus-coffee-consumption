@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component
 /**
  * Creates a single bootstrap admin on startup when [BootstrapAdminProperties] supplies credentials and no
  * admin exists yet, so a fresh prod deployment (where fixtures are off) is reachable. It runs after the
- * fixture loader, so in dev — where the fixtures already seed an admin — it sees that admin and does
+ * fixture loader, so in dev (where the fixtures already seed an admin) it sees that admin and does
  * nothing. The created admin gets a generated capability token and a coffee consumption at zero, exactly
  * like a member created through the API.
  *

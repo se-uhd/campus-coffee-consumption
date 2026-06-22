@@ -25,7 +25,7 @@ private fun intBody(
 
 /**
  * The (private, kitty) portions of a split bean purchase, for the admin ledger breakdown, or `(null, null)`
- * when there is no split to show — a DELETE (which only reverses a balance) or an expense with no kitty
+ * when there is no split to show: a DELETE (which only reverses a balance) or an expense with no kitty
  * portion (a fully-private purchase). The two are surfaced together so both admin views (the member ledger's
  * PRIVATE_EXPENSE row and the kitty ledger's KITTY_EXPENSE row) render the same `private + kitty` split.
  */
@@ -249,7 +249,7 @@ private class MemberWalk(
             return null
         }
         // carry both portions of a split purchase so the admin ledger can break it down (the member-serving
-        // read path nulls them before they leave the domain — see AccountingServiceImpl). The two are present
+        // read path nulls them before they leave the domain, see AccountingServiceImpl). The two are present
         // together only when there is a real kitty split; a DELETE reverses the balance and exposes none, and
         // a fully-private expense leaves both null.
         val (privatePortion, kittyPortion) = splitPortions(event)

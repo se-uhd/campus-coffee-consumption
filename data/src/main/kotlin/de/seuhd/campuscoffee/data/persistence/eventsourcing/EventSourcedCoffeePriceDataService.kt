@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * Event sourcing coffee-price data adapter — the only persistence path. A Decorator around the relational
+ * Event sourcing coffee-price data adapter, the only persistence path. A Decorator around the relational
  * [CoffeePriceDataServiceImpl] (both adapters for the same `CoffeePriceDataService` port, so it is
  * `@Primary`), delegating reads and `findCurrent` and writing each price change event-first. The first
  * price is created through the same `upsert` (no id) and thereafter updated in place, so the log keeps the

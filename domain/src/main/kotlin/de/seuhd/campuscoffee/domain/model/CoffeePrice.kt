@@ -5,7 +5,7 @@ import java.util.UUID
 
 /**
  * Immutable coffee-price domain model: the single global price charged per cup, in euro cents
- * ([amountCents]). It is event-sourced like every other entity — there is one row in the read model, but
+ * ([amountCents]). It is event-sourced like every other entity: there is one row in the read model, but
  * each admin price change is a full-state event in the append-only log, so the complete price history is
  * retrievable from the log and the balance can value each cup at the price in effect when it was consumed.
  *

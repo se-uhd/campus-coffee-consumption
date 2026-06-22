@@ -11,10 +11,10 @@ import path from 'node:path';
  * the development build) as a JSON shard under `coverage-e2e/.raw/`. The global teardown
  * (`coverage.global-teardown.ts`) ingests every shard with monocart-coverage-reports, source-maps it back
  * onto the Angular `.ts` sources, and emits an lcov + HTML report. This is the SPA coverage the e2e run
- * uniquely adds — the backend JaCoCo agent can only see the JVM, never the browser TypeScript.
+ * uniquely adds: the backend JaCoCo agent can only see the JVM, never the browser TypeScript.
  *
- * When the flag is unset (the default `npm run e2e`), the fixture is a passthrough — no CDP coverage, no
- * overhead — so a plain local run is unaffected.
+ * When the flag is unset (the default `npm run e2e`), the fixture is a passthrough (no CDP coverage, no
+ * overhead), so a plain local run is unaffected.
  *
  * Specs import `test`/`expect` from this module instead of directly from `@playwright/test`.
  */

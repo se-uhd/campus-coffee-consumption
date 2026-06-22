@@ -389,7 +389,7 @@ export class AdminUsersComponent implements OnInit {
   private mergeRows(users: UserDto[], overview: MemberBalanceDto[]): MemberRow[] {
     const balanceById = new Map(overview.map((member) => [member.userId, member]));
     // A row with no id cannot be keyed or acted on, so skip it explicitly rather than collapsing every such
-    // user to the '' key — which would collide them onto one another's balance and silently show wrong zeros
+    // user to the '' key, which would collide them onto one another's balance and silently show wrong zeros
     // (mirrors `viewProfile`, which also refuses a null id).
     return users
       .filter((user) => user.id != null)

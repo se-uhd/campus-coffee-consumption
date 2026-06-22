@@ -54,7 +54,7 @@ class PaymentServiceImpl(
             throw ValidationException("A kitty adjustment amount must not be zero.")
         }
         // serialize against other kitty writes so two concurrent ops cannot both read the same balance,
-        // both pass the check, and both commit — the kitty is an aggregate across rows that @Version cannot guard
+        // both pass the check, and both commit; the kitty is an aggregate across rows that @Version cannot guard
         kittyLock.lockForUpdate()
         if (kittyBalanceCents() + amountCents < 0) {
             throw ConflictException("This adjustment would make the kitty balance negative.")

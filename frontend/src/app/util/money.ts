@@ -14,7 +14,7 @@ const EUROS_SIGNED_FORMAT = new Intl.NumberFormat('en-US', {
 
 /**
  * Formats integer euro cents as a euro string for display, e.g. `-420` ⇒ `-4.20 €`, `0` ⇒ `0.00 €`,
- * `123456` ⇒ `1,234.56 €` (English number format — a period decimal and a comma thousands separator — with
+ * `123456` ⇒ `1,234.56 €` (English number format: a period decimal and a comma thousands separator, with
  * the euro sign after the amount). Balance arithmetic stays in integer cents; the single division here is
  * only the display conversion, which rounds to two decimals, so no rounding error accrues. Shared by the
  * `EurosPipe` (templates) and the few component/dialog code paths that need the same formatting directly.
@@ -30,9 +30,9 @@ export function formatEuros(cents: number | null | undefined, signed = false): s
 /**
  * The reason a euro-amount string could not be parsed into cents, used to drive a specific message.
  *
- * - `empty` — the field is blank (no value typed yet); usually shown as no error, only as a `required` state.
- * - `ambiguous-separator` — both a comma and a point appear, so the decimal separator is undecidable.
- * - `invalid` — non-numeric junk, more than two decimal places, a lone sign or separator, or a negative zero.
+ * - `empty`: the field is blank (no value typed yet); usually shown as no error, only as a `required` state.
+ * - `ambiguous-separator`: both a comma and a point appear, so the decimal separator is undecidable.
+ * - `invalid`: non-numeric junk, more than two decimal places, a lone sign or separator, or a negative zero.
  */
 export type EuroParseError = 'empty' | 'ambiguous-separator' | 'invalid';
 
@@ -49,7 +49,7 @@ export type EuroParseResult =
  * Parses a user-entered euro amount into integer euro cents without floating-point arithmetic, accepting a
  * comma OR a point as the decimal separator. A single separator type (only `,` or only `.`) is the decimal
  * separator, so `"8,50"`, `"8.50"`, `"8,5"`, and `"8"` all parse (to `850`, `850`, `850`, and `800` cents);
- * the digits around it are combined as integers, so `8.50` becomes exactly `850` — never `849`/`851` from a
+ * the digits around it are combined as integers, so `8.50` becomes exactly `850`, never `849`/`851` from a
  * float rounding error. If BOTH `,` and `.` appear the separator is ambiguous (a thousands separator cannot
  * be told from the decimal one), so the result is `ambiguous-separator`. More than two decimal places,
  * non-numeric junk, a lone sign or separator, a missing whole part (`".5"`), a trailing separator (`"4."`),
@@ -97,8 +97,8 @@ export function parseEurosToCents(input: string | number | null | undefined): Eu
 
 /**
  * Parses a user-entered euro amount into integer euro cents without floating-point arithmetic, accepting a
- * comma OR a point as the decimal separator (see {@link parseEurosToCents}). Any failure — empty, ambiguous,
- * or malformed — collapses to `null`; use {@link parseEurosToCents} directly when the reason is needed to
+ * comma OR a point as the decimal separator (see {@link parseEurosToCents}). Any failure (empty, ambiguous,
+ * or malformed) collapses to `null`; use {@link parseEurosToCents} directly when the reason is needed to
  * show a specific message.
  *
  * @param euros the entered euro amount as a string or number (from a text input model)

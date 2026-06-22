@@ -25,7 +25,7 @@ import java.util.UUID
 /**
  * Admin controller for recording and correcting a member's bean purchases (JWT, admin only). The buyer is
  * the `{userId}` path variable; the body carries the weight, total, and the kitty/private split. A member
- * records their own purchases through `/api/expenses` instead — only an admin reaches these split,
+ * records their own purchases through `/api/expenses` instead; only an admin reaches these split,
  * attribution, and correction operations.
  */
 @Tag(name = "Admin expenses", description = "Recording, correcting, and deleting members' bean purchases (admin only).")

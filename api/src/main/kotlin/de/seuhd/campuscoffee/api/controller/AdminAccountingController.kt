@@ -68,7 +68,7 @@ class AdminAccountingController(
         val admin = currentUserProvider.currentUser()
         return ResponseEntity.ok(
             // the admin-by-id ledger exposes the kitty-funded portion of a split expense (the member-serving
-            // /api/ledger does not — see AccountingService.memberLedger)
+            // /api/ledger does not, see AccountingService.memberLedger)
             accountingDtoMapper.toEntryDtos(
                 accountingService.memberLedger(userId, limit, offset, admin, includeKittyPortion = true)
             )

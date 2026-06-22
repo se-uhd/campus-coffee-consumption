@@ -42,7 +42,7 @@ class ProfileController(
     fun get(): ResponseEntity<UserDto> = ResponseEntity.ok(withCapabilityUrl(currentUserProvider.currentUser()))
 
     /**
-     * Updates the authenticated member's own profile — first name, last name, and email only. The update
+     * Updates the authenticated member's own profile: first name, last name, and email only. The update
      * is pinned to the caller's own id and login name, and the server-owned fields a member must not change
      * through their profile (the password, role, and active flag) are dropped, so a profile edit can change
      * nothing beyond the three intended fields (a member authenticates only with their capability token and

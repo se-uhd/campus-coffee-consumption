@@ -15,7 +15,7 @@ import org.testcontainers.utility.DockerImageName
 
 /**
  * Utilities for the system tests: the PostgreSQL container wiring, the shared RestTestClient, and helpers
- * for the two authentication mechanisms — an admin JWT minted at the token endpoint, and a member
+ * for the two authentication mechanisms: an admin JWT minted at the token endpoint, and a member
  * capability token sent as the `X-Coffee-Token` header.
  */
 object SystemTestUtils {

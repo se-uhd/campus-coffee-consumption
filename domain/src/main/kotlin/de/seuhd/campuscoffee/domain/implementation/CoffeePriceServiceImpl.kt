@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional
 /**
  * Domain implementation of [CoffeePriceService]. The price is a single global row: created the first time
  * one is set (or seeded at bootstrap) and updated in place thereafter, which the event-sourced data adapter
- * records as a full-state event — so the log keeps the full price history. Reading the current price is
+ * records as a full-state event, so the log keeps the full price history. Reading the current price is
  * open; changing it and reading its history are admin-only.
  */
 @Service

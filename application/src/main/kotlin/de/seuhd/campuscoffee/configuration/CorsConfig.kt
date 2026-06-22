@@ -9,7 +9,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 /**
  * Builds the CORS source the security chain consults. With an empty [CorsProperties.allowedOrigins] (the
  * default, same-origin SPA) it registers no path mapping, so a cross-origin request receives no
- * `Access-Control-Allow` headers — i.e. CORS stays off. When origins are configured, it allows them on
+ * `Access-Control-Allow` headers, i.e. CORS stays off. When origins are configured, it allows them on
  * the API paths with the headers the SPA needs (`Authorization`, `X-Coffee-Token`, `Content-Type`).
  */
 @Configuration

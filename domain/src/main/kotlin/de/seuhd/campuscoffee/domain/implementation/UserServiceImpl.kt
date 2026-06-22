@@ -52,8 +52,8 @@ class UserServiceImpl(
     }
 
     /**
-     * Refuses to hard-delete a member who has any financial footprint — a non-zero coffee count, or any
-     * expense or settlement — so the financial history is preserved (an admin deactivates them instead).
+     * Refuses to hard-delete a member who has any financial footprint (a non-zero coffee count, or any
+     * expense or settlement) so the financial history is preserved (an admin deactivates them instead).
      * A pristine member (count zero, no money records) is deleted, cascading their zeroed consumption row.
      * Also refuses to delete the last remaining active admin, so the system never locks every admin out.
      *
@@ -80,8 +80,8 @@ class UserServiceImpl(
      * password exists only for an admin**: a member (USER) authenticates solely with their capability token
      * and never has a password, so any supplied password is dropped and the stored hash is cleared. An
      * admin's password hash is, in order: a freshly supplied raw password (hashed), else the hash already
-     * stored for that admin (on an update that does not supply a new one). When neither is present — a
-     * newly created admin, or a member being promoted (who had no stored hash) — the admin would end up
+     * stored for that admin (on an update that does not supply a new one). When neither is present, for a
+     * newly created admin or a member being promoted (who had no stored hash), the admin would end up
      * with no password, which fails with a [MissingFieldException]. A capability token is generated for a
      * new user without one (otherwise the existing token is kept); role and active default to USER/active
      * for a create. The acting-user policy is enforced by [create]/[update] before they call this.

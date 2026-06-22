@@ -240,7 +240,7 @@ export class LedgerListComponent {
   }
 
   /**
-   * Whether the entry is an admin split bean purchase that carries a kitty portion — only then is the
+   * Whether the entry is an admin split bean purchase that carries a kitty portion; only then is the
    * condensed split shown (an unsplit, 100%-private expense shows none). Both expense rows can carry it: a
    * `PRIVATE_EXPENSE` on a member's ledger and a `KITTY_EXPENSE` on the kitty history. The portions are
    * present only on the admin views (the member-serving read strips them), so a member's own ledger never

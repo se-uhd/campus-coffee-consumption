@@ -4,7 +4,7 @@ import { LedgerEntryDto } from '../models';
 export interface AppendedLedgerPage {
   /** The merged entries: `existing` followed by the rows of the page not already present by `seq`. */
   readonly entries: LedgerEntryDto[];
-  /** How many rows were actually appended after de-duplication — the basis for the "Load more" decision. */
+  /** How many rows were actually appended after de-duplication: the basis for the "Load more" decision. */
   readonly appended: number;
 }
 
