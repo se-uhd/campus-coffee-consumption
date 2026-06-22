@@ -13,10 +13,6 @@
   ],
   "tags": [
     {
-      "name": "Admin accounting",
-      "description": "Per-member balances and ledgers (admin only)."
-    },
-    {
       "name": "Consumption",
       "description": "Adding and undoing a member's own coffees, authenticated by their capability token (X-Coffee-Token)."
     },
@@ -29,12 +25,12 @@
       "description": "Recording, correcting, and deleting members' bean purchases (admin only)."
     },
     {
-      "name": "Dev data",
-      "description": "Dev-only endpoints to clear, load, and inspect test data in the database."
+      "name": "Kitty",
+      "description": "The communal kitty: balance, history, deposits, and adjustments (admin only)."
     },
     {
-      "name": "Kitty",
-      "description": "The communal kitty: its balance and history, member deposits, and adjustments (admin only)."
+      "name": "Dev data",
+      "description": "Dev-only endpoints to clear, load, and inspect test data in the database."
     },
     {
       "name": "Price",
@@ -2074,7 +2070,7 @@
     "/api/users/{userId}/activity": {
       "get": {
         "tags": [
-          "Admin accounting"
+          "Users"
         ],
         "summary": "Get a page of a member's activity.",
         "operationId": "memberActivity",
@@ -2096,9 +2092,7 @@
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 20,
-              "exclusiveMinimum": 0,
-              "maximum": 100
+              "default": 20
             }
           },
           {
@@ -2109,8 +2103,7 @@
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 0,
-              "minimum": 0
+              "default": 0
             }
           }
         ],
@@ -2422,7 +2415,7 @@
     "/api/users/overview": {
       "get": {
         "tags": [
-          "Admin accounting"
+          "Users"
         ],
         "summary": "Get every member's current count and balance.",
         "operationId": "overview",
