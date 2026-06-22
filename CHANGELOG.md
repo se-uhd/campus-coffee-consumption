@@ -56,9 +56,11 @@ rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
   (the UI's "Recent activity"). The kitty's `GET /api/kitty/ledger` is now `GET /api/kitty/history` (its UI
   "Kitty history"), and the two kitty money-movements move from `/api/payments/*` under the kitty resource:
   `POST /api/kitty/deposit` (renamed from "settlement", the UI's "deposit") and `POST /api/kitty/adjustment`.
-  `SummaryController` is renamed to `MemberController` and `PaymentController` folds into `KittyController`.
-  The shared `LedgerEntryDto`/`LedgerEntryType` data types keep their names; the OpenAPI spec, the generated
-  frontend DTOs, the SPA services, and the docs are all updated together.
+  `SummaryController` is renamed to `MemberController`, `PaymentController` folds into `KittyController`, and
+  `AdminAccountingController` (the per-member overview and activity, both under `/api/users`) folds into
+  `UserController`. The endpoint paths and the shared `LedgerEntryDto`/`LedgerEntryType` data types keep
+  their names; the OpenAPI spec, the generated frontend DTOs, the SPA services, and the docs are all updated
+  together.
 - The `events.note` metadata column records only an absolute count correction's reason; a settlement, kitty
   adjustment, or expense note lives in that entity's own event body (the docs are corrected to match).
 - **Architecture.** The price-singleton conflict is mapped to a domain `DuplicationException` in the data
