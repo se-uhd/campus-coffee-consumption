@@ -9,7 +9,7 @@ import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 
@@ -48,15 +48,15 @@ class FixtureStartupLoader(
             idGenerator.reset()
             clearAll()
             val (users, consumptions) = TestFixtures.loadAll(userService, coffeeConsumptionService, coffeePriceService)
-            log.info("Reset and reseeded the fixture data on startup: {} users, {} consumptions.", users, consumptions)
+            log.info { "Reset and reseeded the fixture data on startup: $users users, $consumptions consumptions." }
             return
         }
         if (userService.getAll().isNotEmpty()) {
-            log.info("Skipping the fixture load: the database already has users.")
+            log.info { "Skipping the fixture load: the database already has users." }
             return
         }
         val (users, consumptions) = TestFixtures.loadAll(userService, coffeeConsumptionService, coffeePriceService)
-        log.info("Loaded the fixture data on startup: {} users, {} consumptions.", users, consumptions)
+        log.info { "Loaded the fixture data on startup: $users users, $consumptions consumptions." }
     }
 
     /**
@@ -74,6 +74,6 @@ class FixtureStartupLoader(
     private companion object {
         // runs after the event sourcing rebuild (100) startup task, before the bootstrap admin (300)
         private const val ORDER = 200
-        private val log = LoggerFactory.getLogger(FixtureStartupLoader::class.java)
+        private val log = KotlinLogging.logger {}
     }
 }

@@ -88,6 +88,22 @@ rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
 - **Em-dashes removed from all prose and source comments** across the docs, `README.md`, `CLAUDE.md`, and
   the Kotlin/TypeScript/SCSS/build files, replaced with plain punctuation. This completes the AI-slop
   cleanup the 0.3.0 entry began.
+- Run the `:application:test` suite (the system, acceptance, and architecture tests, the slow part of the
+  build) in parallel across several JVM processes. `maxParallelForks` on the `application` `test` task now
+  defaults to `min(4, availableProcessors / 2)` (override with `-PtestForks=N`; `-PtestForks=1` disables
+  parallelism), with a `1g` per-fork heap cap so the forks cannot collectively overcommit. Process-level
+  forking is the only safe form of parallelism here: `SystemTestUtils` is an `object` with a shared mutable
+  `RestTestClient` and the test bases wipe the whole database between tests with `clearAll()`, so two tests
+  must never run concurrently in the same JVM or against the same database. Each fork is a separate JVM with
+  its own `SystemTestUtils` and its own Testcontainers PostgreSQL instance (the container lives in
+  `AbstractSystemTest`'s companion object, one per JVM), and JUnit runs the classes within a fork serially,
+  while Spring's per-JVM context cache still pays off within each fork.
+- Log through **kotlin-logging** (`io.github.oshai:kotlin-logging-jvm`) instead of the SLF4J API directly:
+  every `LoggerFactory.getLogger(X::class.java)` becomes `KotlinLogging.logger {}` and the call sites move
+  from the SLF4J parameterized form (`log.info("... {}", arg)`) to the lambda form (`log.info { "... $arg" }`),
+  which builds the message only when the level is enabled. kotlin-logging is a thin Kotlin layer over SLF4J,
+  so the backend stays Logback (via the Spring Boot starters) and the resolved logger names and message
+  text are unchanged.
 
 ### Added
 

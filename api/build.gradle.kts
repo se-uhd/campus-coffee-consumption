@@ -13,6 +13,8 @@ dependencies {
     api(project(":domain"))
 
     implementation(libs.spring.boot.starter.web)
+    // The controllers and the exception handler log via KotlinLogging.logger {} (a Kotlin facade over SLF4J).
+    implementation(libs.kotlin.logging)
     // `api` (not `implementation`): the public DTOs carry springdoc `@Schema` annotations, so the Swagger
     // annotation classes are part of api's compile contract. Exposing them lets the application module's
     // annotation processor resolve `@Schema(accessMode = ...)` instead of warning that the enum is missing.

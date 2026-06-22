@@ -14,6 +14,8 @@ dependencies {
 
     implementation(libs.spring.boot.starter.data.jpa)
     implementation(libs.postgresql)
+    // The event-sourcing startup runner logs via KotlinLogging.logger {} (a Kotlin facade over SLF4J).
+    implementation(libs.kotlin.logging)
     implementation(libs.spring.boot.flyway)
     implementation(libs.flyway.core)
     runtimeOnly(libs.flyway.database.postgresql)

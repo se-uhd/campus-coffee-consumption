@@ -271,6 +271,15 @@ All tests:
 gradle test
 ```
 
+The `:application:test` task (the system, acceptance, and architecture tests, the slow part of the build)
+runs in parallel across several JVM processes; `maxParallelForks` defaults to `min(4, cpu / 2)`. This is
+safe because each fork is a separate JVM with its own `SystemTestUtils` (an `object` with a shared mutable
+`RestTestClient`) and its own Testcontainers PostgreSQL instance, and JUnit runs the classes within a fork
+serially, so two tests never touch the shared client at once and `clearAll()` never wipes a running test's
+data (in-JVM parallelism would race on both). Each fork boots a full Spring context and a database
+container, so on a machine with little memory override the count with `-PtestForks=N`; `-PtestForks=1`
+disables parallelism.
+
 Single test class (scope the task to the module that contains the test; the bare `test` task runs in
 every module, and the `--tests` filter fails the modules that have no matching test):
 
