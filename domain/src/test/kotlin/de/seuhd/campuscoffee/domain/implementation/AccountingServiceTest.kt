@@ -74,7 +74,7 @@ class AccountingServiceTest {
         runningBalanceCents: Long
     ) = LedgerEntry(
         type = type,
-        seq = 1L,
+        id = UUID.fromString("00000000-0000-0000-0000-000000000001"),
         createdAt = LocalDateTime.now(),
         createdBy = "max",
         note = null,

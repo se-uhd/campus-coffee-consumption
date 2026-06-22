@@ -55,6 +55,12 @@ private fun uuidBody(
  */
 private fun seqOf(event: EventEntity): Long = requireNotNull(event.seq) { "A stored event must carry a seq." }
 
+/**
+ * The event's own id, used as a ledger entry's stable per-entry key (for client-side paging and dedup). The
+ * append position [seqOf] orders the walk but stays inside the data layer; the entry exposes this id instead.
+ */
+private fun idOf(event: EventEntity): UUID = requireNotNull(event.id) { "A stored event must carry an id." }
+
 /** The event's recorded time. */
 private fun createdAtOf(event: EventEntity): LocalDateTime =
     requireNotNull(event.createdAt) { "A stored event must carry a createdAt." }
@@ -292,7 +298,7 @@ private class MemberWalk(
         kittyAmountCents: Long? = null
     ) = LedgerEntry(
         type = type,
-        seq = seqOf(event),
+        id = idOf(event),
         createdAt = createdAtOf(event),
         createdBy = actorOf(event),
         note = event.note,
@@ -402,7 +408,7 @@ private class KittyWalk {
         kittyAmountCents: Long? = null
     ) = LedgerEntry(
         type = type,
-        seq = seqOf(event),
+        id = idOf(event),
         createdAt = createdAtOf(event),
         createdBy = actorOf(event),
         note = event.note,
