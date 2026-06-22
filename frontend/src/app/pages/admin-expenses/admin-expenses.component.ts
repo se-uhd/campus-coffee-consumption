@@ -23,6 +23,7 @@ import { UtcDatePipe } from '../../pipes/utc-date.pipe';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
 import { MemberSelectComponent } from '../../components/member-select/member-select.component';
+import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import { AdminExpenseRequest, ExpenseDto, UserDto } from '../../models';
 import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../util/money';
 
@@ -51,7 +52,8 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
     EurosPipe,
     UtcDatePipe,
     AppHeaderComponent,
-    MemberSelectComponent
+    MemberSelectComponent,
+    EuroAmountDirective
   ],
   template: `
     <cc-app-header
@@ -112,6 +114,7 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                 #amountModel="ngModel"
                 [(ngModel)]="amountEuros"
                 (ngModelChange)="error = ''"
+                ccEuroAmount
                 required
               />
               <mat-hint>Use a comma or a point, e.g. 8,50 or 8.50.</mat-hint>
@@ -130,6 +133,7 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                   #privateModel="ngModel"
                   [(ngModel)]="privateEuros"
                   (ngModelChange)="error = ''"
+                  ccEuroAmount
                   required
                 />
                 <mat-hint>Use a comma or a point, e.g. 8,50 or 8.50.</mat-hint>
@@ -147,6 +151,7 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                   #kittyModel="ngModel"
                   [(ngModel)]="kittyEuros"
                   (ngModelChange)="error = ''"
+                  ccEuroAmount
                   required
                 />
                 <mat-hint>Use a comma or a point, e.g. 8,50 or 8.50.</mat-hint>

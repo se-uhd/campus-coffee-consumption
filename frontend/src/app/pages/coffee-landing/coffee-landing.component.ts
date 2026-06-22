@@ -17,6 +17,7 @@ import { LedgerListComponent } from '../../components/ledger-list/ledger-list.co
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { BalanceSummaryComponent } from '../../components/balance-summary/balance-summary.component';
 import { CollapsibleCardComponent } from '../../components/collapsible-card/collapsible-card.component';
+import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import { LedgerEntryDto, MemberExpenseRequest, MemberSummaryDto } from '../../models';
 import { euroInputError, toCents } from '../../util/money';
 import { appendLedgerPage } from '../../util/ledger';
@@ -47,7 +48,8 @@ const LEDGER_PAGE_SIZE = 10;
     LedgerListComponent,
     AppHeaderComponent,
     BalanceSummaryComponent,
-    CollapsibleCardComponent
+    CollapsibleCardComponent,
+    EuroAmountDirective
   ],
   template: `
     <cc-app-header [home]="['/login', token]">
@@ -149,6 +151,7 @@ const LEDGER_PAGE_SIZE = 10;
                 name="amount"
                 #amountModel="ngModel"
                 [(ngModel)]="expenseAmountEuros"
+                ccEuroAmount
                 required
               />
               <mat-hint>Use a comma or a point, e.g. 4,20 or 4.20.</mat-hint>
