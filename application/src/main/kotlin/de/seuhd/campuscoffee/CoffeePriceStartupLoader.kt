@@ -3,7 +3,7 @@ package de.seuhd.campuscoffee
 import de.seuhd.campuscoffee.configuration.CoffeePriceProperties
 import de.seuhd.campuscoffee.domain.ports.StartupTask
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 
 /**
@@ -26,12 +26,12 @@ class CoffeePriceStartupLoader(
     /** Creates the initial price at the configured default unless one already exists. */
     fun seedInitialPrice() {
         val price = coffeePriceService.ensureInitialPrice(coffeePriceProperties.initialCents)
-        log.info("The coffee price is {} cents per cup.", price.amountCents)
+        log.info { "The coffee price is ${price.amountCents} cents per cup." }
     }
 
     private companion object {
         // runs after the fixture loader (200); in dev the fixtures already seeded a price, so this no-ops
         private const val ORDER = 250
-        private val log = LoggerFactory.getLogger(CoffeePriceStartupLoader::class.java)
+        private val log = KotlinLogging.logger {}
     }
 }

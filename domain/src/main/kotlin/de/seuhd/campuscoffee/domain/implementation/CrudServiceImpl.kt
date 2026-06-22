@@ -4,7 +4,7 @@ import de.seuhd.campuscoffee.domain.exceptions.DuplicationException
 import de.seuhd.campuscoffee.domain.model.DomainModel
 import de.seuhd.campuscoffee.domain.ports.api.CrudService
 import de.seuhd.campuscoffee.domain.ports.data.CrudDataService
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.transaction.annotation.Transactional
 
 /**
@@ -23,17 +23,17 @@ abstract class CrudServiceImpl<DOMAIN : DomainModel<ID>, ID>(
     protected abstract fun dataService(): CrudDataService<DOMAIN, ID>
 
     override fun clear() {
-        log.warn("Clearing all {} data.", domainClass.simpleName)
+        log.warn { "Clearing all ${domainClass.simpleName} data." }
         dataService().clear()
     }
 
     override fun getAll(): List<DOMAIN> {
-        log.debug("Retrieving all {}.", domainClass.simpleName)
+        log.debug { "Retrieving all ${domainClass.simpleName}." }
         return dataService().getAll()
     }
 
     override fun getById(id: ID): DOMAIN {
-        log.debug("Retrieving {} with id '{}'.", domainClass.simpleName, id)
+        log.debug { "Retrieving ${domainClass.simpleName} with id '$id'." }
         return dataService().getById(id)
     }
 
@@ -46,19 +46,19 @@ abstract class CrudServiceImpl<DOMAIN : DomainModel<ID>, ID>(
     override fun upsert(domainObject: DOMAIN): DOMAIN {
         val id = domainObject.id
         if (id == null) {
-            log.debug("Creating a new {}.", domainClass.simpleName)
+            log.debug { "Creating a new ${domainClass.simpleName}." }
         } else {
             // no existence pre-read here: the data adapter's update path reads the row by id and throws
             // NotFoundException itself if it is missing, so a pre-read would only duplicate that lookup
-            log.debug("Updating {}.", describe(domainObject))
+            log.debug { "Updating ${describe(domainObject)}." }
         }
 
         try {
             val upserted = dataService().upsert(domainObject)
-            log.debug("Upserted {}.", describe(upserted))
+            log.debug { "Upserted ${describe(upserted)}." }
             return upserted
         } catch (e: DuplicationException) {
-            log.warn("Failed to upsert {}: {}", domainClass.simpleName, e.message)
+            log.warn { "Failed to upsert ${domainClass.simpleName}: ${e.message}" }
             throw e
         }
     }
@@ -66,9 +66,9 @@ abstract class CrudServiceImpl<DOMAIN : DomainModel<ID>, ID>(
     override fun delete(id: ID) {
         // resolve the label before deleting, while the entity (and its natural key) still exists
         val label = describeId(id)
-        log.debug("Deleting {}.", label)
+        log.debug { "Deleting $label." }
         dataService().delete(id)
-        log.info("Deleted {}.", label)
+        log.info { "Deleted $label." }
     }
 
     /**
@@ -90,6 +90,6 @@ abstract class CrudServiceImpl<DOMAIN : DomainModel<ID>, ID>(
     protected open fun describeId(id: ID): String = "${domainClass.simpleName} with id '$id'"
 
     private companion object {
-        private val log = LoggerFactory.getLogger(CrudServiceImpl::class.java)
+        private val log = KotlinLogging.logger {}
     }
 }
