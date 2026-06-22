@@ -1,6 +1,7 @@
 package de.seuhd.campuscoffee.domain.model
 
 import java.time.LocalDateTime
+import java.util.UUID
 
 /**
  * The kind of a [LedgerEntry]. The first four appear in a member's unified ledger; the last three appear in
@@ -28,13 +29,15 @@ enum class LedgerEntryType {
 
 /**
  * One row of a unified ledger, reconstructed from a single event-log row (there is no ledger table). It is
- * a read-only projection: it carries no identifier.
+ * a read-only projection. Its [id] is the id of the event it was reconstructed from, a stable per-entry key
+ * a client can use to page and deduplicate; it deliberately is not the event-store append position (that
+ * ordering detail stays inside the data layer).
  *
  * [amountCents] is the signed effect this entry has on the running balance it belongs to (a member's
  * balance for a member ledger, or the kitty for the kitty ledger), and [runningBalanceCents] is that
  * balance after this entry (computed by walking the stream oldest-first). Both are `Long` so a large admin
- * override (count × price) cannot overflow. [seq] is the event's append order; [createdAt]/[createdBy]/[note]
- * are the event metadata. The remaining fields are populated only where they apply: [count]/[delta] for a
+ * override (count × price) cannot overflow. [createdAt]/[createdBy]/[note] are the event metadata. The
+ * remaining fields are populated only where they apply: [count]/[delta] for a
  * consumption entry, [weightGrams] for an expense entry, and [privateAmountCents]/[kittyAmountCents] for an
  * admin-split expense (its two portions, shown only on the admin views, see below).
  *
@@ -48,7 +51,7 @@ enum class LedgerEntryType {
  */
 data class LedgerEntry(
     val type: LedgerEntryType,
-    val seq: Long,
+    val id: UUID,
     val createdAt: LocalDateTime,
     val createdBy: String,
     val note: String?,

@@ -116,7 +116,7 @@ interface MemberRow {
                 required
               />
               @if (firstNameModel.invalid && firstNameModel.touched) {
-                <mat-error>Required.</mat-error>
+                <mat-error>A first name is required.</mat-error>
               }
             </mat-form-field>
             <mat-form-field>
@@ -129,7 +129,7 @@ interface MemberRow {
                 required
               />
               @if (lastNameModel.invalid && lastNameModel.touched) {
-                <mat-error>Required.</mat-error>
+                <mat-error>A last name is required.</mat-error>
               }
             </mat-form-field>
           </div>
