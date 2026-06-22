@@ -11,7 +11,7 @@ member has a running coffee count, valued at a global admin-set **price per cup*
 **capability URL** printed as a **QR code on the wall**; scanning it opens a small mobile-first Angular web
 app where they add a coffee (and may **undo** a recent one within a grace period) and record their own bean
 purchases. Admins create and manage members, set the price, record expenses and kitty settlements, and
-correct anyone's count. Settling up is a **settlement** (real money paid into the kitty), not a reset.
+correct anyone's count. Settling up is a **settlement** (real money paid into the kitty); there is no reset.
 Every change — consumptions, prices, expenses, and payments — is recorded in an append-only **event log**,
 the only persistence model, from which a **unified ledger** (coffees, purchases, and settlements with a
 running balance) is read. Money is stored as integer **euro cents** end to end. See
@@ -46,7 +46,7 @@ From `application/src/test/kotlin/de/seuhd/campuscoffee/tests/architecture/Archi
 The domain defines **port interfaces** that adapters implement:
 
 - **API Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/api/`): Generic service interface `CrudService<DOMAIN, ID>` and the concrete service interfaces `UserService`, `CoffeeConsumptionService`, `CoffeePriceService`, `ExpenseService`, `PaymentService`, and `AccountingService` (the read side: a member's summary and unified ledger, the per-member overview, and the kitty ledger and balance).
-- **Data Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/data/`): Generic data service interface `CrudDataService<DOMAIN, ID>`, the concrete `UserDataService`, `CoffeeConsumptionDataService` (the latter adds `getByUserId`), `CoffeePriceDataService`, `ExpenseDataService`, and `PaymentDataService`, the event-log-backed `ConsumptionHistoryDataService` and `LedgerDataService` (the unified-ledger and kitty walk over the log), and the `PasswordHasher` port.
+- **Data Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/data/`): Generic data service interface `CrudDataService<DOMAIN, ID>`, the concrete `UserDataService`, `CoffeeConsumptionDataService` (the latter adds `getByUserId`), `CoffeePriceDataService`, `ExpenseDataService`, and `PaymentDataService`, the event-log-backed `ConsumptionHistoryDataService` and `LedgerDataService` (the unified-ledger and kitty walk over the log), the `KittyLock` port (a Postgres advisory lock serializing the kitty-overdraw check, implemented by `PostgresKittyLock`), and the `PasswordHasher` port.
 - **Infrastructure ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/`): `IdGenerator`, `CapabilityTokenGenerator`, `QrCodeGenerator`, `StartupTask`, plus the request-scoped event-metadata ports `ActorProvider` and `ChangeNoteContext`.
 
 Service **implementations**:
@@ -128,6 +128,13 @@ lowers it by the price; an undo raises it by the price of the `+1` it reverses; 
 raises it; a settlement raises it (and feeds the kitty). The **kitty** is fed by settlements and admin
 adjustments and drawn down by the kitty portion of admin expenses.
 
+The kitty must never go negative. Any operation that would drive it below zero — the kitty portion of an
+admin expense or a negative kitty adjustment — is refused with a 409 (`ConflictException`). The check and the
+write are serialized by a Postgres advisory lock (the `KittyLock` domain port, implemented by
+`PostgresKittyLock` in the data layer via `pg_advisory_xact_lock`) so two concurrent draws cannot both read
+a sufficient balance and overdraw the fund (a TOCTOU race). `ExpenseService` and `PaymentService` take the
+lock around the read-then-write.
+
 The balance values each cup at the price **in effect when it was consumed** via an "as-of" join over the
 log keyed on the event **append order (`seq`)**, never a wall-clock timestamp (the two per-write
 `createdAt` clocks are not comparable, and the in-place price singleton would collapse a timestamp-keyed
@@ -172,7 +179,7 @@ Domain-specific controllers/services extend these base classes (e.g., `UserContr
 - Java 25 and Gradle 9.5, provisioned via `mise.toml` (no Gradle wrapper). Run Gradle through mise
   (CI uses `jdx/mise-action`). The build pins a **Java 25 toolchain with no auto-download**, so a
   JDK 25 must be present on the machine — mise supplies it.
-- Node is provisioned via `mise.toml` for the frontend build.
+- Node 24 is provisioned via `mise.toml` for the frontend build, lint, and tests.
 - The Java major version has a **single source of truth**: the `java` entry in
   `gradle/libs.versions.toml`. The convention plugins resolve it for the Gradle toolchain and the Kotlin
   `jvmTarget`; `mise.toml` and the Dockerfile runtime image pin the same major by hand.
@@ -223,6 +230,17 @@ The `dev` profile:
 - Loads the fixture dataset on startup (`campus-coffee.fixtures.load-on-startup: true`, when the database
   has no users yet): one admin and four members with deterministic capability tokens, each with a coffee
   consumption at zero, so the app comes up with the seeded ids and demo-able coffee links ready.
+- Resets the data on every dev start (`campus-coffee.fixtures.reset-on-startup: true`): clears the data and
+  reseeds the fixtures (and the demo data below), so each restart returns to the same deterministic state.
+- Layers on **dev demo data** via the dev-only `DevDemoDataLoader` (`@Profile("dev")`, a `StartupTask` at
+  order 260, after the fixture reset+reseed and the price seed): about nine extra members (a mix of roles and
+  active states) and an initial kitty float, and it also enriches **every existing fixture user** (the admin
+  `jane_doe` included) with varied consumption, bean-purchase, and deposit history, so the members list
+  paginates and the ledger and change-log views are non-empty for almost everyone. Two members are
+  deliberately left **empty** to demo the empty state: a freshly created active member `new_user` (no history
+  at all) and the inactive demo member `hannes_schulz`. Demo members that get history are created active,
+  given their history, then deactivated last (seeding history onto an inactive member is rejected by the
+  domain). It is `@Profile("dev")`, so the tests still see exactly the five-member fixture set.
 - Registers the dev-only `DevController` (in the `api` layer) under `/api/dev`:
   `GET /api/dev/data` reports the counts, `PUT /api/dev/data` replaces the data with the fixtures
   (clear + seed; idempotent, reassigning the same seeded ids), and `DELETE /api/dev/data` clears it.
@@ -276,17 +294,68 @@ gradle :domain:test --tests "CoffeeConsumptionServiceTest.decrementing a count a
   `pitest` task (e.g., `gradle :domain:pitest -Pmutation`). The `application` cross-module run
   (`gradle :application:pitest -Pmutation`) additionally mutates `api.*`/`data.*` against the system and
   acceptance tests. The generated `*MapperImpl` classes are excluded, mirroring the JaCoCo gate.
+- **"Both" coverage — the e2e run feeds both gates.** The Playwright e2e contributes coverage to *both*
+  sides:
+  - **Backend (JVM) e2e coverage merged into the JaCoCo gate.** `gradle :coverage:runE2eCoverage`
+    (`scripts/run-e2e-coverage.sh`) builds the source-mapped SPA + jar, launches it under the JaCoCo agent
+    (`-javaagent:…=destfile=coverage/build/jacoco/e2e.exec,output=file,append=false`) on the dev profile
+    against PostgreSQL on `:5432`, waits for `/actuator/health`, runs the e2e (`PW_COVERAGE=1 npm run
+    e2e`), then SIGTERMs the app so the agent flushes `e2e.exec`. The aggregate report and `coverageGate`
+    in `coverage/build.gradle.kts` add `coverage/build/jacoco/e2e.exec` to their `executionData` *when it
+    exists*, so an e2e run's HTTP traffic counts toward the same gate; a plain `gradle build` (no
+    `e2e.exec`) degrades to the in-JVM coverage alone. The agent jar is resolved from the `jacocoAgentJar`
+    configuration. The task is opt-in (not wired into `check`) because it is orchestration-heavy and needs
+    a running Postgres + Playwright's chromium. After it runs, `gradle :coverage:coverageGate` folds
+    `e2e.exec` in.
+  - **Frontend unit coverage (Vitest).** `npm run test:coverage` (the `coverage` configuration of the
+    Angular `@angular/build:unit-test` builder, `@vitest/coverage-v8`) writes lcov + HTML + text-summary
+    under `frontend/coverage/`. The thresholds in `angular.json` are a deliberately *low floor*
+    (statements/functions/lines 1%, branches 0%) — the suite is a single service spec (~1% of the app), so
+    the floor only guards against a regression to zero, not a real coverage target. Raise it as the unit
+    suite grows.
+  - **Frontend e2e (browser) coverage.** The e2e run also captures the SPA TypeScript coverage the JaCoCo
+    agent can never see: a per-test Playwright fixture (`frontend/e2e/fixtures.ts`) turns on Chromium V8
+    coverage under `PW_COVERAGE=1`, and a global teardown (`frontend/e2e/coverage.global-teardown.ts`)
+    source-maps it onto the `.ts` sources with `monocart-coverage-reports`, emitting lcov + HTML under
+    `frontend/coverage-e2e/` (~70% of the app TS). The source maps come from the `coverage` Angular build
+    configuration (`npm run build:coverage`, `sourceMap.scripts: true`, no output hashing), which
+    `scripts/run-e2e-coverage.sh` builds and `:application:bootJar -PskipFrontendBuild` bundles as-is. A
+    plain `npm run e2e` (no `PW_COVERAGE`) is unaffected.
+  - **CI.** A separate `e2e` job in `.github/workflows/build.yml` runs the whole flow against a PostgreSQL
+    service container and uploads the coverage artifacts (`e2e.exec`, the aggregate report, and
+    `frontend/coverage-e2e/`); the core `build` job is unchanged.
 
 ### Frontend
 
-The Angular SPA lives in `frontend/` and is built by Gradle (a Node-Gradle task runs `npm ci` + `npm run
-build` and copies `frontend/dist/**/browser/` into `application/src/main/resources/static/`, wired before
-`:application:processResources`/`bootJar`), so `gradle build` produces one self-contained jar. For frontend
-development run the Angular dev server, which proxies `/api` to the backend on `:8080`:
+The Angular 22 SPA (TypeScript 6, Angular Material 22, on Node 24 via mise) lives in `frontend/` and is
+built by Gradle (a Node-Gradle task runs `npm ci` + `npm run build` and copies `frontend/dist/**/browser/`
+into `application/src/main/resources/static/`, wired before `:application:processResources`/`bootJar`), so
+`gradle build` produces one self-contained jar. For frontend development run the Angular dev server, which
+proxies `/api` to the backend on `:8080`:
 
 ```shell
 cd frontend && npm start
 ```
+
+**Frontend static analysis (wired into `gradle check`).** The `frontendLint` Gradle task (in
+`application/build.gradle.kts`) runs `npm run lint` — **angular-eslint** plus **Stylelint** for the SCSS —
+and is bound to `check`, so `gradle build` and CI fail on a lint violation. **Prettier** (`npm run format` /
+`format:check`) and **Knip** (`npm run knip`, dead-code/unused-dependency detection) round out the toolset.
+
+**OpenAPI → frontend-DTO codegen.** The TypeScript request/response DTOs are generated from the backend
+OpenAPI spec, not written by hand. The `generateFrontendDtos` Gradle task runs
+`scripts/generate-frontend-dtos.sh`, which generates into `frontend/src/app/api/model/` and is **hash-skip**
+(it regenerates only when the committed spec `frontend/src-gen/api-docs.json` changes). It is a dependency
+of `frontendBuild` and `frontendLint`, so the build keeps the DTOs current. `frontend/src/app/models.ts`
+re-exports the generated DTOs (aliasing request bodies and surfacing the enum unions), so the rest of the
+SPA imports from `models.ts` and the frontend/backend contracts cannot drift. **Do not hand-edit
+`frontend/src/app/api/model/`** — regenerate it.
+
+**Frontend tests and coverage** (run via mise's Node): `npm test` (Vitest unit tests), `npm run
+test:coverage` (the same with a coverage report under `frontend/coverage/`), `npm run e2e` (Playwright
+against an already-running app on `:8080`, the suite in `frontend/e2e/`), and `PW_COVERAGE=1 npm run e2e`
+(the e2e with browser V8 coverage written to `frontend/coverage-e2e/`). See **Code Coverage and Mutation
+Testing** for how the e2e also feeds the backend JaCoCo gate.
 
 ### Docker
 
@@ -404,7 +473,11 @@ keep conventional camelCase names.
 - **OpenAPI/Swagger** (SpringDoc) for API documentation.
 - **Spring Security**: a JWT (bearer-token) resource server for admins and a custom capability token filter for members (no HTTP Basic).
 - **Testcontainers** for system tests, **Cucumber** for BDD, **ArchUnit** for architecture testing.
-- **Angular** (standalone components, Angular Material, `HttpClient`) for the frontend.
+- **Angular 22** (standalone components, signal `input()`/`output()` and `computed`, `@defer`/`@let`,
+  Angular Material 22, `HttpClient`) on **TypeScript 6** and **Node 24** for the frontend. Unit tests run on
+  **Vitest** (not Karma/Jasmine); end-to-end tests on **Playwright**.
+- **angular-eslint + Prettier + Stylelint + Knip** for frontend static analysis, all wired into
+  `gradle check`; **Qodana** (a JVM job and a JS/TS job) in CI on top of ktlint/detekt.
 
 ## Authentication and Authorization
 
@@ -439,8 +512,9 @@ controllers map paths relative to the resource.
 
 ### Member self-service (auth: `X-Coffee-Token` header; principal = the token's member)
 
-- `GET  /summary` — the member landing: current total, balance, the current price, and the kitty balance.
-- `GET  /consumption?limit=5&offset=0` — own current total plus a page of the change log (`ConsumptionDto`).
+- `GET  /summary?ledgerLimit=10&ledgerOffset=0` — the member landing in one call (`MemberSummaryDto`):
+  current total, balance, the current price, the kitty balance, whether the most recent coffee is still
+  `cancellable`, and the first page of the unified `ledger` (`ledgerLimit` defaults to 10).
 - `POST /consumption` (no body) — add one coffee, returns the summary.
 - `POST /consumption/cancel` — undo the most recent un-cancelled own coffee within the grace period (nothing
   to undo / past the grace period → 409).
@@ -457,13 +531,17 @@ controllers map paths relative to the resource.
 - `PUT /users/{id}` edits the profile, `role`, and `active` (deactivate/reactivate).
 - `DELETE /users/{id}` hard-deletes a member; refused (409) if the member has any financial history (deactivate instead).
 - `GET /users/me` — the signed-in admin's own user (the admin landing default).
-- `GET /users/overview` — a per-member overview (counts and balances).
-- `GET /users/{id}/link`, `POST /users/{id}/link/rotate`, `GET /users/{id}/qr.png`.
+- `GET /users/overview` — a per-member overview (counts and balances); it now renders in the member-management page (`/admin/users`).
+- `GET /users/{id}/link`, `POST /users/{id}/link/rotate`, `GET /users/{id}/qr.png` (downloads as
+  `<loginName>.png`, transparent background).
+- `GET /users/qr.zip` — a streamed ZIP of every member's QR code as `<loginName>.png` (capped at 1000
+  members; powers the admin "Download all QR codes" button).
 - `GET  /users/{id}/consumption?limit=5&offset=0` — a member's total plus a page of the change log.
 - `GET  /users/{id}/ledger?limit=5&offset=0` — a member's unified ledger.
 - `POST /users/{id}/consumption` `{ delta: 1 | -1 }` — a single-step change.
 - `PUT  /users/{id}/consumption` `{ total, note? }` — the absolute count correction (`note` is the optional admin reason, ≤ 500 chars).
 - `POST/PUT/DELETE /users/{id}/expenses` `{ amountCents, privateAmountCents, kittyAmountCents, weightGrams?, note? }` — record / correct / delete a member's bean purchase with an explicit private/kitty split (must sum to the total) attributed to the member as buyer.
+- `GET /price` — read the current global price (admin-only; members receive it through their landing summary).
 - `PUT /price` `{ amountCents }` — set the global price; `GET /price/history` — the full price history from the log.
 - `POST /payments/settlement` `{ userId, amountCents, note? }` — a member pays money into the kitty (credits the member, feeds the kitty).
 - `POST /payments/adjustment` `{ amountCents, note? }` — a pure kitty adjustment (an initial float or a correction).
@@ -508,6 +586,9 @@ Notes on semantics:
     the prod profile none).
   - `campus-coffee.fixtures.load-on-startup` (`FixturesProperties`, application module): when `true` and
     the database has no users yet, load the fixtures on startup (on in dev, off in prod).
+  - `campus-coffee.fixtures.reset-on-startup` (`FixturesProperties`, application module): when `true`, clear
+    the data and reseed the fixtures on every startup (on in dev, off in prod), so each dev restart returns
+    to the deterministic seeded state.
   - `campus-coffee.bootstrap-admin.*` (`BootstrapAdminProperties`, application module): when set and no
     admin exists yet, create one admin on startup (used in prod, where fixtures are off).
   - `campus-coffee.cors.allowed-origins` (`CorsProperties`, application module): a default-empty CORS
@@ -517,8 +598,9 @@ The startup tasks run before the embedded web server accepts requests (via a `Sm
 `StartupDataInitializer`, that runs every registered `StartupTask` in `order`): the optional event-log
 rebuild (order 100), then the fixture loader (200), then the price seeder (`CoffeePriceStartupLoader`, 250,
 seeds `campus-coffee.price.initial-cents` when no price exists yet so a price exists before any coffee is
-consumed), then the bootstrap admin (300). So in dev the fixtures seed an admin and the bootstrap step is a
-no-op; in prod the bootstrap step creates the admin.
+consumed), then the dev-only `DevDemoDataLoader` (260, `@Profile("dev")`), then the bootstrap admin (300).
+So in dev the fixtures seed an admin and the bootstrap step is a no-op; in prod the bootstrap step creates
+the admin (and the demo loader does not run).
 
 ## Important Patterns
 
@@ -529,15 +611,17 @@ Domain exceptions in `domain/.../exceptions/`:
 - `DuplicationException`: Duplicate unique fields (409).
 - `ValidationException`: Malformed input / business rule violation (400) — e.g. a `delta` other than `±1`, a count correction below zero, or an expense whose split does not sum to its total.
 - `MissingFieldException`: Required field missing (400).
-- `ConflictException`: A well-formed request that conflicts with the resource's current state (409) — a `−1` at 0, or an undo with nothing to undo or past the grace period.
+- `ConflictException`: A well-formed request that conflicts with the resource's current state (409) — a `−1` at 0, an undo with nothing to undo or past the grace period, or an operation that would drive the kitty below zero (the kitty-overdraw guard, see below).
 - `ConcurrentUpdateException`: Optimistic-locking conflict (409) — a concurrent self-scan; the SPA retries.
 - `ForbiddenException`: Authorization failure (403) — not the owner / not an admin, or a deactivated member mutating.
 - `DeletionConflictException`: Deletion blocked because other data references the entity (409) — e.g. hard-deleting a member who has any financial history (a non-zero count, or any expense or settlement); the admin deactivates them instead.
 
 Global exception handler: `api/.../exceptions/GlobalExceptionHandler.kt`. It extends
 `ResponseEntityExceptionHandler`, so the standard Spring MVC exceptions also map to their proper status
-codes (an unmapped path returns 404, a wrong HTTP method 405) instead of a generic 500. The REST API is
-JSON-only (`ApiPathConfig` removes the XML message converter and pins UTF-8 on JSON).
+codes (an unmapped path returns 404, a wrong HTTP method 405) instead of a generic 500. It also maps a
+Jakarta `ConstraintViolationException` (an out-of-range paging `limit`/`offset` that violates the
+`@Max`/`@Min`/`@Positive` bounds) to a clean 400 instead of letting it fall through to a generic 500. The
+REST API is JSON-only (`ApiPathConfig` removes the XML message converter and pins UTF-8 on JSON).
 
 ### MapStruct Configuration
 

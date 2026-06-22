@@ -1,0 +1,11 @@
+dist
+node_modules
+.angular
+out-tsc
+coverage
+test-results
+playwright-report
+package-lock.json
+src/theme-colors.scss
+# Generated OpenAPI DTOs (openapi-generator owns their formatting).
+src/app/api

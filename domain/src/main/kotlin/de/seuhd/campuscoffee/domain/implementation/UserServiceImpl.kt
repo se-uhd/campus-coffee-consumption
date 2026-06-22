@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.domain.implementation
 
+import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.MissingFieldException
@@ -40,15 +41,31 @@ class UserServiceImpl(
     UserService {
     override fun dataService(): CrudDataService<User, UUID> = userDataService
 
+    /** Labels a user by id and login name so the upsert audit trail is not an opaque UUID alone. */
+    override fun describe(domainObject: User): String =
+        "User with id '${domainObject.id}', login name '${domainObject.loginName}'"
+
+    /** Labels a user by id and login name for the delete log, resolving the login name from the store. */
+    override fun describeId(id: UUID): String {
+        val loginName = runCatching { userDataService.getById(id).loginName }.getOrNull()
+        return "User with id '$id'" + loginName?.let { ", login name '$it'" }.orEmpty()
+    }
+
     /**
      * Refuses to hard-delete a member who has any financial footprint — a non-zero coffee count, or any
      * expense or settlement — so the financial history is preserved (an admin deactivates them instead).
      * A pristine member (count zero, no money records) is deleted, cascading their zeroed consumption row.
+     * Also refuses to delete the last remaining active admin, so the system never locks every admin out.
      *
+     * @throws ConflictException if deleting the last remaining active admin
      * @throws DeletionConflictException if the member has financial history
      */
     @Transactional
     override fun delete(id: UUID) {
+        val target = runCatching { userDataService.getById(id) }.getOrNull()
+        if (target != null) {
+            requireNotLastActiveAdmin(target, "delete")
+        }
         val hasConsumed = coffeeConsumptionDataService.getByUserId(id).count != 0
         val hasExpenses = expenseDataService.getAllByBuyer(id).isNotEmpty()
         val hasPayments = paymentDataService.getAllByUser(id).isNotEmpty()
@@ -136,13 +153,20 @@ class UserServiceImpl(
         if (!isSelf && !isAdmin) {
             throw ForbiddenException("A user may update only their own account unless they are an admin.")
         }
+        // a deactivated member is read-only: a self profile edit (PUT /api/profile) by an inactive,
+        // still-authenticated member is rejected, matching every other member mutation. An admin may still
+        // edit anyone (including themselves) so a deactivated admin is not locked out of administration.
+        if (isSelf && !isAdmin && actingUser.active != true) {
+            throw ForbiddenException("A deactivated member is read-only and cannot edit their profile.")
+        }
         // only an admin may change the role or the active flag; a non-admin update keeps the stored values
-        return upsert(
-            user.copy(
-                role = if (isAdmin) user.role ?: existing.role else existing.role,
-                active = if (isAdmin) user.active ?: existing.active else existing.active
-            )
-        )
+        val newRole = if (isAdmin) user.role ?: existing.role else existing.role
+        val newActive = if (isAdmin) user.active ?: existing.active else existing.active
+        // refuse to demote (ADMIN -> USER) or deactivate (active -> false) the last remaining active admin
+        if (newRole != Role.ADMIN || newActive == false) {
+            requireNotLastActiveAdmin(existing, "demote or deactivate")
+        }
+        return upsert(user.copy(role = newRole, active = newActive))
     }
 
     @Transactional
@@ -172,6 +196,34 @@ class UserServiceImpl(
     ) {
         if (actingUser.role != Role.ADMIN) {
             throw ForbiddenException("Only an admin may $action.")
+        }
+    }
+
+    /**
+     * Refuses the given [action] when [target] is the last remaining active admin, so the system can never
+     * lose its final administrator. [target] is the last active admin when it is itself an active admin and
+     * no other user is. Callers invoke this only for an operation that would remove [target]'s active-admin
+     * status (a demotion, a deactivation, or a delete); for any other operation the guard is a no-op because
+     * [target] is left an active admin.
+     *
+     * @param target the user whose active-admin status the operation would remove
+     * @param action the human-readable verb for the conflict message (e.g. "delete")
+     * @throws ConflictException if [target] is the last remaining active admin
+     */
+    private fun requireNotLastActiveAdmin(
+        target: User,
+        action: String
+    ) {
+        val isActiveAdmin = target.role == Role.ADMIN && target.active != false
+        if (!isActiveAdmin) {
+            return
+        }
+        val otherActiveAdmins =
+            userDataService.getAll().any { other ->
+                other.persistedId != target.persistedId && other.role == Role.ADMIN && other.active != false
+            }
+        if (!otherActiveAdmins) {
+            throw ConflictException("At least one active admin must remain; you cannot $action the last one.")
         }
     }
 }

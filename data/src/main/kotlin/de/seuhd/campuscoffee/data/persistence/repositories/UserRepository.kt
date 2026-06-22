@@ -9,6 +9,13 @@ import java.util.UUID
  */
 interface UserRepository : JpaRepository<UserEntity, UUID> {
     /**
+     * Returns all users ordered by login name ascending. A stable, human-readable order so a mutation such
+     * as a deactivation or a token rotation never reshuffles the admin user list (Postgres otherwise returns
+     * the updated row in a different physical position).
+     */
+    fun findAllByOrderByLoginNameAsc(): List<UserEntity>
+
+    /**
      * Returns the user with the given login name, or null if none matches.
      *
      * @param loginName the login name to look up

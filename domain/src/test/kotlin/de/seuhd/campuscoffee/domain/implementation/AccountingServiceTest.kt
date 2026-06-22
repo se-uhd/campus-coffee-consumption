@@ -195,4 +195,60 @@ class AccountingServiceTest {
 
         assertThat(service.allBalances(admin).first().balanceCents).isEqualTo(0)
     }
+
+    @Test
+    fun `a member's ledger reflects only the private portion of a split expense and never the kitty portion`() {
+        // the member ledger the data service projects for a split bean purchase carries only the buyer's
+        // private credit (PRIVATE_EXPENSE); the kitty-funded portion lives in the kitty ledger and must never
+        // appear in the member view. A 900-cent purchase split 400 private / 500 kitty: the member sees +400.
+        val privateOnly = entry(LedgerEntryType.PRIVATE_EXPENSE, 400, 400)
+        whenever(userDataService.getById(memberId)).thenReturn(member)
+        whenever(ledgerDataService.memberLedger(memberId, "max")).thenReturn(listOf(privateOnly))
+
+        val page = service.memberLedger(memberId, 10, 0, admin)
+
+        // only the private credit surfaces, valued at the private portion (400, never the 900 total or the
+        // 500 kitty portion), and no kitty entry leaks into the member view
+        assertThat(page).singleElement()
+        assertThat(page.first().type).isEqualTo(LedgerEntryType.PRIVATE_EXPENSE)
+        assertThat(page.first().amountCents).isEqualTo(400)
+        assertThat(page.first().runningBalanceCents).isEqualTo(400)
+        assertThat(page.map { it.type })
+            .doesNotContain(LedgerEntryType.KITTY_EXPENSE, LedgerEntryType.KITTY_ADJUSTMENT)
+    }
+
+    @Test
+    fun `memberLedger clamps a negative offset to zero and a limit above the cap to the maximum`() {
+        // a 120-entry ledger: more than the 100 cap, so the page size is clamped, and a negative offset is
+        // treated as zero (the page starts at the newest entry). The newest-first ordering is preserved.
+        val full = (1..120).map { entry(LedgerEntryType.CONSUMPTION, -50, -50L * it) }
+        whenever(userDataService.getById(memberId)).thenReturn(member)
+        whenever(ledgerDataService.memberLedger(memberId, "max")).thenReturn(full)
+
+        val page = service.memberLedger(memberId, limit = 1_000, offset = -10, actingUser = admin)
+
+        // the limit is capped at MAX_LIMIT (100); a negative offset clamps to 0, so the page starts newest
+        assertThat(page).hasSize(100)
+        // newest-first: the last (highest running balance) ledger entry leads the page
+        assertThat(page.first().runningBalanceCents).isEqualTo(-6_000L)
+    }
+
+    @Test
+    fun `memberLedger returns an empty page for an offset beyond the end of the ledger`() {
+        val full = listOf(entry(LedgerEntryType.CONSUMPTION, -50, -50))
+        whenever(userDataService.getById(memberId)).thenReturn(member)
+        whenever(ledgerDataService.memberLedger(memberId, "max")).thenReturn(full)
+
+        // an offset past the single entry yields an empty page rather than an error
+        assertThat(service.memberLedger(memberId, limit = 10, offset = 5, actingUser = admin)).isEmpty()
+    }
+
+    @Test
+    fun `kittyLedger clamps a limit above the cap to the maximum for an admin`() {
+        val full = (1..150).map { entry(LedgerEntryType.KITTY_ADJUSTMENT, 100, 100L * it) }
+        whenever(ledgerDataService.kittyLedger()).thenReturn(full)
+
+        // the kitty ledger paginates through the same clamp: a limit above MAX_LIMIT (100) is capped
+        assertThat(service.kittyLedger(limit = 500, offset = 0, actingUser = admin)).hasSize(100)
+    }
 }

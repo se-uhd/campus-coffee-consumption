@@ -1,0 +1,26 @@
+{
+  "extends": ["stylelint-config-standard-scss"],
+  "rules": {
+    "selector-class-pattern": [
+      "^[a-z](?:[a-z0-9]*)(?:-[a-z0-9]+)*(?:--[a-z0-9]+(?:-[a-z0-9]+)*)?(?:__[a-z0-9]+(?:-[a-z0-9]+)*)?$",
+      {
+        "message": "Expected class selector to be kebab-case, optionally with BEM __element / --modifier suffixes"
+      }
+    ],
+    "scss/comment-no-empty": null,
+    "scss/at-mixin-argumentless-call-parentheses": null,
+    "block-no-redundant-nested-style-rules": null,
+    "value-keyword-case": [
+      "lower",
+      {
+        "ignoreProperties": ["/font/", "--mat-sys-brand-font-family", "--mat-sys-plain-font-family"]
+      }
+    ],
+    "property-no-deprecated": [
+      true,
+      {
+        "ignoreProperties": ["clip"]
+      }
+    ]
+  }
+}

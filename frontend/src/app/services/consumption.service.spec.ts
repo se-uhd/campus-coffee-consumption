@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ConsumptionService } from './consumption.service';
 import { ConsumptionDto } from '../models';
@@ -10,7 +10,7 @@ describe('ConsumptionService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [ConsumptionService, provideHttpClient(), provideHttpClientTesting()]
+      providers: [ConsumptionService, provideHttpClient(withXhr()), provideHttpClientTesting()]
     });
     service = TestBed.inject(ConsumptionService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -45,6 +45,16 @@ describe('ConsumptionService', () => {
     const req = httpMock.expectOne('/api/users/user-1/consumption');
     expect(req.request.method).toBe('PUT');
     expect(req.request.body).toEqual({ total: 0, note: 'Paid' });
+    req.flush(expected);
+    expect(await promise).toEqual(expected);
+  });
+
+  it('PUTs an override with an empty note as undefined so it records null', async () => {
+    const expected: ConsumptionDto = { total: 2, changes: [] };
+    const promise = service.overrideForUser('user-1', 2, '');
+    const req = httpMock.expectOne('/api/users/user-1/consumption');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ total: 2, note: undefined });
     req.flush(expected);
     expect(await promise).toEqual(expected);
   });

@@ -4,3 +4,13 @@
 /out-tsc
 /.angular
 npm-debug.log
+
+# Playwright end-to-end test artifacts
+/test-results
+/playwright-report
+/playwright/.cache
+
+# Coverage reports (Vitest unit-test coverage and the Playwright/V8 e2e coverage)
+/coverage
+/coverage-e2e
+/.nyc_output

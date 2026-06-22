@@ -11,6 +11,11 @@ import { PriceChangeDto, PriceDto, PriceUpdateRequest } from '../models';
 export class PriceService {
   constructor(private readonly http: HttpClient) {}
 
+  /** The current global coffee price (euro cents) — a single GET, not the whole history. */
+  current(): Promise<PriceDto> {
+    return firstValueFrom(this.http.get<PriceDto>('/api/price'));
+  }
+
   /** Sets a new global coffee price (euro cents), returning the stored price. */
   setPrice(amountCents: number): Promise<PriceDto> {
     const body: PriceUpdateRequest = { amountCents };

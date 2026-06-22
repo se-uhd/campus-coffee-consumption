@@ -6,12 +6,16 @@ import de.seuhd.campuscoffee.api.dtos.ConsumptionOverrideDto
 import de.seuhd.campuscoffee.api.dtos.UserDto
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
+import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.client.returnResult
+import java.io.ByteArrayInputStream
 import java.util.UUID
+import java.util.zip.ZipInputStream
 
 /**
  * System tests for the admin member-management and consumption-by-id flow, authenticated by a JWT minted
@@ -53,7 +57,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .returnResult<UserDto>()
 
         assertThat(result.status.value()).isEqualTo(201)
-        assertThat(result.responseBody!!.capabilityUrl).contains("/coffee/")
+        assertThat(result.responseBody!!.capabilityUrl).contains("/login/")
     }
 
     @Test
@@ -200,6 +204,38 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
+    fun `downloading all QR codes returns a zip of per-member PNGs named by login`() {
+        val result =
+            client()
+                .get()
+                .uri("/api/users/qr.zip")
+                .withAdmin()
+                .exchange()
+                .returnResult<ByteArray>()
+
+        assertThat(result.status.value()).isEqualTo(200)
+        assertThat(result.responseHeaders.contentType.toString()).isEqualTo("application/zip")
+        val entries = zipEntryNames(result.responseBody!!)
+        // one PNG per seeded user (the admin and the four members), each named after the member's login
+        assertThat(entries).hasSize(5)
+        assertThat(entries).allMatch { it.endsWith(".png") }
+        assertThat(entries).contains("jane_doe.png", "maxmustermann.png")
+    }
+
+    @Test
+    fun `a member capability token downloading all QR codes returns 403 Forbidden`() {
+        // the bulk QR ZIP is admin-only; a member's capability token grants only self-service
+        val status =
+            client()
+                .get()
+                .uri("/api/users/qr.zip")
+                .withMember("maxmustermann")
+                .exchange()
+                .statusCode()
+        assertThat(status).isEqualTo(403)
+    }
+
+    @Test
     fun `an admin increments a member's count by id`() {
         val id = memberId()
 
@@ -278,5 +314,88 @@ class UserAdminSystemTests : AbstractSystemTest() {
             .exchange()
 
         assertThat(adminConsumption(id).total).isEqualTo(0)
+    }
+
+    @Test
+    fun `deactivating the last active admin returns 409 Conflict`() {
+        // jane_doe is the only seeded admin, so deactivating her would leave no active admin
+        val adminId = seededUser("jane_doe").persistedId
+        val body =
+            mapOf(
+                "id" to adminId.toString(),
+                "loginName" to "jane_doe",
+                "emailAddress" to "jane.doe@se.uni-heidelberg.de",
+                "firstName" to "Jane",
+                "lastName" to "Doe",
+                "role" to "ADMIN",
+                "active" to false
+            )
+
+        val status =
+            client()
+                .put()
+                .uri("/api/users/{id}", adminId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .withAdmin()
+                .exchange()
+                .statusCode()
+
+        assertThat(status).isEqualTo(409)
+    }
+
+    @Test
+    fun `demoting the last active admin returns 409 Conflict`() {
+        val adminId = seededUser("jane_doe").persistedId
+        val body =
+            mapOf(
+                "id" to adminId.toString(),
+                "loginName" to "jane_doe",
+                "emailAddress" to "jane.doe@se.uni-heidelberg.de",
+                "firstName" to "Jane",
+                "lastName" to "Doe",
+                "role" to "USER",
+                "active" to true
+            )
+
+        val status =
+            client()
+                .put()
+                .uri("/api/users/{id}", adminId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .withAdmin()
+                .exchange()
+                .statusCode()
+
+        assertThat(status).isEqualTo(409)
+    }
+
+    @Test
+    fun `deleting the last active admin returns 409 Conflict`() {
+        val adminId = seededUser("jane_doe").persistedId
+
+        val status =
+            client()
+                .delete()
+                .uri("/api/users/{id}", adminId)
+                .withAdmin()
+                .exchange()
+                .statusCode()
+
+        assertThat(status).isEqualTo(409)
+    }
+
+    /** The entry names contained in a ZIP archive's bytes. */
+    private fun zipEntryNames(bytes: ByteArray): List<String> {
+        val names = mutableListOf<String>()
+        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                names += entry.name
+                entry = zip.nextEntry
+            }
+        }
+        return names
     }
 }

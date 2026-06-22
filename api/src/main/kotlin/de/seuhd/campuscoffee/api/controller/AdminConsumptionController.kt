@@ -11,8 +11,12 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.Positive
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller
+import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -30,6 +34,7 @@ import java.util.UUID
  * page of recent changes).
  */
 @Tag(name = "User consumption (admin)", description = "Admin view and adjustment of any member's coffee consumption.")
+@Validated
 @Controller
 @RequestMapping("/users/{userId}/consumption")
 class AdminConsumptionController(
@@ -50,9 +55,12 @@ class AdminConsumptionController(
         @Parameter(description = "Unique identifier of the member.", required = true)
         @PathVariable userId: UUID,
         @Parameter(description = "Maximum number of changes to return.")
-        @RequestParam(defaultValue = DEFAULT_LIMIT) limit: Int,
+        @RequestParam(defaultValue = DEFAULT_LIMIT)
+        @Positive
+        @Max(MAX_PAGE_LIMIT) limit: Int,
         @Parameter(description = "Number of changes to skip from the newest (for paging).")
-        @RequestParam(defaultValue = "0") offset: Int
+        @RequestParam(defaultValue = "0")
+        @Min(0) offset: Int
     ): ResponseEntity<ConsumptionDto> = ResponseEntity.ok(response(userId, limit, offset))
 
     /**
@@ -116,5 +124,8 @@ class AdminConsumptionController(
 
     private companion object {
         private const val DEFAULT_LIMIT = "5"
+
+        /** The maximum page size a paged read accepts; an out-of-range value is a 400, not a silent clamp. */
+        private const val MAX_PAGE_LIMIT = 100L
     }
 }

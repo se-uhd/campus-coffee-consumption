@@ -15,6 +15,11 @@ import org.springframework.security.core.userdetails.User as SpringUser
  * hash and the single `ROLE_<role>` authority derived from the user's role. This is the bridge between the
  * domain `User` and Spring Security, used by the admin-login path (the token endpoint); the authorization
  * rules themselves are defined in [SecurityConfig].
+ *
+ * The [UserDetails] is built **disabled** for an inactive user, so the `DaoAuthenticationProvider` rejects
+ * a deactivated admin's `POST /api/auth/token` with a `DisabledException` (surfaced as 401 by the global
+ * exception handler). This is the login-time half of the admin-deactivation lockout; an in-flight JWT
+ * minted before deactivation is rejected separately when the request principal is resolved to a domain user.
  */
 @Service
 class CampusUserDetailsService(
@@ -42,6 +47,8 @@ class CampusUserDetailsService(
             .withUsername(user.loginName)
             .password(storedHash)
             .authorities(authorities)
+            // a deactivated user is disabled, so the DaoAuthenticationProvider refuses the login
+            .disabled(user.active == false)
             .build()
     }
 }

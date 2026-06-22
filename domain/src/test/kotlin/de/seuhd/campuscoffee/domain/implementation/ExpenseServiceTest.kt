@@ -1,11 +1,16 @@
 package de.seuhd.campuscoffee.domain.implementation
 
+import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
 import de.seuhd.campuscoffee.domain.model.Expense
+import de.seuhd.campuscoffee.domain.model.LedgerEntry
+import de.seuhd.campuscoffee.domain.model.LedgerEntryType
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
+import de.seuhd.campuscoffee.domain.ports.data.KittyLock
+import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -15,6 +20,7 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import java.time.LocalDateTime
 import java.util.UUID
 
 /**
@@ -25,7 +31,9 @@ import java.util.UUID
 class ExpenseServiceTest {
     private val expenseDataService: ExpenseDataService = mock()
     private val userDataService: UserDataService = mock()
-    private val service = ExpenseServiceImpl(expenseDataService, userDataService)
+    private val ledgerDataService: LedgerDataService = mock()
+    private val kittyLock: KittyLock = mock()
+    private val service = ExpenseServiceImpl(expenseDataService, userDataService, ledgerDataService, kittyLock)
 
     private val memberId: UUID = UUID(0L, 1L)
     private val buyerId: UUID = UUID(0L, 2L)
@@ -86,6 +94,7 @@ class ExpenseServiceTest {
 
     @Test
     fun `record by an admin with a matching split stores the kitty and private portions`() {
+        whenever(ledgerDataService.kittyLedger()).thenReturn(kittyWith(10000))
         whenever(userDataService.getById(buyerId)).thenReturn(buyer)
         whenever(expenseDataService.upsert(any())).thenAnswer { it.arguments[0] as Expense }
 
@@ -103,6 +112,24 @@ class ExpenseServiceTest {
         assertThat(expense.privateAmountCents).isEqualTo(400)
         assertThat(expense.kittyAmountCents).isEqualTo(500)
         assertThat(expense.buyer).isEqualTo(buyer)
+    }
+
+    @Test
+    fun `record whose kitty portion exceeds the kitty balance throws ConflictException`() {
+        whenever(ledgerDataService.kittyLedger()).thenReturn(kittyWith(300))
+
+        assertThrows<ConflictException> {
+            service.record(
+                buyerUserId = buyerId,
+                weightGrams = 1000,
+                amountCents = 900,
+                privateAmountCents = 400,
+                kittyAmountCents = 500,
+                note = null,
+                actingUser = admin
+            )
+        }
+        verify(expenseDataService, never()).upsert(any())
     }
 
     @Test
@@ -244,4 +271,17 @@ class ExpenseServiceTest {
 
         assertThat(expenses).containsExactly(expense)
     }
+
+    private fun kittyWith(balanceCents: Long): List<LedgerEntry> =
+        listOf(
+            LedgerEntry(
+                type = LedgerEntryType.KITTY_ADJUSTMENT,
+                seq = 1L,
+                createdAt = LocalDateTime.of(2026, 1, 1, 0, 0),
+                createdBy = "system",
+                note = null,
+                amountCents = balanceCents,
+                runningBalanceCents = balanceCents
+            )
+        )
 }

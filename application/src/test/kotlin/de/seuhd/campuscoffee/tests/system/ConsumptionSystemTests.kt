@@ -173,7 +173,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
                 .responseBody!!
 
         assertThat(profile.loginName).isEqualTo(member)
-        assertThat(profile.capabilityUrl).contains("/coffee/")
+        assertThat(profile.capabilityUrl).contains("/login/")
     }
 
     @Test

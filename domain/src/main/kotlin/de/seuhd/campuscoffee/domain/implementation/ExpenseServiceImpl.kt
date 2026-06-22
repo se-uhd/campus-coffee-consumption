@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.domain.implementation
 
+import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
 import de.seuhd.campuscoffee.domain.model.Expense
@@ -8,6 +9,8 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
+import de.seuhd.campuscoffee.domain.ports.data.KittyLock
+import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -15,15 +18,17 @@ import java.util.UUID
 
 /**
  * Domain implementation of [ExpenseService]. A member records only their own purchase, 100% private to
- * themselves — the buyer and split are derived here, never read from the request, so a member cannot
+ * themselves. The buyer and split are derived here, never read from the request, so a member cannot
  * attribute a purchase to someone else or fund it from the kitty. Recording a split, attributing to another
  * member, correcting, and deleting are all admin-only. Every purchase is validated so the private and kitty
- * portions sum to the total.
+ * portions sum to the total, and an admin split whose kitty portion would overdraw the kitty is rejected (409).
  */
 @Service
 class ExpenseServiceImpl(
     private val expenseDataService: ExpenseDataService,
-    private val userDataService: UserDataService
+    private val userDataService: UserDataService,
+    private val ledgerDataService: LedgerDataService,
+    private val kittyLock: KittyLock
 ) : ExpenseService {
     @Transactional
     override fun recordOwn(
@@ -62,6 +67,10 @@ class ExpenseServiceImpl(
     ): Expense {
         requireAdmin(actingUser)
         validateAmounts(weightGrams, amountCents, privateAmountCents, kittyAmountCents)
+        kittyLock.lockForUpdate()
+        if (kittyBalanceCents() - kittyAmountCents < 0) {
+            throw ConflictException("This expense's kitty portion would make the kitty balance negative.")
+        }
         val buyer = userDataService.getById(buyerUserId)
         return expenseDataService.upsert(
             Expense(
@@ -95,6 +104,11 @@ class ExpenseServiceImpl(
         if (buyerUserId != existing.buyer.persistedId) {
             throw ValidationException("An expense's buyer cannot be changed; delete it and record a new one.")
         }
+        // correcting changes the kitty draw by (new − old); reject if that would overdraw the kitty
+        kittyLock.lockForUpdate()
+        if (kittyBalanceCents() + existing.kittyAmountCents - kittyAmountCents < 0) {
+            throw ConflictException("This correction would make the kitty balance negative.")
+        }
         return expenseDataService.upsert(
             existing.copy(
                 weightGrams = weightGrams,
@@ -124,6 +138,9 @@ class ExpenseServiceImpl(
     }
 
     override fun clear() = expenseDataService.clear()
+
+    /** The current kitty balance in cents, read from the event log (the last running balance of its history). */
+    private fun kittyBalanceCents(): Long = ledgerDataService.kittyLedger().lastOrNull()?.runningBalanceCents ?: 0L
 
     /** Validates that nothing is negative and the private and kitty portions sum to the total. */
     private fun validateAmounts(
