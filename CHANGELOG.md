@@ -7,6 +7,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Malformed euro amounts now show their validation message.** Every money form (the price, the member and
+  admin expense amounts and the private/kitty split, the kitty deposit, and the kitty adjustment) checked
+  its euro input only through a component method, which correctly disabled the submit button but never put
+  the form control into an error state, so Angular Material kept the field's `<mat-error>` hidden and the
+  user got no reason. A new `ccEuroAmount` template-driven validator marks a non-empty, unparseable amount
+  invalid, so the existing message (`Enter a valid amount (e.g. ...).`, or the comma-and-point hint) is
+  shown; the empty case stays owned by `required`.
+- **The Playwright end-to-end suite passes against the 0.3.0 UI.** The suite added in 0.3.0 was never run
+  green before release, so several specs had drifted from the shipped UI: they asserted pre-redesign text
+  (`Undo last coffee` instead of `Undo last cup`, `cups · X € each` instead of `cups (X € each)`, a bare
+  `Balance`), matched the ambiguous `Member` label that also resolved to the header's "Manage members"
+  link, expected the then-suppressed euro `mat-error`, and filled the kitty-adjustment field without first
+  expanding its collapsed card. The specs now target the shipped UI, and the euro-validation fix above makes
+  the validation specs pass for real rather than by weakening them.
+
 ## [0.3.0] - 2026-06-22
 
 A frontend overhaul (Angular 19 to 22, a SE@UHD-branded design system, Karma/Jasmine to Vitest, and a full

@@ -13,6 +13,7 @@ import { NotificationService } from '../../services/notification.service';
 import { EurosPipe } from '../../pipes/euros.pipe';
 import { UtcDatePipe } from '../../pipes/utc-date.pipe';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
+import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import { PriceChangeDto } from '../../models';
 import { euroInputError, toCents } from '../../util/money';
 
@@ -34,7 +35,8 @@ import { euroInputError, toCents } from '../../util/money';
     MatProgressSpinnerModule,
     EurosPipe,
     UtcDatePipe,
-    AppHeaderComponent
+    AppHeaderComponent,
+    EuroAmountDirective
   ],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
@@ -68,6 +70,7 @@ import { euroInputError, toCents } from '../../util/money';
                 name="price"
                 #priceModel="ngModel"
                 [(ngModel)]="newPriceEuros"
+                ccEuroAmount
                 required
               />
               <mat-hint>Use a comma or a point, e.g. 0,50 or 0.50.</mat-hint>
