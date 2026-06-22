@@ -6,7 +6,7 @@ import de.seuhd.campuscoffee.data.persistence.repositories.ExpenseRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.PaymentRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.UserRepository
 import de.seuhd.campuscoffee.domain.ports.StartupTask
-import org.slf4j.LoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -46,13 +46,13 @@ class EventsToDataRunner(
     fun rebuildFromLog() {
         if (eventRepository.count() == 0L) {
             // an empty log against possibly-populated tables: rebuilding would only wipe them, so refuse
-            log.warn("Skipping the events-to-data rebuild: the event log is empty; not clearing the read tables.")
+            log.warn { "Skipping the events-to-data rebuild: the event log is empty; not clearing the read tables." }
             return
         }
         clearReadTables()
         val events = eventRepository.findAllByOrderBySeqAsc()
         events.forEach { projector.apply(it) }
-        log.info("Rebuilt the read model from {} events in the log.", events.size)
+        log.info { "Rebuilt the read model from ${events.size} events in the log." }
     }
 
     /**
@@ -70,6 +70,6 @@ class EventsToDataRunner(
     companion object {
         /** The rebuild runs before the fixture loader, so the loader's empty-users check sees the rebuilt data. */
         const val ORDER = 100
-        private val log = LoggerFactory.getLogger(EventsToDataRunner::class.java)
+        private val log = KotlinLogging.logger {}
     }
 }
