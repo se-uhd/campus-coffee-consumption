@@ -10,21 +10,16 @@ import de.seuhd.campuscoffee.api.security.CurrentUserProvider
 import de.seuhd.campuscoffee.domain.ports.api.AccountingService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import jakarta.validation.constraints.Max
-import jakarta.validation.constraints.Min
-import jakarta.validation.constraints.Positive
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller
-import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseBody
 import org.springframework.web.bind.annotation.ResponseStatus
 
@@ -36,7 +31,6 @@ import org.springframework.web.bind.annotation.ResponseStatus
  * would reveal who deposited and contributed).
  */
 @Tag(name = "Kitty", description = "The communal kitty: balance, history, deposits, and adjustments (admin only).")
-@Validated
 @Controller
 @RequestMapping("/kitty")
 class KittyController(
@@ -49,22 +43,15 @@ class KittyController(
     /**
      * Returns the kitty balance and a page of its history (newest first).
      *
-     * @param limit  the maximum number of history entries to return
-     * @param offset the number of newest entries to skip
+     * @param page the validated paging window (limit/offset)
      */
     @Operation(summary = "Get the kitty balance and a page of its history.")
     @GetMapping("/history")
     fun history(
-        @Parameter(description = "Maximum number of history entries to return.")
-        @RequestParam(defaultValue = "50")
-        @Positive
-        @Max(MAX_PAGE_LIMIT) limit: Int,
-        @Parameter(description = "Number of newest entries to skip.")
-        @RequestParam(defaultValue = "0")
-        @Min(0) offset: Int
+        @Valid @ParameterObject page: PageQuery
     ): ResponseEntity<KittyDto> {
         val admin = currentUserProvider.currentUser()
-        val entries = accountingService.kittyLedger(limit, offset, admin)
+        val entries = accountingService.kittyLedger(page.limitOr(HISTORY_LIMIT), page.offset, admin)
         return ResponseEntity.ok(accountingDtoMapper.toKittyDto(accountingService.kittyBalanceCents(), entries))
     }
 
@@ -109,7 +96,7 @@ class KittyController(
     }
 
     private companion object {
-        /** The maximum page size a paged read accepts; an out-of-range value is a 400, not a silent clamp. */
-        private const val MAX_PAGE_LIMIT = 100L
+        /** The default page size for the kitty history read when the caller supplies no limit. */
+        private const val HISTORY_LIMIT = 50
     }
 }
