@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { UserDto } from '../models';
+import { ProfileUpdateRequest, UserDto } from '../models';
 
 /**
  * The authenticated user's own profile against `/api/profile` (the interceptor adds the X-Coffee-Token).
@@ -16,8 +16,8 @@ export class ProfileService {
     return firstValueFrom(this.http.get<UserDto>('/api/profile'));
   }
 
-  /** Updates the caller's own first name, last name, and email. */
-  update(profile: UserDto): Promise<UserDto> {
+  /** Updates the caller's own first name, last name, and email (the only fields a profile edit may change). */
+  update(profile: ProfileUpdateRequest): Promise<UserDto> {
     return firstValueFrom(this.http.put<UserDto>('/api/profile', profile));
   }
 

@@ -8,7 +8,7 @@ import java.util.UUID
 
 /**
  * Request body for an admin recording that a member paid money into the kitty
- * (`POST /api/payments/settlement`): the member, the positive amount in euro cents, and an optional note.
+ * (`POST /api/kitty/deposit`): the member, the positive amount in euro cents, and an optional note.
  */
 data class SettlementRequestDto(
     @field:NotNull(message = "User id is required.")

@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * The app is expected to be already running and self-contained at http://localhost:8080 (the Spring Boot jar
  * serving the bundled Angular SPA plus the /api backend, dev profile), so there is deliberately no
- * `webServer` block — the tests neither start nor stop the app. Run with `npx playwright test`.
+ * `webServer` block, so the tests neither start nor stop the app. Run with `npx playwright test`.
  */
 export default defineConfig({
   testDir: './e2e',

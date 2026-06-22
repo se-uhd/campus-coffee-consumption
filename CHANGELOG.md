@@ -5,38 +5,93 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.1] - 2026-06-22
+
+A hardening release working through an extensive adversarial review of the whole project (code, docs,
+design): production-deployment fixes, accounting and event-sourcing correctness, architecture-leak cleanups,
+a fuller API contract, frontend correctness and UX, the previously-missing tests, and a repo-wide em-dash
+and prose cleanup. It also aligns the API endpoint names with the frontend vocabulary, a breaking endpoint
+rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
+
+### Security
+
+- The insecure JWT-secret fallback is scoped to the dev profile only; a missing `JWT_SECRET` now fails fast
+  in every other profile, and the prod compose runs the prod profile with a real secret (it previously ran
+  the dev profile with the committed default).
+- The runtime container runs as a dedicated non-root user and declares a `/actuator/health` healthcheck.
 
 ### Fixed
 
-- **Malformed euro amounts now show their validation message.** Every money form (the price, the member and
-  admin expense amounts and the private/kitty split, the kitty deposit, and the kitty adjustment) checked
-  its euro input only through a component method, which correctly disabled the submit button but never put
-  the form control into an error state, so Angular Material kept the field's `<mat-error>` hidden and the
-  user got no reason. A new `ccEuroAmount` template-driven validator marks a non-empty, unparseable amount
-  invalid, so the existing message (`Enter a valid amount (e.g. ...).`, or the comma-and-point hint) is
-  shown; the empty case stays owned by `required`.
-- **The Playwright end-to-end suite passes against the 0.3.0 UI.** The suite added in 0.3.0 was never run
-  green before release, so several specs had drifted from the shipped UI: they asserted pre-redesign text
-  (`Undo last coffee` instead of `Undo last cup`, `cups · X € each` instead of `cups (X € each)`, a bare
-  `Balance`), matched the ambiguous `Member` label that also resolved to the header's "Manage members"
-  link, expected the then-suppressed euro `mat-error`, and filled the kitty-adjustment field without first
-  expanding its collapsed card. The specs now target the shipped UI, and the euro-validation fix above makes
-  the validation specs pass for real rather than by weakening them.
+- **Production deployment.** Prod now uses random id seeds (the deterministic seeds re-issued colliding
+  UUIDs on the first entity created after any restart), requires an `https` base URL (a new `ProdConfigGuard`
+  fails fast on a missing or non-https value, so wall QR codes are never dead links), and targets managed
+  Cloud SQL. `compose.prod.yaml` previously overrode the datasource with an ephemeral `postgres/postgres`
+  sidecar that destroyed the event-log money ledger on every redeploy; the deploy now wires `DB_PASSWORD`,
+  the base URL, and `BOOTSTRAP_ADMIN_*` so a fresh prod instance comes up with an admin.
+- **Login names are immutable after creation.** The ledger walk classifies a member's own scans by the
+  actor login recorded in the append-only log, so a rename previously disabled the member's undo and could
+  misvalue their balance; an update now pins the stored login (mirroring the capability-token pin).
+- A corrected (UPDATE) or deleted expense ledger row shows only its signed delta effect, not an absolute
+  private/kitty split that could not be reconciled with the delta.
+- A missing as-of price falls back to the earliest known price instead of throwing, and the admin overview
+  isolates a per-member failure, so one malformed stream can no longer 500 a whole ledger or overview read.
+- **Frontend.** A `+1` retries once on a concurrent-update 409 (the documented self-scan retry); the admin
+  count-correction field is reseeded from the current count, so Set no longer silently reverts intervening
+  cups; a busy entry-guard stops a fast double-tap double-submitting; a token-less admin 401 redirects to
+  the login form; a negative price/expense/deposit is flagged inline; and a non-integer gram weight is
+  rejected.
+- **Malformed euro amounts now show their validation message.** Every money form validated its euro input
+  only through a component method, which disabled the submit button but left the control valid, so Angular
+  Material kept the field's `<mat-error>` hidden. A new `ccEuroAmount` template-driven validator marks a
+  non-empty, unparseable (or, for a price/expense/deposit, negative) amount invalid so the message shows.
+- **The Playwright end-to-end suite passes against the shipped UI.** The suite added in 0.3.0 was never run
+  green before release, so several specs had drifted (`Undo last coffee` vs `Undo last cup`, the ambiguous
+  `Member` label, a euro `mat-error` that did not yet render, the collapsed kitty-adjustment card). The
+  specs now target the shipped UI.
 
 ### Changed
 
-- **Em-dashes removed from the prose** across the docs, `README.md`, `CHANGELOG.md`, `AGENTS.md`, and
-  `CLAUDE.md`, replaced with plain punctuation (commas, colons, parentheses, or sentence breaks). This
-  completes the AI-slop cleanup the 0.3.0 entry began. Documentation-only.
+- **API endpoint names aligned with the frontend vocabulary (breaking).** The member and admin activity
+  feeds, the member's `GET /api/ledger` and the admin's `GET /api/users/{id}/ledger`, are now `/activity`
+  (the UI's "Recent activity"). The kitty's `GET /api/kitty/ledger` is now `GET /api/kitty/history` (its UI
+  "Kitty history"), and the two kitty money-movements move from `/api/payments/*` under the kitty resource:
+  `POST /api/kitty/deposit` (renamed from "settlement", the UI's "deposit") and `POST /api/kitty/adjustment`.
+  `SummaryController` is renamed to `MemberController` and `PaymentController` folds into `KittyController`.
+  The shared `LedgerEntryDto`/`LedgerEntryType` data types keep their names; the OpenAPI spec, the generated
+  frontend DTOs, the SPA services, and the docs are all updated together.
+- The `events.note` metadata column records only an absolute count correction's reason; a settlement, kitty
+  adjustment, or expense note lives in that entity's own event body (the docs are corrected to match).
+- **Architecture.** The price-singleton conflict is mapped to a domain `DuplicationException` in the data
+  adapter, so no Spring persistence exception is caught in the domain; the event-store `seq` is removed from
+  the domain `CancellableIncrement`; the ArchUnit rules now cover the `web`/`configuration` packages and
+  assert every class belongs to a layer; and dead code is removed (`ConsumptionProperties`,
+  `EventSourcedMutator.create`, the no-op `OnCreate` group, `ValidationException`'s unused constructor).
+- **API and OpenAPI.** Settlement, adjustment, and admin-expense create declare `201`; the QR endpoints
+  advertise `image/png` and `application/zip`; a dedicated `ProfileUpdateDto` carries the profile edit; and
+  the hand-written controllers document their `400/401/403/404/409` responses. The committed OpenAPI spec
+  and the generated frontend DTOs are regenerated to match.
+- **Frontend UX.** A human browser-tab title with per-route titles, a real not-found page for unknown URLs,
+  a `prefers-reduced-motion` block, a `theme-color` meta and a web manifest, one consistent snackbar action
+  label, and the ledger now reads "Coffee undone" and "total N cups" (no jargon or math glyph).
+- A new `V8` migration adds an `(entity_type, seq)` index and a `UNIQUE(seq)`; the kitty ledger reads one
+  SQL-ordered stream instead of re-sorting two in memory.
+- **Em-dashes removed from all prose and source comments** across the docs, `README.md`, `CLAUDE.md`, and
+  the Kotlin/TypeScript/SCSS/build files, replaced with plain punctuation. This completes the AI-slop
+  cleanup the 0.3.0 entry began.
+
+### Added
+
+- The previously-missing tests: two concurrent self-scans (no lost update, a clean 409), the
+  expense-correction kitty-overdraw guard, the advisory-lock ordering (the lock is taken before the balance
+  read), the money fat-finger caps, and the login-rename invariant.
 
 ### Fixed (documentation)
 
-- **Documentation corrections in `CLAUDE.md` and `README.md`.** The three ledger endpoints now show their
-  real `@RequestParam` defaults (`/ledger` and `/users/{id}/ledger` default to `limit=20`, `/kitty/ledger`
-  to `limit=50`; the change-log default stays 5). `CLAUDE.md` now lists `GET /users/filter`, and its `V4`
-  migration note documents the `is_singleton` column and `uq_coffee_prices_singleton` constraint that
-  enforce the single-row invariant at the schema level.
+- The three ledger endpoints show their real `@RequestParam` defaults (`/ledger` and `/users/{id}/ledger`
+  default to `limit=20`, `/kitty/ledger` to `limit=50`; the change-log default stays 5). `CLAUDE.md` now
+  lists `GET /users/filter`, documents the `is_singleton` / `uq_coffee_prices_singleton` single-row guard,
+  corrects the domain "no external dependencies" claim (it depends on Spring by design), marks the expense
+  `weightGrams` required, and the `StartupDataInitializer` KDoc lists the real startup-task order.
 
 ## [0.3.0] - 2026-06-22
 
@@ -316,7 +371,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
-[Unreleased]: https://github.com/se-uhd/campus-coffee-consumption/compare/v0.3.0...HEAD
+[0.3.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.3.1
 [0.3.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.3.0
 [0.2.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.2.0
 [0.1.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.1.1

@@ -92,7 +92,7 @@ class EventsToDataRebuildSystemTest {
     private fun kittyBalance(): Long =
         client()
             .get()
-            .uri("/api/kitty/ledger")
+            .uri("/api/kitty/history")
             .accept(MediaType.APPLICATION_JSON)
             .withAdmin()
             .exchange()
@@ -117,7 +117,7 @@ class EventsToDataRebuildSystemTest {
             .exchange()
         client()
             .post()
-            .uri("/api/payments/settlement")
+            .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
             .body(mapOf("userId" to memberId().toString(), "amountCents" to 1000))
             .withAdmin()
