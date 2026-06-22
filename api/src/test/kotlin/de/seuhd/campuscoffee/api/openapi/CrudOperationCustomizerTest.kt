@@ -3,10 +3,8 @@ package de.seuhd.campuscoffee.api.openapi
 import de.seuhd.campuscoffee.api.capability.CapabilityQrResponder
 import de.seuhd.campuscoffee.api.capability.CapabilityUrlFactory
 import de.seuhd.campuscoffee.api.controller.UserController
-import de.seuhd.campuscoffee.api.mapper.AccountingDtoMapper
 import de.seuhd.campuscoffee.api.mapper.UserDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
-import de.seuhd.campuscoffee.domain.ports.api.AccountingService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import io.swagger.v3.oas.models.Operation
 import io.swagger.v3.oas.models.media.Content
@@ -137,9 +135,7 @@ class CrudOperationCustomizerTest {
                 mock<UserDtoMapper>(),
                 mock<CurrentUserProvider>(),
                 mock<CapabilityUrlFactory>(),
-                mock<CapabilityQrResponder>(),
-                mock<AccountingService>(),
-                mock<AccountingDtoMapper>()
+                mock<CapabilityQrResponder>()
             )
 
         /** Every `@CrudOperation`-annotated handler method on the real [UserController]. */
