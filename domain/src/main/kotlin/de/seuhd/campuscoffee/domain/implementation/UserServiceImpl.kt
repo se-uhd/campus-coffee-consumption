@@ -166,7 +166,11 @@ class UserServiceImpl(
         if (newRole != Role.ADMIN || newActive == false) {
             requireNotLastActiveAdmin(existing, "demote or deactivate")
         }
-        return upsert(user.copy(role = newRole, active = newActive))
+        // the login name is immutable after creation (pinned to the stored value, mirroring the capability
+        // token): the append-only event log attributes each change to the actor's login name, and the ledger
+        // classifies an owner self-scan vs an admin step by that login, so a rename would silently break a
+        // member's undo and could misvalue their balance.
+        return upsert(user.copy(loginName = existing.loginName, role = newRole, active = newActive))
     }
 
     @Transactional

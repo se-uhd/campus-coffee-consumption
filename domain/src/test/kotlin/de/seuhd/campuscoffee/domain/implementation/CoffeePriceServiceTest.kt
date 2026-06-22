@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.domain.implementation
 
+import de.seuhd.campuscoffee.domain.exceptions.DuplicationException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
 import de.seuhd.campuscoffee.domain.model.CoffeePrice
@@ -16,7 +17,6 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.springframework.dao.DataIntegrityViolationException
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -95,9 +95,10 @@ class CoffeePriceServiceTest {
         whenever(
             coffeePriceDataService.findCurrent()
         ).thenReturn(null, CoffeePrice(id = UUID(0L, 5L), amountCents = 50))
-        // ...but the concurrent winner already inserted it, so the insert hits the singleton uniqueness guard
+        // ...but the concurrent winner already inserted it, so the insert hits the singleton uniqueness guard,
+        // which the data adapter surfaces as a domain DuplicationException (not a raw Spring exception)
         whenever(coffeePriceDataService.upsert(any()))
-            .thenThrow(DataIntegrityViolationException("uq_coffee_prices_singleton"))
+            .thenThrow(DuplicationException(CoffeePrice::class.java, "is_singleton", "the coffee price"))
             .thenAnswer { it.arguments[0] as CoffeePrice }
 
         val price = service.setPrice(70, admin)

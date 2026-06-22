@@ -93,7 +93,7 @@ class AccountingServiceTest {
         whenever(coffeePriceService.getCurrent()).thenReturn(CoffeePrice(amountCents = 50))
         whenever(ledgerDataService.kittyLedger()).thenReturn(emptyList())
         whenever(coffeeConsumptionService.cancellableIncrement(memberId, member))
-            .thenReturn(CancellableIncrement(1L, LocalDateTime.now(), 50))
+            .thenReturn(CancellableIncrement(LocalDateTime.now(), 50))
 
         val summary = service.memberSummary(memberId, 10, 0, member)
 

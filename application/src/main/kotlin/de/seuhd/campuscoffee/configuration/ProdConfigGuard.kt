@@ -1,9 +1,9 @@
 package de.seuhd.campuscoffee.configuration
 
 import de.seuhd.campuscoffee.api.configuration.AppProperties
+import jakarta.annotation.PostConstruct
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
-import jakarta.annotation.PostConstruct
 
 /**
  * Fails the prod startup fast on an unsafe public base URL. The capability token is embedded in the QR/login

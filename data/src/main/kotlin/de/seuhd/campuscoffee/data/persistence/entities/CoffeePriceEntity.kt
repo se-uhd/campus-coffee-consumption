@@ -18,4 +18,13 @@ class CoffeePriceEntity : Entity() {
     @field:Version
     @field:Column(name = "version")
     var version: Long? = null
+
+    companion object {
+        const val SINGLETON_COLUMN = "is_singleton"
+
+        /** The single-row guard constraint, declared in the Flyway migration; the entity does not map the
+         *  column (the database default supplies it). This name is the single source of truth shared by the
+         *  DDL, the relational ConstraintMapping, and the event-sourcing projector's duplication rules. */
+        const val SINGLETON_UNIQUE_CONSTRAINT = "uq_coffee_prices_singleton"
+    }
 }

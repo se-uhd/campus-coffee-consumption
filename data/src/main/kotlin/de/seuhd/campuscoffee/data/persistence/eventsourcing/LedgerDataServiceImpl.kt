@@ -30,7 +30,11 @@ private fun intBody(
  * PRIVATE_EXPENSE row and the kitty ledger's KITTY_EXPENSE row) render the same `private + kitty` split.
  */
 private fun splitPortions(event: EventEntity): Pair<Long?, Long?> {
-    if (event.changeType == ChangeType.DELETE || (intBody(event, "kittyAmountCents") ?: 0) <= 0) {
+    // Only an INSERT (the original purchase) carries an absolute split worth displaying. An UPDATE row's
+    // amountCents is a delta (new minus old) and a DELETE only reverses the balance, so an absolute
+    // private/kitty breakdown shown beside a delta amount could not be reconciled by a reader; those rows
+    // show only their signed effect.
+    if (event.changeType != ChangeType.INSERT || (intBody(event, "kittyAmountCents") ?: 0) <= 0) {
         return null to null
     }
     return (intBody(event, "privateAmountCents") ?: 0).toLong() to (intBody(event, "kittyAmountCents") ?: 0).toLong()
@@ -42,7 +46,13 @@ private fun uuidBody(
     key: String
 ): UUID = UUID.fromString(requireNotNull(event.body?.get(key)) { "An event body must carry $key." }.toString())
 
-/** The event's append position. */
+/**
+ * The event's append position. `seq` is assigned by the identity column at INSERT, not at commit, and price
+ * changes and `+1` consumptions are not serialized by a lock, so two concurrent unlocked transactions could
+ * in principle acquire `seq` in one order and commit in the other. In practice a price change does not
+ * interleave with self-scans, so the as-of valuation is stable; the kitty-overdraw path that must not race is
+ * separately serialized by the advisory lock.
+ */
 private fun seqOf(event: EventEntity): Long = requireNotNull(event.seq) { "A stored event must carry a seq." }
 
 /** The event's recorded time. */
@@ -54,16 +64,18 @@ private fun actorOf(event: EventEntity): String = event.createdBy ?: SYSTEM_ACTO
 
 /**
  * The price in effect at append position [seq]: the latest price event at or before it. A price is always
- * seeded before any coffee is consumed (see the bootstrap), so this always resolves; a miss signals a bug.
+ * seeded before any coffee is consumed (see the bootstrap), so the as-of lookup normally resolves. If a
+ * hand-edited or misordered log somehow holds a coffee before any price, fall back to the earliest known
+ * price (or 0 when the log carries no price at all) rather than throwing, so one malformed member stream
+ * cannot 500 a whole admin overview or ledger read.
  */
 private fun priceAsOf(
     seq: Long,
     prices: List<PricePoint>
 ): Int =
     prices.lastOrNull { it.seq <= seq }?.amountCents
-        ?: error(
-            "No coffee price was in effect at event seq=$seq; a price must be seeded before any coffee is consumed."
-        )
+        ?: prices.firstOrNull()?.amountCents
+        ?: 0
 
 /**
  * Reads the unified-ledger and balance projections straight from the append-only event log (there is no
@@ -87,9 +99,8 @@ class LedgerDataServiceImpl(
 
     override fun kittyLedger(): List<LedgerEntry> {
         val walk = KittyWalk()
-        val payments = eventRepository.findByEntityTypeOrderBySeqAsc(LoggedEntityType.PAYMENT.label)
-        val expenses = eventRepository.findByEntityTypeOrderBySeqAsc(LoggedEntityType.EXPENSE.label)
-        (payments + expenses).sortedBy { seqOf(it) }.forEach { walk.accept(it) }
+        // one SQL-ordered stream (payments + expenses by seq) instead of two type queries re-sorted in memory
+        eventRepository.findKittyStream().forEach { walk.accept(it) }
         return walk.result()
     }
 
@@ -112,7 +123,7 @@ class LedgerDataServiceImpl(
                 when {
                     isOwnerStep && delta == 1 ->
                         stack.addLast(
-                            CancellableIncrement(seqOf(event), createdAtOf(event), priceAsOf(seqOf(event), prices))
+                            CancellableIncrement(createdAtOf(event), priceAsOf(seqOf(event), prices))
                         )
                     isOwnerStep && delta == -1 -> stack.removeLastOrNull()
                     // an admin override that lowers the count removes that many outstanding owner increments,
@@ -144,8 +155,10 @@ class LedgerDataServiceImpl(
  * Accumulates one member's ledger oldest-first. Each accepted event contributes a signed effect to the
  * running [balance]; a coffee is valued at the price in effect at its append position, an owner undo credits
  * the exact price of the increment it pops off [incrementPrices], and an admin override is a lump at the
- * override-time price. Only the private portion of an expense and the member's own settlements affect the
- * balance.
+ * override-time price. Because the override is valued at the override-time price (not the per-cup prices
+ * actually charged), a correction down made after a price change may not net the member's balance exactly to
+ * zero; that is the documented intended rule, not a rounding bug. Only the private portion of an expense and
+ * the member's own settlements affect the balance.
  */
 @Suppress("UndocumentedFunction", "UndocumentedFunctionParameter")
 private class MemberWalk(

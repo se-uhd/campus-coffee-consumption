@@ -12,8 +12,9 @@ import java.util.UUID
 
 /**
  * Data-layer adapter implementing the coffee-price data service port. Persistence only (business logic
- * lives in the domain service layer). The price has no unique key — its singleton-ness is a service rule —
- * so it declares no constraint mappings.
+ * lives in the domain service layer). The single-row invariant is guarded by the `uq_coffee_prices_singleton`
+ * unique constraint, mapped to a [de.seuhd.campuscoffee.domain.exceptions.DuplicationException] so a racing
+ * double-create surfaces as a domain exception, not a raw Spring `DataIntegrityViolationException`.
  */
 @Service
 class CoffeePriceDataServiceImpl(
@@ -24,7 +25,13 @@ class CoffeePriceDataServiceImpl(
         repository,
         entityMapper,
         CoffeePrice::class.java,
-        emptySet<ConstraintMapping<CoffeePrice>>(),
+        setOf(
+            ConstraintMapping<CoffeePrice>(
+                { "the coffee price" },
+                CoffeePriceEntity.SINGLETON_COLUMN,
+                CoffeePriceEntity.SINGLETON_UNIQUE_CONSTRAINT
+            )
+        ),
         idGenerator
     ),
     CoffeePriceDataService {

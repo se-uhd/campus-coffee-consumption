@@ -2,7 +2,6 @@ package de.seuhd.campuscoffee.api.controller
 
 import de.seuhd.campuscoffee.api.capability.CapabilityQrResponder
 import de.seuhd.campuscoffee.api.capability.CapabilityUrlFactory
-import de.seuhd.campuscoffee.api.dtos.OnCreate
 import de.seuhd.campuscoffee.api.dtos.UserDto
 import de.seuhd.campuscoffee.api.mapper.DtoMapper
 import de.seuhd.campuscoffee.api.mapper.UserDtoMapper
@@ -23,10 +22,8 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import jakarta.validation.groups.Default
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller
-import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -87,7 +84,7 @@ class UserController(
     override fun create(
         @Parameter(description = "Data of the member to create, including their role.", required = true)
         @RequestBody
-        @Validated(Default::class, OnCreate::class) dto: UserDto
+        @Valid dto: UserDto
     ): ResponseEntity<UserDto> {
         require(dto.id == null) { "ID must not be set when creating a new resource." }
         // creating a member is an admin operation; the domain assigns the capability token and the
