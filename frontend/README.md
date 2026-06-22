@@ -32,11 +32,11 @@ npm test   # Karma + Jasmine, headless Chrome
 
 ## Structure
 
-- `src/app/services/` — `AuthService` (admin JWT login), `CapabilityTokenService` (holds the member token
+- `src/app/services/`: `AuthService` (admin JWT login), `CapabilityTokenService` (holds the member token
   from the active `/coffee/:token` route), `ConsumptionService`, `UserService`, `ProfileService`.
-- `src/app/interceptors/auth.interceptor.ts` — attaches the admin JWT to `/api/users/**` calls and the
+- `src/app/interceptors/auth.interceptor.ts`: attaches the admin JWT to `/api/users/**` calls and the
   member `X-Coffee-Token` header to `/api/consumption/**` and `/api/profile/**` calls.
-- `src/app/pages/` — `login`, `coffee-landing` (member), `member-profile` (shared), `admin-landing`,
+- `src/app/pages/`: `login`, `coffee-landing` (member), `member-profile` (shared), `admin-landing`,
   `admin-users`.
 
 QR codes are fetched as a blob through `HttpClient` (so the auth header is attached) and shown via an

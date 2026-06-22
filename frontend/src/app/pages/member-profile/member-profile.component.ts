@@ -402,7 +402,11 @@ export class MemberProfileComponent implements OnInit {
     try {
       const updated = this.adminMode
         ? await this.userService.update(this.profile.id!, this.profile)
-        : await this.profileService.update(this.profile);
+        : await this.profileService.update({
+            firstName: this.profile.firstName!,
+            lastName: this.profile.lastName!,
+            emailAddress: this.profile.emailAddress!
+          });
       // the admin PUT response may omit `capabilityUrl` (it is assembled, not a stored field), which would
       // blank the "Coffee link"; keep the one already loaded when the response does not carry it
       this.profile = { ...updated, capabilityUrl: updated.capabilityUrl ?? this.profile.capabilityUrl };

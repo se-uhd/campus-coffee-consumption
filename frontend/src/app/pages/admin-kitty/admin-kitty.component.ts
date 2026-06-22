@@ -9,7 +9,6 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { UserService } from '../../services/user.service';
 import { KittyService } from '../../services/kitty.service';
-import { PaymentService } from '../../services/payment.service';
 import { NotificationService } from '../../services/notification.service';
 import { EurosPipe } from '../../pipes/euros.pipe';
 import { LedgerListComponent } from '../../components/ledger-list/ledger-list.component';
@@ -204,7 +203,6 @@ export class AdminKittyComponent implements OnInit {
   constructor(
     private readonly userService: UserService,
     private readonly kittyService: KittyService,
-    private readonly paymentService: PaymentService,
     private readonly notifications: NotificationService
   ) {}
 
@@ -228,7 +226,7 @@ export class AdminKittyComponent implements OnInit {
     this.loadError = '';
     try {
       this.users = await this.userService.list();
-      const kitty = await this.kittyService.ledger(PAGE_SIZE, 0);
+      const kitty = await this.kittyService.history(PAGE_SIZE, 0);
       this.kitty = kitty;
       this.entries = kitty.entries;
       this.hasMore = kitty.entries.length === PAGE_SIZE;
@@ -243,7 +241,7 @@ export class AdminKittyComponent implements OnInit {
   async loadMore(): Promise<void> {
     this.loadingMore = true;
     try {
-      const next = await this.kittyService.ledger(PAGE_SIZE, this.entries.length);
+      const next = await this.kittyService.history(PAGE_SIZE, this.entries.length);
       const { entries, appended } = appendLedgerPage(this.entries, next.entries);
       this.entries = entries;
       // base "Load more" on the rows actually gained: a full page that collapsed to fewer new rows (its
@@ -268,7 +266,7 @@ export class AdminKittyComponent implements OnInit {
     }
     this.busy = true;
     try {
-      await this.paymentService.settlement({
+      await this.kittyService.deposit({
         userId: this.settlementUserId,
         amountCents,
         note: this.settlementNote || undefined
@@ -296,7 +294,7 @@ export class AdminKittyComponent implements OnInit {
     }
     this.busy = true;
     try {
-      await this.paymentService.adjustment({ amountCents, note: this.adjustmentNote || undefined });
+      await this.kittyService.adjustment({ amountCents, note: this.adjustmentNote || undefined });
       this.adjustmentEuros = '';
       this.adjustmentNote = '';
       this.notifications.success('Kitty adjusted.');

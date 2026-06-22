@@ -1,4 +1,4 @@
-# `src-gen/` — the OpenAPI spec that drives the frontend DTO codegen
+# `src-gen/`: the OpenAPI spec that drives the frontend DTO codegen
 
 `api-docs.json` is the backend's OpenAPI spec, exported from the running application. It is the **input**
 to the frontend DTO codegen: `scripts/generate-frontend-dtos.sh` runs `openapi-generator` over it to

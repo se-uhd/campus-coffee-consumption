@@ -63,7 +63,7 @@ class AccountingSystemTests : AbstractSystemTest() {
     private fun kitty(): KittyDto =
         client()
             .get()
-            .uri("/api/kitty/ledger")
+            .uri("/api/kitty/history")
             .accept(MediaType.APPLICATION_JSON)
             .withAdmin()
             .exchange()
@@ -76,7 +76,7 @@ class AccountingSystemTests : AbstractSystemTest() {
     private fun fundKitty(amountCents: Int) =
         client()
             .post()
-            .uri("/api/payments/adjustment")
+            .uri("/api/kitty/adjustment")
             .contentType(MediaType.APPLICATION_JSON)
             .body(AdjustmentRequestDto(amountCents = amountCents, note = "float"))
             .withAdmin()
@@ -162,7 +162,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         // start the kitty with a float so the kitty-funded portion is visible against a known base
         client()
             .post()
-            .uri("/api/payments/adjustment")
+            .uri("/api/kitty/adjustment")
             .contentType(MediaType.APPLICATION_JSON)
             .body(AdjustmentRequestDto(amountCents = 1000, note = "float"))
             .withAdmin()
@@ -207,7 +207,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         val payment =
             client()
                 .post()
-                .uri("/api/payments/settlement")
+                .uri("/api/kitty/deposit")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(SettlementRequestDto(userId = memberId(), amountCents = 1000, note = "paid"))
                 .withAdmin()
@@ -225,7 +225,7 @@ class AccountingSystemTests : AbstractSystemTest() {
 
         client()
             .post()
-            .uri("/api/payments/adjustment")
+            .uri("/api/kitty/adjustment")
             .contentType(MediaType.APPLICATION_JSON)
             .body(AdjustmentRequestDto(amountCents = 750, note = "float"))
             .withAdmin()
@@ -411,7 +411,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         // float the kitty so the kitty draw has somewhere to come from
         client()
             .post()
-            .uri("/api/payments/adjustment")
+            .uri("/api/kitty/adjustment")
             .contentType(MediaType.APPLICATION_JSON)
             .body(AdjustmentRequestDto(amountCents = 1000, note = "float"))
             .withAdmin()
@@ -489,7 +489,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         val status =
             client()
                 .post()
-                .uri("/api/payments/adjustment")
+                .uri("/api/kitty/adjustment")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(AdjustmentRequestDto(amountCents = -800, note = "overdraw"))
                 .withAdmin()
