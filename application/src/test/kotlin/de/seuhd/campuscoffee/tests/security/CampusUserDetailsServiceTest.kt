@@ -17,8 +17,9 @@ import java.util.UUID
 
 /**
  * Unit tests for [CampusUserDetailsService], which adapts a domain [User] to a Spring Security
- * UserDetails: the single role becomes a `ROLE_<role>` authority, the stored hash becomes the password,
- * and both a missing hash and an unknown login name map to [UsernameNotFoundException].
+ * UserDetails: the single role becomes a `ROLE_<role>` authority, the stored hash becomes the password, a
+ * deactivated user is built disabled, and both a missing hash and an unknown login name map to
+ * [UsernameNotFoundException].
  */
 @ExtendWith(MockitoExtension::class)
 class CampusUserDetailsServiceTest {
@@ -29,7 +30,8 @@ class CampusUserDetailsServiceTest {
 
     private fun user(
         role: Role?,
-        passwordHash: String?
+        passwordHash: String?,
+        active: Boolean? = true
     ) = User(
         id = UUID(0L, 1L),
         loginName = "jane_doe",
@@ -37,6 +39,7 @@ class CampusUserDetailsServiceTest {
         firstName = "Jane",
         lastName = "Doe",
         role = role,
+        active = active,
         passwordHash = passwordHash
     )
 
@@ -49,6 +52,21 @@ class CampusUserDetailsServiceTest {
         assertThat(details.username).isEqualTo("jane_doe")
         assertThat(details.password).isEqualTo("{bcrypt}HASH")
         assertThat(details.authorities.map { it.authority }).containsExactly("ROLE_ADMIN")
+    }
+
+    @Test
+    fun `loadUserByUsername builds an enabled UserDetails for an active user`() {
+        whenever(userService.getByLoginName("jane_doe")).thenReturn(user(Role.ADMIN, "{bcrypt}HASH", active = true))
+
+        assertThat(service.loadUserByUsername("jane_doe").isEnabled).isTrue()
+    }
+
+    @Test
+    fun `loadUserByUsername builds a disabled UserDetails for a deactivated user`() {
+        whenever(userService.getByLoginName("jane_doe")).thenReturn(user(Role.ADMIN, "{bcrypt}HASH", active = false))
+
+        // a disabled UserDetails makes the DaoAuthenticationProvider refuse the login (DisabledException)
+        assertThat(service.loadUserByUsername("jane_doe").isEnabled).isFalse()
     }
 
     @Test

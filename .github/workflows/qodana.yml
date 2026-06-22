@@ -1,9 +1,14 @@
 # Qodana: JetBrains' code-quality scanner, run as a SEPARATE job from build.yml. It runs the IntelliJ
-# inspection engine headlessly so CI catches the idiomatic-Kotlin issues that ktlint and detekt do not —
-# a redundant SAM constructor, a lambda that belongs outside the parentheses, a redundant `public`
-# modifier, unused symbols, and the rest of the IDE's default checks. The linter, profile, JDK, and
-# enforcement settings live in the root qodana.yaml (Community linter + the `recommended` profile, which
-# mirrors IntelliJ's default inspection profile).
+# inspection engine headlessly so CI catches the idiomatic issues that the fast gates do not.
+#
+# Two independent jobs, one per stack:
+#   - `qodana` scans the Kotlin/JVM backend (the JVM Community linter; the linter, profile, JDK, and
+#     enforcement settings live in the root qodana.yaml). It catches what ktlint/detekt do not — a
+#     redundant SAM constructor, a lambda that belongs outside the parentheses, a redundant `public`
+#     modifier, unused symbols, and the rest of the IDE's default Kotlin checks.
+#   - `qodana-frontend` scans the Angular SPA (the JS Community linter; settings in frontend/qodana.yaml).
+#     It is the IDE-inspection counterpart to the ESLint + Stylelint gate that `npm run lint` runs.
+# Both use the `recommended` profile (mirrors the IDE's default inspection profile) and failThreshold: 0.
 name: Qodana
 
 on:
@@ -62,4 +67,50 @@ jobs:
         with:
           name: qodana-sarif
           path: ${{ runner.temp }}/qodana/results/qodana.sarif.json
+          if-no-files-found: warn
+
+  # The Angular SPA scan — the JS/TS counterpart to the `qodana` job above. Independent job (separate
+  # runner) so a frontend finding does not block the backend report and vice versa; it mirrors that job's
+  # triggers, permissions, failThreshold (0, via frontend/qodana.yaml), and artifact upload.
+  qodana-frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # post the inspection summary as a PR comment (when triggered by a PR)
+      checks: write        # publish findings as check-run annotations (used on push, where there is no PR)
+      actions: read        # let the action read this workflow run for its status report (telemetry)
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Qodana diffs the change against the base ref to label problems as new vs. pre-existing, so it
+          # needs full history, mirroring the backend job.
+          fetch-depth: 0
+          persist-credentials: false # no step pushes back to the repository
+
+      - name: Qodana Scan (frontend)
+        uses: JetBrains/qodana-action@v2026.1.3
+        with:
+          # Scan only the Angular SPA; its frontend/qodana.yaml selects the JS linter and sets
+          # failThreshold: 0, so this job fails on any problem above the baseline. (Space-separated args;
+          # the comma-separated form is deprecated.)
+          args: --project-dir frontend
+          # Keep this job's results and caches in their own directories so they never collide with the
+          # backend job's (the two jobs share a workflow run).
+          results-dir: ${{ runner.temp }}/qodana-frontend/results
+          cache-dir: ${{ runner.temp }}/qodana-frontend/cache
+          artifact-name: qodana-report-frontend # distinct from the backend job's default report artifact
+        env:
+          # Optional. The Community linter needs no license, so the scan runs without this. Setting the
+          # QODANA_TOKEN repository secret additionally uploads results to Qodana Cloud and enables its
+          # server-side quality gate; the PR comment and SARIF work without it.
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+
+      - name: Upload frontend Qodana SARIF as an artifact
+        # Distinct artifact name from the backend job's `qodana-sarif` so the two uploads do not collide.
+        # `if: always()` so a run that fails the threshold still yields the file.
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: qodana-sarif-frontend
+          path: ${{ runner.temp }}/qodana-frontend/results/qodana.sarif.json
           if-no-files-found: warn

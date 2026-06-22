@@ -16,6 +16,7 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.dao.DataIntegrityViolationException
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -85,6 +86,24 @@ class CoffeePriceServiceTest {
 
         val price = service.setPrice(70, admin)
 
+        assertThat(price.amountCents).isEqualTo(70)
+    }
+
+    @Test
+    fun `setPrice on a concurrent first write re-reads the winner and updates it to the requested amount`() {
+        // no price on the initial read, so this write tries to insert the singleton...
+        whenever(
+            coffeePriceDataService.findCurrent()
+        ).thenReturn(null, CoffeePrice(id = UUID(0L, 5L), amountCents = 50))
+        // ...but the concurrent winner already inserted it, so the insert hits the singleton uniqueness guard
+        whenever(coffeePriceDataService.upsert(any()))
+            .thenThrow(DataIntegrityViolationException("uq_coffee_prices_singleton"))
+            .thenAnswer { it.arguments[0] as CoffeePrice }
+
+        val price = service.setPrice(70, admin)
+
+        // the winner's row is re-read and updated to the requested amount rather than failing with a 500
+        assertThat(price.id).isEqualTo(UUID(0L, 5L))
         assertThat(price.amountCents).isEqualTo(70)
     }
 

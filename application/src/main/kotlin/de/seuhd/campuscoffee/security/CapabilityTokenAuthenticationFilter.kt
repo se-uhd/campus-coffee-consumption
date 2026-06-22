@@ -18,10 +18,10 @@ import org.springframework.web.filter.OncePerRequestFilter
  * principal is **always** `ROLE_USER`, never `ROLE_ADMIN`, so an admin's own token grants only
  * self-service, and admin operations require the JWT instead.
  *
- * A missing header leaves the request unauthenticated (a protected endpoint then answers 401 via the entry
- * point). An unknown or rotated token also leaves it unauthenticated, so it likewise yields 401. A
- * deactivated member is still authenticated here (so their reads work); the domain rejects their mutations
- * with 403, keeping the account read-only.
+ * A missing or blank header leaves the request unauthenticated (a protected endpoint then answers 401 via
+ * the entry point). An unknown or rotated token also leaves it unauthenticated, so it likewise yields 401.
+ * A deactivated member is still authenticated here (so their reads work); the domain rejects their
+ * mutations with 403, keeping the account read-only.
  */
 @Component
 class CapabilityTokenAuthenticationFilter(
@@ -33,7 +33,9 @@ class CapabilityTokenAuthenticationFilter(
         filterChain: FilterChain
     ) {
         val token = request.getHeader(COFFEE_TOKEN_HEADER)
-        if (token != null && SecurityContextHolder.getContext().authentication == null) {
+        // a blank token (empty or whitespace-only header) never matches a real token; skip the lookup and
+        // leave the request unauthenticated so it answers 401 rather than running a doomed query
+        if (!token.isNullOrBlank() && SecurityContextHolder.getContext().authentication == null) {
             userService.findByCapabilityToken(token)?.let { member ->
                 val authentication =
                     UsernamePasswordAuthenticationToken(

@@ -1,0 +1,467 @@
+package de.seuhd.campuscoffee
+
+import de.seuhd.campuscoffee.domain.model.Role
+import de.seuhd.campuscoffee.domain.model.User
+import de.seuhd.campuscoffee.domain.model.persistedId
+import de.seuhd.campuscoffee.domain.ports.StartupTask
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
+import de.seuhd.campuscoffee.domain.ports.api.PaymentService
+import de.seuhd.campuscoffee.domain.ports.api.UserService
+import org.slf4j.LoggerFactory
+import org.springframework.context.annotation.Profile
+import org.springframework.stereotype.Component
+
+/**
+ * Dev-only (`@Profile("dev")`) demo-data loader that layers extra members and some consumption, bean-purchase
+ * and settlement history on top of the five-user fixture set, so the dev app comes up with enough members to
+ * paginate (5 per page) and with non-empty ledger and change-log views. It also layers a representative
+ * history (cups, own purchases, and a deposit) onto the primary fixture member `maxmustermann` — the member
+ * whose capability link is the demo link printed on the wall — so its unified ledger exercises every entry
+ * kind. `maxmustermann` stays active.
+ *
+ * On top of that it gives a rich, varied history to **every** other existing user too — the fixture admin
+ * `jane_doe` and the remaining fixture members (`student2023`, `lisa_lee`, `olivia_lee`) via
+ * [ENRICHED_FIXTURE_LOGINS], plus each demo member with a non-empty [DemoMember] spec — so the ledger and
+ * change-log views are populated for almost everyone. A couple of users are deliberately left **empty** to
+ * demo the empty state: the freshly created member [EMPTY_DEMO_LOGIN] (`new_user`, no history at all) and the
+ * inactive demo member `hannes_schulz` (its spec carries no coffees, expenses, or settlement).
+ *
+ * It is deliberately a separate `@Profile("dev")` [StartupTask] (order [ORDER], after the fixture reset+seed
+ * at 200 and the price seed at 250) rather than a change to [de.seuhd.campuscoffee.domain.tests.TestFixtures]:
+ * the fixture set is asserted exactly by the system and acceptance tests, which do not activate the dev
+ * profile, so this loader never runs in the test context and leaves those assertions untouched.
+ *
+ * Determinism: the dev id generator is reset on every boot (the dev `reset-on-startup`), and the fixture
+ * loader clears all data and reseeds before this runs, so every start reproduces the same demo data with the
+ * same assigned ids. The loader is also idempotent within a run — it skips if its demo members already exist
+ * — so a restart without a reset does not duplicate them.
+ *
+ * Actor attribution mirrors the fixtures: this runs outside any web request, so the `ActorProvider` finds no
+ * principal and every seeded event is recorded with `created_by = "system"` (the admin/member passed as the
+ * acting user only satisfies the domain authorization checks).
+ */
+@Component
+@Profile("dev")
+class DevDemoDataLoader(
+    private val userService: UserService,
+    private val coffeeConsumptionService: CoffeeConsumptionService,
+    private val expenseService: ExpenseService,
+    private val paymentService: PaymentService
+) : StartupTask {
+    override val order = ORDER
+
+    override fun run() = loadDemoData()
+
+    /**
+     * One demo member to create, with the consumption and money history to layer on top of them. [coffees]
+     * is how many cups to add (each a `+1`), [ownExpenses] the member's own bean purchases (weight grams to
+     * amount cents), and [settlementCents] an optional settlement the member paid into the kitty.
+     */
+    private data class DemoMember(
+        val loginName: String,
+        val firstName: String,
+        val lastName: String,
+        val role: Role,
+        val active: Boolean,
+        val coffees: Int,
+        val ownExpenses: List<Pair<Int, Int>>,
+        val settlementCents: Int?
+    )
+
+    /**
+     * One admin-recorded bean-purchase variant to seed, exercising one expense split type. [totalCents] is the
+     * total paid (must equal [privateCents] + [kittyCents]); [privateCents] is credited to the buyer and
+     * [kittyCents] is drawn from the kitty. [label] names the variant for the log line.
+     */
+    private data class AdminExpenseVariant(
+        val label: String,
+        val weightGrams: Int,
+        val totalCents: Int,
+        val privateCents: Int,
+        val kittyCents: Int,
+        val note: String
+    )
+
+    /**
+     * Creates the demo members and seeds their history, unless they already exist. Resolves the seeded
+     * fixture admin (`jane_doe`) to act for the admin-only operations (settlements and the kitty adjustment).
+     */
+    fun loadDemoData() {
+        val existingLogins = userService.getAll().mapTo(HashSet()) { it.loginName }
+        if (DEMO_MEMBERS.first().loginName in existingLogins) {
+            log.info("Skipping the dev demo data: the demo members already exist.")
+            return
+        }
+        val admin = userService.getByLoginName(ADMIN_LOGIN)
+        var coffeeTotal = 0
+        var expenseTotal = 0
+        var settlementTotal = 0
+        DEMO_MEMBERS.forEach { spec ->
+            val member = createMember(spec)
+            repeat(spec.coffees) {
+                coffeeConsumptionService.applyDelta(member.persistedId, 1, member)
+                coffeeTotal++
+            }
+            spec.ownExpenses.forEach { (weightGrams, amountCents) ->
+                expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", member)
+                expenseTotal++
+            }
+            spec.settlementCents?.let { amount ->
+                paymentService.recordSettlement(member.persistedId, amount, "demo settlement", admin)
+                settlementTotal++
+            }
+            // deactivate last, after the member's history is seeded: a deactivated member is read-only and
+            // could not record their own coffees or purchases, so an inactive demo member is created active,
+            // given a realistic past, then deactivated here
+            if (!spec.active) {
+                userService.upsert(member.copy(active = false))
+            }
+        }
+        // one pure kitty adjustment (an initial float) so the kitty ledger and balance are non-zero on a
+        // fresh dev start; settlements only ever add to the kitty, so it can never go negative here
+        paymentService.adjustKitty(KITTY_FLOAT_CENTS, "demo initial kitty float", admin)
+        seedPrimaryDemoMemberHistory(admin)
+        seedFixtureMemberHistories(admin)
+        // the three admin-recorded expense variants (all booked against the primary demo member as buyer), so
+        // the admin expense log shows every split type: private-only, kitty-only, and a private+kitty split.
+        // Placed after the kitty float and all settlements above, so the kitty portion these draw (only the
+        // kitty-only and the split contribute) is covered and the kitty stays >= 0.
+        seedPrimaryDemoMemberAdminExpenses(admin)
+        // an extra active member with no history at all, to demo the empty ledger/change-log state
+        createMember(EMPTY_DEMO_MEMBER)
+        log.info(
+            "Seeded the dev demo data: {} extra members, {} coffees, {} own purchases, {} settlements, " +
+                "one kitty float, plus varied histories for {} other fixture users and one empty member ({}).",
+            DEMO_MEMBERS.size,
+            coffeeTotal,
+            expenseTotal,
+            settlementTotal,
+            ENRICHED_FIXTURE_LOGINS.size,
+            EMPTY_DEMO_LOGIN
+        )
+    }
+
+    /**
+     * Gives a rich, varied history to every remaining existing fixture user (the admin and the fixture
+     * members other than the primary demo member, which [seedPrimaryDemoMemberHistory] already covers), so
+     * nearly every user has populated ledger and change-log views. The counts and amounts are varied by the
+     * user's index in [ENRICHED_FIXTURE_LOGINS] so the rows look realistic rather than identical. Each user
+     * is an existing, active fixture user, so seeding only appends events. The admin is just another user
+     * here — it has a consumption row and can hold cups, purchases, and deposits like anyone.
+     *
+     * @param admin the resolved fixture admin, acting for the admin-only settlements
+     */
+    private fun seedFixtureMemberHistories(admin: User) {
+        ENRICHED_FIXTURE_LOGINS.forEachIndexed { index, login ->
+            seedVariedHistory(userService.getByLoginName(login), index, admin)
+        }
+    }
+
+    /**
+     * Seeds a varied coffee, own-bean-purchase, and settlement history onto an existing, active [member].
+     * The volume varies with [index] so consecutive users do not get identical rows: a handful of cups, one
+     * to three own purchases, and one or two deposits, all attributed to the member (the deposits acted by
+     * the [admin]). Member purchases are 100% private, and settlements only add to the kitty, so this never
+     * draws the kitty down.
+     *
+     * @param member the existing active user to enrich
+     * @param index  the user's position, used to vary the counts and amounts
+     * @param admin  the resolved fixture admin, acting for the admin-only settlements
+     */
+    private fun seedVariedHistory(
+        member: User,
+        index: Int,
+        admin: User
+    ) {
+        repeat(BASE_COFFEES + index * COFFEE_STEP) {
+            coffeeConsumptionService.applyDelta(member.persistedId, 1, member)
+        }
+        repeat(1 + index % MAX_EXTRA_OWN_EXPENSES) { purchase ->
+            val weightGrams = BASE_EXPENSE_GRAMS + (index + purchase) * EXPENSE_GRAMS_STEP
+            val amountCents = BASE_EXPENSE_CENTS + (index + purchase) * EXPENSE_CENTS_STEP
+            expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", member)
+        }
+        repeat(1 + index % MAX_EXTRA_SETTLEMENTS) { deposit ->
+            val amountCents = BASE_SETTLEMENT_CENTS + (index + deposit) * SETTLEMENT_CENTS_STEP
+            paymentService.recordSettlement(member.persistedId, amountCents, "demo deposit", admin)
+        }
+    }
+
+    /**
+     * Creates one demo member directly through the service's upsert (the same seeding path the fixtures use,
+     * which bypasses the admin-only `create` check), then creates their consumption at zero so the count can
+     * be advanced. Returns the persisted member (with their assigned id and capability token).
+     */
+    private fun createMember(spec: DemoMember): User {
+        val created =
+            userService.upsert(
+                User(
+                    loginName = spec.loginName,
+                    emailAddress = "${spec.loginName}@se.uni-heidelberg.de",
+                    firstName = spec.firstName,
+                    lastName = spec.lastName,
+                    role = spec.role,
+                    // always created active so the consumption/expense seeding succeeds; a spec marked
+                    // inactive is deactivated by the caller after its history is seeded
+                    active = true,
+                    // an admin needs a password; a member authenticates by their capability token alone
+                    password = if (spec.role == Role.ADMIN) DEMO_ADMIN_PASSWORD else null
+                )
+            )
+        coffeeConsumptionService.createForUser(created)
+        return created
+    }
+
+    /**
+     * Layers a representative history onto the primary demo capability link, the fixture member
+     * [PRIMARY_DEMO_LOGIN] (the one printed on the wall for demos), so its unified ledger has every entry kind
+     * — cups, own bean purchases, and a deposit — and the "All"/"Cups"/"Expenses"/"Deposits" ledger tabs each
+     * show data. The fixture loader already created this member (active, with a consumption row at zero), so
+     * this only adds events; the member stays active. Reuses the same service calls the demo members use.
+     *
+     * @param admin the resolved fixture admin, acting for the admin-only settlement
+     */
+    private fun seedPrimaryDemoMemberHistory(admin: User) {
+        val member = userService.getByLoginName(PRIMARY_DEMO_LOGIN)
+        repeat(PRIMARY_DEMO_COFFEES) {
+            coffeeConsumptionService.applyDelta(member.persistedId, 1, member)
+        }
+        PRIMARY_DEMO_OWN_EXPENSES.forEach { (weightGrams, amountCents) ->
+            expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", member)
+        }
+        paymentService.recordSettlement(member.persistedId, PRIMARY_DEMO_SETTLEMENT_CENTS, "demo deposit", admin)
+        log.info("Seeded the primary demo member ({}) with a full demo ledger.", PRIMARY_DEMO_LOGIN)
+    }
+
+    /**
+     * Records the three admin bean-purchase variants for the primary demo member [PRIMARY_DEMO_LOGIN], so the
+     * dev app demonstrates every expense split type the admin can record: a **private-only** purchase (the
+     * whole total credited to the member, nothing from the kitty), a **kitty-only** purchase (the whole total
+     * drawn from the kitty, nothing credited to the member), and a **private+kitty split** (a portion each).
+     * Each shows up on the admin expense log, and the kitty-touching ones on the kitty ledger too.
+     *
+     * The buyer is the member; the actor is the [admin] (only an admin may record these). The kitty portions
+     * (the kitty-only total and the split's kitty portion) draw the kitty down, so the caller must invoke this
+     * only after the kitty float and all settlements are seeded; with the [KITTY_FLOAT_CENTS] float plus the
+     * demo settlements available, these small draws keep the kitty non-negative.
+     *
+     * @param admin the resolved fixture admin, acting for the admin-only records
+     */
+    private fun seedPrimaryDemoMemberAdminExpenses(admin: User) {
+        val member = userService.getByLoginName(PRIMARY_DEMO_LOGIN)
+        ADMIN_EXPENSE_VARIANTS.forEach { variant ->
+            expenseService.record(
+                buyerUserId = member.persistedId,
+                weightGrams = variant.weightGrams,
+                amountCents = variant.totalCents,
+                privateAmountCents = variant.privateCents,
+                kittyAmountCents = variant.kittyCents,
+                note = variant.note,
+                actingUser = admin
+            )
+            log.info(
+                "Seeded an admin {} expense for the primary demo member ({}): {}c total = {}c private + {}c " +
+                    "kitty.",
+                variant.label,
+                PRIMARY_DEMO_LOGIN,
+                variant.totalCents,
+                variant.privateCents,
+                variant.kittyCents
+            )
+        }
+    }
+
+    private companion object {
+        // runs after the fixture reset+seed (200) and the price seed (250), so a price is in effect before
+        // any demo coffee is added and the demo members layer on top of the seeded fixtures
+        private const val ORDER = 260
+
+        // the seeded fixture admin, resolved to satisfy the admin-only settlement and kitty operations
+        private const val ADMIN_LOGIN = "jane_doe"
+
+        // a demo password for the extra admin members (dev only; an admin requires a password)
+        private const val DEMO_ADMIN_PASSWORD = "demoAdminPassword42"
+
+        // an initial kitty float (euro cents) so the kitty ledger is non-empty on a fresh dev start
+        private const val KITTY_FLOAT_CENTS = 5_000
+
+        // the fixture member whose capability link is the primary demo link (printed on the wall for demos);
+        // given a full demo ledger below so every ledger tab shows data. Kept active.
+        private const val PRIMARY_DEMO_LOGIN = "maxmustermann"
+        private const val PRIMARY_DEMO_COFFEES = 8
+        private val PRIMARY_DEMO_OWN_EXPENSES = listOf(500 to 1299, 1000 to 2499)
+        private const val PRIMARY_DEMO_SETTLEMENT_CENTS = 2000
+
+        // the three admin-recorded bean-purchase variants for the primary demo member, one per split type, so
+        // the admin expense log shows every variant. Each satisfies private + kitty == total. The kitty
+        // portions (the kitty-only total of 1000c and the split's 600c = 1600c drawn) are seeded after the
+        // kitty float and all settlements; the float (KITTY_FLOAT_CENTS) plus settlements cover these small
+        // draws, so the kitty stays >= 0.
+        private val ADMIN_EXPENSE_VARIANTS =
+            listOf(
+                // private-only: the whole total credited to the member, nothing from the kitty
+                AdminExpenseVariant(
+                    label = "private-only",
+                    weightGrams = 500,
+                    totalCents = 800,
+                    privateCents = 800,
+                    kittyCents = 0,
+                    note = "demo private-only bean purchase"
+                ),
+                // kitty-only: the whole total drawn from the kitty, nothing credited to the member
+                AdminExpenseVariant(
+                    label = "kitty-only",
+                    weightGrams = 750,
+                    totalCents = 1_000,
+                    privateCents = 0,
+                    kittyCents = 1_000,
+                    note = "demo kitty-only bean purchase"
+                ),
+                // private+kitty split: a portion credited to the member, a portion drawn from the kitty
+                AdminExpenseVariant(
+                    label = "split",
+                    weightGrams = 1_000,
+                    totalCents = 1_500,
+                    privateCents = 900,
+                    kittyCents = 600,
+                    note = "demo split bean purchase"
+                )
+            )
+
+        // the remaining existing fixture users (the admin and the fixture members other than the primary
+        // demo member) given a rich, varied history so almost every user has populated ledger/history views.
+        // The admin is just another user here: it has a consumption row and can hold cups, purchases, and
+        // deposits like anyone.
+        private val ENRICHED_FIXTURE_LOGINS = listOf(ADMIN_LOGIN, "student2023", "lisa_lee", "olivia_lee")
+
+        // knobs for the varied per-user history; the volume scales with the user's index so consecutive
+        // users do not get identical rows
+        private const val BASE_COFFEES = 4
+        private const val COFFEE_STEP = 3
+        private const val MAX_EXTRA_OWN_EXPENSES = 3
+        private const val BASE_EXPENSE_GRAMS = 250
+        private const val EXPENSE_GRAMS_STEP = 250
+        private const val BASE_EXPENSE_CENTS = 899
+        private const val EXPENSE_CENTS_STEP = 400
+        private const val MAX_EXTRA_SETTLEMENTS = 2
+        private const val BASE_SETTLEMENT_CENTS = 1000
+        private const val SETTLEMENT_CENTS_STEP = 500
+
+        // a freshly created active member with no history at all, to demo the empty ledger/change-log state
+        private const val EMPTY_DEMO_LOGIN = "new_user"
+        private val EMPTY_DEMO_MEMBER =
+            DemoMember(
+                EMPTY_DEMO_LOGIN,
+                "Nina",
+                "Neumann",
+                Role.USER,
+                active = true,
+                coffees = 0,
+                ownExpenses = emptyList(),
+                settlementCents = null
+            )
+
+        private val log = LoggerFactory.getLogger(DevDemoDataLoader::class.java)
+
+        // nine extra members with German names: a mix of roles (two admins) and active states (two
+        // inactive), most with a little consumption, purchase, and settlement history so the lists paginate
+        // (5/page) and the ledger/history views are not empty; one (`hannes_schulz`) is deliberately left
+        // empty to demo the empty state
+        private val DEMO_MEMBERS =
+            listOf(
+                DemoMember(
+                    "anna_schneider",
+                    "Anna",
+                    "Schneider",
+                    Role.USER,
+                    true,
+                    coffees = 7,
+                    ownExpenses = listOf(500 to 1299),
+                    settlementCents = 1000
+                ),
+                DemoMember(
+                    "bernd_fischer",
+                    "Bernd",
+                    "Fischer",
+                    Role.USER,
+                    true,
+                    coffees = 3,
+                    ownExpenses = emptyList(),
+                    settlementCents = null
+                ),
+                DemoMember(
+                    "clara_weber",
+                    "Clara",
+                    "Weber",
+                    Role.ADMIN,
+                    true,
+                    coffees = 12,
+                    ownExpenses = listOf(1000 to 2499, 250 to 799),
+                    settlementCents = 2000
+                ),
+                DemoMember(
+                    "david_meyer",
+                    "David",
+                    "Meyer",
+                    Role.USER,
+                    true,
+                    coffees = 5,
+                    ownExpenses = listOf(500 to 1199),
+                    settlementCents = null
+                ),
+                DemoMember(
+                    "emma_wagner",
+                    "Emma",
+                    "Wagner",
+                    Role.USER,
+                    false,
+                    coffees = 2,
+                    ownExpenses = emptyList(),
+                    settlementCents = null
+                ),
+                DemoMember(
+                    "felix_becker",
+                    "Felix",
+                    "Becker",
+                    Role.USER,
+                    true,
+                    coffees = 9,
+                    ownExpenses = listOf(750 to 1899),
+                    settlementCents = 1500
+                ),
+                DemoMember(
+                    "greta_hoffmann",
+                    "Greta",
+                    "Hoffmann",
+                    Role.ADMIN,
+                    true,
+                    coffees = 4,
+                    ownExpenses = emptyList(),
+                    settlementCents = null
+                ),
+                // deliberately left empty (no coffees, purchases, or settlement) to demo the empty state on
+                // an inactive member, alongside the active empty member `new_user`
+                DemoMember(
+                    "hannes_schulz",
+                    "Hannes",
+                    "Schulz",
+                    Role.USER,
+                    false,
+                    coffees = 0,
+                    ownExpenses = emptyList(),
+                    settlementCents = null
+                ),
+                DemoMember(
+                    "ida_koch",
+                    "Ida",
+                    "Koch",
+                    Role.USER,
+                    true,
+                    coffees = 6,
+                    ownExpenses = listOf(500 to 1349),
+                    settlementCents = 800
+                )
+            )
+    }
+}

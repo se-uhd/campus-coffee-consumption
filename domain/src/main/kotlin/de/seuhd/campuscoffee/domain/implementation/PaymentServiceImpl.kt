@@ -1,11 +1,14 @@
 package de.seuhd.campuscoffee.domain.implementation
 
+import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
 import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
+import de.seuhd.campuscoffee.domain.ports.data.KittyLock
+import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.springframework.stereotype.Service
@@ -14,13 +17,16 @@ import java.util.UUID
 
 /**
  * Domain implementation of [PaymentService]. Every operation is admin-only. A settlement records a member
- * paying money in (positive only); a kitty adjustment changes the kitty alone and may be signed. Payments
- * are never edited — a mistake is corrected with a compensating entry.
+ * paying money in (positive only); a kitty adjustment changes the kitty alone and may be signed, but may not
+ * drive the kitty balance below zero (409). Payments are never edited. A mistake is corrected with a
+ * compensating entry.
  */
 @Service
 class PaymentServiceImpl(
     private val paymentDataService: PaymentDataService,
-    private val userDataService: UserDataService
+    private val userDataService: UserDataService,
+    private val ledgerDataService: LedgerDataService,
+    private val kittyLock: KittyLock
 ) : PaymentService {
     @Transactional
     override fun recordSettlement(
@@ -47,10 +53,19 @@ class PaymentServiceImpl(
         if (amountCents == 0) {
             throw ValidationException("A kitty adjustment amount must not be zero.")
         }
+        // serialize against other kitty writes so two concurrent ops cannot both read the same balance,
+        // both pass the check, and both commit — the kitty is an aggregate across rows that @Version cannot guard
+        kittyLock.lockForUpdate()
+        if (kittyBalanceCents() + amountCents < 0) {
+            throw ConflictException("This adjustment would make the kitty balance negative.")
+        }
         return paymentDataService.upsert(Payment(user = null, amountCents = amountCents, note = note))
     }
 
     override fun clear() = paymentDataService.clear()
+
+    /** The current kitty balance in cents, read from the event log (the last running balance of its history). */
+    private fun kittyBalanceCents(): Long = ledgerDataService.kittyLedger().lastOrNull()?.runningBalanceCents ?: 0L
 
     /** Requires [actingUser] to be an admin, else 403. */
     private fun requireAdmin(actingUser: User) {

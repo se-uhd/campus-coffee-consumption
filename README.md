@@ -3,20 +3,20 @@
 A coffee consumption tracker for [**SE@UHD**](https://se-uhd.de/), the Software Engineering Group at Heidelberg University. Each
 group member has a running coffee count, valued at a global admin-set **price per cup**, which feeds a
 per-member **balance** and a communal **kitty**. A member bumps their own count by scanning a **QR code on
-the wall** — a secret per-member **capability link** that opens a small mobile-first web app where they add
-a coffee, **undo** a recent one within a grace period, record their own bean purchases, and see their
-balance. Admins create and manage members, set the price, record expenses and kitty settlements, and
-correct anyone's count. Settling up is a **settlement** (real money into the kitty), not a reset. Every
-change is recorded in an append-only **event log**, from which a **unified ledger** (coffees, purchases, and
-settlements with a running balance) is read. Money is tracked in **euro cents**.
+the wall**: a secret per-member **capability link**. Scanning it opens a small mobile-first web app where
+they add a coffee, **undo** a recent one within a grace period, record their own bean purchases, and see
+their balance. Admins create and manage members, set the price, record expenses and kitty settlements, and
+correct anyone's count. Settling up records a **settlement** (real money into the kitty); there is no reset.
+Every change is recorded in an append-only **event log**, from which a **unified ledger** (coffees,
+purchases, and settlements with a running balance) is read. Money is tracked in **euro cents**.
 
 The app is a Spring Boot / Kotlin backend (hexagonal architecture, event sourcing persistence) with an
-Angular single-page frontend, derived from the CampusCoffee teaching project.
+Angular 22 single-page frontend, derived from the CampusCoffee teaching project.
 
 ## How it works
 
 - **Members** authenticate with their secret **capability token**. The token is encoded in their wall QR
-  code as `https://<host>/coffee/{token}`; scanning it opens the SPA, which sends the token as the
+  code as `https://<host>/login/{token}`; scanning it opens the SPA, which sends the token as the
   `X-Coffee-Token` header on its API calls. The token never appears in an API URL path, only at the SPA
   entry point, so it stays out of API access logs. A member adds one coffee at a time, may **undo** the most
   recent one within a short grace period, records their own bean purchases, and sees their balance, the
@@ -27,10 +27,15 @@ Angular single-page frontend, derived from the CampusCoffee teaching project.
   with a private/kitty split and kitty settlements and adjustments, corrects any member's count, and reviews
   the kitty ledger and a per-member overview. There is no reset: settling up is a settlement, and a count
   change is a correction (optionally with a note).
+- **SPA routing.** A member's capability link `/login/{token}` opens the member landing, with the member
+  profile at `/login/{token}/profile`. The admin area is consolidated under `/admin/`: the login form at
+  `/admin/login`, the landing/dashboard at `/admin`, the members, price, expenses, and kitty pages at
+  `/admin/users`, `/admin/price`, `/admin/expenses`, and `/admin/kitty`, and the admin profile at
+  `/admin/profile`. The root path and any unknown route redirect to `/admin`.
 - **Money is in euro cents and each cup is valued at the price when it was drunk.** A member's balance
   reads like a prepaid card (negative means they owe the fund), valuing each coffee at the price in effect
   when it was consumed.
-- **The event log is the source of truth.** Each change — to a count, the price, an expense, or a payment —
+- **The event log is the source of truth.** Each change (to a count, the price, an expense, or a payment)
   appends one full-state event; the relational tables are a read model projected from the log, and the
   unified ledger and balances are read straight from the event rows (each carries who made the change, when,
   and an optional note). See `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`.
@@ -40,13 +45,15 @@ Angular single-page frontend, derived from the CampusCoffee teaching project.
 A multi-module Gradle project (Kotlin DSL) following a hexagonal (ports-and-adapters) architecture, with
 layer boundaries enforced by ArchUnit:
 
-- **domain** — domain models, port interfaces, and business logic (no framework dependencies beyond validation).
-- **api** — REST controllers, DTOs, MapStruct DTO mappers, the QR/capability URL helpers.
-- **data** — JPA entities, repositories, the event sourcing machinery (event store, read model projector,
+- **domain**: domain models, port interfaces, and business logic (no framework dependencies beyond validation).
+- **api**: REST controllers, DTOs, MapStruct DTO mappers, the QR/capability URL helpers.
+- **data**: JPA entities, repositories, the event sourcing machinery (event store, read model projector,
   decorators), and the ZXing QR and capability token adapters.
-- **application** — the Spring Boot app that wires it together: security (JWT + capability token filter),
+- **application**: the Spring Boot app that wires it together: security (JWT + capability token filter),
   configuration profiles, startup fixtures, and the bundled SPA.
-- **frontend** — the Angular SPA, built by Gradle and bundled into the application's `static/` resources.
+- **frontend**: the Angular 22 SPA (TypeScript 6, Angular Material 22, Node 24), built by Gradle and
+  bundled into the application's `static/` resources. Its request/response DTOs are generated from the
+  backend OpenAPI spec (see Frontend tooling, below).
 
 Event sourcing is the only persistence model. See `CLAUDE.md` for the full architecture and the
 `doc/` notes for the design records.
@@ -54,8 +61,8 @@ Event sourcing is the only persistence model. See `CLAUDE.md` for the full archi
 ## Prerequisites
 
 - **Java 25** and **Gradle 9.5**, provisioned via [mise](https://mise.jdx.dev/) (`mise.toml`; no Gradle wrapper).
-- **Node** (for the frontend), also provisioned via mise.
-- **Docker** — for a local PostgreSQL database in the `dev` profile and for the Testcontainers-based tests.
+- **Node 24** (for the frontend), also provisioned via mise.
+- **Docker**: for a local PostgreSQL database in the `dev` profile and for the Testcontainers-based tests.
 
 ## Running locally
 
@@ -83,7 +90,7 @@ cd frontend && npm start
 Alternatively, `gradle build` bundles the SPA into the backend jar, so `http://localhost:8080` serves the
 whole app from one process.
 
-## Seeded fixtures (dev)
+## Test fixtures (dev)
 
 The `dev` profile seeds one admin and four members with deterministic capability tokens (so demos are
 repeatable), each with a coffee consumption at zero. The credentials live in
@@ -97,10 +104,19 @@ repeatable), each with a coffee consumption at zero. The credentials live in
 | `lisa_lee`      | USER  | `Lk8jH4gF6dS2aP0oI9uY7tR3eW1qZ5xCvBnM2mN8bVlk` |
 | `olivia_lee`    | USER  | `Ty6rE2wQ8aS4dF0gH6jK1lZ3xC9vB5nMqWeR7tY1uIty` |
 
-A member's capability link is `http://localhost:8080/coffee/<token>`. Only the admin has a password (in
+A member's capability link is `http://localhost:8080/login/<token>`. Only the admin has a password (in
 `TestFixtures.kt`), used for the JWT login; members have no password and authenticate solely with their
 capability link. The dev `DevController` (`GET/PUT/DELETE /api/dev/data`) reports the counts, reloads the
 fixtures (reassigning the same seeded ids), or clears the data.
+
+On top of these fixtures, the `dev` profile runs a dev-only `DevDemoDataLoader` that adds about nine more
+members and an initial kitty float, and also enriches **every existing fixture user** (the admin `jane_doe`
+included) with varied consumption, bean-purchase, and deposit history, so the members list paginates and the
+ledger and history views are not empty on a fresh start. Two members are deliberately left **empty** to demo
+the empty state: a freshly created active member `new_user` (no history at all) and the inactive demo member
+`hannes_schulz`. It is `@Profile("dev")`, so the tests still see exactly the five-member fixture set above.
+The `dev` profile also reseeds on every startup (`campus-coffee.fixtures.reset-on-startup`), returning to
+this deterministic state on each restart.
 
 ## REST API
 
@@ -108,38 +124,40 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 
 **Member (auth: `X-Coffee-Token`):**
 
-- `GET  /summary` — the member landing in one call: current count, balance, the current price, the kitty balance, and the first page of the unified ledger.
-- `POST /consumption` (no body) — add one coffee.
-- `POST /consumption/cancel` — undo the most recent coffee within the grace period (nothing to undo / past the grace period → 409 Conflict).
-- `GET  /ledger?limit=5&offset=0` — own unified ledger (coffees, purchases, settlements) with a running balance.
-- `POST /expenses` `{ "weightGrams": N, "amountCents": N, "note"?: "…" }` — record an own bean purchase (booked 100% to the member).
-- `GET  /profile`, `PUT /profile` — view / edit own name and email (the response includes the capability URL).
-- `GET  /profile/qr.png` — own QR code (high-resolution PNG).
+- `GET  /summary`: the member landing in one call (current count, balance, the current price, the kitty balance, and the first page of the unified ledger).
+- `POST /consumption` (no body): add one coffee.
+- `POST /consumption/cancel`: undo the most recent coffee within the grace period (nothing to undo, or past the grace period, returns 409 Conflict).
+- `GET  /ledger?limit=5&offset=0`: own unified ledger (coffees, purchases, settlements) with a running balance.
+- `POST /expenses` `{ "weightGrams": N, "amountCents": N, "note"?: "…" }`: record an own bean purchase (booked 100% to the member).
+- `GET  /profile`, `PUT /profile`: view and edit own name and email (the response includes the capability URL).
+- `GET  /profile/qr.png`: own QR code (high-resolution PNG).
 
 **Admin (auth: JWT, `ROLE_ADMIN`):**
 
-- `GET /users`, `POST /users`, `GET/PUT/DELETE /users/{id}`, `GET /users/me`, `GET /users/filter?login_name=…`, `GET /users/overview`.
-- `DELETE /users/{id}` — refused (409) if the member has financial history; deactivate instead.
+- `GET /users`, `POST /users`, `GET/PUT/DELETE /users/{id}`, `GET /users/me`, `GET /users/filter?login_name=…`, `GET /users/overview` (the per-member overview now renders in the member-management page, `/admin/users`).
+- `DELETE /users/{id}`: refused (409) if the member has financial history; deactivate instead.
 - `GET /users/{id}/link`, `POST /users/{id}/link/rotate`, `GET /users/{id}/qr.png`.
+- `GET /users/qr.zip`: a streamed ZIP of every member's QR code (one `<loginName>.png` per member).
 - `GET  /users/{id}/consumption?limit=5&offset=0`, `GET /users/{id}/ledger?limit=5&offset=0`.
 - `POST /users/{id}/consumption` `{ "delta": 1 | -1 }`.
-- `PUT  /users/{id}/consumption` `{ "total": N, "note": "…" }` — absolute count correction (`note` optional).
-- `GET/POST/PUT/DELETE /users/{id}/expenses` — list / record / correct / delete a member's purchases with a private/kitty split (the buyer cannot be changed on a correction).
-- `PUT /price` `{ "amountCents": N }`, `GET /price/history` — set the global price / view its full history.
-- `POST /payments/settlement` `{ "userId", "amountCents", "note"? }` — a member pays money into the kitty.
-- `POST /payments/adjustment` `{ "amountCents", "note"? }` — a pure kitty adjustment (initial float / correction).
-- `GET /kitty/ledger?limit=5&offset=0` — the kitty ledger with the running kitty balance.
+- `PUT  /users/{id}/consumption` `{ "total": N, "note": "…" }`: absolute count correction (`note` optional).
+- `GET/POST/PUT/DELETE /users/{id}/expenses`: list, record, correct, or delete a member's purchases with a private/kitty split (the buyer cannot be changed on a correction).
+- `GET /price`: read the current global price (admin-only; members receive it through their landing summary).
+- `PUT /price` `{ "amountCents": N }`, `GET /price/history`: set the global price, or view its full history.
+- `POST /payments/settlement` `{ "userId", "amountCents", "note"? }`: a member pays money into the kitty.
+- `POST /payments/adjustment` `{ "amountCents", "note"? }`: a pure kitty adjustment (an initial float or a correction).
+- `GET /kitty/ledger?limit=5&offset=0`: the kitty ledger with the running kitty balance.
 
 **Auth:** `POST /auth/token` `{ "loginName": "…", "password": "…" }` → `{ "token": "<jwt>" }`.
 
 Money is in integer euro cents throughout. The HTTP method carries the semantics: `GET` reads, member
 `POST /consumption` adds one coffee (and `/cancel` undoes a recent one), and admin `PUT` sets an absolute
-total. There is no reset, no `−1`, no `DELETE` on consumption — settling up is a settlement and a count
-change is a correction, both kept in the append-only log.
+total. Consumption has no reset, no `−1`, and no `DELETE`. Settling up records a settlement; a count change
+records a correction; both stay in the append-only log.
 
 ## Inspecting the event log
 
-Every change — to a count, the price, an expense, or a payment — is one row in the append-only `events`
+Every change (to a count, the price, an expense, or a payment) is one row in the append-only `events`
 table. The `created_by` column records the actor's login (a member, an admin, or `"system"` for the
 fixtures), and `note` records an admin's reason for a count correction or a kitty adjustment:
 
@@ -153,12 +171,24 @@ To rebuild the read tables from the log on startup (an event sourcing demonstrat
 ## Testing
 
 ```shell
-gradle build      # compiles, runs ktlint + detekt, the test suite, and the JaCoCo coverage gate
+gradle build      # compiles, runs ktlint + detekt, the frontend lint, the test suite, and the coverage gate
 gradle test       # the test suite only
 ```
 
 The backend tests use Testcontainers (PostgreSQL) for the system and integration tests and Cucumber for
-the acceptance tests. The frontend uses Karma/Jasmine (`cd frontend && npm test`).
+the acceptance tests. The frontend uses **Vitest** for unit tests (`cd frontend && npm test`) and
+**Playwright** for the end-to-end suite (`npm run e2e`, against a running app).
+
+## Frontend tooling
+
+- **Lint and static analysis.** `npm run lint` runs angular-eslint and Stylelint (with Prettier and Knip
+  available via `npm run format` / `npm run knip`). It is wired into `gradle check` (the `frontendLint`
+  task), so `gradle build` and CI fail on a frontend lint violation.
+- **OpenAPI → DTO codegen.** The TypeScript DTOs in `frontend/src/app/api/model/` are generated from the
+  backend OpenAPI spec by `scripts/generate-frontend-dtos.sh` (run automatically by the Gradle build, and
+  skipped when the spec is unchanged), so the frontend and backend contracts cannot drift. The rest of the
+  SPA imports them through `frontend/src/app/models.ts`; do not hand-edit the generated `api/model/`
+  directory.
 
 ## Production deployment (Cloud Run + Cloud SQL)
 

@@ -19,8 +19,6 @@ export class AccountingService {
   /** A page of a member's unified ledger by id (newest first). */
   memberLedger(userId: string, limit = 20, offset = 0): Promise<LedgerEntryDto[]> {
     const params = new HttpParams().set('limit', limit).set('offset', offset);
-    return firstValueFrom(
-      this.http.get<LedgerEntryDto[]>(`/api/users/${userId}/ledger`, { params })
-    );
+    return firstValueFrom(this.http.get<LedgerEntryDto[]>(`/api/users/${userId}/ledger`, { params }));
   }
 }

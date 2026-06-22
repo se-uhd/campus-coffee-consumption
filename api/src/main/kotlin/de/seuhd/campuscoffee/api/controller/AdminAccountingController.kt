@@ -8,8 +8,12 @@ import de.seuhd.campuscoffee.domain.ports.api.AccountingService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.Positive
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller
+import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
@@ -21,6 +25,7 @@ import java.util.UUID
  * given member's unified ledger.
  */
 @Tag(name = "Admin accounting", description = "Per-member balances and ledgers (admin only).")
+@Validated
 @Controller
 @RequestMapping("/users")
 class AdminAccountingController(
@@ -48,13 +53,25 @@ class AdminAccountingController(
     fun memberLedger(
         @PathVariable userId: UUID,
         @Parameter(description = "Maximum number of entries to return.")
-        @RequestParam(defaultValue = "20") limit: Int,
+        @RequestParam(defaultValue = "20")
+        @Positive
+        @Max(MAX_PAGE_LIMIT) limit: Int,
         @Parameter(description = "Number of newest entries to skip.")
-        @RequestParam(defaultValue = "0") offset: Int
+        @RequestParam(defaultValue = "0")
+        @Min(0) offset: Int
     ): ResponseEntity<List<LedgerEntryDto>> {
         val admin = currentUserProvider.currentUser()
         return ResponseEntity.ok(
-            accountingDtoMapper.toEntryDtos(accountingService.memberLedger(userId, limit, offset, admin))
+            // the admin-by-id ledger exposes the kitty-funded portion of a split expense (the member-serving
+            // /api/ledger does not — see AccountingService.memberLedger)
+            accountingDtoMapper.toEntryDtos(
+                accountingService.memberLedger(userId, limit, offset, admin, includeKittyPortion = true)
+            )
         )
+    }
+
+    private companion object {
+        /** The maximum page size a paged read accepts; an out-of-range value is a 400, not a silent clamp. */
+        private const val MAX_PAGE_LIMIT = 100L
     }
 }

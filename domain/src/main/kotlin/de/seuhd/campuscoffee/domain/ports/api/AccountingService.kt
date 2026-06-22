@@ -19,6 +19,10 @@ interface AccountingService {
      * whether the most recent coffee is still cancellable, and the first page of the unified ledger
      * (newest first). Readable by the member themselves or an admin.
      *
+     * The summary is the member-serving view, so its ledger never carries the kitty-funded portion of an
+     * admin split purchase: a member's purchases read as 100% private, and the kitty split is not leaked to
+     * them even when an admin recorded the split against them.
+     *
      * @param userId      the member whose summary to read
      * @param ledgerLimit the number of ledger entries on the first page
      * @param ledgerOffset the number of newest entries to skip
@@ -36,10 +40,17 @@ interface AccountingService {
     /**
      * Returns a page of a member's unified ledger, newest first. Readable by the member or an admin.
      *
-     * @param userId     the member whose ledger to read
-     * @param limit      the maximum number of entries to return
-     * @param offset     the number of newest entries to skip
-     * @param actingUser the authenticated user attempting the read
+     * [includeKittyPortion] gates the kitty-funded portion of a split bean purchase
+     * ([LedgerEntry.kittyAmountCents]): the admin-by-id read passes `true` (the admin sees the split), the
+     * member-serving read passes `false` (the kitty split is stripped, so it never reaches a member, even for
+     * an admin-recorded split purchase on them). It never changes the balance math, which uses only the
+     * private portion.
+     *
+     * @param userId              the member whose ledger to read
+     * @param limit               the maximum number of entries to return
+     * @param offset              the number of newest entries to skip
+     * @param actingUser          the authenticated user attempting the read
+     * @param includeKittyPortion whether to expose the kitty portion of a split expense (admin view only)
      * @throws ForbiddenException if [actingUser] is neither that member nor an admin
      * @throws NotFoundException if no member exists for [userId]
      */
@@ -47,7 +58,8 @@ interface AccountingService {
         userId: UUID,
         limit: Int,
         offset: Int,
-        actingUser: User
+        actingUser: User,
+        includeKittyPortion: Boolean = false
     ): List<LedgerEntry>
 
     /**

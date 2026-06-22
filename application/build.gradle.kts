@@ -62,10 +62,29 @@ val frontendInstall by tasks.registering(NpmTask::class) {
     outputs.dir(rootProject.file("frontend/node_modules"))
 }
 
-// `npm run build` produces frontend/dist/frontend/browser; cached on the sources.
+// Regenerates the frontend TypeScript DTOs from the committed backend OpenAPI spec
+// (frontend/src-gen/api-docs.json) via scripts/generate-frontend-dtos.sh, which runs openapi-generator
+// (models only) into frontend/src/app/api/model. The script is a hash-skip wrapper, so this is a fast
+// no-op when the spec is unchanged; the inputs/outputs below let Gradle skip the task entirely when
+// neither the spec nor the generated model dir changed. The script's npx uses the mise-provided Node by
+// inheriting it from PATH (the node block above sets download = false). frontendInstall must run first so
+// the pinned @openapitools/openapi-generator-cli devDependency is present for `npx --no-install`.
+val generateFrontendDtos by tasks.registering(Exec::class) {
+    description = "Generates the frontend DTOs from the backend OpenAPI spec (openapi-generator, models only)."
+    dependsOn(frontendInstall)
+    workingDir(rootProject.projectDir)
+    commandLine("bash", "scripts/generate-frontend-dtos.sh")
+    inputs.file(rootProject.file("frontend/src-gen/api-docs.json"))
+    inputs.file(rootProject.file("scripts/generate-frontend-dtos.sh"))
+    outputs.dir(rootProject.file("frontend/src/app/api/model"))
+    outputs.file(rootProject.file("frontend/src-gen/.api-docs.hash"))
+}
+
+// `npm run build` produces frontend/dist/frontend/browser; cached on the sources. Depends on
+// generateFrontendDtos because the generated DTOs (frontend/src/app/api) are part of the build's sources.
 val frontendBuild by tasks.registering(NpmTask::class) {
     description = "Builds the Angular SPA bundled into the boot jar (npm run build)."
-    dependsOn(frontendInstall)
+    dependsOn(frontendInstall, generateFrontendDtos)
     args.set(listOf("run", "build"))
     inputs.dir(rootProject.file("frontend/src"))
     inputs.files(
@@ -76,13 +95,50 @@ val frontendBuild by tasks.registering(NpmTask::class) {
     outputs.dir(rootProject.file("frontend/dist"))
 }
 
+// `npm run lint` runs the frontend's static analysis (ESLint via angular-eslint + Stylelint), mirroring
+// the backend's ktlint/detekt gates. Wired into `check` below so `gradle build`/`gradle check` fails on a
+// frontend lint violation just as it does on a Kotlin one. Cached on the linted sources and the tool
+// configs; produces no artifact, so an up-to-date marker file stands in for an output.
+val frontendLint by tasks.registering(NpmTask::class) {
+    description = "Lints the Angular SPA (ESLint + Stylelint via npm run lint)."
+    // generateFrontendDtos writes into frontend/src/app/api, which is under the linted source tree, so
+    // it must run first (the generated DTOs are excluded from the lint by the eslint config, but the
+    // input directory still references them).
+    dependsOn(frontendInstall, generateFrontendDtos)
+    args.set(listOf("run", "lint"))
+    inputs.dir(rootProject.file("frontend/src"))
+    inputs.files(
+        rootProject.file("frontend/eslint.config.js"),
+        rootProject.file("frontend/.stylelintrc.json"),
+        rootProject.file("frontend/.stylelintignore"),
+        rootProject.file("frontend/angular.json"),
+        rootProject.file("frontend/tsconfig.json"),
+        rootProject.file("frontend/tsconfig.app.json")
+    )
+    val marker = layout.buildDirectory.file("frontend-lint.marker")
+    outputs.file(marker)
+    doLast { marker.get().asFile.writeText("ok") }
+}
+
+// Run the frontend lint as part of `check` (and therefore `build`), like ktlint/detekt on the backend.
+tasks.named("check") {
+    dependsOn(frontendLint)
+}
+
 // Name the boot jar application.jar (version-independent) so the Dockerfile references a stable
 // name instead of a version-coupled application-<version>.jar. The built SPA is bundled into the jar's
 // classpath static resources, so the single Cloud Run image serves the app and the API from one origin.
 // Only bootJar (part of `assemble`/`build`) triggers the npm build, so a bare `gradle test` does not.
+//
+// `-PskipFrontendBuild` (used by scripts/run-e2e-coverage.sh) skips the production SPA build so an
+// already-built, source-mapped ("coverage") SPA in frontend/dist is bundled as-is instead of being
+// overwritten; the e2e coverage run needs the source maps to map browser V8 coverage back to .ts.
+val skipFrontendBuild = providers.gradleProperty("skipFrontendBuild").isPresent
 tasks.named<BootJar>("bootJar") {
     archiveFileName.set("application.jar")
-    dependsOn(frontendBuild)
+    if (!skipFrontendBuild) {
+        dependsOn(frontendBuild)
+    }
     from(rootProject.file("frontend/dist/frontend/browser")) {
         into("BOOT-INF/classes/static")
     }

@@ -1,225 +1,498 @@
-import { Component, OnInit } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component, DestroyRef, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatListModule } from '@angular/material/list';
-import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import { ConsumptionService } from '../../services/consumption.service';
 import { AccountingService } from '../../services/accounting.service';
-import { EurosPipe } from '../../pipes/euros.pipe';
+import { PriceService } from '../../services/price.service';
+import { KittyService } from '../../services/kitty.service';
+import { NotificationService } from '../../services/notification.service';
+import { AdminSelectionService } from '../../services/admin-selection.service';
 import { LedgerListComponent } from '../../components/ledger-list/ledger-list.component';
-import { ConsumptionDto, LedgerEntryDto, MemberBalanceDto, UserDto } from '../../models';
+import { AppHeaderComponent } from '../../components/app-header/app-header.component';
+import { BalanceSummaryComponent } from '../../components/balance-summary/balance-summary.component';
+import { MemberSelectComponent } from '../../components/member-select/member-select.component';
+import { ConsumptionDto, LedgerEntryDto, UserDto } from '../../models';
+import { appendLedgerPage } from '../../util/ledger';
+
+/** The page size for one ledger page; "Load more" appends another page of this size (matching the member landing). */
+const LEDGER_PAGE_SIZE = 10;
 
 /**
- * Admin landing: the admin's own consumption by default, a selector for any member, +/- adjustment, and an
- * edit mode that overrides the total. Shows the selected member's balance and unified ledger, a per-member
- * balance overview, and links to the user-admin, price, expenses, kitty, and own-profile pages. A member is
- * settled by recording a payment on the kitty page, not by zeroing their count.
+ * Admin landing: the selected member's view, mirroring the member landing. A member selector at the top
+ * (the admin's own account by default, marked with a person icon), then the same blocks as the member page: a big
+ * coffee count with the admin's single-step +/- controls and an Edit action that opens an absolute count
+ * correction folded into the count panel, the selected member's balance / kitty / price summary, and the
+ * member's recent activity (the unified ledger, paged with "Load more"). The all-members overview lives on the
+ * Members page (`/admin/users`). The header links to the members, price, expenses, kitty, and own-profile
+ * pages and signs out. A member is settled by recording a payment on the kitty page, not by zeroing their
+ * count.
  */
 @Component({
   selector: 'cc-admin-landing',
   imports: [
     RouterLink,
     FormsModule,
-    MatToolbarModule,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
-    MatListModule,
-    MatSelectModule,
     MatFormFieldModule,
     MatInputModule,
-    EurosPipe,
-    LedgerListComponent
+    MatTooltipModule,
+    MatProgressBarModule,
+    MatProgressSpinnerModule,
+    LedgerListComponent,
+    AppHeaderComponent,
+    BalanceSummaryComponent,
+    MemberSelectComponent
   ],
   template: `
-    <mat-toolbar color="primary">
-      <span>SE&#64;UHD Coffee</span>
-      <span class="spacer"></span>
-      <a mat-icon-button routerLink="/admin/users" aria-label="Manage users"><mat-icon>group</mat-icon></a>
-      <a mat-icon-button routerLink="/admin/price" aria-label="Price"><mat-icon>sell</mat-icon></a>
-      <a mat-icon-button routerLink="/admin/expenses" aria-label="Expenses"><mat-icon>shopping_cart</mat-icon></a>
-      <a mat-icon-button routerLink="/admin/kitty" aria-label="Kitty"><mat-icon>savings</mat-icon></a>
-      <a mat-icon-button routerLink="/profile" aria-label="My profile"><mat-icon>person</mat-icon></a>
-      <button mat-icon-button (click)="logout()" aria-label="Sign out"><mat-icon>logout</mat-icon></button>
-    </mat-toolbar>
+    <cc-app-header [home]="'/admin'">
+      <a mat-icon-button routerLink="/admin/users" aria-label="Manage members" matTooltip="Members">
+        <mat-icon>group</mat-icon>
+      </a>
+      <a
+        mat-icon-button
+        routerLink="/admin/price"
+        queryParamsHandling="preserve"
+        aria-label="Price"
+        matTooltip="Price"
+      >
+        <mat-icon>sell</mat-icon>
+      </a>
+      <a
+        mat-icon-button
+        routerLink="/admin/expenses"
+        queryParamsHandling="preserve"
+        aria-label="Expenses"
+        matTooltip="Expenses"
+      >
+        <mat-icon>shopping_cart</mat-icon>
+      </a>
+      <a
+        mat-icon-button
+        routerLink="/admin/kitty"
+        queryParamsHandling="preserve"
+        aria-label="Kitty"
+        matTooltip="Kitty"
+      >
+        <mat-icon>savings</mat-icon>
+      </a>
+      <a
+        mat-icon-button
+        routerLink="/admin/profile"
+        queryParamsHandling="preserve"
+        aria-label="My profile"
+        matTooltip="My profile"
+      >
+        <mat-icon>person</mat-icon>
+      </a>
+      <button mat-icon-button (click)="logout()" aria-label="Sign out" matTooltip="Sign out">
+        <mat-icon>logout</mat-icon>
+      </button>
+    </cc-app-header>
+
+    @if (loading) {
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    }
 
     <div class="page">
-      <mat-card class="card">
-        <h2>Member balances</h2>
-        <mat-list>
-          @for (member of overview; track member.userId) {
-            <mat-list-item lines="2">
-              <span matListItemTitle>{{ member.loginName }}</span>
-              <span matListItemLine class="muted">
-                {{ member.firstName }} {{ member.lastName }} · {{ member.count }} cups
-              </span>
-              <span matListItemMeta>
-                @if (member.balanceCents < 0) {
-                  <span class="warn">owes {{ -member.balanceCents | euros }}</span>
-                } @else if (member.balanceCents > 0) {
-                  {{ member.balanceCents | euros }} credit
-                } @else {
-                  settled
-                }
-              </span>
-            </mat-list-item>
-          } @empty {
-            <p class="muted">No members yet.</p>
-          }
-        </mat-list>
-      </mat-card>
+      @if (loadError) {
+        <mat-card class="card">
+          <p class="warn">{{ loadError }}</p>
+          <button mat-stroked-button (click)="reload()">Retry</button>
+        </mat-card>
+      } @else {
+        <mat-card class="card">
+          <cc-member-select
+            [users]="users"
+            [selectedId]="selectedId"
+            [ownUserId]="selection.ownUserId"
+            (selectionChange)="onMemberChange($event)"
+          ></cc-member-select>
+        </mat-card>
 
-      <mat-card class="card">
-        <mat-form-field class="full-width">
-          <mat-label>Member</mat-label>
-          <mat-select [(ngModel)]="selectedId" (selectionChange)="loadConsumption()">
-            @for (user of users; track user.id) {
-              <mat-option [value]="user.id">{{ user.loginName }} ({{ user.firstName }} {{ user.lastName }})</mat-option>
+        <cc-balance-summary
+          [count]="consumption?.total ?? null"
+          [priceCents]="priceCents"
+          [balanceCents]="balanceCents"
+          [kittyBalanceCents]="kittyBalanceCents"
+          [showBalance]="true"
+        >
+          <button
+            mat-fab
+            class="cc-fab-neutral"
+            (click)="change(-1)"
+            [disabled]="busy || consumption?.total === 0"
+            aria-label="Remove a coffee"
+            matTooltip="Remove a coffee"
+          >
+            <mat-icon>remove</mat-icon>
+          </button>
+          <button
+            mat-fab
+            color="primary"
+            (click)="change(1)"
+            [disabled]="busy"
+            aria-label="Add a coffee"
+            matTooltip="Add a coffee"
+          >
+            @if (busy) {
+              <mat-spinner diameter="20"></mat-spinner>
+            } @else {
+              <mat-icon>add</mat-icon>
             }
-          </mat-select>
-        </mat-form-field>
-      </mat-card>
-
-      <mat-card class="card">
-        <div style="text-align:center">
-          <div style="font-size:3.5rem;font-weight:600">{{ consumption?.total ?? '-' }}</div>
-          <div class="muted">cups</div>
-          @if (balanceCents != null) {
-            <div class="muted" style="margin-top:4px">
-              @if (balanceCents < 0) {
-                <span class="warn">owes {{ -balanceCents | euros }}</span>
-              } @else if (balanceCents > 0) {
-                {{ balanceCents | euros }} credit
-              } @else {
-                settled ({{ balanceCents | euros }})
-              }
-            </div>
-          }
-          <div class="row" style="justify-content:center;margin-top:16px;gap:24px">
-            <button mat-fab color="warn" (click)="change(-1)" [disabled]="busy"><mat-icon>remove</mat-icon></button>
-            <button mat-fab color="primary" (click)="change(1)" [disabled]="busy"><mat-icon>add</mat-icon></button>
+          </button>
+          <button
+            mat-fab
+            class="cc-fab-neutral"
+            (click)="editMode = !editMode"
+            aria-label="Edit total"
+            matTooltip="Correct coffee count"
+          >
+            <mat-icon>edit</mat-icon>
+          </button>
+          <div extra>
+            @if (editMode) {
+              <p class="muted cc-edit-hint">
+                Set the member's coffee count to an exact total (an absolute correction).
+              </p>
+              <form #correctionForm="ngForm" class="form-row cc-edit-total">
+                <mat-form-field>
+                  <mat-label>New total</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    min="0"
+                    step="1"
+                    name="newTotal"
+                    #newTotalModel="ngModel"
+                    [(ngModel)]="newTotal"
+                    (ngModelChange)="error = ''"
+                    required
+                  />
+                  @if (newTotalModel.touched && newTotalError()) {
+                    <mat-error>{{ newTotalError() }}</mat-error>
+                  }
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Note (optional)</mat-label>
+                  <input matInput name="note" [(ngModel)]="note" />
+                </mat-form-field>
+                <button
+                  mat-flat-button
+                  color="primary"
+                  (click)="override()"
+                  [disabled]="correctionForm.invalid || newTotalError() != null || busy"
+                >
+                  @if (busy) {
+                    <mat-spinner diameter="20"></mat-spinner>
+                  } @else {
+                    Set
+                  }
+                </button>
+              </form>
+            }
+            @if (error) {
+              <p class="warn">{{ error }}</p>
+            }
           </div>
-        </div>
+        </cc-balance-summary>
 
-        <div class="row" style="margin-top:16px">
-          <button mat-stroked-button (click)="editMode = !editMode"><mat-icon>edit</mat-icon> Edit total</button>
-        </div>
-
-        @if (editMode) {
-          <div class="row" style="margin-top:12px">
-            <mat-form-field>
-              <mat-label>New total</mat-label>
-              <input matInput type="number" min="0" [(ngModel)]="newTotal" />
-            </mat-form-field>
-            <mat-form-field>
-              <mat-label>Note (optional)</mat-label>
-              <input matInput [(ngModel)]="note" />
-            </mat-form-field>
-            <button mat-flat-button color="primary" (click)="override()" [disabled]="busy">Set</button>
-          </div>
-        }
-        @if (error) {
-          <p class="warn">{{ error }}</p>
-        }
-      </mat-card>
-
-      <mat-card class="card">
-        <h2>Recent activity</h2>
-        <cc-ledger-list [entries]="ledger" [showFilter]="true"></cc-ledger-list>
-      </mat-card>
+        <mat-card class="card">
+          <h2>Recent activity</h2>
+          <cc-ledger-list
+            [entries]="ledger"
+            [showFilter]="true"
+            [canLoadMore]="hasMore"
+            [loadingMore]="loadingMore"
+            (loadMore)="loadMore()"
+          ></cc-ledger-list>
+        </mat-card>
+      }
     </div>
-  `
+  `,
+  changeDetection: ChangeDetectionStrategy.Eager,
+  styles: [
+    `
+      .cc-edit-hint {
+        margin: 16px 0 0;
+        text-align: center;
+      }
+
+      .cc-edit-total {
+        margin-top: 16px;
+        align-items: center;
+        justify-content: center;
+      }
+    `
+  ]
 })
 export class AdminLandingComponent implements OnInit {
   users: UserDto[] = [];
-  overview: MemberBalanceDto[] = [];
   selectedId = '';
+  /** The member whose data is currently loaded, used to skip a redundant reload on a repeated `member` param. */
+  private loadedId = '';
   consumption: ConsumptionDto | null = null;
   ledger: LedgerEntryDto[] = [];
   balanceCents: number | null = null;
+  priceCents: number | null = null;
+  kittyBalanceCents: number | null = null;
   editMode = false;
   newTotal = 0;
   note = '';
   busy = false;
+  loading = false;
+  loadingMore = false;
+  loadError = '';
   error = '';
+  hasMore = false;
+
+  private readonly destroyRef = inject(DestroyRef);
 
   constructor(
     private readonly auth: AuthService,
     private readonly userService: UserService,
     private readonly consumptionService: ConsumptionService,
     private readonly accountingService: AccountingService,
-    private readonly router: Router
+    private readonly priceService: PriceService,
+    private readonly kittyService: KittyService,
+    private readonly notifications: NotificationService,
+    private readonly router: Router,
+    private readonly route: ActivatedRoute,
+    readonly selection: AdminSelectionService
   ) {}
 
-  async ngOnInit(): Promise<void> {
-    this.users = await this.userService.list();
-    this.overview = await this.accountingService.overview();
-    const me = await this.userService.me();
-    this.selectedId = me.id ?? this.users[0]?.id ?? '';
-    await this.loadConsumption();
+  /**
+   * The validation message for the "New total" count-correction field, or null when it is a valid count.
+   * The total must be a whole number of cups that is not negative; anything else is rejected before submit.
+   */
+  newTotalError(): string | null {
+    const total = this.newTotal;
+    if (total == null || !Number.isInteger(total) || total < 0) {
+      return 'Enter a whole number of cups (0 or more).';
+    }
+    return null;
   }
 
-  /** Loads the selected member's total, balance, and unified ledger. */
-  async loadConsumption(): Promise<void> {
-    if (!this.selectedId) {
+  async ngOnInit(): Promise<void> {
+    await this.reload();
+    // The URL is the source of truth for the selected member: follow the `member` query param (so the
+    // browser Back/Forward buttons, which change it, re-select and reload). The first emission ran the
+    // initial selection above via `reload`; later emissions (a member switch, or a Back/Forward) are
+    // applied here. Skip while still loading the initial member list (the param is applied in `reload`).
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      if (this.loading || this.loadError) {
+        return;
+      }
+      void this.applySelectionFromUrl(params.get('member'));
+    });
+  }
+
+  /**
+   * Selects the member named by the URL's `member` param (or the admin's own account when it is absent) and
+   * reloads, unless that member's data is already loaded — so a Back/Forward that changes the param re-loads,
+   * but a redundant re-emission of the same param does not load twice. `loadedId` (the member actually
+   * loaded) is the guard, not the bound `selectedId` (which the dropdown already advanced before navigating).
+   *
+   * @param memberId the value of the `member` query param, or null when it is absent
+   */
+  private async applySelectionFromUrl(memberId: string | null): Promise<void> {
+    const effective = this.selection.selectFromParam(memberId);
+    if (effective === this.loadedId) {
+      this.selectedId = effective;
       return;
     }
+    this.selectedId = effective;
+    this.editMode = false;
+    // unlike `reload()`, this post-navigation load runs outside a try/catch boundary (the queryParamMap
+    // subscription only `void`s it), so a failed load for the navigated-to member would silently keep the
+    // previous member's data on screen; surface it as a retryable error instead (matching member-profile)
+    try {
+      await this.loadConsumption();
+    } catch (error) {
+      this.loadError = 'Could not load that member.';
+      this.notifications.error(error, 'Could not load that member.');
+    }
+  }
+
+  /** Loads the members and the fund figures, then the default member's detail; surfaces a retryable error. */
+  async reload(): Promise<void> {
+    this.loading = true;
+    this.loadError = '';
+    try {
+      this.users = await this.userService.list();
+      await this.refreshFund();
+      const me = await this.userService.me();
+      // record the admin's own id as the shared default, then take the selection from the URL's `member`
+      // param (the source of truth) — the admin's own account when it is absent — so a deep link or a
+      // refresh on `/admin?member=<id>` lands on that member
+      this.selection.setOwnUserId(me.id ?? '');
+      this.selectedId = this.selection.selectFromParam(this.route.snapshot.queryParamMap.get('member'));
+      await this.loadConsumption();
+    } catch {
+      this.loadError = 'Could not load the admin dashboard.';
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  /** Refreshes the global price and the kitty balance shown in the balance summary. */
+  private async refreshFund(): Promise<void> {
+    // read just the current price (one GET), not the whole history, since only the latest value is shown
+    const [price, kitty] = await Promise.all([this.priceService.current(), this.kittyService.ledger(1, 0)]);
+    this.priceCents = price.amountCents;
+    this.kittyBalanceCents = kitty.balanceCents;
+  }
+
+  /**
+   * Pushes the newly-selected member onto the URL as the `member` query param (a history entry, so Back
+   * undoes the switch). The `queryParamMap` subscription then mirrors it into the shared selection and
+   * reloads — the URL stays the source of truth, so the selection is never set directly here.
+   *
+   * @param memberId the member id picked in the selector
+   */
+  async onMemberChange(memberId: string): Promise<void> {
+    this.selectedId = memberId;
+    await this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { member: memberId },
+      queryParamsHandling: 'merge'
+    });
+  }
+
+  /**
+   * Loads the selected member's total, balance, and unified ledger. The member id is captured at the start
+   * so that a slower earlier load, fired by a rapid member switch, discards its result instead of clobbering
+   * the current selection's data.
+   */
+  async loadConsumption(): Promise<void> {
+    const requestedId = this.selectedId;
+    if (!requestedId) {
+      return;
+    }
+    this.loadedId = requestedId;
     this.error = '';
-    this.consumption = await this.consumptionService.getForUser(this.selectedId);
-    this.newTotal = this.consumption.total;
-    await this.loadLedger();
+    const consumption = await this.consumptionService.getForUser(requestedId);
+    if (requestedId !== this.selectedId) {
+      return;
+    }
+    this.consumption = consumption;
+    this.newTotal = consumption.total;
+    await this.loadLedger(requestedId);
   }
 
-  /** Loads the selected member's unified ledger and derives the current balance from its newest row. */
-  private async loadLedger(): Promise<void> {
-    this.ledger = await this.accountingService.memberLedger(this.selectedId);
-    this.balanceCents = this.ledger.length > 0 ? this.ledger[0].runningBalanceCents : 0;
-    // keep the per-member overview in step with the latest change
-    this.overview = await this.accountingService.overview();
+  /**
+   * Loads the first page of the selected member's unified ledger (newest-first; "Load more" appends the
+   * rest) and derives the current balance from its newest row. The member id is passed in (captured by the
+   * caller) so a stale earlier load discards its result.
+   *
+   * @param requestedId the member id captured when the load was started
+   */
+  private async loadLedger(requestedId: string = this.selectedId): Promise<void> {
+    const ledger = await this.accountingService.memberLedger(requestedId, LEDGER_PAGE_SIZE, 0);
+    if (requestedId !== this.selectedId) {
+      return;
+    }
+    this.ledger = ledger;
+    this.hasMore = ledger.length === LEDGER_PAGE_SIZE;
+    this.balanceCents = ledger.length > 0 ? ledger[0].runningBalanceCents : 0;
   }
 
-  /** Applies a +1/-1 to the selected member, optimistically then reconciling to the server total. */
+  /** Appends the next page of the selected member's unified ledger (incremental "Load more" server paging). */
+  async loadMore(): Promise<void> {
+    const requestedId = this.selectedId;
+    this.loadingMore = true;
+    try {
+      const next = await this.accountingService.memberLedger(
+        requestedId,
+        LEDGER_PAGE_SIZE,
+        this.ledger.length
+      );
+      if (requestedId !== this.selectedId) {
+        return;
+      }
+      const { entries, appended } = appendLedgerPage(this.ledger, next);
+      this.ledger = entries;
+      // base "Load more" on the rows actually gained: a full page that collapsed to fewer new rows (its
+      // boundary row was a duplicate) means there is nothing more to fetch
+      this.hasMore = appended === LEDGER_PAGE_SIZE;
+    } catch (error) {
+      this.notifications.error(error, 'Could not load more activity.');
+    } finally {
+      this.loadingMore = false;
+    }
+  }
+
+  /**
+   * Applies a +1/-1 to the selected member, optimistically then reconciling to the server total. The member
+   * id is captured up front and every state write is guarded on it still being the current selection, so a
+   * rapid member switch mid-request never lands one member's count/ledger on another's view.
+   */
   async change(delta: number): Promise<void> {
+    const id = this.selectedId;
     this.busy = true;
     this.error = '';
-    // optimistic: move the displayed total immediately, then reconcile to the server response below
+    // optimistic: move the displayed total immediately, then reconcile to the server response below. Floor
+    // at zero so a rapid double-click on `−` cannot momentarily flash a negative count before the server
+    // (which is the real authority for the floor) reconciles.
     if (this.consumption) {
       this.consumption = { ...this.consumption, total: Math.max(0, this.consumption.total + delta) };
     }
     try {
-      this.consumption = await this.consumptionService.changeForUser(this.selectedId, delta);
-      await this.loadLedger();
-    } catch {
-      this.error = delta < 0 ? 'Count is already zero.' : 'Could not record that.';
-      await this.loadConsumption();
+      const updated = await this.consumptionService.changeForUser(id, delta);
+      if (id !== this.selectedId) {
+        return;
+      }
+      this.consumption = updated;
+      await this.loadLedger(id);
+      await this.refreshFund();
+    } catch (error) {
+      this.notifications.error(error, delta < 0 ? 'Count is already zero.' : 'Could not record that.');
+      if (id === this.selectedId) {
+        await this.loadConsumption();
+      }
     } finally {
       this.busy = false;
     }
   }
 
-  /** Overrides the selected member's total (edit mode). */
+  /**
+   * Overrides the selected member's total (edit mode). The member id is captured up front and the result is
+   * committed only while it is still the current selection, so a member switch mid-request cannot apply one
+   * member's correction to another's view.
+   */
   async override(): Promise<void> {
+    const id = this.selectedId;
     this.error = '';
-    if (this.newTotal < 0) {
+    if (this.newTotalError() != null) {
       this.error = 'The total cannot be negative.';
       return;
     }
     this.busy = true;
     try {
-      this.consumption = await this.consumptionService.overrideForUser(this.selectedId, this.newTotal, this.note);
+      const updated = await this.consumptionService.overrideForUser(id, this.newTotal, this.note);
+      if (id !== this.selectedId) {
+        return;
+      }
+      this.consumption = updated;
       this.editMode = false;
       this.note = '';
-      await this.loadLedger();
-    } catch {
-      this.error = 'Could not set the total.';
+      this.notifications.success('Total updated.');
+      await this.loadLedger(id);
+      await this.refreshFund();
+    } catch (error) {
+      this.notifications.error(error, 'Could not set the total.');
     } finally {
       this.busy = false;
     }
@@ -228,6 +501,6 @@ export class AdminLandingComponent implements OnInit {
   /** Signs the admin out and returns to login. */
   logout(): void {
     this.auth.logout();
-    this.router.navigate(['/login']);
+    this.router.navigate(['/admin/login']);
   }
 }

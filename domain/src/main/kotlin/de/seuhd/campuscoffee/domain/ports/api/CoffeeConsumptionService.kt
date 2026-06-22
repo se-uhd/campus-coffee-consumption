@@ -65,6 +65,11 @@ interface CoffeeConsumptionService : CrudService<CoffeeConsumption, UUID> {
      * Sets the count of the user with [userId] to an explicit value (an admin correction; any non-negative
      * value, including zero). An optional [note] documents the change in the event log.
      *
+     * This absolute override is authoritative: it writes the new [total] as the count's full state, so it
+     * intentionally supersedes any concurrent self-scan. A member `+1` that lands between the admin's read
+     * and write is overwritten by design (the admin asserts an absolute value, not a relative adjustment),
+     * so this write is deliberately not guarded against that race.
+     *
      * @param userId     the id of the user whose count to set
      * @param total      the new, non-negative count
      * @param note       an optional admin annotation recorded with the change (e.g. the payment reason)

@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
 import java.util.UUID
 
 /**
@@ -64,8 +65,12 @@ class UserController(
     @Operation
     @CrudOperation(operation = GET_ALL, resource = USER, roleRestricted = true)
     @GetMapping("")
-    override fun getAll(): ResponseEntity<List<UserDto>> =
-        ResponseEntity.ok(userService.getAll().map { withCapabilityUrl(it) })
+    override fun getAll(): ResponseEntity<List<UserDto>> {
+        // resolve the principal so a deactivated admin's in-flight JWT is rejected here too (the resolver
+        // throws ForbiddenException for a deactivated admin), keeping the lockout uniform across endpoints
+        currentUserProvider.currentUser()
+        return ResponseEntity.ok(userService.getAll().map { withCapabilityUrl(it) })
+    }
 
     @Operation
     @CrudOperation(operation = GET_BY_ID, resource = USER, roleRestricted = true)
@@ -173,6 +178,15 @@ class UserController(
         @PathVariable id: UUID
     ): ResponseEntity<ByteArray> =
         capabilityQrResponder.qrResponse(userService.getById(id, currentUserProvider.currentUser()))
+
+    /** Downloads a ZIP archive of every member's capability QR code, each entry named `<loginName>.png`. */
+    @Operation(summary = "Download a ZIP archive of every member's capability QR code (one PNG per member).")
+    @GetMapping("/qr.zip")
+    fun qrCodesZip(): ResponseEntity<StreamingResponseBody> {
+        // resolve the principal so a deactivated admin's in-flight JWT is rejected here too
+        currentUserProvider.currentUser()
+        return capabilityQrResponder.zipResponse(userService.getAll())
+    }
 
     /** Maps a user to its DTO and fills in the assembled capability URL from the member's secret token. */
     private fun withCapabilityUrl(user: User): UserDto =

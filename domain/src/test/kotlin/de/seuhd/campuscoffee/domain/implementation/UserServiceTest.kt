@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.domain.implementation
 
+import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.MissingFieldException
@@ -72,6 +73,10 @@ class UserServiceTest {
             capabilityToken = "ADMIN-TOKEN",
             passwordHash = "ADMIN-HASH"
         )
+
+    // a second, distinct active admin, so the last-active-admin guard does not fire when one is changed
+    private val otherAdmin =
+        admin.copy(id = UUID(0L, 98L), loginName = "john", emailAddress = "john@se.de", capabilityToken = "OTHER-TOKEN")
 
     @BeforeEach
     fun setUp() {
@@ -218,6 +223,8 @@ class UserServiceTest {
     fun `update demoting an admin to a member clears the password`() {
         whenever(userDataService.getById(adminId)).thenReturn(admin)
         whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+        // a second active admin remains, so demoting this one is allowed (it is not the last active admin)
+        whenever(userDataService.getAll()).thenReturn(listOf(admin, otherAdmin))
 
         val updated = service.update(admin.copy(role = Role.USER), admin)
 
@@ -510,5 +517,58 @@ class UserServiceTest {
 
         assertThrows<DeletionConflictException> { service.delete(memberId) }
         verify(userDataService, never()).delete(any())
+    }
+
+    @Test
+    fun `update deactivating the last active admin throws ConflictException`() {
+        whenever(userDataService.getById(adminId)).thenReturn(admin)
+        // the admin is the only active admin in the store
+        whenever(userDataService.getAll()).thenReturn(listOf(admin, storedMember))
+
+        assertThrows<ConflictException> { service.update(admin.copy(active = false), admin) }
+        verify(userDataService, never()).upsert(any())
+    }
+
+    @Test
+    fun `update demoting the last active admin throws ConflictException`() {
+        whenever(userDataService.getById(adminId)).thenReturn(admin)
+        whenever(userDataService.getAll()).thenReturn(listOf(admin, storedMember))
+
+        assertThrows<ConflictException> { service.update(admin.copy(role = Role.USER), admin) }
+        verify(userDataService, never()).upsert(any())
+    }
+
+    @Test
+    fun `update deactivating an admin while another active admin remains is allowed`() {
+        whenever(userDataService.getById(adminId)).thenReturn(admin)
+        whenever(userDataService.getAll()).thenReturn(listOf(admin, otherAdmin))
+        whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+
+        val updated = service.update(admin.copy(active = false), admin)
+
+        assertThat(updated.active).isFalse()
+    }
+
+    @Test
+    fun `delete of the last active admin throws ConflictException`() {
+        whenever(userDataService.getById(adminId)).thenReturn(admin)
+        whenever(userDataService.getAll()).thenReturn(listOf(admin, storedMember))
+
+        assertThrows<ConflictException> { service.delete(adminId) }
+        verify(userDataService, never()).delete(any())
+    }
+
+    @Test
+    fun `delete of an admin while another active admin remains passes the last-admin guard`() {
+        whenever(userDataService.getById(adminId)).thenReturn(admin)
+        whenever(userDataService.getAll()).thenReturn(listOf(admin, otherAdmin))
+        whenever(coffeeConsumptionDataService.getByUserId(adminId))
+            .thenReturn(CoffeeConsumption(user = admin, count = 0))
+        whenever(expenseDataService.getAllByBuyer(adminId)).thenReturn(emptyList())
+        whenever(paymentDataService.getAllByUser(adminId)).thenReturn(emptyList())
+
+        service.delete(adminId)
+
+        verify(userDataService).delete(adminId)
     }
 }

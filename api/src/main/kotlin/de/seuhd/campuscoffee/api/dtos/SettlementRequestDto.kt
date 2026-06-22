@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.api.dtos
 
+import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
@@ -14,6 +15,7 @@ data class SettlementRequestDto(
     val userId: UUID?,
     @field:NotNull(message = "Amount is required.")
     @field:Min(value = 1, message = "A settlement amount must be positive.")
+    @field:Max(value = MAX_MONEY_CENTS, message = "Amount is implausibly large.")
     val amountCents: Int?,
     @field:Size(max = 500, message = "Note must be at most 500 characters long.")
     val note: String? = null

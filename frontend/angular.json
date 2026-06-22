@@ -11,14 +11,12 @@
       "prefix": "cc",
       "architect": {
         "build": {
-          "builder": "@angular-devkit/build-angular:application",
+          "builder": "@angular/build:application",
           "options": {
             "outputPath": "dist/frontend",
             "index": "src/index.html",
             "browser": "src/main.ts",
-            "polyfills": [
-              "zone.js"
-            ],
+            "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
             "assets": [
               {
@@ -26,10 +24,7 @@
                 "input": "public"
               }
             ],
-            "styles": [
-              "@angular/material/prebuilt-themes/azure-blue.css",
-              "src/styles.css"
-            ],
+            "styles": ["node_modules/material-icons/iconfont/material-icons.css", "src/styles.scss"],
             "scripts": []
           },
           "configurations": {
@@ -52,12 +47,29 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "coverage": {
+              "optimization": false,
+              "extractLicenses": false,
+              "outputHashing": "none",
+              "sourceMap": {
+                "scripts": true,
+                "styles": false,
+                "vendor": false
+              }
+            },
+            "testing": {
+              "aot": false,
+              "optimization": false,
+              "extractLicenses": false,
+              "styles": ["src/styles.scss"],
+              "polyfills": ["zone.js", "zone.js/testing"]
             }
           },
           "defaultConfiguration": "production"
         },
         "serve": {
-          "builder": "@angular-devkit/build-angular:dev-server",
+          "builder": "@angular/build:dev-server",
           "options": {
             "proxyConfig": "src/proxy.conf.json"
           },
@@ -72,20 +84,69 @@
           "defaultConfiguration": "development"
         },
         "test": {
-          "builder": "@angular-devkit/build-angular:karma",
+          "builder": "@angular/build:unit-test",
           "options": {
-            "polyfills": [
-              "zone.js",
-              "zone.js/testing"
-            ],
             "tsConfig": "tsconfig.spec.json",
-            "styles": [
-              "src/styles.css"
-            ],
-            "scripts": []
+            "buildTarget": ":build:testing",
+            "runner": "vitest"
+          },
+          "configurations": {
+            "coverage": {
+              "coverage": true,
+              "coverageReporters": ["text-summary", "lcovonly", "html"],
+              "coverageInclude": ["src/app/**/*.ts"],
+              "coverageExclude": [
+                "src/app/api/**",
+                "src/**/*.spec.ts",
+                "src/main.ts",
+                "src/app/app.config.ts",
+                "src/app/app.routes.ts"
+              ],
+              "coverageThresholds": {
+                "statements": 1,
+                "branches": 0,
+                "functions": 1,
+                "lines": 1
+              }
+            }
+          }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html"]
           }
         }
       }
     }
+  },
+  "schematics": {
+    "@schematics/angular:component": {
+      "type": "component"
+    },
+    "@schematics/angular:directive": {
+      "type": "directive"
+    },
+    "@schematics/angular:service": {
+      "type": "service"
+    },
+    "@schematics/angular:guard": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:interceptor": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:module": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:pipe": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:resolver": {
+      "typeSeparator": "."
+    }
+  },
+  "cli": {
+    "schematicCollections": ["angular-eslint"]
   }
 }
