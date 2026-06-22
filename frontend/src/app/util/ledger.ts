@@ -29,7 +29,7 @@ export interface AppendedLedgerPage {
  * @returns the merged entries and the de-duplicated count of rows appended
  */
 export function appendLedgerPage(existing: LedgerEntryDto[], next: LedgerEntryDto[]): AppendedLedgerPage {
-  const seen = new Set(existing.map((entry) => entry.seq));
-  const fresh = next.filter((entry) => !seen.has(entry.seq));
+  const seen = new Set(existing.map((entry) => entry.id));
+  const fresh = next.filter((entry) => !seen.has(entry.id));
   return { entries: [...existing, ...fresh], appended: fresh.length };
 }

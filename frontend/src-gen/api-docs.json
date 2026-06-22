@@ -3519,9 +3519,9 @@
               "KITTY_ADJUSTMENT"
             ]
           },
-          "seq": {
-            "type": "integer",
-            "format": "int64"
+          "id": {
+            "type": "string",
+            "format": "uuid"
           },
           "createdAt": {
             "type": "string",
@@ -3584,8 +3584,8 @@
           "amountCents",
           "createdAt",
           "createdBy",
+          "id",
           "runningBalanceCents",
-          "seq",
           "type"
         ]
       },
