@@ -47,7 +47,8 @@ class AccountingServiceImpl(
             // only offer undo when there is actually a coffee to remove (a stale stack entry could otherwise
             // mark a zero count cancellable)
             cancellable = count > 0 && coffeeConsumptionService.cancellableIncrement(userId, actingUser) != null,
-            ledger = page(fullLedger, ledgerLimit, ledgerOffset)
+            // the summary is the member-serving view: strip the kitty split so it never reaches a member
+            ledger = page(fullLedger, ledgerLimit, ledgerOffset).map { it.withoutKittyPortion() }
         )
     }
 
@@ -55,10 +56,14 @@ class AccountingServiceImpl(
         userId: UUID,
         limit: Int,
         offset: Int,
-        actingUser: User
+        actingUser: User,
+        includeKittyPortion: Boolean
     ): List<LedgerEntry> {
         val member = requireMayViewMember(userId, actingUser)
-        return page(ledgerDataService.memberLedger(userId, member.loginName), limit, offset)
+        val page = page(ledgerDataService.memberLedger(userId, member.loginName), limit, offset)
+        // the admin-by-id read keeps the kitty split; the member-serving read strips it so the kitty-funded
+        // portion of a split purchase never reaches a member (the balance math is unaffected either way)
+        return if (includeKittyPortion) page else page.map { it.withoutKittyPortion() }
     }
 
     override fun kittyBalanceCents(): Long = ledgerDataService.kittyLedger().lastOrNull()?.runningBalanceCents ?: 0L
@@ -74,12 +79,31 @@ class AccountingServiceImpl(
 
     override fun allBalances(actingUser: User): List<MemberBalance> {
         requireAdmin(actingUser)
-        return userDataService.getAll().map { user ->
-            val balance =
-                ledgerDataService.memberLedger(user.persistedId, user.loginName).lastOrNull()?.runningBalanceCents ?: 0L
-            MemberBalance(user, coffeeConsumptionDataService.getByUserId(user.persistedId).count, balance)
-        }
+        // sort by login name so the per-member overview keeps a stable, human-readable order; a mutation
+        // (a deactivation, a token rotation) must never reshuffle the admin's overview
+        return userDataService
+            .getAll()
+            .sortedBy { it.loginName }
+            .map { user ->
+                val balance =
+                    ledgerDataService
+                        .memberLedger(user.persistedId, user.loginName)
+                        .lastOrNull()
+                        ?.runningBalanceCents ?: 0L
+                MemberBalance(user, coffeeConsumptionDataService.getByUserId(user.persistedId).count, balance)
+            }
     }
+
+    /**
+     * Strips both portions of a split expense from a ledger entry (the member-serving views): the split is
+     * admin-only and must never reach a member. A no-op for an entry that carries none.
+     */
+    private fun LedgerEntry.withoutKittyPortion(): LedgerEntry =
+        if (kittyAmountCents == null && privateAmountCents == null) {
+            this
+        } else {
+            copy(privateAmountCents = null, kittyAmountCents = null)
+        }
 
     /** Reverses the oldest-first ledger to newest-first and returns the requested page. */
     private fun page(

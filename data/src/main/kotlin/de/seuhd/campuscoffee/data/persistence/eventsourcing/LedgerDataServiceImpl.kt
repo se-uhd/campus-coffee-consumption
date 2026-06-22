@@ -23,6 +23,19 @@ private fun intBody(
     key: String
 ): Int? = (event.body?.get(key) as? Number)?.toInt()
 
+/**
+ * The (private, kitty) portions of a split bean purchase, for the admin ledger breakdown, or `(null, null)`
+ * when there is no split to show — a DELETE (which only reverses a balance) or an expense with no kitty
+ * portion (a fully-private purchase). The two are surfaced together so both admin views (the member ledger's
+ * PRIVATE_EXPENSE row and the kitty ledger's KITTY_EXPENSE row) render the same `private + kitty` split.
+ */
+private fun splitPortions(event: EventEntity): Pair<Long?, Long?> {
+    if (event.changeType == ChangeType.DELETE || (intBody(event, "kittyAmountCents") ?: 0) <= 0) {
+        return null to null
+    }
+    return (intBody(event, "privateAmountCents") ?: 0).toLong() to (intBody(event, "kittyAmountCents") ?: 0).toLong()
+}
+
 /** Reads a required UUID field from an event body. */
 private fun uuidBody(
     event: EventEntity,
@@ -179,6 +192,12 @@ private class MemberWalk(
                 entry(event, LedgerEntryType.CONSUMPTION, -price.toLong(), count = count, delta = delta)
             }
             byOwner && delta == -1 -> {
+                // an owner -1 undoes one of the member's own +1s and normally pops its exact stacked price.
+                // A missing one is reachable (e.g. dev fixtures seed coffees as the "system" actor, so an
+                // owner undo of one finds no own increment on the stack), so credit the price in effect at the
+                // undo's append position rather than failing the whole ledger read. An undo lands within the
+                // short grace window of its increment, so the as-of price equals the increment price in
+                // practice; this only differs in the contrived case the exact increment is genuinely absent.
                 val price = incrementPrices.removeLastOrNull() ?: priceAsOf(seq, prices)
                 entry(event, LedgerEntryType.CONSUMPTION_CANCEL, price.toLong(), count = count, delta = delta)
             }
@@ -216,11 +235,18 @@ private class MemberWalk(
         if (effect == 0) {
             return null
         }
+        // carry both portions of a split purchase so the admin ledger can break it down (the member-serving
+        // read path nulls them before they leave the domain — see AccountingServiceImpl). The two are present
+        // together only when there is a real kitty split; a DELETE reverses the balance and exposes none, and
+        // a fully-private expense leaves both null.
+        val (privatePortion, kittyPortion) = splitPortions(event)
         return entry(
             event,
             LedgerEntryType.PRIVATE_EXPENSE,
             effect.toLong(),
-            weightGrams = intBody(event, "weightGrams")
+            weightGrams = intBody(event, "weightGrams"),
+            privateAmountCents = privatePortion,
+            kittyAmountCents = kittyPortion
         )
     }
 
@@ -248,7 +274,9 @@ private class MemberWalk(
         amountCents: Long,
         count: Int? = null,
         delta: Int? = null,
-        weightGrams: Int? = null
+        weightGrams: Int? = null,
+        privateAmountCents: Long? = null,
+        kittyAmountCents: Long? = null
     ) = LedgerEntry(
         type = type,
         seq = seqOf(event),
@@ -259,7 +287,9 @@ private class MemberWalk(
         runningBalanceCents = 0,
         count = count,
         delta = delta,
-        weightGrams = weightGrams
+        weightGrams = weightGrams,
+        privateAmountCents = privateAmountCents,
+        kittyAmountCents = kittyAmountCents
     )
 }
 
@@ -337,14 +367,26 @@ private class KittyWalk {
         if (effect == 0) {
             return null
         }
-        return entry(event, LedgerEntryType.KITTY_EXPENSE, effect.toLong(), weightGrams = intBody(event, "weightGrams"))
+        // carry both portions so the admin kitty ledger renders the same `private + kitty` split as the member
+        // ledger's expense row; a DELETE only reverses the kitty draw and exposes none.
+        val (privatePortion, kittyPortion) = splitPortions(event)
+        return entry(
+            event,
+            LedgerEntryType.KITTY_EXPENSE,
+            effect.toLong(),
+            weightGrams = intBody(event, "weightGrams"),
+            privateAmountCents = privatePortion,
+            kittyAmountCents = kittyPortion
+        )
     }
 
     private fun entry(
         event: EventEntity,
         type: LedgerEntryType,
         amountCents: Long,
-        weightGrams: Int? = null
+        weightGrams: Int? = null,
+        privateAmountCents: Long? = null,
+        kittyAmountCents: Long? = null
     ) = LedgerEntry(
         type = type,
         seq = seqOf(event),
@@ -353,6 +395,8 @@ private class KittyWalk {
         note = event.note,
         amountCents = amountCents,
         runningBalanceCents = 0,
-        weightGrams = weightGrams
+        weightGrams = weightGrams,
+        privateAmountCents = privateAmountCents,
+        kittyAmountCents = kittyAmountCents
     )
 }

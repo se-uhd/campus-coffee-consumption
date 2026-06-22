@@ -1,0 +1,37 @@
+# Qodana configuration for the Angular SPA — the JS/TS counterpart to the backend's root qodana.yaml.
+# It runs the WebStorm/IntelliJ JavaScript inspection engine headlessly so CI catches the idiomatic
+# TypeScript/Angular issues that live in the IDE inspections, complementing (not replacing) the fast
+# ESLint + Stylelint gate that `npm run lint` (and the Gradle `frontendLint` task) runs.
+#
+# The CI job is the `qodana-frontend` job in .github/workflows/qodana.yml. Locally:
+# `qodana scan --project-dir frontend` (needs the Qodana CLI and Docker).
+version: "1.0"
+
+# The free JS Community linter, which bundles the JavaScript/TypeScript inspections. Pinned to a release
+# tag (not :latest) so a new linter version cannot silently change the findings on an unrelated commit;
+# bump it deliberately, like the JVM linter pin and the other tool pins in the repository.
+linter: jetbrains/qodana-js:2026.1
+
+# Use the broad `recommended` profile (mirrors the IDE's own default inspection profile), matching the
+# backend scan, rather than the narrower `starter` subset.
+profile:
+  name: qodana.recommended
+
+# --- Enforcement -----------------------------------------------------------------------------------------
+# `failThreshold: 0` makes Qodana a blocking gate, exactly like the backend scan: the job fails if ANY
+# problem is reported. If you later prefer to grandfather a batch of findings, commit a baseline (run the
+# job, download the `qodana-sarif-frontend` artifact, commit its `qodana.sarif.json` as
+# `frontend/qodana.sarif.baseline`, and pass `--baseline` in the workflow).
+failThreshold: 0
+
+# --- Scope -----------------------------------------------------------------------------------------------
+# Skip generated/build artifacts, the locked dependencies, and the generated Material theme palette so the
+# scan only inspects hand-written source.
+exclude:
+  - name: All
+    paths:
+      - dist
+      - node_modules
+      - .angular
+      - out-tsc
+      - src/theme-colors.scss

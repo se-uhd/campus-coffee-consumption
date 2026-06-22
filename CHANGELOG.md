@@ -7,6 +7,156 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-22
+
+A frontend overhaul (Angular 19 to 22, a SE@UHD-branded design system, Karma/Jasmine to Vitest, and a full
+static-analysis and end-to-end-test toolchain), an OpenAPI-driven frontend-DTO codegen, "Both"-sided
+coverage, a routing and admin-landing redesign, a bulk QR ZIP download, dev demo data, a kitty-overdraw
+guard, and admin-deactivation and last-active-admin safeguards. No end-user REST API breaking changes.
+
+### Added
+
+- **Bulk QR ZIP download.** `GET /api/users/qr.zip` (admin) streams a ZIP of every member's QR code as
+  `<loginName>.png`, written and flushed entry by entry (no whole-archive buffering) and capped at 1000
+  members (a warning is logged and the cap bundled beyond that), so a large member set cannot exhaust
+  memory. The admin users page gains a "Download all QR codes" button. The per-member QR PNG now downloads
+  with a `<loginName>.png` filename and a transparent background, so it sits on any wall color.
+- **A frontend design system.** A SE@UHD / Heidelberg brand-red (`#C61826`) Angular Material M3 theme on an
+  8 dp spacing grid, a shared header and balance-summary component, role chips, a paginated members table,
+  and consistent loading / error / snackbar / confirm-dialog UX with field-level form validation. A
+  member's balance reads as a signed `+`/`−` figure.
+- **OpenAPI → frontend-DTO codegen.** `scripts/generate-frontend-dtos.sh` generates the frontend DTOs from
+  the backend OpenAPI spec into `frontend/src/app/api/model/` (hash-skipped: it regenerates only when the
+  spec changes) and is wired into the Gradle build; `frontend/src/app/models.ts` re-exports the generated
+  DTOs, so the frontend and backend contracts cannot drift.
+- **Frontend static analysis.** angular-eslint, Prettier, Stylelint, and Knip (dead-code/dependency
+  detection) are wired into `gradle check` via a `frontendLint` task, and a Qodana JS/TS CI job runs
+  alongside the Kotlin one.
+- **"Both" coverage: frontend unit + e2e coverage, and backend e2e coverage merged into the JaCoCo gate.**
+  Three coverage collectors join the existing in-JVM JaCoCo aggregate. (1) The Angular Vitest unit-test
+  builder now produces a coverage report (`@vitest/coverage-v8`): `npm run test:coverage` writes
+  lcov + HTML + text-summary under `frontend/coverage/` (a low, documented floor, as a single service spec
+  covers ~1%, which guards against a regression to zero, not a real target). (2) The Playwright e2e run collects
+  the SPA's TypeScript coverage the JaCoCo agent can never see: a per-test fixture turns on Chromium V8
+  coverage (`PW_COVERAGE=1`) and a global teardown source-maps it back onto the `.ts` sources with
+  `monocart-coverage-reports`, emitting lcov under `frontend/coverage-e2e/` (~71% of the app TypeScript).
+  (3) The same e2e run also records backend JVM coverage: the new `:coverage:runE2eCoverage` task
+  (`scripts/run-e2e-coverage.sh`) builds a source-mapped SPA + jar, launches it under the JaCoCo agent
+  (`destfile=coverage/build/jacoco/e2e.exec`) on the dev profile against PostgreSQL, waits for
+  `/actuator/health`, drives it with Playwright, and stops it so the agent flushes the exec. The aggregate
+  report and `coverageGate` fold `e2e.exec` in when present (and degrade gracefully to the in-JVM coverage
+  when absent), so the e2e HTTP traffic counts toward the same gate. A new `e2e` CI job (in `build.yml`)
+  runs the whole flow against a PostgreSQL service container and uploads the coverage artifacts; the
+  existing `build` job is unchanged.
+- **A Playwright end-to-end suite** under `frontend/e2e/`, driving the bundled app through the member and
+  admin flows in a real browser.
+- **Kitty-overdraw guard.** Any operation that would drive the kitty balance below zero (an admin expense's
+  kitty portion or a negative kitty adjustment) is now refused with a 409, serialized by a Postgres advisory
+  lock (`KittyLock` port, `PostgresKittyLock` adapter, `pg_advisory_xact_lock`) so two concurrent draws
+  cannot both pass the check and overdraw the fund.
+- **Dev demo data.** A dev-only `DevDemoDataLoader` startup task (active only under the `dev` profile, so the
+  tests are untouched) seeds about nine extra demo members (a mix of roles and active states) and an initial
+  kitty float, and also enriches **every existing fixture user** (the admin `jane_doe` included) with varied
+  consumption, bean-purchase, and deposit history, so the dev app comes up with enough members to paginate
+  (5 per page) and with non-empty ledger and change-log views for almost everyone. Two members are
+  deliberately left empty to demo the empty state: a freshly created active member `new_user` (no history)
+  and the inactive demo member `hannes_schulz`. It stays `@Profile("dev")`, so the tests still see exactly
+  the five-member fixture set. Deterministic and idempotent: it runs after the dev fixture reset+reseed and
+  the price seed.
+- **Dev `reset-on-startup`.** A `campus-coffee.fixtures.reset-on-startup` flag (on in the dev profile) that
+  clears and reseeds the fixtures (and the demo data) on every dev start, so each restart returns to the
+  same deterministic state.
+- **`GET /api/price` (admin).** Read the current global price per cup directly (admin only); members keep
+  receiving the price through their landing summary, so this is an admin-side convenience read alongside
+  `PUT /api/price` and `GET /api/price/history`.
+- **Kitty history shows the expense split.** A `KITTY_EXPENSE` row in the admin kitty ledger now carries both
+  the member-funded (`privateAmountCents`) and kitty-funded (`kittyAmountCents`) portions of a split bean
+  purchase, so the kitty history renders the same `person private + savings kitty` footer the member ledger's
+  expense row already showed. The member-serving read still strips both portions, so a member never sees the
+  split. The `LedgerEntryDto` gains a `privateAmountCents` field.
+- **Last-active-admin guard.** Deactivating, demoting, or deleting the last active admin is now refused
+  (409), so an admin can no longer lock every admin out of the system. A deactivated admin also loses admin
+  access immediately, consistent with a deactivated member losing self-service mutations.
+- **npm/frontend dependency updates.** Dependabot now also tracks the frontend's npm dependencies.
+
+### Changed
+
+- **Frontend upgraded to Angular 22 (from 19)**, Angular Material 22, and TypeScript 6, adopting the Angular
+  22 idioms (signal `input()` / `output()`, `computed`, `@defer`, `@let`, `afterNextRender`, `DestroyRef`,
+  `viewChild`) while keeping constructor dependency injection.
+- **Unit testing moved from Karma/Jasmine to Vitest** (`npm test` and `npm run test:coverage` now run
+  Vitest).
+- **Node upgraded to 24 (from 22)** in `mise.toml`.
+- **Money is shown in English format** (a period decimal separator with the `€` after the amount), and a
+  member's balance is a signed `+`/`−` figure, dropping the "settled / owes / credit" wording.
+- **Member-facing terminology.** A member's payment-in is called a "Deposit" (not a settlement/payment), the
+  ledger filter reads "Cups / Expenses / Deposits", and the kitty is shown as "Kitty balance" vs
+  "Kitty history".
+- **Stable user-list ordering.** The admin user list (`GET /api/users`) and the per-member overview
+  (`GET /api/users/overview`) are now ordered by login name ascending, so deactivating a member or rotating a
+  capability token no longer reshuffles the rows (Postgres otherwise returns an updated row in a different
+  physical position).
+- **Paged reads reject out-of-range `limit`/`offset` with 400.** The paged endpoints (`/summary`, `/ledger`,
+  `/kitty/ledger`, the admin per-member ledger and consumption) now validate `limit` (`1..100`) and `offset`
+  (`>= 0`) with bean validation, so an out-of-range value is a clean 400 rather than a silent clamp.
+- **Money amounts are bounded.** The settlement, kitty-adjustment, price, and expense request bodies now cap
+  each amount at 100,000 EUR (the adjustment on both sides) as a fat-finger guardrail, rejecting an absurd
+  amount with a 400.
+- **SPA routing.** The member capability URL is now `/login/{token}` (was `/coffee/{token}`), with the
+  member profile at `/login/{token}/profile`. The admin UI is consolidated under `/admin/`: the login form
+  moves to `/admin/login` (was `/login`), the landing/dashboard to `/admin` (was the root empty path), and
+  the admin profile to `/admin/profile` (was `/profile`); the members, price, expenses, and kitty pages stay
+  at `/admin/users`, `/admin/price`, `/admin/expenses`, and `/admin/kitty`. The root path and any unknown
+  route redirect to `/admin`.
+- **Admin landing redesigned to mirror the member view**, and the all-members overview moved into the
+  member-management page (`/admin/users`): the admin landing now presents the same balance-summary and
+  ledger view a member sees, while the per-member overview (counts and balances) renders alongside the
+  members table in `/admin/users` rather than on the landing.
+- **Admin 401 redirects to `/admin/login`.** An admin API call that comes back `401` (an expired or missing
+  JWT) now sends the SPA to `/admin/login` rather than failing in place.
+- **Tidied admin price and kitty copy.** The price page heading reads "Current price per cup" (the redundant
+  "per cup" caption under the value is gone); the kitty page drops the "currently in the communal pot"
+  caption under the balance; and the deposit form's blurb is reworded from "A member paid money into the
+  fund; this credits their balance." to plainer wording.
+- **README "Seeded fixtures" → "Test fixtures."**
+
+### Fixed
+
+- **Kitty-overdraw TOCTOU race.** The kitty-balance check and the write are now serialized by a Postgres
+  advisory lock, so two concurrent draws can no longer both read a sufficient balance and overdraw the
+  kitty.
+- **Member-profile deep-link / refresh 401.** Opening or refreshing a member-profile URL directly now
+  registers the capability token from the route, so the page no longer 401s on a deep link.
+- **Dev demo-loader startup crash.** The demo loader seeded coffees onto members it had created inactive,
+  which the domain rejected; demo members are now created active, given their history, and deactivated last.
+- **Price-history `@for` crash.** The price-history list `@for` lacked a `track`, triggering NG0955; it now
+  tracks `$index`.
+- **Member-switch stale-response race.** Switching the selected member no longer renders a late response
+  from the previously selected one.
+- **Load-more boundary duplication.** Paging the ledger/change log no longer duplicates the boundary row; the
+  walk de-duplicates by `seq`.
+- **Idempotent initial-price seeding.** When two instances seed the global price singleton at once, the loser
+  (which hits the `uq_coffee_prices_singleton` guard) now re-reads and returns the price the winner seeded
+  instead of surfacing a 500.
+- **Graceful ledger undo-valuation fallback.** The unified-ledger walk no longer fails outright when an
+  owner undo cannot be matched to a stacked increment price; it falls back gracefully rather than erroring
+  the whole ledger read.
+- **QR filename sanitization.** The login name in a QR PNG's `Content-Disposition` filename and ZIP entry
+  name is now whitelisted to `[A-Za-z0-9_-]` (other characters replaced), so download/archive safety no
+  longer depends on the upstream login-name validation staying strict.
+- **Backend OpenAPI required-but-nullable schema bug.** An `OpenApiCustomizer` corrects the generated spec so
+  required fields are no longer also marked nullable, which kept the frontend-DTO codegen honest.
+- **AI-slop prose cleanup** across the docs, UI copy, and KDoc, with consistent American spelling.
+- **Frontend state and error hardening.** The selected member is reset on logout (so a stale selection no
+  longer carries into the next admin session), an error on member-switch is now surfaced instead of being
+  swallowed, and the capability URL is preserved across a member-profile reload so a deep-linked profile no
+  longer drops the token.
+- **Ledger and balance figures keep a constant size regardless of sign.** The `.warn` styling (red for a
+  negative amount) carried a smaller font-size meant for inline messages, which leaked into the figures: a
+  coffee/expense cost (negative) rendered smaller than a positive deposit in the ledger list, and the
+  personal balance shrank when it went negative. Both figures are now pinned to a fixed size so only the
+  color changes with the sign, making the cost amount consistent across every ledger and kitty-history row.
+
 ## [0.2.0] - 2026-06-21
 
 A communal-fund accounting model on top of the consumption tracker: a price per cup, member-recorded bean
@@ -21,7 +171,7 @@ machinery. See `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`
   (admin); the current price reaches members through their landing summary. Seeded at 50 cents on first
   startup (`campus-coffee.price.initial-cents`).
 - **Bean-purchase expenses** (`Expense`), event-sourced. A member records their own purchase
-  (`POST /api/expenses`), always booked 100% from their own pocket — the buyer and split are server-derived,
+  (`POST /api/expenses`), always booked 100% from their own pocket: the buyer and split are server-derived,
   so a member cannot attribute a purchase to someone else or fund it from the kitty. An admin lists,
   records, corrects, and deletes a member's purchases with an explicit kitty/private split and buyer
   attribution (`GET`/`POST`/`PUT`/`DELETE /api/users/{id}/expenses`); the split must sum to the total, and
@@ -31,7 +181,7 @@ machinery. See `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`
   alone (an initial float or a correction). Endpoints: `POST /api/payments/settlement`,
   `POST /api/payments/adjustment`, `GET /api/kitty/ledger` (admin). Members see only the kitty *balance*,
   in their summary.
-- **Per-member balance** (a prepaid-card figure — negative means the member owes the fund), valuing each cup
+- **Per-member balance** (a prepaid-card figure: negative means the member owes the fund), valuing each cup
   at the price in effect when it was consumed. The valuation is an "as-of" join over the event log keyed on
   append order (`seq`), not on a wall-clock timestamp.
 - **Unified ledger** per member (`GET /api/ledger`, and the landing `GET /api/summary`): one chronological
@@ -61,7 +211,7 @@ machinery. See `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`
 ### Added
 
 - Qodana CI job (`.github/workflows/qodana.yml`), a separate workflow from the Gradle build that runs
-  JetBrains Qodana — the free JVM Community linter with the `qodana.recommended` profile — to catch the
+  JetBrains Qodana (the free JVM Community linter with the `qodana.recommended` profile) to catch the
   idiomatic-Kotlin issues the IDE's default inspections flag but ktlint and detekt do not. It opens the
   project with JDK 25, fails on any problem (`failThreshold: 0`), uploads the report as a `qodana-sarif`
   artifact, and suppresses two systematic false positives for this project: `UnusedSymbol` (the Community
@@ -79,8 +229,8 @@ machinery. See `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`
   `version` in `gradle.properties` is the single source of truth, and the latest changelog release header
   must match it (enforced by `scripts/check-version-sync.sh`).
 - Flatten the `de.seuhd.campuscoffee.domain.model.objects` package into `de.seuhd.campuscoffee.domain.model`.
-  The `objects` subpackage was vestigial — the counterpart of the upstream CampusCoffee `model.enums`
-  subpackage, which this project dropped — so the domain model objects now live directly in `domain.model`.
+  The `objects` subpackage was vestigial (the counterpart of the upstream CampusCoffee `model.enums`
+  subpackage, which this project dropped), so the domain model objects now live directly in `domain.model`.
 - Apply idiomatic-Kotlin cleanups in the test sources: reified `returnResult<T>()` instead of
   `returnResult(T::class.java)`, and trailing lambdas instead of a redundant SAM constructor and a
   parenthesized lambda argument.
@@ -134,6 +284,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.3.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.3.0
 [0.2.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.2.0
 [0.1.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.1.1
 [0.1.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.1.0

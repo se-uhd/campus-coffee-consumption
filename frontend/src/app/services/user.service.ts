@@ -53,4 +53,9 @@ export class UserService {
   qrBlob(id: string): Promise<Blob> {
     return firstValueFrom(this.http.get(`/api/users/${id}/qr.png`, { responseType: 'blob' }));
   }
+
+  /** A ZIP archive of every member's QR code as a blob (each entry named `<loginName>.png`). */
+  qrZipBlob(): Promise<Blob> {
+    return firstValueFrom(this.http.get('/api/users/qr.zip', { responseType: 'blob' }));
+  }
 }

@@ -1,6 +1,6 @@
 [tools]
 java = 'temurin-25'
 gradle = '9.5'
-node = '22' # builds the Angular frontend (the Gradle node integration uses this node)
+node = '24' # builds the Angular frontend (the Gradle node integration uses this node); Angular 22 requires Node >= 22.22.3 / >= 24.15.0
 gcloud = 'latest'
 python = '3.13' # required by some gcloud components

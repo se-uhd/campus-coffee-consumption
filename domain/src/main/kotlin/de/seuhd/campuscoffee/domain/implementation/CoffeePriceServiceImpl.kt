@@ -9,6 +9,7 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeePriceDataService
 import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -37,13 +38,32 @@ class CoffeePriceServiceImpl(
             throw ValidationException("The coffee price cannot be negative.")
         }
         val current = coffeePriceDataService.findCurrent()
-        val toSave = current?.copy(amountCents = amountCents) ?: CoffeePrice(amountCents = amountCents)
-        return coffeePriceDataService.upsert(toSave)
+        // An existing row is updated in place; the first write inserts the singleton. Two concurrent first
+        // writes would both miss the existing row and both try to insert, so the loser hits the
+        // uq_coffee_prices_singleton guard — handle that the same way ensureInitialPrice does (re-read the
+        // winner's just-committed row and update it to the requested amount) rather than 500.
+        if (current != null) {
+            return coffeePriceDataService.upsert(current.copy(amountCents = amountCents))
+        }
+        return try {
+            coffeePriceDataService.upsert(CoffeePrice(amountCents = amountCents))
+        } catch (_: DataIntegrityViolationException) {
+            val winner = currentOrThrow()
+            coffeePriceDataService.upsert(winner.copy(amountCents = amountCents))
+        }
     }
 
     @Transactional
-    override fun ensureInitialPrice(amountCents: Int): CoffeePrice =
-        coffeePriceDataService.findCurrent() ?: coffeePriceDataService.upsert(CoffeePrice(amountCents = amountCents))
+    override fun ensureInitialPrice(amountCents: Int): CoffeePrice {
+        coffeePriceDataService.findCurrent()?.let { return it }
+        return try {
+            coffeePriceDataService.upsert(CoffeePrice(amountCents = amountCents))
+        } catch (_: DataIntegrityViolationException) {
+            // two instances seeding the singleton at once: the loser hits the uq_coffee_prices_singleton
+            // guard. The winner's row is already committed, so re-read and return that rather than fail.
+            currentOrThrow()
+        }
+    }
 
     override fun priceHistory(actingUser: User): List<PriceChange> {
         requireAdmin(actingUser)
@@ -52,6 +72,15 @@ class CoffeePriceServiceImpl(
     }
 
     override fun clear() = coffeePriceDataService.clear()
+
+    /**
+     * Re-reads the current price after a singleton-uniqueness conflict, when the winning concurrent write
+     * has already committed the row. The row must exist by then, so its absence is unreachable.
+     */
+    private fun currentOrThrow(): CoffeePrice =
+        requireNotNull(coffeePriceDataService.findCurrent()) {
+            "The price singleton insert was rejected but no price exists; this should be unreachable."
+        }
 
     /** Requires [actingUser] to be an admin, else 403. */
     private fun requireAdmin(actingUser: User) {

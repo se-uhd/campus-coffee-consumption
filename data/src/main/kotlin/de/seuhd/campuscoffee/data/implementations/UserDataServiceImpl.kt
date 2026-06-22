@@ -43,6 +43,13 @@ class UserDataServiceImpl(
     ),
     UserDataService {
     /**
+     * Returns all users in a stable order (by login name ascending). Overrides the base, which uses the
+     * repository's default (physically ordered) `findAll`, so that a mutation such as a deactivation or a
+     * capability-token rotation never reshuffles the admin user list.
+     */
+    override fun getAll(): List<User> = repository.findAllByOrderByLoginNameAsc().map { mapper.fromEntity(it) }
+
+    /**
      * Retrieves a user by their unique login name.
      *
      * @throws NotFoundException if no user exists with the given login name

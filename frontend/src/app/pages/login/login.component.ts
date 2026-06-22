@@ -1,25 +1,47 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
+import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 
 /** Admin login page: username + password exchanged for a JWT, then redirect to the admin landing. */
 @Component({
   selector: 'cc-login',
-  imports: [FormsModule, MatCardModule, MatFormFieldModule, MatInputModule, MatButtonModule],
+  imports: [
+    FormsModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    MatProgressSpinnerModule,
+    AppHeaderComponent
+  ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
+    <cc-app-header [home]="'/admin'"></cc-app-header>
+
     <div class="page">
-      <h1>SE&#64;UHD Coffee</h1>
       <mat-card class="card">
-        <h2>Admin login</h2>
-        <form (ngSubmit)="submit()">
+        <h2>Admin sign-in</h2>
+        <form #form="ngForm" (ngSubmit)="submit()">
           <mat-form-field class="full-width">
             <mat-label>Login name</mat-label>
-            <input matInput name="loginName" [(ngModel)]="loginName" autocomplete="username" required />
+            <input
+              matInput
+              name="loginName"
+              #loginNameModel="ngModel"
+              [(ngModel)]="loginName"
+              autocomplete="username"
+              required
+            />
+            @if (loginNameModel.invalid && loginNameModel.touched) {
+              <mat-error>Enter your login name.</mat-error>
+            }
           </mat-form-field>
           <mat-form-field class="full-width">
             <mat-label>Password</mat-label>
@@ -27,18 +49,31 @@ import { AuthService } from '../../services/auth.service';
               matInput
               type="password"
               name="password"
+              #passwordModel="ngModel"
               [(ngModel)]="password"
               autocomplete="current-password"
               required
             />
+            @if (passwordModel.invalid && passwordModel.touched) {
+              <mat-error>Enter your password.</mat-error>
+            }
           </mat-form-field>
-          <button mat-flat-button color="primary" type="submit" [disabled]="loading">Sign in</button>
+          <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || loading">
+            @if (loading) {
+              <mat-spinner diameter="20"></mat-spinner>
+            } @else {
+              Sign in
+            }
+          </button>
           @if (error) {
             <p class="warn">{{ error }}</p>
           }
         </form>
       </mat-card>
-      <p class="muted">Members do not log in here: scan your wall QR code to open your coffee link.</p>
+      <p class="muted">
+        Members don't sign in here. Open your personal link to record coffee consumption and check your
+        balance. The link itself is your credential.
+      </p>
     </div>
   `
 })
@@ -59,7 +94,7 @@ export class LoginComponent {
     this.error = '';
     try {
       await this.auth.login(this.loginName, this.password);
-      await this.router.navigate(['/']);
+      await this.router.navigate(['/admin']);
     } catch {
       this.error = 'Login failed. Check your credentials.';
     } finally {

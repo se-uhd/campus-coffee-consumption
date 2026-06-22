@@ -35,7 +35,16 @@ enum class LedgerEntryType {
  * balance after this entry (computed by walking the stream oldest-first). Both are `Long` so a large admin
  * override (count × price) cannot overflow. [seq] is the event's append order; [createdAt]/[createdBy]/[note]
  * are the event metadata. The remaining fields are populated only where they apply: [count]/[delta] for a
- * consumption entry, [weightGrams] for an expense entry.
+ * consumption entry, [weightGrams] for an expense entry, and [privateAmountCents]/[kittyAmountCents] for an
+ * admin-split expense (its two portions, shown only on the admin views — see below).
+ *
+ * [privateAmountCents] and [kittyAmountCents] are the member-funded and kitty-funded portions of a split
+ * bean purchase. They are present together, only on an expense that an admin split between the member and the
+ * kitty — a [LedgerEntryType.PRIVATE_EXPENSE] on the member ledger and a [LedgerEntryType.KITTY_EXPENSE] on
+ * the kitty ledger both carry the same two portions — and both are null for an unsplit expense (fully private
+ * or fully kitty) and every non-expense entry. They are for the **admin** views only: the split must never
+ * reach a member, so the member-serving read path nulls both (a member's purchases read as 100% private).
+ * They never touch [amountCents]/[runningBalanceCents], which stay the entry's own signed effect alone.
  */
 data class LedgerEntry(
     val type: LedgerEntryType,
@@ -47,5 +56,7 @@ data class LedgerEntry(
     val runningBalanceCents: Long,
     val count: Int? = null,
     val delta: Int? = null,
-    val weightGrams: Int? = null
+    val weightGrams: Int? = null,
+    val privateAmountCents: Long? = null,
+    val kittyAmountCents: Long? = null
 )

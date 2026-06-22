@@ -1,7 +1,7 @@
-# Dependabot keeps the GitHub Actions, Gradle (Kotlin/Java) dependencies, and the Dockerfile base
-# images current. Most versions live in the gradle/libs.versions.toml catalog, which the gradle
-# ecosystem updates (BOM-managed dependencies without an explicit version follow the Spring Boot BOM
-# and are not bumped here).
+# Dependabot keeps the GitHub Actions, Gradle (Kotlin/Java) dependencies, the frontend npm dependencies,
+# and the Dockerfile base images current. Most backend versions live in the gradle/libs.versions.toml
+# catalog, which the gradle ecosystem updates (BOM-managed dependencies without an explicit version
+# follow the Spring Boot BOM and are not bumped here); the frontend versions live in frontend/package.json.
 # Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
 version: 2
 updates:
@@ -28,6 +28,17 @@ updates:
     groups:
       # Bundle minor and patch bumps into one PR; major upgrades get their own PR for careful review.
       gradle-minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  # Frontend npm dependencies (the Angular SPA in frontend/). The Angular packages move together each
+  # release, so a major (e.g. an Angular major) gets its own PR while minor/patch bumps are batched.
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      npm-minor-and-patch:
         update-types: ["minor", "patch"]
 
   # Dockerfile base images. Only the build-stage jdxcode/mise image is bumped here; its version is the

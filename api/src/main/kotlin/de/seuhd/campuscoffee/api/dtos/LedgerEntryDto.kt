@@ -8,7 +8,10 @@ import java.time.LocalDateTime
  * Response DTO for one row of a unified ledger (a member's or the kitty's). [type] discriminates the row;
  * [amountCents] is its signed effect on the balance and [runningBalanceCents] the balance after it (euro
  * cents). [count]/[delta] are present only for a consumption row and [weightGrams] only for an expense row,
- * so they are omitted when absent.
+ * so they are omitted when absent. [privateAmountCents]/[kittyAmountCents] are present together only on the
+ * **admin** views of a split bean purchase (its member-funded and kitty-funded portions): both the member
+ * ledger's PRIVATE_EXPENSE row and the kitty ledger's KITTY_EXPENSE row carry them. The member-serving read
+ * strips both, so a member never sees the split (their purchases read as 100% private).
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class LedgerEntryDto(
@@ -21,5 +24,7 @@ data class LedgerEntryDto(
     val runningBalanceCents: Long,
     val count: Int? = null,
     val delta: Int? = null,
-    val weightGrams: Int? = null
+    val weightGrams: Int? = null,
+    val privateAmountCents: Long? = null,
+    val kittyAmountCents: Long? = null
 )

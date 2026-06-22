@@ -96,6 +96,27 @@ class AccountingEventLogSystemTests : AbstractSystemTest() {
     }
 
     @Test
+    fun `an admin count correction appends a CoffeeConsumption event carrying the note and the admin login`() {
+        val reason = "manual correction: spilled a pot"
+        client()
+            .put()
+            .uri("/api/users/{id}/consumption", seededUser(member).persistedId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(mapOf("total" to 3, "note" to reason))
+            .withAdmin()
+            .exchange()
+
+        // the latest consumption event (the correction) carries the note in the raw events.note column
+        // (not the full-state body) and the acting admin's login in created_by
+        val latest = eventsOf("CoffeeConsumption").last()
+        assertThat((latest.body["count"] as Number).toInt()).isEqualTo(3)
+        assertThat(latest.note).isEqualTo(reason)
+        assertThat(latest.createdBy).isEqualTo("jane_doe")
+        // the note is an event-row column, never part of the full-state JSON body
+        assertThat(latest.body).doesNotContainKey("note")
+    }
+
+    @Test
     fun `a settlement appends a Payment event with the member and amount and the admin login`() {
         client()
             .post()

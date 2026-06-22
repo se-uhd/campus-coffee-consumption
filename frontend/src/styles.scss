@@ -1,0 +1,377 @@
+// Global, mobile-first styles for the SE@UHD coffee fund.
+//
+// The Material theme is a custom M3 theme built around the official Universität Heidelberg house color
+// (Pantone 1805 C / RAL 3000 — brand red #C61826). The tonal palettes in `theme-colors.scss` were generated
+// by `ng generate @angular/material:theme-color --primary-color "#C61826"`; this file turns them into a
+// theme and applies it. The app stays on the system-ui font stack (no web font).
+
+@use '@angular/material' as mat;
+@use './theme-colors' as brand;
+
+// ---------------------------------------------------------------------------
+// Material M3 theme
+// ---------------------------------------------------------------------------
+
+// `use-system-variables: true` makes every component token reference a `--mat-sys-*` CSS variable instead
+// of baking a hex literal, so the whole palette is steerable from one place at runtime — that is how the
+// brand red and the white-card / sand-fond overrides below take effect everywhere.
+$cc-theme: mat.define-theme(
+  (
+    color: (
+      theme-type: light,
+      primary: brand.$primary-palette,
+      tertiary: brand.$tertiary-palette,
+      use-system-variables: true,
+      system-variables-prefix: sys
+    ),
+    typography: (
+      use-system-variables: true,
+      system-variables-prefix: sys
+    ),
+    density: (
+      scale: 0
+    )
+  )
+);
+
+:root {
+  // Brand constants. The generated tonal palette rounds the seed to #bd0e21; we pin the system tokens to
+  // the exact house red below so every primary control is true #C61826.
+  --cc-brand: #c61826; // Pantone 1805 C / RAL 3000 — official Universität Heidelberg house red
+  --cc-brand-dark: #590d08; // seal-border "Ochsenblut" — hover / pressed / emphasis
+  --cc-sand: #f4f1ea; // page background ("Sand")
+  --cc-surface: #fff; // cards stay white
+  --cc-ink: #1f1f1f; // near-black body text
+  --cc-ink-muted: #5f5b57; // secondary text
+  --cc-hairline: #e7e2d8; // subtle borders on the sand background
+
+  // The brand "Ochsenblut" shadow tint, as an `r, g, b` triplet so callers vary only the alpha. Used by
+  // the card and header elevations below; one source of truth instead of a hardcoded `rgba(89, 13, 8, …)`.
+  --cc-shadow-rgb: 89, 13, 8;
+
+  // Emit the `--mat-sys-*` palette the components reference, then the component themes that consume it.
+  @include mat.system-level-colors($cc-theme);
+  @include mat.system-level-typography($cc-theme);
+  @include mat.all-component-themes($cc-theme);
+  @include mat.typography-hierarchy($cc-theme);
+  @include mat.elevation-classes();
+
+  // Brand the M3 system tokens: exact house red for primary, a clean white card surface on the sand fond,
+  // and the native system-ui type. `& {}` opts into the CSS-correct cascade so these win without a warning.
+  & {
+    --mat-sys-primary: var(--cc-brand);
+    --mat-sys-on-primary: #fff;
+    --mat-sys-primary-container: #ffdad7;
+    --mat-sys-on-primary-container: #410004;
+    --mat-sys-background: var(--cc-sand);
+    --mat-sys-on-background: var(--cc-ink);
+    --mat-sys-surface: var(--cc-surface);
+    --mat-sys-surface-container-lowest: var(--cc-surface);
+    --mat-sys-surface-container-low: var(--cc-surface);
+    --mat-sys-surface-container: var(--cc-surface);
+    --mat-sys-surface-container-high: var(--cc-surface);
+    --mat-sys-surface-container-highest: var(--cc-surface);
+    --mat-sys-on-surface: var(--cc-ink);
+    --mat-sys-on-surface-variant: var(--cc-ink-muted);
+    --mat-sys-outline-variant: var(--cc-hairline);
+
+    // System-ui everywhere (the brand/plain families and the shorthand font tokens Material reads).
+    --mat-sys-brand-font-family:
+      system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --mat-sys-plain-font-family:
+      system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Base elements
+// ---------------------------------------------------------------------------
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  background: var(--cc-sand);
+  color: var(--cc-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+a {
+  color: var(--cc-brand);
+}
+
+// ---------------------------------------------------------------------------
+// Layout: the 8dp spacing grid
+// ---------------------------------------------------------------------------
+
+// The member pages stay narrow and mobile-first (a wall QR sends them here on a phone). On a wide desktop
+// the column is centered on the sand fond so it reads as an intentional card column, not lost in a void.
+.page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+// The admin pages need room to breathe — especially the members table. Same vertical rhythm, more width.
+.page--wide {
+  max-width: 920px;
+  padding: 24px 24px 48px;
+}
+
+// Cards: white surface, 16px padding, consistent radius and a soft elevation. The 16px `gap` on `.page`
+// owns the vertical rhythm between cards, so cards carry no bottom margin of their own.
+.card,
+mat-card.card {
+  background: var(--cc-surface);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px rgb(var(--cc-shadow-rgb), 0.06),
+    0 2px 8px rgb(var(--cc-shadow-rgb), 0.06);
+  padding: 16px;
+  margin: 0;
+}
+
+// Tighten the default mat-card content padding so our own `.card` padding is the single source of truth.
+mat-card.card > .mat-mdc-card-content,
+mat-card.card .mat-mdc-card-content:last-child {
+  padding: 0;
+}
+
+// A horizontal flex row with vertically-centered items and an 8dp gap.
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+// A form row that wraps on narrow screens and shares width evenly (e.g. first/last name side by side).
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.form-row > * {
+  flex: 1 1 180px;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+// Standalone full-width form fields stack with a consistent 8dp inner rhythm.
+.full-width {
+  width: 100%;
+}
+
+// Field rhythm is the single source of truth (not Material's incidental subscript margin): every form field
+// inside a card is a block with a consistent 16px gap to the next element, so stacked inputs sit on the grid.
+.card mat-form-field,
+mat-card.card mat-form-field {
+  display: block;
+  margin-bottom: 16px;
+}
+
+// A field that is the last child of a card (or shares a wrapping `.form-row`, which owns its own gap) needs
+// no trailing margin; the card padding / row gap takes over.
+.card mat-form-field:last-child,
+mat-card.card mat-form-field:last-child,
+.card .form-row mat-form-field,
+mat-card.card .form-row mat-form-field {
+  margin-bottom: 0;
+}
+
+// ---------------------------------------------------------------------------
+// Typography helpers
+// ---------------------------------------------------------------------------
+
+h1,
+h2,
+h3 {
+  color: var(--cc-ink);
+}
+
+// Card section titles: one consistent size, a deliberate 16px rhythm below, no stray top margin
+// (the card padding sets the offset).
+.card h2,
+mat-card.card h2 {
+  margin: 0 0 16px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+// A heading sharing a `.row` with an action carries no margin of its own; the row owns the layout.
+.card .row h2,
+mat-card.card .row h2 {
+  margin: 0;
+}
+
+.card h2:only-child,
+mat-card.card h2:last-child {
+  margin-bottom: 0;
+}
+
+.muted {
+  color: var(--cc-ink-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+// Negative / error text uses the Material error token (#BA1A1A), never the brand red — the brand red is
+// reserved for brand/primary/active accents, so a negative balance no longer clashes with a `color="warn"`
+// destructive button.
+.warn {
+  color: var(--mat-sys-error);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+// A large display figure (the coffee count, a balance, the price).
+.display {
+  font-size: 4rem;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--cc-ink);
+}
+
+.display--md {
+  font-size: 2.5rem;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.break-word {
+  word-break: break-all;
+}
+
+// Visually hidden but available to assistive tech (an empty action column header, a table caption).
+.cc-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// ---------------------------------------------------------------------------
+// Brand accents on Material controls
+// ---------------------------------------------------------------------------
+
+// The centered header title and brand text read in the house red.
+.cc-brand-text {
+  color: var(--cc-brand);
+}
+
+// A small inline chip. The brand-tinted variant marks an ADMIN role with the M3 primary-container tokens;
+// the neutral variant (`.cc-chip--neutral`) marks a plain USER role on the sand surface.
+.cc-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+}
+
+.cc-chip--neutral {
+  background: var(--cc-sand);
+  color: var(--cc-ink-muted);
+}
+
+// Give the primary FAB a clear pressed/hover emphasis in the darker brand tone.
+.mat-mdc-fab.mat-primary:hover {
+  --mat-fab-container-color: var(--cc-brand-dark);
+}
+
+// A neutral FAB for a non-destructive secondary control (the admin −1 step). It is NOT `color="warn"`: the
+// error red is reserved for genuinely destructive actions (delete), so a step-down reads as neutral, not
+// dangerous. A sand surface with the muted-ink glyph and a hairline edge.
+.cc-fab-neutral.mat-mdc-fab {
+  --mat-fab-container-color: var(--cc-sand);
+  --mat-fab-foreground-color: var(--cc-ink-muted);
+
+  border: 1px solid var(--cc-hairline);
+}
+
+.cc-fab-neutral.mat-mdc-fab:hover {
+  --mat-fab-container-color: var(--cc-hairline);
+}
+
+// ---------------------------------------------------------------------------
+// Admin members table
+// ---------------------------------------------------------------------------
+
+.table-scroll {
+  overflow-x: auto;
+  margin: 0 -16px; // bleed to the card edge so the scroll area uses the full card width
+}
+
+table.mat-mdc-table {
+  width: 100%;
+  background: transparent;
+}
+
+// Comfortable, readable row height and aligned cells.
+.mat-mdc-header-cell,
+.mat-mdc-cell {
+  padding: 12px 16px;
+}
+
+.mat-mdc-header-cell {
+  font-weight: 600;
+  color: var(--cc-ink-muted);
+}
+
+// Right-align numeric columns (Cups, Balance) and use tabular figures so they line up.
+.col-numeric.mat-mdc-header-cell,
+.col-numeric.mat-mdc-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.col-actions.mat-mdc-header-cell,
+.col-actions.mat-mdc-cell {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+
+  // breathing room so the preceding right-aligned Balance number does not crowd the action icon
+  padding-left: 16px;
+}
+
+.mat-mdc-paginator {
+  background: transparent;
+}

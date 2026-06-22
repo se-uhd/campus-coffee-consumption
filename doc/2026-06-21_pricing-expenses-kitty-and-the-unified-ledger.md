@@ -1,7 +1,7 @@
 # Pricing, expenses, the kitty, balances, and the unified ledger
 
 This record describes how the consumption tracker grew a small communal-fund accounting model: a price per
-cup, member-recorded bean purchases, a shared kitty, per-member balances, and one unified ledger — all on
+cup, member-recorded bean purchases, a shared kitty, per-member balances, and one unified ledger, all on
 top of the existing event-sourcing architecture, with no change to the machinery that appends an event and
 projects it.
 
@@ -17,7 +17,7 @@ Consumption, purchases, and settlements appear together in one **unified ledger*
 ## The money model
 
 A member's balance is a prepaid-card figure: **negative means they owe the fund**, positive means the fund
-owes them. Topping up raises it; drinking lowers it.
+owes them. A payment or purchase raises it; consuming a coffee lowers it.
 
 | Event | Member balance effect | Kitty effect |
 |---|---|---|
@@ -40,13 +40,13 @@ read-model entity, a relational `*DataServiceImpl`, and a `@Primary` event-sourc
 full-state event and projects it in one transaction.
 
 - **`CoffeePrice`** is a single global row, created once and updated in place. Every change is a full-state
-  event, so the append-only log *is* the price history. There is no fixed sentinel id and no special insert
+  event, so the append-only log is the price history. There is no fixed sentinel id and no special insert
   path. The first price is created through the normal `upsert` (null id) and updated thereafter.
 - **`Expense`** flattens its buyer to a `buyerUserId` in the event body and splits its total into a private
   portion (credits the buyer) and a kitty portion (draws the kitty down). The split must sum to the total,
   validated in the domain service (a 400) and backed by a database CHECK.
 - **`Payment`** flattens its user to a nullable `userId`: present is a settlement (credits the member and
-  feeds the kitty); null is a pure kitty adjustment (the kitty only). Payments are never edited — a mistake
+  feeds the kitty); null is a pure kitty adjustment (the kitty only). Payments are never edited. A mistake
   is corrected with a compensating entry.
 
 A new **`LoggedEntityType`** enum (data layer) is the `events.entity_type` discriminator. Each constant

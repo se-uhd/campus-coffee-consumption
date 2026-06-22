@@ -1,6 +1,6 @@
 # Future feature ideas
 
-A living backlog of ideas not yet built — deliberately **undated**, unlike the dated design records in this
+A running backlog of ideas not yet built, deliberately **undated**, unlike the dated design records in this
 folder (which capture decisions at a point in time). Add ideas freely; move one into a dated design record
 when it is picked up and designed.
 
@@ -10,14 +10,14 @@ When a member records a bean purchase, let them snap a photo of the receipt in t
 (and ideally the weight and date) filled in automatically, so capturing an expense is a tap rather than
 manual entry.
 
-- **Frontend**: a camera/file input on the purchase form (the browser `capture` attribute on mobile);
-  upload the image with the expense.
-- **Backend**: an OCR step (a hosted vision/OCR API, or a small self-hosted model) that extracts the total,
-  and optionally line items, then pre-fills the form for the member to confirm before saving. Keep the
-  human-in-the-loop confirmation — OCR is a convenience, not the source of truth.
-- **Storage**: decide whether to keep the image (object storage + a reference on the expense) or discard it
-  after extraction. Keeping it helps audits but adds a storage and privacy concern.
-- **Open questions**: which OCR provider; whether to store the image; how to handle multi-currency or
+- On the frontend, add a camera/file input on the purchase form (the browser `capture` attribute on
+  mobile) that uploads the image with the expense.
+- On the backend, run an OCR step (a hosted vision/OCR API, or a small self-hosted model) that extracts the
+  total, and optionally line items, then pre-fills the form for the member to confirm before saving. OCR
+  only suggests the values; the member confirms them.
+- For storage, decide whether to keep the image (object storage plus a reference on the expense) or discard
+  it after extraction. Keeping it helps audits but adds a storage and privacy concern.
+- Open questions: which OCR provider, whether to store the image, and how to handle multi-currency or
   non-coffee line items on a shared receipt.
 
 ## Settlement reconciliation / "who owes whom"

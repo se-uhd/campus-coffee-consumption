@@ -69,6 +69,29 @@ class MemberDeletionSystemTests : AbstractSystemTest() {
     }
 
     @Test
+    fun `deleting a member who has an expense returns 409 Conflict`() {
+        val id = createMember("hasexpense")
+        // record a fully-private bean purchase attributed to the member as buyer (their own purchase): the
+        // member now has a financial footprint, so the hard delete is refused
+        client()
+            .post()
+            .uri("/api/users/{id}/expenses", id)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(
+                mapOf(
+                    "weightGrams" to 1000,
+                    "amountCents" to 900,
+                    "privateAmountCents" to 900,
+                    "kittyAmountCents" to 0,
+                    "note" to "own beans"
+                )
+            ).withAdmin()
+            .exchange()
+
+        assertThat(deleteStatus(id)).isEqualTo(409)
+    }
+
+    @Test
     fun `deleting a member who has a settlement returns 409 Conflict`() {
         val id = createMember("hassettlement")
         client()

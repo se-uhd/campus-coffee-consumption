@@ -24,9 +24,7 @@ export class ExpenseService {
 
   /** Corrects an existing bean purchase by id. */
   adminUpdate(userId: string, expenseId: string, request: AdminExpenseRequest): Promise<ExpenseDto> {
-    return firstValueFrom(
-      this.http.put<ExpenseDto>(`/api/users/${userId}/expenses/${expenseId}`, request)
-    );
+    return firstValueFrom(this.http.put<ExpenseDto>(`/api/users/${userId}/expenses/${expenseId}`, request));
   }
 
   /** Deletes a bean purchase by id. */
