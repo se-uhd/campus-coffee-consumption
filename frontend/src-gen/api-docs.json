@@ -13,6 +13,10 @@
   ],
   "tags": [
     {
+      "name": "Admin accounting",
+      "description": "Per-member balances and activity (admin only)."
+    },
+    {
       "name": "Consumption",
       "description": "Adding and undoing a member's own coffees, authenticated by their capability token (X-Coffee-Token)."
     },
@@ -262,12 +266,10 @@
           {
             "name": "limit",
             "in": "query",
-            "description": "Maximum number of changes to return.",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 5,
               "exclusiveMinimum": 0,
               "maximum": 100
             }
@@ -275,12 +277,10 @@
           {
             "name": "offset",
             "in": "query",
-            "description": "Number of changes to skip from the newest (for paging).",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 0,
               "minimum": 0
             }
           }
@@ -2070,7 +2070,7 @@
     "/api/users/{userId}/activity": {
       "get": {
         "tags": [
-          "Users"
+          "Admin accounting"
         ],
         "summary": "Get a page of a member's activity.",
         "operationId": "memberActivity",
@@ -2087,23 +2087,22 @@
           {
             "name": "limit",
             "in": "query",
-            "description": "Maximum number of entries to return.",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 20
+              "exclusiveMinimum": 0,
+              "maximum": 100
             }
           },
           {
             "name": "offset",
             "in": "query",
-            "description": "Number of newest entries to skip.",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 0
+              "minimum": 0
             }
           }
         ],
@@ -2415,7 +2414,7 @@
     "/api/users/overview": {
       "get": {
         "tags": [
-          "Users"
+          "Admin accounting"
         ],
         "summary": "Get every member's current count and balance.",
         "operationId": "overview",
@@ -2618,27 +2617,23 @@
         "operationId": "summary",
         "parameters": [
           {
-            "name": "ledgerLimit",
+            "name": "limit",
             "in": "query",
-            "description": "Number of activity entries on the first page.",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 10,
               "exclusiveMinimum": 0,
               "maximum": 100
             }
           },
           {
-            "name": "ledgerOffset",
+            "name": "offset",
             "in": "query",
-            "description": "Number of newest activity entries to skip.",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 0,
               "minimum": 0
             }
           }
@@ -2864,12 +2859,10 @@
           {
             "name": "limit",
             "in": "query",
-            "description": "Maximum number of history entries to return.",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 50,
               "exclusiveMinimum": 0,
               "maximum": 100
             }
@@ -2877,12 +2870,10 @@
           {
             "name": "offset",
             "in": "query",
-            "description": "Number of newest entries to skip.",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 0,
               "minimum": 0
             }
           }
@@ -2962,12 +2953,10 @@
           {
             "name": "limit",
             "in": "query",
-            "description": "Maximum number of entries to return.",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 20,
               "exclusiveMinimum": 0,
               "maximum": 100
             }
@@ -2975,12 +2964,10 @@
           {
             "name": "offset",
             "in": "query",
-            "description": "Number of newest entries to skip.",
             "required": false,
             "schema": {
               "type": "integer",
               "format": "int32",
-              "default": 0,
               "minimum": 0
             }
           }
