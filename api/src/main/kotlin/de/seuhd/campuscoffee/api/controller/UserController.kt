@@ -2,7 +2,10 @@ package de.seuhd.campuscoffee.api.controller
 
 import de.seuhd.campuscoffee.api.capability.CapabilityQrResponder
 import de.seuhd.campuscoffee.api.capability.CapabilityUrlFactory
+import de.seuhd.campuscoffee.api.dtos.LedgerEntryDto
+import de.seuhd.campuscoffee.api.dtos.MemberBalanceDto
 import de.seuhd.campuscoffee.api.dtos.UserDto
+import de.seuhd.campuscoffee.api.mapper.AccountingDtoMapper
 import de.seuhd.campuscoffee.api.mapper.DtoMapper
 import de.seuhd.campuscoffee.api.mapper.UserDtoMapper
 import de.seuhd.campuscoffee.api.openapi.CrudOperation
@@ -14,8 +17,10 @@ import de.seuhd.campuscoffee.api.openapi.Operation.GET_BY_ID
 import de.seuhd.campuscoffee.api.openapi.Operation.UPDATE
 import de.seuhd.campuscoffee.api.openapi.Resource.USER
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
+import de.seuhd.campuscoffee.domain.exceptions.ValidationException
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
+import de.seuhd.campuscoffee.domain.ports.api.AccountingService
 import de.seuhd.campuscoffee.domain.ports.api.CrudService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import io.swagger.v3.oas.annotations.Operation
@@ -54,7 +59,9 @@ class UserController(
     private val userDtoMapper: UserDtoMapper,
     private val currentUserProvider: CurrentUserProvider,
     private val capabilityUrlFactory: CapabilityUrlFactory,
-    private val capabilityQrResponder: CapabilityQrResponder
+    private val capabilityQrResponder: CapabilityQrResponder,
+    private val accountingService: AccountingService,
+    private val accountingDtoMapper: AccountingDtoMapper
 ) : CrudController<User, UserDto, UUID>() {
     override fun service(): CrudService<User, UUID> = userService
 
@@ -197,4 +204,58 @@ class UserController(
             .fromDomain(
                 user
             ).copy(capabilityUrl = user.capabilityToken?.let { capabilityUrlFactory.urlFor(it) })
+
+    /**
+     * Returns every member's current count and balance (admin only). Deliberately unpaged, like
+     * `GET /users`: the admin overview table shows all members at once, and a coffee group is small. Each
+     * member's balance is a walk over their event stream, so this is O(members); page it if membership
+     * grows large.
+     */
+    @Operation(summary = "Get every member's current count and balance.")
+    @GetMapping("/overview")
+    fun overview(): ResponseEntity<List<MemberBalanceDto>> {
+        val admin = currentUserProvider.currentUser()
+        return ResponseEntity.ok(accountingDtoMapper.toBalanceDtos(accountingService.allBalances(admin)))
+    }
+
+    /**
+     * Returns a page of the given member's activity feed (their unified ledger, newest first).
+     *
+     * @param userId the member whose activity to read
+     * @param limit  the maximum number of entries to return
+     * @param offset the number of newest entries to skip
+     */
+    @Operation(summary = "Get a page of a member's activity.")
+    @GetMapping("/{userId}/activity")
+    fun memberActivity(
+        @PathVariable userId: UUID,
+        @Parameter(description = "Maximum number of entries to return.")
+        @RequestParam(defaultValue = "20") limit: Int,
+        @Parameter(description = "Number of newest entries to skip.")
+        @RequestParam(defaultValue = "0") offset: Int
+    ): ResponseEntity<List<LedgerEntryDto>> {
+        // This controller extends the generic CrudController, so it cannot carry the class-level @Validated
+        // that drives @Max/@Min parameter validation (the method-validation proxy breaks the inherited generic
+        // CRUD handlers). The paging bounds are checked here instead, giving the same 400 the other paged reads
+        // return for an out-of-range value rather than a silent clamp.
+        if (limit < 1 || limit > MAX_PAGE_LIMIT) {
+            throw ValidationException("limit must be between 1 and $MAX_PAGE_LIMIT")
+        }
+        if (offset < 0) {
+            throw ValidationException("offset must not be negative")
+        }
+        val admin = currentUserProvider.currentUser()
+        return ResponseEntity.ok(
+            // the admin-by-id activity exposes the kitty-funded portion of a split expense (the member-serving
+            // /api/activity does not, see AccountingService.memberLedger)
+            accountingDtoMapper.toEntryDtos(
+                accountingService.memberLedger(userId, limit, offset, admin, includeKittyPortion = true)
+            )
+        )
+    }
+
+    private companion object {
+        /** The maximum page size a paged read accepts; an out-of-range value is a 400, not a silent clamp. */
+        private const val MAX_PAGE_LIMIT = 100
+    }
 }
