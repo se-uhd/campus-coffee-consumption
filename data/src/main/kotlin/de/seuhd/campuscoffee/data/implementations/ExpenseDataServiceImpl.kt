@@ -1,6 +1,5 @@
 package de.seuhd.campuscoffee.data.implementations
 
-import de.seuhd.campuscoffee.data.constraints.ConstraintMapping
 import de.seuhd.campuscoffee.data.mapper.ExpenseEntityMapper
 import de.seuhd.campuscoffee.data.persistence.entities.ExpenseEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.ExpenseRepository
@@ -24,7 +23,7 @@ class ExpenseDataServiceImpl(
         repository,
         entityMapper,
         Expense::class.java,
-        emptySet<ConstraintMapping<Expense>>(),
+        emptySet(),
         idGenerator
     ),
     ExpenseDataService {
