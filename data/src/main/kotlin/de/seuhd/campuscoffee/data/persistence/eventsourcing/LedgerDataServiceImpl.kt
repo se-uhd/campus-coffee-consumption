@@ -69,6 +69,34 @@ private fun createdAtOf(event: EventEntity): LocalDateTime =
 private fun actorOf(event: EventEntity): String = event.createdBy ?: SYSTEM_ACTOR
 
 /**
+ * The signed balance effect of a value-carrying event (an expense's private portion, or a settlement
+ * amount): the full value on INSERT, the change from the remembered previous value on UPDATE, and the
+ * reversal on DELETE. Updates [last] for the entity so the next UPDATE/DELETE of the same entity sees the
+ * right previous value (a DELETE resets it to zero). Shared by the expense and settlement walks, which
+ * differ only in the body field and the per-entity memory.
+ *
+ * @param event the event being walked
+ * @param key the body field holding the value (`privateAmountCents` or `amountCents`)
+ * @param last the per-entity memory of the last value, keyed on the body id
+ */
+private fun deltaEffect(
+    event: EventEntity,
+    key: String,
+    last: MutableMap<UUID, Int>
+): Int {
+    val id = uuidBody(event, "id")
+    val current = intBody(event, key) ?: 0
+    val effect =
+        when (requireNotNull(event.changeType)) {
+            ChangeType.INSERT -> current
+            ChangeType.UPDATE -> current - (last[id] ?: 0)
+            ChangeType.DELETE -> -(last[id] ?: 0)
+        }
+    last[id] = if (event.changeType == ChangeType.DELETE) 0 else current
+    return effect
+}
+
+/**
  * The price in effect at append position [seq]: the latest price event at or before it. A price is always
  * seeded before any coffee is consumed (see the bootstrap), so the as-of lookup normally resolves. If a
  * hand-edited or misordered log somehow holds a coffee before any price, fall back to the earliest known
@@ -235,21 +263,7 @@ private class MemberWalk(
     }
 
     private fun expense(event: EventEntity): LedgerEntry? {
-        val id = uuidBody(event, "id")
-        val effect =
-            when (requireNotNull(event.changeType)) {
-                ChangeType.INSERT -> intBody(event, "privateAmountCents") ?: 0
-                ChangeType.UPDATE -> (intBody(event, "privateAmountCents") ?: 0) - (lastExpensePrivate[id] ?: 0)
-                ChangeType.DELETE -> -(lastExpensePrivate[id] ?: 0)
-            }
-        if (event.changeType ==
-            ChangeType.DELETE
-        ) {
-            lastExpensePrivate[id] = 0
-        } else {
-            lastExpensePrivate[id] =
-                intBody(event, "privateAmountCents") ?: 0
-        }
+        val effect = deltaEffect(event, "privateAmountCents", lastExpensePrivate)
         // a fully kitty-funded expense (no private portion) does not touch the member's balance
         if (effect == 0) {
             return null
@@ -269,21 +283,8 @@ private class MemberWalk(
         )
     }
 
-    private fun settlement(event: EventEntity): LedgerEntry? {
-        val id = uuidBody(event, "id")
-        val effect =
-            when (requireNotNull(event.changeType)) {
-                ChangeType.INSERT -> intBody(event, "amountCents") ?: 0
-                ChangeType.UPDATE -> (intBody(event, "amountCents") ?: 0) - (lastSettlement[id] ?: 0)
-                ChangeType.DELETE -> -(lastSettlement[id] ?: 0)
-            }
-        if (event.changeType ==
-            ChangeType.DELETE
-        ) {
-            lastSettlement[id] = 0
-        } else {
-            lastSettlement[id] = intBody(event, "amountCents") ?: 0
-        }
+    private fun settlement(event: EventEntity): LedgerEntry {
+        val effect = deltaEffect(event, "amountCents", lastSettlement)
         return entry(event, LedgerEntryType.SETTLEMENT, effect.toLong())
     }
 

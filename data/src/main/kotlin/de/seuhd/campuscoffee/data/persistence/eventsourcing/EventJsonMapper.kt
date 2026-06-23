@@ -71,13 +71,7 @@ object EventJsonMapper {
             gen: JsonGenerator,
             ctxt: SerializationContext
         ) {
-            gen.writeStartObject()
-            gen.writeName("id")
-            gen.writePOJO(value.id)
-            gen.writeName("createdAt")
-            gen.writePOJO(value.createdAt)
-            gen.writeName("updatedAt")
-            gen.writePOJO(value.updatedAt)
+            gen.writeEntityHeader(value.id, value.createdAt, value.updatedAt)
             gen.writeName("userId")
             gen.writePOJO(value.user.id)
             gen.writeName("count")
@@ -96,13 +90,7 @@ object EventJsonMapper {
             gen: JsonGenerator,
             ctxt: SerializationContext
         ) {
-            gen.writeStartObject()
-            gen.writeName("id")
-            gen.writePOJO(value.id)
-            gen.writeName("createdAt")
-            gen.writePOJO(value.createdAt)
-            gen.writeName("updatedAt")
-            gen.writePOJO(value.updatedAt)
+            gen.writeEntityHeader(value.id, value.createdAt, value.updatedAt)
             gen.writeName("buyerUserId")
             gen.writePOJO(value.buyer.id)
             gen.writeName("weightGrams")
@@ -129,13 +117,7 @@ object EventJsonMapper {
             gen: JsonGenerator,
             ctxt: SerializationContext
         ) {
-            gen.writeStartObject()
-            gen.writeName("id")
-            gen.writePOJO(value.id)
-            gen.writeName("createdAt")
-            gen.writePOJO(value.createdAt)
-            gen.writeName("updatedAt")
-            gen.writePOJO(value.updatedAt)
+            gen.writeEntityHeader(value.id, value.createdAt, value.updatedAt)
             gen.writeName("userId")
             gen.writePOJO(value.user?.id)
             gen.writeName("amountCents")
@@ -145,4 +127,27 @@ object EventJsonMapper {
             gen.writeEndObject()
         }
     }
+}
+
+/**
+ * Writes the object start and the `id`/`createdAt`/`updatedAt` header that every flattened entity event body
+ * shares, before its per-type fields. Centralizes the prefix the custom serializers would otherwise repeat;
+ * the values go through `writePOJO`, so the timestamps serialize via the same `java.time` path as before.
+ *
+ * @param id the entity id
+ * @param createdAt the entity's creation timestamp
+ * @param updatedAt the entity's last-update timestamp
+ */
+private fun JsonGenerator.writeEntityHeader(
+    id: Any?,
+    createdAt: Any?,
+    updatedAt: Any?
+) {
+    writeStartObject()
+    writeName("id")
+    writePOJO(id)
+    writeName("createdAt")
+    writePOJO(createdAt)
+    writeName("updatedAt")
+    writePOJO(updatedAt)
 }
