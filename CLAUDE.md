@@ -182,11 +182,19 @@ Domain-specific controllers/services extend these base classes (e.g., `UserContr
 - Java 25 and Gradle 9.5, provisioned via `mise.toml` (no Gradle wrapper). Run Gradle through mise
   (CI uses `jdx/mise-action`). The build pins a **Java 25 toolchain with no auto-download**, so a
   JDK 25 must be present on the machine (mise supplies it).
-- Node 24 is provisioned via `mise.toml` for the frontend build, lint, and tests.
+- Node 24 (an LTS) is provisioned via `mise.toml` for the frontend build, lint, and tests.
 - The Java major version has a **single source of truth**: the `java` entry in
   `gradle/libs.versions.toml`. The convention plugins resolve it for the Gradle toolchain and the Kotlin
   `jvmTarget`; `mise.toml` and the Dockerfile runtime image pin the same major by hand.
   `scripts/check-toolchain-versions.sh` (a CI step) fails the build if they drift.
+- **The runtimes stay on LTS releases.** That same `scripts/check-toolchain-versions.sh` also validates the
+  pinned **Node** major (`mise.toml`, the source of truth) against the official Node release schedule, so a
+  non-LTS line is rejected in CI: both an odd "Current" major (e.g. 25, never LTS) and an even-but-not-yet
+  LTS major (e.g. 26, which is "Current" until October 2026). It also asserts `@types/node` and the
+  `frontend/package.json` `engines.node` floor track that same major. Dependabot does not manage `mise.toml`
+  (so a non-LTS Node can only enter by a human edit, which the guard then catches), and a Dependabot rule
+  ignores `@types/node` major bumps so the types never run ahead of the runtime. Bump the Node line by hand
+  (mise + `@types/node` + `engines`, together) only when moving to the next Node LTS.
 
 ### Build
 

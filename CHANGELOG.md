@@ -15,6 +15,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is resolvable at the credential boundary, and a failed attempt has no user); and `BootstrapAdminLoader`
   logs the created admin's id. The dev-only demo loader still names its hardcoded demo fixtures (compile-time
   constants, not user data) for readable startup output.
+- **The runtimes are guarded to stay on LTS.** `scripts/check-toolchain-versions.sh` now also validates the
+  pinned **Node** major (`mise.toml`) against the official Node release schedule, failing CI on a non-LTS
+  line: an odd "Current" major (e.g. 25) or an even-but-not-yet-LTS major (e.g. 26, "Current" until October
+  2026). It also asserts `@types/node` and the `engines.node` floor track that major. Paired with the
+  Dependabot rule that ignores `@types/node` major bumps, this keeps the frontend toolchain on the Node 24
+  LTS line; the runtime is bumped by hand only when moving to the next Node LTS.
 
 ## [0.3.1] - 2026-06-22
 
