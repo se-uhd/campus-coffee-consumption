@@ -35,7 +35,7 @@ after the user so the `user_id` foreign key resolves). A `−1` at 0 yields 409 
 
 ### Registering it on the event machinery
 
-The generic event sourcing machinery (`EventStore`, `EventSourcedMutator`, `ReadModelProjector`, the
+The generic event sourcing machinery (`EventStore`, `EventSourcedWriter`, `ReadModelProjector`, the
 decorators) is unchanged. `CoffeeConsumption` is registered the same way `Review` was: because it
 references a `user`, it is flattened to a `userId` in the event body (mirroring how a review flattened its
 author to an `authorId`), so a consumption event records a reference rather than a copy of the user (a
@@ -47,7 +47,7 @@ copy would leak the user's `passwordHash`).
   `reconstructCoffeeConsumption(body)` that resolves `userId` against the already-projected users read
   table, plus its `DOMAIN_CLASSES` and `DUPLICATION_RULES` entries (the unique `user_id`).
 - `EventSourcedCoffeeConsumptionDataService` decorates the relational `CoffeeConsumptionDataServiceImpl`,
-  routing `upsert` / `delete` / `clear` through the mutator.
+  routing `upsert` / `delete` / `clear` through the writer.
 
 ### The `created_by` and `note` event metadata
 
@@ -62,7 +62,7 @@ Both are set at the `EventStore.append*` boundary from small request-scoped cont
 (reads the authenticated principal's login from the `SecurityContext`, or `"system"` when there is no
 request principal) and `ChangeNoteContext` (a thread-local the consumption service sets, in a
 `try`/`finally`, only around an override or reset). Neither is part of the full-state JSON body, and the
-generic mutator and decorator signatures are untouched.
+generic writer and decorator signatures are untouched.
 
 `created_by` is a login string rather than a user id on purpose. It is audit metadata shown to humans
 (rendered directly in the change-log DTO), it represents the non-user `"system"` actor naturally, and an
