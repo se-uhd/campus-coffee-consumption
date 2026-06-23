@@ -40,7 +40,7 @@ consumption domain and an Angular frontend.
   displayable, without parsing the JSON body or joining back to the mutable `users` read model) and a
   nullable **`note`** (an admin's free-text reason for an absolute override / a reset after payment). Both
   are event metadata, set at the `EventStore` boundary from a request-scoped actor/note context, not part
-  of the full-state JSON body; the generic mutator/decorator signatures stay untouched.
+  of the full-state JSON body; the generic writer/decorator signatures stay untouched.
 - **Capability token:** stored (not just hashed) so an admin can re-display and re-print it, and
   **rotatable** on demand (rotating issues a new URL and invalidates the old QR).
 - **Frontend:** a small, reactive, mobile-first Angular SPA modeled on
@@ -98,10 +98,10 @@ Cucumber. Add a **`frontend/`** Angular project (sibling of the modules). Keep t
   password-hasher port.
 
 ### Event sourcing: the generic machinery is unchanged; two additions
-`EventStore` appends full-state INSERT/UPDATE/DELETE events; `EventSourcedMutator.upsert(domain, getById,
+`EventStore` appends full-state INSERT/UPDATE/DELETE events; `EventSourcedWriter.upsert(domain, getById,
 buildForInsert, buildForUpdate)` assigns id/timestamps, appends, and projects in one transaction;
 `ReadModelProjector` writes each entity's read table via its MapStruct mapper + repository; the
-event-sourced **decorators** (`: …DataService by delegate`) route writes through the mutator and delegate
+event-sourced **decorators** (`: …DataService by delegate`) route writes through the writer and delegate
 reads. We keep all of this. Two changes vs CampusCoffee:
 
 1. **`created_by` (and `note`) metadata on the generic event.** Add two columns to `events` and
@@ -113,7 +113,7 @@ reads. We keep all of this. Two changes vs CampusCoffee:
    `created_by` is a login string, not a user UUID: it is audit metadata shown to humans (rendered
    directly in the change-log DTO), it represents the non-user `"system"` actor naturally, and an
    append-only log should not foreign key into the mutable `users` read model (a renamed/deleted user must
-   not rewrite or break history). The mutator/decorator signatures are untouched, and neither column is part
+   not rewrite or break history). The writer/decorator signatures are untouched, and neither column is part
    of the full-state JSON body. This makes "all of a member's changes" (with who and, for overrides, why)
    retrievable from the log without parsing the body.
 2. **Register `CoffeeConsumption` as a logged entity, a copy of the `Review` wiring** (it references a
@@ -123,7 +123,7 @@ reads. We keep all of this. Two changes vs CampusCoffee:
    - add a `COFFEE_CONSUMPTION` branch to `ReadModelProjector` (`insert`/`update`/`delete`) with a
      `reconstructCoffeeConsumption(body)` resolving `userId` against the users read table (mirrors
      `reconstructReview`), plus its `DOMAIN_CLASSES` and `DUPLICATION_RULES` entries (unique `user_id`);
-   - add `EventSourcedCoffeeConsumptionDataService(delegate, mutator) : CoffeeConsumptionDataService by
+   - add `EventSourcedCoffeeConsumptionDataService(delegate, writer) : CoffeeConsumptionDataService by
      delegate` overriding `upsert`/`delete`/`clear` (a copy of `EventSourcedReviewDataService`).
    - Dropping the persistence-mode toggle: remove the `@ConditionalOnProperty(... "event-sourcing")` from
      every decorator (they become the only adapters), delete `PersistenceProperties`/`PersistenceMode` and
