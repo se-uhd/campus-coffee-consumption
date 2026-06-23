@@ -18,11 +18,11 @@ import java.util.UUID
 @Primary
 class EventSourcedExpenseDataService(
     private val delegate: ExpenseDataServiceImpl,
-    private val mutator: EventSourcedMutator
+    private val writer: EventSourcedWriter
 ) : ExpenseDataService by delegate {
     @Transactional
     override fun upsert(domain: Expense): Expense =
-        mutator.upsert(
+        writer.upsert(
             domain,
             delegate::getById,
             { id, now -> domain.copy(id = id, createdAt = now, updatedAt = now) },
@@ -32,8 +32,8 @@ class EventSourcedExpenseDataService(
     @Transactional
     override fun delete(id: UUID) =
         // carry the buyer id on the DELETE event so the member ledger still matches it and reverses the credit
-        mutator.delete(Expense::class, id, delegate::getById) { mapOf("buyerUserId" to it.buyer.id) }
+        writer.delete(Expense::class, id, delegate::getById) { mapOf("buyerUserId" to it.buyer.id) }
 
     @Transactional
-    override fun clear() = mutator.clear(Expense::class, delegate::clear)
+    override fun clear() = writer.clear(Expense::class, delegate::clear)
 }

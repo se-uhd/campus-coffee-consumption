@@ -19,11 +19,11 @@ import java.util.UUID
 @Primary
 class EventSourcedCoffeePriceDataService(
     private val delegate: CoffeePriceDataServiceImpl,
-    private val mutator: EventSourcedMutator
+    private val writer: EventSourcedWriter
 ) : CoffeePriceDataService by delegate {
     @Transactional
     override fun upsert(domain: CoffeePrice): CoffeePrice =
-        mutator.upsert(
+        writer.upsert(
             domain,
             delegate::getById,
             { id, now -> domain.copy(id = id, createdAt = now, updatedAt = now) },
@@ -31,8 +31,8 @@ class EventSourcedCoffeePriceDataService(
         )
 
     @Transactional
-    override fun delete(id: UUID) = mutator.delete(CoffeePrice::class, id, delegate::getById)
+    override fun delete(id: UUID) = writer.delete(CoffeePrice::class, id, delegate::getById)
 
     @Transactional
-    override fun clear() = mutator.clear(CoffeePrice::class, delegate::clear)
+    override fun clear() = writer.clear(CoffeePrice::class, delegate::clear)
 }
