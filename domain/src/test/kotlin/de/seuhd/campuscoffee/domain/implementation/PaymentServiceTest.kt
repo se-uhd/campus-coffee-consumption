@@ -16,6 +16,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.any
+import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
@@ -110,6 +111,20 @@ class PaymentServiceTest {
     fun `adjustKitty of zero throws ValidationException`() {
         assertThrows<ValidationException> { service.adjustKitty(0, null, admin) }
         verify(paymentDataService, never()).upsert(any())
+    }
+
+    @Test
+    fun `adjustKitty acquires the kitty lock before reading the kitty balance`() {
+        whenever(ledgerDataService.kittyLedger()).thenReturn(kittyWith(1000))
+        whenever(paymentDataService.upsert(any())).thenAnswer { it.arguments[0] as Payment }
+
+        service.adjustKitty(-250, "correction", admin)
+
+        // the overdraw guard is only sound if the lock is taken before the balance is read; a refactor that
+        // reordered or dropped the lock would keep every other test green but reintroduce the TOCTOU race
+        val ordered = inOrder(kittyLock, ledgerDataService)
+        ordered.verify(kittyLock).lockForUpdate()
+        ordered.verify(ledgerDataService).kittyLedger()
     }
 
     private fun kittyWith(balanceCents: Long): List<LedgerEntry> =

@@ -1,4 +1,6 @@
-# Keep crawlers out of the capability-URL entry point so a secret coffee link is never indexed
-# (per the W3C "Good Practices for Capability URLs"). The path is listed, never individual tokens.
+# Capability links live at /login/{token}. They stay out of search results because they are never linked
+# publicly and the app sends them with a no-referrer policy (see the meta tag in index.html). A `Disallow`
+# rule for /login/ is intentionally omitted: robots.txt is not a security control, and listing the path
+# would only advertise the capability-URL prefix without adding any real protection.
 User-agent: *
-Disallow: /coffee/
+Disallow:

@@ -9,7 +9,7 @@ import { UserDto } from '../../models';
  * The shared member picker the admin pages use to choose whose data to view (the landing, expenses, and the
  * admin-mode profile). A presentational dropdown over the member list: the trigger and each option show the
  * member's login name and full name, and the admin's own account is marked with a leading person icon (the
- * agreed "this is you" affordance). It owns no selection state — the bound id comes in via {@link selectedId}
+ * agreed "this is you" affordance). It owns no selection state; the bound id comes in via {@link selectedId}
  * and a pick is reported via {@link selectionChange}; the page keeps the URL as the source of truth.
  */
 @Component({

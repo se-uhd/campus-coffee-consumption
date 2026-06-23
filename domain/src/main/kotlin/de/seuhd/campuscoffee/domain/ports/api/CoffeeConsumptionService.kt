@@ -15,8 +15,8 @@ import java.util.UUID
  * Service interface for coffee-consumption operations: the per-member running count and its change log.
  *
  * This is a port implemented by the domain layer and consumed by the API layer. Each mutation
- * ([applyDelta], [setTotal]) loads the target member's consumption, applies the new count, and upserts it
- * — which the event-sourced data adapter records as a full-state event. There is deliberately no new
+ * ([applyDelta], [setTotal]) loads the target member's consumption, applies the new count, and upserts it,
+ * which the event-sourced data adapter records as a full-state event. There is deliberately no new
  * ledger machinery: the count advances through the same upsert path a review's approval count did.
  *
  * Authorization is by [User.role] and ownership: a member may add a coffee or undo a recent one only on
@@ -122,7 +122,7 @@ interface CoffeeConsumptionService : CrudService<CoffeeConsumption, UUID> {
 
     /**
      * Returns the member's most recent coffee that is still within the grace period to undo, or null if
-     * there is none — used to show or hide the undo affordance. Subject to the same self-or-admin read rule
+     * there is none, used to show or hide the undo affordance. Subject to the same self-or-admin read rule
      * as [getByUserId].
      *
      * @param userId     the id of the member whose cancellable coffee to check

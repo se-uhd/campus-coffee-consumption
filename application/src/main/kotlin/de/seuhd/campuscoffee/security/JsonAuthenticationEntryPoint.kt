@@ -18,7 +18,7 @@ import java.time.LocalDateTime
  * the shape produced by the api layer's GlobalExceptionHandler so error bodies are uniform.
  *
  * Provided in the starter; it only takes effect once the chain actually requires authentication
- * (Exercise 1) — under the permissive `permitAll` chain nothing is rejected.
+ * (Exercise 1): under the permissive `permitAll` chain nothing is rejected.
  */
 @Component
 class JsonAuthenticationEntryPoint(

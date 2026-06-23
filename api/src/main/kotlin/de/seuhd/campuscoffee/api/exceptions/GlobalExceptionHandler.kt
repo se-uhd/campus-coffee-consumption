@@ -110,7 +110,7 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
     /**
      * Fallback handler for unexpected exceptions, returning HTTP 500. The unmapped invariant guards
      * (`IllegalStateException`, raised by Kotlin `error(...)`/`check(...)`) land here; the body is already
-     * clean — the response message is the fixed "An unexpected error occurred." string, not the exception
+     * clean: the response message is the fixed "An unexpected error occurred." string, not the exception
      * message, so no internal detail leaks (the full exception is logged server-side only).
      *
      * @param exception the unexpected exception

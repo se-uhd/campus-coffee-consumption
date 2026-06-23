@@ -12,9 +12,9 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 export class NotificationService {
   constructor(private readonly snackBar: MatSnackBar) {}
 
-  /** Shows a transient success message. */
+  /** Shows a transient success message. The dismiss action matches the error snackbar's for consistency. */
   success(message: string): void {
-    this.snackBar.open(message, 'OK', { duration: 3000 });
+    this.snackBar.open(message, 'Dismiss', { duration: 3000 });
   }
 
   /**

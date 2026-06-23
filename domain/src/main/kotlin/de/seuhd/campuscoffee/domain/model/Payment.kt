@@ -6,11 +6,11 @@ import java.util.UUID
 /**
  * Immutable payment domain model: an admin-recorded movement of money into the communal kitty, in euro
  * cents ([amountCents]). The nullable [user] is the load-bearing distinction:
- * - present — a **settlement**: the member paid money in, which credits their balance and feeds the kitty;
- * - absent — a pure **kitty adjustment**: an initial float or a correction that changes only the kitty.
+ * - present, a **settlement**: the member paid money in, which credits their balance and feeds the kitty;
+ * - absent, a pure **kitty adjustment**: an initial float or a correction that changes only the kitty.
  *
  * Settlements are positive; a kitty adjustment may be signed (a correction can remove money). Payments are
- * never edited — a mistake is corrected with a compensating entry — so the append-only log is the full
+ * never edited (a mistake is corrected with a compensating entry), so the append-only log is the full
  * record of how the kitty reached its balance. The [user] flattens to a user id in the event body.
  */
 data class Payment(

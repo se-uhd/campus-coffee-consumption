@@ -4,7 +4,7 @@ import { ADMIN, loginAsAdmin } from './helpers';
 /**
  * Authentication and routing: an unauthenticated visit to the root redirects to the login page, and a
  * successful admin sign-in lands on the admin dashboard (the selected-member view, mirroring the member
- * landing — the members overview table lives on `/admin/users`).
+ * landing; the members overview table lives on `/admin/users`).
  */
 test.describe('auth and routing', () => {
   test('an unauthenticated visit to / redirects to the login page', async ({ page }) => {

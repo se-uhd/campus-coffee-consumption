@@ -58,18 +58,6 @@ class EventSourcedMutator(
     }
 
     /**
-     * Persists a newly created domain object for a port that has no read-by-id method: assigns a new id and
-     * the timestamps, appends the INSERT event, projects it, and returns the created object.
-     *
-     * @param buildForInsert builds the complete object to insert, given the new id and the timestamp
-     */
-    fun <D : DomainModel<UUID>> create(buildForInsert: (id: UUID, now: LocalDateTime) -> D): D {
-        val complete = buildForInsert(idGenerator.newId(), now())
-        project(eventStore.appendInsert(complete))
-        return complete
-    }
-
-    /**
      * Deletes a domain object. Loads it first (a missing one throws [NotFoundException]
      * [de.seuhd.campuscoffee.domain.exceptions.NotFoundException], matching the relational adapter), then
      * appends the DELETE event and projects the removal (a still-referenced row throws

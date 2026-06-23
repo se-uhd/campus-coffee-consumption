@@ -156,7 +156,7 @@ const LEDGER_PAGE_SIZE = 10;
           <button
             mat-fab
             class="cc-fab-neutral"
-            (click)="editMode = !editMode"
+            (click)="toggleEdit()"
             aria-label="Edit total"
             matTooltip="Correct coffee count"
           >
@@ -301,7 +301,7 @@ export class AdminLandingComponent implements OnInit {
 
   /**
    * Selects the member named by the URL's `member` param (or the admin's own account when it is absent) and
-   * reloads, unless that member's data is already loaded — so a Back/Forward that changes the param re-loads,
+   * reloads, unless that member's data is already loaded, so a Back/Forward that changes the param re-loads,
    * but a redundant re-emission of the same param does not load twice. `loadedId` (the member actually
    * loaded) is the guard, not the bound `selectedId` (which the dropdown already advanced before navigating).
    *
@@ -335,7 +335,7 @@ export class AdminLandingComponent implements OnInit {
       await this.refreshFund();
       const me = await this.userService.me();
       // record the admin's own id as the shared default, then take the selection from the URL's `member`
-      // param (the source of truth) — the admin's own account when it is absent — so a deep link or a
+      // param (the source of truth, the admin's own account when it is absent), so a deep link or a
       // refresh on `/admin?member=<id>` lands on that member
       this.selection.setOwnUserId(me.id ?? '');
       this.selectedId = this.selection.selectFromParam(this.route.snapshot.queryParamMap.get('member'));
@@ -358,7 +358,7 @@ export class AdminLandingComponent implements OnInit {
   /**
    * Pushes the newly-selected member onto the URL as the `member` query param (a history entry, so Back
    * undoes the switch). The `queryParamMap` subscription then mirrors it into the shared selection and
-   * reloads — the URL stays the source of truth, so the selection is never set directly here.
+   * reloads; the URL stays the source of truth, so the selection is never set directly here.
    *
    * @param memberId the member id picked in the selector
    */
@@ -434,6 +434,14 @@ export class AdminLandingComponent implements OnInit {
     }
   }
 
+  /** Toggles the count-correction form, seeding the New total field from the current count when it opens. */
+  toggleEdit(): void {
+    this.editMode = !this.editMode;
+    if (this.editMode && this.consumption) {
+      this.newTotal = this.consumption.total;
+    }
+  }
+
   /**
    * Applies a +1/-1 to the selected member, optimistically then reconciling to the server total. The member
    * id is captured up front and every state write is guarded on it still being the current selection, so a
@@ -455,6 +463,9 @@ export class AdminLandingComponent implements OnInit {
         return;
       }
       this.consumption = updated;
+      // keep the absolute-correction field in step with the count so opening Edit after a +/- does not
+      // pre-fill a stale total that, if Set without retyping, would silently revert the change
+      this.newTotal = updated.total;
       await this.loadLedger(id);
       await this.refreshFund();
     } catch (error) {

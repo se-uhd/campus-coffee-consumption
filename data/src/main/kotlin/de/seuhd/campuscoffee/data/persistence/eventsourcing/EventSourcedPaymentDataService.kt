@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * Event sourcing payment data adapter — the only persistence path. A Decorator around the relational
+ * Event sourcing payment data adapter, the only persistence path. A Decorator around the relational
  * [PaymentDataServiceImpl] (both adapters for the same `PaymentDataService` port, so it is `@Primary`),
  * delegating reads and `getAllByUser` and writing each settlement and kitty adjustment event-first.
  */

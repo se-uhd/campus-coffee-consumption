@@ -9,9 +9,9 @@
 #      writes a source-mapped lcov report under frontend/coverage-e2e/ (coverage JaCoCo can never see).
 #
 # Prerequisites (the script does NOT provision these):
-#   - A PostgreSQL reachable at localhost:5432 (user/password postgres) — the dev profile's datasource.
+#   - A PostgreSQL reachable at localhost:5432 (user/password postgres), the dev profile's datasource.
 #   - Node on PATH (run via `mise exec --`), Playwright's chromium installed (`npx playwright install`).
-#   - The application jar built with the source-mapped ("coverage") SPA — this script builds it.
+#   - The application jar built with the source-mapped ("coverage") SPA, which this script builds.
 #   - The JaCoCo agent jar path passed as $JACOCO_AGENT_JAR (the :coverage Gradle task resolves and passes
 #     it); if unset, the script tries to locate it under the Gradle/Maven caches as a fallback.
 #
@@ -51,17 +51,17 @@ if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
   log "Assembling the application jar (gradle :application:bootJar -PskipFrontendBuild)…"
   # bootJar copies frontend/dist/frontend/browser into the jar's static resources. We pass
   # -PskipFrontendBuild so bootJar does NOT re-run the production SPA build and overwrite the
-  # source-mapped one we just produced (the application build script honors this flag — see below).
+  # source-mapped one we just produced (the application build script honors this flag; see below).
   gradle :application:bootJar -PskipFrontendBuild --console=plain
 else
-  log "SKIP_BUILD=1 — reusing the existing jar at ${JAR}"
+  log "SKIP_BUILD=1: reusing the existing jar at ${JAR}"
 fi
 
 [[ -f "$JAR" ]] || { log "ERROR: jar not found at ${JAR}"; exit 1; }
 
 # --- 2. Resolve the JaCoCo agent jar ------------------------------------------------------------------
 if [[ -z "${JACOCO_AGENT_JAR:-}" ]]; then
-  log "JACOCO_AGENT_JAR unset — searching the Gradle cache for the agent runtime jar…"
+  log "JACOCO_AGENT_JAR unset: searching the Gradle cache for the agent runtime jar…"
   JACOCO_AGENT_JAR="$(find "${HOME}/.gradle/caches" -name 'org.jacoco.agent-*-runtime.jar' 2>/dev/null | sort | tail -1 || true)"
 fi
 [[ -n "${JACOCO_AGENT_JAR}" && -f "${JACOCO_AGENT_JAR}" ]] || {

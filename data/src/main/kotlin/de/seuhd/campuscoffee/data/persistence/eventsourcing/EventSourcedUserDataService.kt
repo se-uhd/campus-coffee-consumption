@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * Event sourcing user data adapter — the only persistence path (the relational-only mode was dropped). A
+ * Event sourcing user data adapter, the only persistence path (the relational-only mode was dropped). A
  * Decorator around the relational [UserDataServiceImpl] (both are adapters for the same `UserDataService`
  * port, so it is marked `@Primary` to be the one the domain binds to): the read methods, `getByLoginName`,
  * and `findByCapabilityToken` delegate to it, while the mutating methods write event-first. The domain has

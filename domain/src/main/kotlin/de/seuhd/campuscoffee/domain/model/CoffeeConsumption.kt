@@ -5,7 +5,7 @@ import java.util.UUID
 
 /**
  * Immutable coffee-consumption domain model: a single member's running coffee count. It is modeled
- * exactly like a CampusCoffee review — it references a [user] the way a review referenced its author —
+ * exactly like a CampusCoffee review (it references a [user] the way a review referenced its author),
  * with the running [count] standing in for the review body. There is exactly one consumption per user.
  *
  * Every change to [count] (a member adding a coffee, a member undoing a recent one, or an admin override
