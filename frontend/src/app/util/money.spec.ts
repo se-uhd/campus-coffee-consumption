@@ -109,6 +109,14 @@ describe('euroInputError', () => {
     expect(euroInputError('8.555', '4.20')).toBe('Enter a valid amount (e.g. 4.20).');
     expect(euroInputError('abc', '0.50')).toBe('Enter a valid amount (e.g. 0.50).');
   });
+
+  it('flags a negative amount when negatives are not allowed (the default)', () => {
+    expect(euroInputError('-5', '4.20')).toBe('Enter a non-negative amount (e.g. 4.20).');
+  });
+
+  it('allows a negative amount when permitted (a kitty adjustment)', () => {
+    expect(euroInputError('-5', '4.20', true)).toBeNull();
+  });
 });
 
 describe('formatEuros', () => {

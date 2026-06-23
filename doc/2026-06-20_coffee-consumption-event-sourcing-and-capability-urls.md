@@ -21,12 +21,12 @@ entity's `@Version` column), exactly as for `Review`; the domain model carries n
 change is a load-modify-save in one transaction, so the loser of two concurrent self-scans gets a
 `ConcurrentUpdateException` (409) and the SPA retries.
 
-### Operations reuse the upsert path — no new machinery
+### Operations reuse the upsert path: no new machinery
 
 Each `+1` / `−1` (a member self-scan or an admin step) and each admin absolute override (any value,
 including `0` for a reset after payment) is a plain `upsert` of the member's `CoffeeConsumption` with the
 new `count`, which the event-sourced decorator records as a full-state UPDATE event. This is identical to
-how a review's approval count advanced through its approval workflow — there is no balance table, ledger,
+how a review's approval count advanced through its approval workflow. There is no balance table, ledger,
 or row locking. `CoffeeConsumptionService` exposes `applyDelta(userId, delta, actingUser)` and
 `setTotal(userId, total, note, actingUser)`; each loads the consumption by user id, applies the new count,
 and upserts. Creating a user also creates that user's consumption at `count = 0` (an INSERT event, logged
@@ -38,8 +38,8 @@ after the user so the `user_id` foreign key resolves). A `−1` at 0 yields 409 
 The generic event sourcing machinery (`EventStore`, `EventSourcedMutator`, `ReadModelProjector`, the
 decorators) is unchanged. `CoffeeConsumption` is registered the same way `Review` was: because it
 references a `user`, it is flattened to a `userId` in the event body (mirroring how a review flattened its
-author to an `authorId`), so a consumption event records a reference rather than a copy of the user — a
-copy would leak the user's `passwordHash`.
+author to an `authorId`), so a consumption event records a reference rather than a copy of the user (a
+copy would leak the user's `passwordHash`).
 
 - `EventJsonMapper` has a `CoffeeConsumptionEventSerializer` writing `id`, `createdAt`, `updatedAt`,
   `userId`, and `count`.
@@ -53,12 +53,12 @@ copy would leak the user's `passwordHash`.
 
 The one change to the generic event infrastructure is two metadata columns on `events` (and `EventEntity`):
 
-- **`created_by`** — the actor's **login name**, a `varchar`: the member via their capability token, the
+- **`created_by`**: the actor's **login name**, a `varchar`: the member via their capability token, the
   admin via their JWT, or `"system"` for the startup fixtures and the bootstrap admin.
-- **`note`** — a nullable `varchar`, an admin's free-text reason for an absolute override or a reset (for
+- **`note`**: a nullable `varchar`, an admin's free-text reason for an absolute override or a reset (for
   example, the payment that prompted clearing a count).
 
-Both are set at the `EventStore.append*` boundary from small request-scoped context ports — `ActorProvider`
+Both are set at the `EventStore.append*` boundary from small request-scoped context ports: `ActorProvider`
 (reads the authenticated principal's login from the `SecurityContext`, or `"system"` when there is no
 request principal) and `ChangeNoteContext` (a thread-local the consumption service sets, in a
 `try`/`finally`, only around an override or reset). Neither is part of the full-state JSON body, and the
@@ -66,7 +66,7 @@ generic mutator and decorator signatures are untouched.
 
 `created_by` is a login string rather than a user id on purpose. It is audit metadata shown to humans
 (rendered directly in the change-log DTO), it represents the non-user `"system"` actor naturally, and an
-append-only log should not foreign key into the mutable users read model — a renamed or deleted user must
+append-only log should not foreign key into the mutable users read model: a renamed or deleted user must
 not rewrite or break history.
 
 ### The change log is read from the event log
@@ -81,7 +81,7 @@ the log.
 
 ## The capability URL scheme
 
-A member authenticates only with a secret **capability URL** — a per-member URL that grants the holder the
+A member authenticates only with a secret **capability URL**, a per-member URL that grants the holder the
 ability to change that member's coffee count. It is encoded in a wall QR code as
 `https://<host>/login/{token}`. The scheme follows the W3C TAG finding
 [Good Practices for Capability URLs](https://www.w3.org/TR/capability-urls/) (2014), with one deliberate
@@ -93,7 +93,7 @@ deviation.
   generates cryptographically random ones.
 - **HTTPS only (§5.1).** Capability URLs are `https` in production (Cloud Run TLS); the token never travels
   over plain HTTP. `campus-coffee.app.base-url` carries the public origin used to build the URL.
-- **Revocation instead of expiry — the deliberate deviation (§5.1).** The finding recommends expiry, but
+- **Revocation instead of expiry (the deliberate deviation, §5.1).** The finding recommends expiry, but
   wall-printed QR codes are meant to be long-lived, so the URLs are persistent by design and the app relies
   on admin **rotation / revocation** instead (one token per user; rotating issues a new URL and invalidates
   the old QR). A rotated or unknown token fails authentication (401); a deactivated member is read-only
@@ -102,7 +102,7 @@ deviation.
   only loads the page; every data change is a `POST`/`PUT` API call, so scanning or opening the URL never
   mutates anything.
 - **Minimize leakage (§5.1).** The token appears in a URL only at the SPA entry point (`/login/{token}`),
-  never in an API path — the SPA forwards it as the `X-Coffee-Token` header — so it stays out of API server
+  never in an API path (the SPA forwards it as the `X-Coffee-Token` header), so it stays out of API server
   and proxy access logs. The token page should avoid third-party scripts and assets and send
   `Referrer-Policy: no-referrer` (and `rel="noreferrer"` on outbound links) so the URL cannot leak via the
   `Referer` header, and should be kept out of analytics.
@@ -118,6 +118,6 @@ Members authenticate only with the capability token; admins only with a JWT. Cam
 Basic and JWT to teach both, but an SPA plus capability links needs just one mechanism each, so HTTP Basic
 was dropped. The capability token principal is always `ROLE_USER`, never `ROLE_ADMIN`, so an admin's own
 token grants only self-service; admin operations require the JWT. The JWT is a work-session token (~10-hour
-TTL) with no refresh flow — over-engineering for an internal, few-admin tool, and a refresh token stored in
+TTL) with no refresh flow: over-engineering for an internal, few-admin tool, and a refresh token stored in
 the SPA would not reduce the real (XSS) risk. If long, revocable sessions are ever wanted, the cleaner
 upgrade for this same-origin SPA is a server-side httpOnly session cookie, not a refresh token.

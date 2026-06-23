@@ -24,7 +24,7 @@ import java.util.UUID
  * and payments, whose user foreign keys are RESTRICT) and the cascading consumptions must be cleared before
  * the users, then the independent price. This seeds all five logged entity types against a real PostgreSQL
  * schema (with the real RESTRICT constraints) and asserts the documented clear order raises no foreign-key
- * violation and empties every read table and the event log — which a wrong order (clearing users first)
+ * violation and empties every read table and the event log, which a wrong order (clearing users first)
  * would not.
  */
 class ClearAllForeignKeyOrderIntegrationTest : AbstractEventSourcingDataIntegrationTest() {

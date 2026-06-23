@@ -16,13 +16,13 @@ import org.springframework.stereotype.Component
  * Dev-only (`@Profile("dev")`) demo-data loader that layers extra members and some consumption, bean-purchase
  * and settlement history on top of the five-user fixture set, so the dev app comes up with enough members to
  * paginate (5 per page) and with non-empty ledger and change-log views. It also layers a representative
- * history (cups, own purchases, and a deposit) onto the primary fixture member `maxmustermann` — the member
- * whose capability link is the demo link printed on the wall — so its unified ledger exercises every entry
+ * history (cups, own purchases, and a deposit) onto the primary fixture member `maxmustermann` (the member
+ * whose capability link is the demo link printed on the wall), so its unified ledger exercises every entry
  * kind. `maxmustermann` stays active.
  *
- * On top of that it gives a rich, varied history to **every** other existing user too — the fixture admin
+ * On top of that it gives a rich, varied history to **every** other existing user too: the fixture admin
  * `jane_doe` and the remaining fixture members (`student2023`, `lisa_lee`, `olivia_lee`) via
- * [ENRICHED_FIXTURE_LOGINS], plus each demo member with a non-empty [DemoMember] spec — so the ledger and
+ * [ENRICHED_FIXTURE_LOGINS], plus each demo member with a non-empty [DemoMember] spec, so the ledger and
  * change-log views are populated for almost everyone. A couple of users are deliberately left **empty** to
  * demo the empty state: the freshly created member [EMPTY_DEMO_LOGIN] (`new_user`, no history at all) and the
  * inactive demo member `hannes_schulz` (its spec carries no coffees, expenses, or settlement).
@@ -34,8 +34,8 @@ import org.springframework.stereotype.Component
  *
  * Determinism: the dev id generator is reset on every boot (the dev `reset-on-startup`), and the fixture
  * loader clears all data and reseeds before this runs, so every start reproduces the same demo data with the
- * same assigned ids. The loader is also idempotent within a run — it skips if its demo members already exist
- * — so a restart without a reset does not duplicate them.
+ * same assigned ids. The loader is also idempotent within a run (it skips if its demo members already exist),
+ * so a restart without a reset does not duplicate them.
  *
  * Actor attribution mirrors the fixtures: this runs outside any web request, so the `ActorProvider` finds no
  * principal and every seeded event is recorded with `created_by = "system"` (the admin/member passed as the
@@ -148,7 +148,7 @@ class DevDemoDataLoader(
      * nearly every user has populated ledger and change-log views. The counts and amounts are varied by the
      * user's index in [ENRICHED_FIXTURE_LOGINS] so the rows look realistic rather than identical. Each user
      * is an existing, active fixture user, so seeding only appends events. The admin is just another user
-     * here — it has a consumption row and can hold cups, purchases, and deposits like anyone.
+     * here: it has a consumption row and can hold cups, purchases, and deposits like anyone.
      *
      * @param admin the resolved fixture admin, acting for the admin-only settlements
      */
@@ -216,7 +216,7 @@ class DevDemoDataLoader(
     /**
      * Layers a representative history onto the primary demo capability link, the fixture member
      * [PRIMARY_DEMO_LOGIN] (the one printed on the wall for demos), so its unified ledger has every entry kind
-     * — cups, own bean purchases, and a deposit — and the "All"/"Cups"/"Expenses"/"Deposits" ledger tabs each
+     * (cups, own bean purchases, and a deposit) and the "All"/"Cups"/"Expenses"/"Deposits" ledger tabs each
      * show data. The fixture loader already created this member (active, with a consumption row at zero), so
      * this only adds events; the member stays active. Reuses the same service calls the demo members use.
      *

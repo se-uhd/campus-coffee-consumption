@@ -13,8 +13,8 @@ import org.springframework.stereotype.Component
  * where a request saw the empty tables.
  *
  * Spring injects every [StartupTask] bean present (each is conditional on its own property), and they run in
- * ascending [StartupTask.order]: import the existing rows into the event log, rebuild the read model from the
- * log, then load the fixtures (whose guard then sees the rebuilt users and does not load them again).
+ * ascending [StartupTask.order]: the optional event-log rebuild (order 100), the fixture loader (200), the
+ * price seeder (250), the dev-only demo-data loader (260), and the bootstrap admin (300).
  */
 @Component
 class StartupDataInitializer(

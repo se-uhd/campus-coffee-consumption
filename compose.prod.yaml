@@ -1,55 +1,29 @@
 name: campus-coffee-consumption-prod
 
-# Runs the application in the prod profile: authentication is enforced, Swagger and the /api/dev
-# endpoints are off, and the JWT secret comes from the environment (no insecure fallback). The prod
-# profile loads the fixture data on startup, so the demo has content without the /api/dev endpoints.
+# Cloud Run prod deployment. The prod profile enforces authentication, turns Swagger and the /api/dev
+# endpoints off, requires a real JWT secret and https base URL (no insecure fallbacks), and loads NO fixture
+# data: prod has real members, and the first admin is created from BOOTSTRAP_ADMIN_* on first startup. The
+# database is managed Cloud SQL, connected via the prod profile's socket-factory datasource (see
+# application.yaml), NOT an in-container sidecar, so the append-only money ledger survives every redeploy.
 #
-# Local: cp deploy.env.example deploy.env (fill in JWT_SECRET) && DB_HOST=db docker compose -f compose.prod.yaml up
-# Cloud Run: a single `gcloud beta run compose up compose.prod.yaml` (or run scripts/deploy-cloudrun.sh).
+# All secrets and the public URL come from deploy.env (gitignored; copy deploy.env.example and fill it in).
+# Deploy with scripts/deploy-cloudrun.sh. The Cloud Run runtime service account needs the Cloud SQL Client
+# role, and the Cloud SQL Admin API must be enabled, for the socket factory to connect.
 #
-# DB_HOST defaults to localhost for Cloud Run: `gcloud run compose up` deploys the app and db as sidecar
-# containers in one service that share a network namespace and talk over localhost (no service-name DNS,
-# unlike Docker Compose). Local Docker Compose reaches the db by its service name, so set DB_HOST=db there.
+# This file is the cloud deploy only; for local development use `gradle :application:bootRun` or
+# `docker compose up` (the dev compose.yaml), which run the dev profile against a local Postgres.
 
 services:
   app:
     build:
       context: .
     container_name: campus-coffee-consumption-app-prod
-    networks:
-      - campus-coffee-net
     ports:
       - '8080:8080'
-    depends_on:
-      db:
-        condition: service_healthy
     restart: on-failure
-    # JWT_SECRET comes from deploy.env (gitignored; copy deploy.env.example).
-    # `gcloud run compose up` and local `docker compose` both load env_file and set these on the container,
-    # so a single deploy command brings the service up healthy — no follow-up to set the secret.
+    # deploy.env supplies JWT_SECRET, DB_PASSWORD, CAMPUS_COFFEE_APP_BASE_URL, and the BOOTSTRAP_ADMIN_*
+    # credentials. `gcloud run compose up` and local `docker compose` both load env_file onto the container.
     env_file:
       - deploy.env
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://${DB_HOST:-localhost}:5432/postgres
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=postgres
-
-  db:
-    image: 'postgres:18-alpine'
-    container_name: db-prod
-    networks:
-      - campus-coffee-net
-    ports:
-      - '5432:5432'
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
-      interval: 2s
-      timeout: 5s
-      retries: 15
-
-networks:
-  campus-coffee-net:

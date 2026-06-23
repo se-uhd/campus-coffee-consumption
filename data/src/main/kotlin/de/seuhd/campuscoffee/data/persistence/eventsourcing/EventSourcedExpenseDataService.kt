@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * Event sourcing expense data adapter — the only persistence path. A Decorator around the relational
+ * Event sourcing expense data adapter, the only persistence path. A Decorator around the relational
  * [ExpenseDataServiceImpl] (both adapters for the same `ExpenseDataService` port, so it is `@Primary`),
  * delegating reads and `getAllByBuyer` and writing each recorded purchase and each admin correction
  * event-first.

@@ -8,6 +8,7 @@ import de.seuhd.campuscoffee.data.mapper.ExpenseEntityMapper
 import de.seuhd.campuscoffee.data.mapper.PaymentEntityMapper
 import de.seuhd.campuscoffee.data.mapper.UserEntityMapper
 import de.seuhd.campuscoffee.data.persistence.entities.CoffeeConsumptionEntity
+import de.seuhd.campuscoffee.data.persistence.entities.CoffeePriceEntity
 import de.seuhd.campuscoffee.data.persistence.entities.Entity
 import de.seuhd.campuscoffee.data.persistence.entities.UserEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeConsumptionRepository
@@ -379,7 +380,9 @@ class ReadModelProjector(
                         UserEntity.CAPABILITY_TOKEN_COLUMN
                     ) { "${it["capabilityToken"]}" },
                 CoffeeConsumptionEntity.USER_UNIQUE_CONSTRAINT to
-                    DuplicationRule(CoffeeConsumption::class.java, "user_id") { "user ${it["userId"]}" }
+                    DuplicationRule(CoffeeConsumption::class.java, "user_id") { "user ${it["userId"]}" },
+                CoffeePriceEntity.SINGLETON_UNIQUE_CONSTRAINT to
+                    DuplicationRule(CoffeePrice::class.java, CoffeePriceEntity.SINGLETON_COLUMN) { "the coffee price" }
             ).mapKeys { it.key.lowercase() }
     }
 }

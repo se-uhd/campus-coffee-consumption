@@ -2,7 +2,6 @@ package de.seuhd.campuscoffee.api.controller
 
 import de.seuhd.campuscoffee.api.capability.CapabilityQrResponder
 import de.seuhd.campuscoffee.api.capability.CapabilityUrlFactory
-import de.seuhd.campuscoffee.api.dtos.OnCreate
 import de.seuhd.campuscoffee.api.dtos.UserDto
 import de.seuhd.campuscoffee.api.mapper.DtoMapper
 import de.seuhd.campuscoffee.api.mapper.UserDtoMapper
@@ -23,10 +22,9 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import jakarta.validation.groups.Default
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller
-import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -62,6 +60,11 @@ class UserController(
 
     override fun mapper(): DtoMapper<User, UserDto> = userDtoMapper
 
+    /**
+     * Returns every member (admin only). Deliberately unpaged, unlike the ledger reads: the admin SPA needs
+     * the whole member set at once (the member-selector dropdown and the overview table), and a coffee group
+     * is small enough that the full list is cheap. Bound it by paging only if the membership grows large.
+     */
     @Operation
     @CrudOperation(operation = GET_ALL, resource = USER, roleRestricted = true)
     @GetMapping("")
@@ -87,7 +90,7 @@ class UserController(
     override fun create(
         @Parameter(description = "Data of the member to create, including their role.", required = true)
         @RequestBody
-        @Validated(Default::class, OnCreate::class) dto: UserDto
+        @Valid dto: UserDto
     ): ResponseEntity<UserDto> {
         require(dto.id == null) { "ID must not be set when creating a new resource." }
         // creating a member is an admin operation; the domain assigns the capability token and the
@@ -172,7 +175,7 @@ class UserController(
      * @param id the id of the member whose QR code to download
      */
     @Operation(summary = "Download a member's capability QR code (high-resolution PNG).")
-    @GetMapping("/{id}/qr.png")
+    @GetMapping("/{id}/qr.png", produces = [MediaType.IMAGE_PNG_VALUE])
     fun qrCode(
         @Parameter(description = "Unique identifier of the member.", required = true)
         @PathVariable id: UUID
@@ -181,7 +184,7 @@ class UserController(
 
     /** Downloads a ZIP archive of every member's capability QR code, each entry named `<loginName>.png`. */
     @Operation(summary = "Download a ZIP archive of every member's capability QR code (one PNG per member).")
-    @GetMapping("/qr.zip")
+    @GetMapping("/qr.zip", produces = ["application/zip"])
     fun qrCodesZip(): ResponseEntity<StreamingResponseBody> {
         // resolve the principal so a deactivated admin's in-flight JWT is rejected here too
         currentUserProvider.currentUser()

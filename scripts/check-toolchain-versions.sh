@@ -25,7 +25,7 @@ mise=$(sed -n "s/^java *= *.*-\([0-9][0-9]*\).*/\1/p" mise.toml)
 docker=$(sed -n 's/^FROM eclipse-temurin:\([0-9][0-9]*\).*/\1/p' Dockerfile)
 [ -n "$docker" ] || fail "could not read the Java version from the Dockerfile runtime image"
 
-echo "Java major version — catalog=$catalog mise=$mise dockerfile=$docker"
+echo "Java major version: catalog=$catalog mise=$mise dockerfile=$docker"
 
 [ "$catalog" = "$mise" ] || fail "mise.toml Java version ($mise) differs from the version catalog ($catalog)"
 [ "$catalog" = "$docker" ] || fail "Dockerfile Java version ($docker) differs from the version catalog ($catalog)"

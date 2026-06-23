@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service
  * PostgreSQL [KittyLock] backed by a transaction-level advisory lock (`pg_advisory_xact_lock`) on a fixed
  * application key. The lock is held until the surrounding transaction commits or rolls back, so concurrent
  * kitty-mutating transactions serialize and each reads the previous one's committed balance. It uses no
- * table row — a pure Postgres advisory lock keyed on [KITTY_LOCK_KEY].
+ * table row, just a pure Postgres advisory lock keyed on [KITTY_LOCK_KEY].
  */
 @Service
 class PostgresKittyLock(

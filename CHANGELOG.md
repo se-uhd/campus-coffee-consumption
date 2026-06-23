@@ -24,6 +24,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   expanding its collapsed card. The specs now target the shipped UI, and the euro-validation fix above makes
   the validation specs pass for real rather than by weakening them.
 
+### Changed
+
+- **Em-dashes removed from the prose** across the docs, `README.md`, `CHANGELOG.md`, `AGENTS.md`, and
+  `CLAUDE.md`, replaced with plain punctuation (commas, colons, parentheses, or sentence breaks). This
+  completes the AI-slop cleanup the 0.3.0 entry began. Documentation-only.
+
+### Fixed (documentation)
+
+- **Documentation corrections in `CLAUDE.md` and `README.md`.** The three ledger endpoints now show their
+  real `@RequestParam` defaults (`/ledger` and `/users/{id}/ledger` default to `limit=20`, `/kitty/ledger`
+  to `limit=50`; the change-log default stays 5). `CLAUDE.md` now lists `GET /users/filter`, and its `V4`
+  migration note documents the `is_singleton` column and `uq_coffee_prices_singleton` constraint that
+  enforce the single-row invariant at the schema level.
+
 ## [0.3.0] - 2026-06-22
 
 A frontend overhaul (Angular 19 to 22, a SE@UHD-branded design system, Karma/Jasmine to Vitest, and a full
@@ -163,7 +177,8 @@ guard, and admin-deactivation and last-active-admin safeguards. No end-user REST
   longer depends on the upstream login-name validation staying strict.
 - **Backend OpenAPI required-but-nullable schema bug.** An `OpenApiCustomizer` corrects the generated spec so
   required fields are no longer also marked nullable, which kept the frontend-DTO codegen honest.
-- **AI-slop prose cleanup** across the docs, UI copy, and KDoc, with consistent American spelling.
+- **Partial AI-slop prose cleanup** across the docs, UI copy, and KDoc, with consistent American spelling.
+  Em-dashes were not yet removed; that follows in a later change.
 - **Frontend state and error hardening.** The selected member is reset on logout (so a stale selection no
   longer carries into the next admin session), an error on member-switch is now surfaced instead of being
   swallowed, and the capability URL is preserved across a member-profile reload so a deep-linked profile no
@@ -301,6 +316,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[Unreleased]: https://github.com/se-uhd/campus-coffee-consumption/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.3.0
 [0.2.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.2.0
 [0.1.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.1.1

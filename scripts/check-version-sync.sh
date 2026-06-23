@@ -21,7 +21,7 @@ gradle=$(sed -n 's/^version *= *\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p
 changelog=$(sed -n 's/^## \[\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)\].*/\1/p' CHANGELOG.md | head -n1)
 [ -n "$changelog" ] || fail "could not read a released version (## [x.y.z]) from CHANGELOG.md"
 
-echo "Project version — gradle=$gradle changelog=$changelog"
+echo "Project version: gradle=$gradle changelog=$changelog"
 
 [ "$gradle" = "$changelog" ] ||
   fail "latest CHANGELOG.md version ($changelog) differs from the Gradle build version ($gradle)"

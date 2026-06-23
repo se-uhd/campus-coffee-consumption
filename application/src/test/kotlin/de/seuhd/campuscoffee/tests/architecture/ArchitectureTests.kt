@@ -16,9 +16,18 @@ class ArchitectureTests {
             ClassFileImporter()
                 .importPackages("de.seuhd.campuscoffee") // imports all sub-packages
 
-        // the .security package holds the application's own wiring (Spring Security, JWT, UserDetailsService)
+        // the application module's own wiring: the root package (the Spring Boot app + startup loaders), its
+        // security (Spring Security, JWT, UserDetailsService), web (SPA forwarding), and configuration
+        // (CORS, the prod guard, the @ConfigurationProperties), plus the test sources. All of it is the
+        // application layer, which no other layer may access.
         val applicationPackages =
-            arrayOf("de.seuhd.campuscoffee", "de.seuhd.campuscoffee.security..", "de.seuhd.campuscoffee.tests..")
+            arrayOf(
+                "de.seuhd.campuscoffee",
+                "de.seuhd.campuscoffee.security..",
+                "de.seuhd.campuscoffee.web..",
+                "de.seuhd.campuscoffee.configuration..",
+                "de.seuhd.campuscoffee.tests.."
+            )
 
         layeredArchitecture()
             .consideringAllDependencies()
@@ -38,6 +47,9 @@ class ArchitectureTests {
             .mayOnlyBeAccessedByLayers("application")
             .whereLayer("application")
             .mayNotBeAccessedByAnyLayer()
+            // every imported production/test class must belong to one of the layers above, so a new top-level
+            // package cannot silently escape the layer rules (the gap that left web/configuration uncovered)
+            .ensureAllClassesAreContainedInArchitecture()
             .check(classes)
     }
 

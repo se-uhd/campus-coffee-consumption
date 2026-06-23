@@ -26,7 +26,7 @@ import java.util.UUID
 
 /**
  * Domain implementation of [CoffeeConsumptionService]. Each `+1`/`-1` ([applyDelta]) and admin override
- * ([setTotal]) loads the member's consumption, applies the new count, and upserts it — recorded by the
+ * ([setTotal]) loads the member's consumption, applies the new count, and upserts it, recorded by the
  * event-sourced data adapter as a full-state event, reusing the same upsert path a review's approval
  * count used. Enforces the authorization rules: a member may view and step only their own count, an admin
  * may act on anyone, the absolute override is admin-only, a deactivated member is read-only, and the count
@@ -40,7 +40,9 @@ class CoffeeConsumptionServiceImpl(
     private val ledgerDataService: LedgerDataService,
     private val userDataService: UserDataService,
     private val changeNoteContext: ChangeNoteContext,
-    @param:Value("\${campus-coffee.consumption.cancel-grace-period:5m}") private val cancelGracePeriod: Duration
+    // the grace-period default lives once in application.yaml (campus-coffee.consumption.cancel-grace-period,
+    // defaulting to 5m there); the domain binds the key directly because it cannot depend on the api module
+    @param:Value("\${campus-coffee.consumption.cancel-grace-period}") private val cancelGracePeriod: Duration
 ) : CrudServiceImpl<CoffeeConsumption, UUID>(CoffeeConsumption::class.java),
     CoffeeConsumptionService {
     override fun dataService(): CrudDataService<CoffeeConsumption, UUID> = coffeeConsumptionDataService
@@ -84,9 +86,10 @@ class CoffeeConsumptionServiceImpl(
             throw ValidationException("The coffee count cannot be negative.")
         }
         val current = coffeeConsumptionDataService.getByUserId(userId)
-        // the override is authoritative: it writes an absolute count, so it intentionally supersedes any
-        // concurrent self-scan (a +1 landing between this read and write is overwritten by design — the
-        // admin asserts a value, not an adjustment), which is why this write is not guarded against that race
+        // the override is authoritative: it writes an absolute count asserted by the admin. It adds no
+        // domain-level concurrency guard, but the write is not actually last-writer-wins: the event-sourced
+        // read-model projection carries a @Version column, so a self-scan landing between this read and the
+        // flush surfaces as a ConcurrentUpdateException (409), not a silent overwrite, and the admin re-applies.
         // expose the admin's note to the event store for the duration of this one recording upsert
         return changeNoteContext.runWithNote(note) {
             coffeeConsumptionDataService.upsert(current.copy(count = total))
@@ -118,6 +121,10 @@ class CoffeeConsumptionServiceImpl(
         if (actingUser.active != true) {
             throw ForbiddenException("A deactivated member is read-only and cannot undo a coffee.")
         }
+        // invariant: the grace/candidate gate here and the ledger credit (which re-walks the member's
+        // increments LIFO) derive the same chosen increment from the same stack rules, so they must stay
+        // rule-identical. The count <= 0 recheck below plus the @Version-guarded write prevent a double-undo
+        // even though this candidate read is not serialized with the write.
         val candidate =
             ledgerDataService.lastCancellableIncrement(userId, actingUser.loginName)
                 ?: throw ConflictException("There is no recent coffee to undo.")
@@ -169,8 +176,8 @@ class CoffeeConsumptionServiceImpl(
     }
 
     /**
-     * Allows a `+1`/`-1` only when [actingUser] owns the consumption of [userId] or is an admin, and — for
-     * the owner — only while the account is active (a deactivated member is authenticated read-only).
+     * Allows a `+1`/`-1` only when [actingUser] owns the consumption of [userId] or is an admin, and, for
+     * the owner, only while the account is active (a deactivated member is authenticated read-only).
      */
     private fun requireMaySelfMutate(
         userId: UUID,

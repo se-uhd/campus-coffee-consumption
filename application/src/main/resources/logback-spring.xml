@@ -2,13 +2,16 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
     <include resource="org/springframework/boot/logging/logback/console-appender.xml" />
-    <include resource="org/springframework/boot/logging/logback/file-appender.xml" />
+    <!-- The rolling file appender is a dev convenience (logging.file.name is set only in the dev profile);
+         prod and the tests log to the console only, captured by the platform / build. -->
+    <springProfile name="dev">
+        <include resource="org/springframework/boot/logging/logback/file-appender.xml" />
+    </springProfile>
 
     <root level="INFO">
         <appender-ref ref="CONSOLE" />
-    </root>
-
-    <root level="INFO">
-        <appender-ref ref="FILE" />
+        <springProfile name="dev">
+            <appender-ref ref="FILE" />
+        </springProfile>
     </root>
 </configuration>

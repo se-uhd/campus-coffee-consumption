@@ -48,9 +48,9 @@ abstract class CrudServiceImpl<DOMAIN : DomainModel<ID>, ID>(
         if (id == null) {
             log.debug("Creating a new {}.", domainClass.simpleName)
         } else {
+            // no existence pre-read here: the data adapter's update path reads the row by id and throws
+            // NotFoundException itself if it is missing, so a pre-read would only duplicate that lookup
             log.debug("Updating {}.", describe(domainObject))
-            // the entity must exist in the database before the update
-            dataService().getById(id)
         }
 
         try {
