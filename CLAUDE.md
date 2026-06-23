@@ -65,7 +65,7 @@ source of truth, and the relational tables are a **read model** projected from i
   `@Primary`, so the domain binds to them. Each write request appends one full-state event (`EventStore`)
   and projects it into the tables (`ReadModelProjector`) in one transaction, so a constraint violation
   rolls both back and the log never holds an invalid event.
-- `EventSourcedMutator.upsert(domain, getById, buildForInsert, buildForUpdate)` is the shared event-first
+- `EventSourcedWriter.upsert(domain, getById, buildForInsert, buildForUpdate)` is the shared event-first
   logic; it assigns the id and timestamps, appends, and projects, holding no per-type knowledge.
 - The projection reuses the MapStruct entity mappers and preserves the id and timestamps from the event
   body (`Entity.markTimestampsPreassigned()`). Read requests are served from the materialized tables (no
@@ -82,7 +82,7 @@ Two additions versus CampusCoffee's event machinery:
    reason). A settlement, kitty adjustment, or expense note is written into that entity's own event body
    (by its `Event*Serializer`), not into this metadata `note` column, so a `note` query over `events`
    returns null for those. Neither metadata field is part of the full-state JSON body,
-   and the generic mutator/decorator signatures are untouched. `created_by` is a login string, not a user
+   and the generic writer/decorator signatures are untouched. `created_by` is a login string, not a user
    id, so the audit trail is human-readable, represents the non-user `"system"` actor naturally, and does
    not foreign key into the mutable users read model.
 2. **Several logged entities, each modeled exactly like CampusCoffee's `Review`.** `CoffeeConsumption`,

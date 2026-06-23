@@ -17,11 +17,11 @@ import java.util.UUID
 @Primary
 class EventSourcedPaymentDataService(
     private val delegate: PaymentDataServiceImpl,
-    private val mutator: EventSourcedMutator
+    private val writer: EventSourcedWriter
 ) : PaymentDataService by delegate {
     @Transactional
     override fun upsert(domain: Payment): Payment =
-        mutator.upsert(
+        writer.upsert(
             domain,
             delegate::getById,
             { id, now -> domain.copy(id = id, createdAt = now, updatedAt = now) },
@@ -31,8 +31,8 @@ class EventSourcedPaymentDataService(
     @Transactional
     override fun delete(id: UUID) =
         // carry the member id (null for a pure kitty adjustment) so the member ledger reverses a settlement
-        mutator.delete(Payment::class, id, delegate::getById) { mapOf("userId" to it.user?.id) }
+        writer.delete(Payment::class, id, delegate::getById) { mapOf("userId" to it.user?.id) }
 
     @Transactional
-    override fun clear() = mutator.clear(Payment::class, delegate::clear)
+    override fun clear() = writer.clear(Payment::class, delegate::clear)
 }
