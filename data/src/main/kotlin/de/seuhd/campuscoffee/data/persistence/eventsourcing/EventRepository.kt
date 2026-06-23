@@ -17,7 +17,7 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
      * newest first, for reading an entity's history from the log. A native query because the match is on
      * the `jsonb` body's `id` (indexed by `idx_events_body_id`), which JPQL cannot express.
      *
-     * @param entityType the entity type label (the domain class's simple name)
+     * @param entityType the entity type label (the [LoggedEntityType] label stored in `entity_type`)
      * @param bodyId     the domain object's id as it appears in the body (its string form)
      * @param limit      the maximum number of events to return
      * @param offset     the number of events to skip from the newest (for paging)
@@ -65,16 +65,28 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
     ): List<EventEntity>
 
     /**
+     * Returns the whole kitty money stream in append order: every payment (a settlement or a kitty
+     * adjustment) and every expense, ordered by `seq` in SQL so the kitty walk reads one ordered stream
+     * instead of concatenating two type streams and re-sorting them in memory. The `(entity_type, seq)`
+     * index (V8) serves this directly.
+     */
+    @Query(
+        value = "SELECT * FROM events WHERE entity_type IN ('Payment', 'Expense') ORDER BY seq ASC",
+        nativeQuery = true
+    )
+    fun findKittyStream(): List<EventEntity>
+
+    /**
      * Whether the log already holds at least one event for the given domain type, so the import can skip it.
      *
-     * @param entityType the entity type label (the domain class's simple name)
+     * @param entityType the entity type label (the [LoggedEntityType] label stored in `entity_type`)
      */
     fun existsByEntityType(entityType: String): Boolean
 
     /**
      * Removes every event for the given domain type, when clearing that type's data.
      *
-     * @param entityType the entity type label (the domain class's simple name)
+     * @param entityType the entity type label (the [LoggedEntityType] label stored in `entity_type`)
      */
     fun deleteByEntityType(entityType: String)
 }

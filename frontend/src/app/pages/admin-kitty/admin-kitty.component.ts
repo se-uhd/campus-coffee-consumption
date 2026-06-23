@@ -24,7 +24,7 @@ import { appendLedgerPage } from '../../util/ledger';
 const PAGE_SIZE = 20;
 
 /**
- * Admin kitty page: shows the communal kitty balance and history, and offers two money movements — a member
+ * Admin kitty page: shows the communal kitty balance and history, and offers two money movements: a member
  * deposit (a member paid money in) and a kitty adjustment (a direct change to the kitty balance, which may
  * be negative). Euro inputs are converted to integer cents on submit, never via float math.
  */
@@ -151,7 +151,7 @@ const PAGE_SIZE = 20;
                 name="adjustmentAmount"
                 #adjustmentModel="ngModel"
                 [(ngModel)]="adjustmentEuros"
-                ccEuroAmount
+                ccEuroAmount="allow-negative"
                 required
               />
               <mat-hint>Use a comma or a point, e.g. 5,00 or 5.00 (zero is not allowed).</mat-hint>
@@ -213,9 +213,9 @@ export class AdminKittyComponent implements OnInit {
     return euroInputError(this.settlementEuros, '5.00');
   }
 
-  /** The validation message for the kitty-adjustment amount (e.g. the ambiguous comma+point case), or null. */
+  /** The validation message for the kitty-adjustment amount; a negative amount is allowed here (unlike a deposit). */
   adjustmentError(): string | null {
-    return euroInputError(this.adjustmentEuros, '5.00');
+    return euroInputError(this.adjustmentEuros, '5.00', true);
   }
 
   async ngOnInit(): Promise<void> {
@@ -258,6 +258,9 @@ export class AdminKittyComponent implements OnInit {
 
   /** Records a member settlement; the euro input is converted to integer cents before sending. */
   async recordSettlement(): Promise<void> {
+    if (this.busy) {
+      return;
+    }
     const amountCents = toCents(this.settlementEuros);
     if (!this.settlementUserId || amountCents == null || amountCents <= 0) {
       this.notifications.error(null, 'Choose a member and a positive amount.');
@@ -283,6 +286,9 @@ export class AdminKittyComponent implements OnInit {
 
   /** Adjusts the kitty (may be negative); the euro input is converted to integer cents before sending. */
   async recordAdjustment(): Promise<void> {
+    if (this.busy) {
+      return;
+    }
     const amountCents = toCents(this.adjustmentEuros);
     if (amountCents == null || amountCents === 0) {
       this.notifications.error(null, 'Enter a non-zero amount.');

@@ -1,5 +1,5 @@
 # Keep the Docker build context small and reproducible: the image builds the app from source with
-# Gradle, so local build outputs, caches, VCS, IDE, and docs are not needed.
+# Gradle, so local build outputs, caches, VCS, IDE, node_modules, and docs are not needed.
 .git
 .gitignore
 .gradle
@@ -12,3 +12,12 @@ doc
 *.log
 deploy.env
 .env
+# Host-generated frontend dirs (the Gradle build runs npm itself, so none of these are inputs). node_modules
+# alone is hundreds of MB of build context that would otherwise be uploaded on every build.
+**/node_modules
+frontend/dist
+frontend/.angular
+frontend/coverage
+frontend/coverage-e2e
+frontend/playwright-report
+frontend/test-results

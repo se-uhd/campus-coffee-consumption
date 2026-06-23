@@ -30,7 +30,7 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
 /**
  * Admin expenses page: records a bean purchase for a selected member with the explicit kitty/private split
  * (the two amounts must sum to the total), and lists that member's purchases (loaded by id) so an admin can
- * correct or delete each one by id. The buyer is fixed for the lifetime of a purchase — a correction keeps
+ * correct or delete each one by id. The buyer is fixed for the lifetime of a purchase: a correction keeps
  * the same member (the backend rejects changing a purchase's buyer), so the selector chooses whose purchases
  * to manage, not a reassignment target.
  */
@@ -95,6 +95,7 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                 matInput
                 type="number"
                 min="0"
+                step="1"
                 name="weight"
                 #weightModel="ngModel"
                 [(ngModel)]="weightGrams"
@@ -319,8 +320,8 @@ export class AdminExpensesComponent implements OnInit {
       // selection) still defaults to the admin's own account rather than the first member
       const me = await this.userService.me();
       this.selection.setOwnUserId(me.id ?? '');
-      // take the selection from the URL's `member` param (the source of truth) — the admin's own account
-      // when it is absent — so a deep link or a refresh on `/admin/expenses?member=<id>` lands on that member
+      // take the selection from the URL's `member` param (the source of truth, the admin's own account
+      // when it is absent), so a deep link or a refresh on `/admin/expenses?member=<id>` lands on that member
       this.selectedId = this.selection.selectFromParam(this.route.snapshot.queryParamMap.get('member'));
       await this.loadPurchases();
     } catch {
@@ -333,7 +334,7 @@ export class AdminExpensesComponent implements OnInit {
   /**
    * Pushes the newly-selected member onto the URL as the `member` query param (a history entry, so Back
    * undoes the switch). The `queryParamMap` subscription then mirrors it into the shared selection and
-   * reloads the member's purchases — the URL stays the source of truth.
+   * reloads the member's purchases; the URL stays the source of truth.
    *
    * @param memberId the member id picked in the selector
    */
@@ -348,7 +349,7 @@ export class AdminExpensesComponent implements OnInit {
 
   /**
    * Selects the member named by the URL's `member` param (or the admin's own account when it is absent),
-   * resets the form, and reloads the member's purchases — unless that member's purchases are already loaded,
+   * resets the form, and reloads the member's purchases, unless that member's purchases are already loaded,
    * so a redundant re-emission of the same param does not reload. `loadedId` (the member actually loaded) is
    * the guard, not the bound `selectedId` (which the dropdown already advanced before navigating).
    *
@@ -426,11 +427,12 @@ export class AdminExpensesComponent implements OnInit {
     if (
       weightGrams == null ||
       weightGrams < 0 ||
+      !Number.isInteger(weightGrams) ||
       amountCents == null ||
       privateAmountCents == null ||
       kittyAmountCents == null
     ) {
-      this.error = 'Enter the weight, total, and both shares.';
+      this.error = 'Enter a whole-gram weight, a total, and both shares.';
       return null;
     }
     if (privateAmountCents + kittyAmountCents !== amountCents) {

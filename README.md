@@ -127,7 +127,7 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `GET  /summary`: the member landing in one call (current count, balance, the current price, the kitty balance, and the first page of the unified ledger).
 - `POST /consumption` (no body): add one coffee.
 - `POST /consumption/cancel`: undo the most recent coffee within the grace period (nothing to undo, or past the grace period, returns 409 Conflict).
-- `GET  /ledger?limit=5&offset=0`: own unified ledger (coffees, purchases, settlements) with a running balance.
+- `GET  /ledger?limit=20&offset=0`: own unified ledger (coffees, purchases, settlements) with a running balance.
 - `POST /expenses` `{ "weightGrams": N, "amountCents": N, "note"?: "…" }`: record an own bean purchase (booked 100% to the member).
 - `GET  /profile`, `PUT /profile`: view and edit own name and email (the response includes the capability URL).
 - `GET  /profile/qr.png`: own QR code (high-resolution PNG).
@@ -138,7 +138,7 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `DELETE /users/{id}`: refused (409) if the member has financial history; deactivate instead.
 - `GET /users/{id}/link`, `POST /users/{id}/link/rotate`, `GET /users/{id}/qr.png`.
 - `GET /users/qr.zip`: a streamed ZIP of every member's QR code (one `<loginName>.png` per member).
-- `GET  /users/{id}/consumption?limit=5&offset=0`, `GET /users/{id}/ledger?limit=5&offset=0`.
+- `GET  /users/{id}/consumption?limit=5&offset=0`, `GET /users/{id}/ledger?limit=20&offset=0`.
 - `POST /users/{id}/consumption` `{ "delta": 1 | -1 }`.
 - `PUT  /users/{id}/consumption` `{ "total": N, "note": "…" }`: absolute count correction (`note` optional).
 - `GET/POST/PUT/DELETE /users/{id}/expenses`: list, record, correct, or delete a member's purchases with a private/kitty split (the buyer cannot be changed on a correction).
@@ -146,7 +146,7 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `PUT /price` `{ "amountCents": N }`, `GET /price/history`: set the global price, or view its full history.
 - `POST /payments/settlement` `{ "userId", "amountCents", "note"? }`: a member pays money into the kitty.
 - `POST /payments/adjustment` `{ "amountCents", "note"? }`: a pure kitty adjustment (an initial float or a correction).
-- `GET /kitty/ledger?limit=5&offset=0`: the kitty ledger with the running kitty balance.
+- `GET /kitty/ledger?limit=50&offset=0`: the kitty ledger with the running kitty balance.
 
 **Auth:** `POST /auth/token` `{ "loginName": "…", "password": "…" }` → `{ "token": "<jwt>" }`.
 
@@ -159,7 +159,8 @@ records a correction; both stay in the append-only log.
 
 Every change (to a count, the price, an expense, or a payment) is one row in the append-only `events`
 table. The `created_by` column records the actor's login (a member, an admin, or `"system"` for the
-fixtures), and `note` records an admin's reason for a count correction or a kitty adjustment:
+fixtures), and `note` records an admin's reason for an absolute count correction (a settlement, kitty
+adjustment, or expense note lives in that entity's own event body, not this column):
 
 ```sql
 SELECT change_type, entity_type, created_by, note FROM events ORDER BY seq;

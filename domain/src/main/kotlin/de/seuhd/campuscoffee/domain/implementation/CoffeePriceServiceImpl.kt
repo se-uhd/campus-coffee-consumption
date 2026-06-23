@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.domain.implementation
 
+import de.seuhd.campuscoffee.domain.exceptions.DuplicationException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
 import de.seuhd.campuscoffee.domain.model.CoffeePrice
@@ -9,14 +10,13 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeePriceDataService
 import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 /**
  * Domain implementation of [CoffeePriceService]. The price is a single global row: created the first time
  * one is set (or seeded at bootstrap) and updated in place thereafter, which the event-sourced data adapter
- * records as a full-state event — so the log keeps the full price history. Reading the current price is
+ * records as a full-state event, so the log keeps the full price history. Reading the current price is
  * open; changing it and reading its history are admin-only.
  */
 @Service
@@ -39,15 +39,15 @@ class CoffeePriceServiceImpl(
         }
         val current = coffeePriceDataService.findCurrent()
         // An existing row is updated in place; the first write inserts the singleton. Two concurrent first
-        // writes would both miss the existing row and both try to insert, so the loser hits the
-        // uq_coffee_prices_singleton guard — handle that the same way ensureInitialPrice does (re-read the
-        // winner's just-committed row and update it to the requested amount) rather than 500.
+        // writes would both miss the existing row and both try to insert, so the loser hits the single-row
+        // guard, which the data adapter maps to a domain DuplicationException (not a raw Spring exception):
+        // handle it the way ensureInitialPrice does (re-read the winner's row and update it) rather than fail.
         if (current != null) {
             return coffeePriceDataService.upsert(current.copy(amountCents = amountCents))
         }
         return try {
             coffeePriceDataService.upsert(CoffeePrice(amountCents = amountCents))
-        } catch (_: DataIntegrityViolationException) {
+        } catch (_: DuplicationException) {
             val winner = currentOrThrow()
             coffeePriceDataService.upsert(winner.copy(amountCents = amountCents))
         }
@@ -58,9 +58,9 @@ class CoffeePriceServiceImpl(
         coffeePriceDataService.findCurrent()?.let { return it }
         return try {
             coffeePriceDataService.upsert(CoffeePrice(amountCents = amountCents))
-        } catch (_: DataIntegrityViolationException) {
-            // two instances seeding the singleton at once: the loser hits the uq_coffee_prices_singleton
-            // guard. The winner's row is already committed, so re-read and return that rather than fail.
+        } catch (_: DuplicationException) {
+            // two instances seeding the singleton at once: the loser hits the single-row guard (surfaced as a
+            // domain DuplicationException by the data adapter). The winner's row is committed, so re-read it.
             currentOrThrow()
         }
     }

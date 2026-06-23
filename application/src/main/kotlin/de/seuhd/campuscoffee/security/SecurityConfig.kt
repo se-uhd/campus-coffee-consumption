@@ -20,14 +20,14 @@ import org.springframework.security.web.access.AccessDeniedHandler
 import org.springframework.web.cors.CorsConfigurationSource
 
 /**
- * Spring Security configuration. Two authentication mechanisms, one per audience — there is no HTTP Basic:
+ * Spring Security configuration. Two authentication mechanisms, one per audience (there is no HTTP Basic):
  * - **Admins** authenticate with a **JWT bearer token** (minted by the token endpoint from a
  *   username+password login), mapped by the resource server to a `ROLE_ADMIN` principal.
  * - **Members** authenticate with their secret **capability token** (the `X-Coffee-Token` header), resolved
- *   by [CapabilityTokenAuthenticationFilter] to a `ROLE_USER` principal — even an admin's own token grants
+ *   by [CapabilityTokenAuthenticationFilter] to a `ROLE_USER` principal; even an admin's own token grants
  *   only self-service.
  *
- * The filter chain is stateless (no server-side session) with CSRF disabled — CSRF protects the
+ * The filter chain is stateless (no server-side session) with CSRF disabled: CSRF protects the
  * cookie-based sessions this token-based API never uses. The access rules gate the API surface by
  * audience; the finer ownership rules (a member acting only on their own count; a user editing only their
  * own account; the deactivated-member read-only rule) depend on the targeted resource, so they live in the

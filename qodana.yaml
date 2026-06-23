@@ -1,7 +1,7 @@
-# Qodana configuration — JetBrains' code-quality scanner, which runs the IntelliJ inspection engine
+# Qodana configuration: JetBrains' code-quality scanner, which runs the IntelliJ inspection engine
 # headlessly. It complements (does not replace) the fast ktlint/detekt gates in `gradle build`: it catches
-# the idiomatic-Kotlin issues that live only in the IDE inspections — a redundant SAM constructor, a lambda
-# that belongs outside the parentheses, a redundant `public` modifier, unused symbols — none of which
+# the idiomatic-Kotlin issues that live only in the IDE inspections (a redundant SAM constructor, a lambda
+# that belongs outside the parentheses, a redundant `public` modifier, unused symbols), none of which
 # ktlint (formatting) or detekt (its default ruleset plus our custom KDoc rules) reports.
 #
 # The CI job is .github/workflows/qodana.yml. Locally: `qodana scan` (needs the Qodana CLI and Docker).
@@ -21,7 +21,7 @@ profile:
 
 # The project targets JDK 25 (the single source of truth is gradle/libs.versions.toml; mise.toml pins the
 # same). Open and resolve the Gradle model with a matching JDK so the type-resolution-dependent inspections
-# actually run — e.g. the redundant SAM-constructor check must know that IdGenerator is a `fun interface`.
+# actually run, e.g. the redundant SAM-constructor check must know that IdGenerator is a `fun interface`.
 projectJDK: "25"
 
 # --- Enforcement -----------------------------------------------------------------------------------------

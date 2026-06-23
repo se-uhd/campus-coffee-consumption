@@ -4,7 +4,7 @@ import { LedgerEntryDto } from '../models';
 export interface AppendedLedgerPage {
   /** The merged entries: `existing` followed by the rows of the page not already present by `seq`. */
   readonly entries: LedgerEntryDto[];
-  /** How many rows were actually appended after de-duplication — the basis for the "Load more" decision. */
+  /** How many rows were actually appended after de-duplication: the basis for the "Load more" decision. */
   readonly appended: number;
 }
 
@@ -18,6 +18,11 @@ export interface AppendedLedgerPage {
  * the rows it actually gained, not the raw page length: when a full page collapses to fewer new rows because
  * its boundary row was a duplicate of the last-seen entry, a raw-length check would leave a phantom "Load
  * more" that fetches nothing new.
+ *
+ * Known limitation (offset paging): each row keeps the running balance the server computed at its fetch
+ * time, so a money movement made by someone else between page fetches is not reflected in already-loaded
+ * rows; it self-heals on the next reload or local action. Switch to a seq-cursor with a summary refresh if
+ * exact live balances on an open, long-scrolled ledger ever matter.
  *
  * @param existing the entries already loaded (newest first, as the API returns them)
  * @param next the next page just fetched

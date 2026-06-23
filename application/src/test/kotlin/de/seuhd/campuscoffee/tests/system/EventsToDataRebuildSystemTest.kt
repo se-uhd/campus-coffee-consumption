@@ -31,7 +31,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 /**
  * System test for the event sourcing rebuild: with `events-to-data-on-startup` on so the [EventsToDataRunner]
  * bean exists, seed users, consumptions, a price, an expense, and a settlement; then rebuild the read tables
- * from the log and assert the balance, kitty, and ledger are unchanged — the log is a faithful source of
+ * from the log and assert the balance, kitty, and ledger are unchanged: the log is a faithful source of
  * truth.
  */
 @SpringBootTest(classes = [Application::class], webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)

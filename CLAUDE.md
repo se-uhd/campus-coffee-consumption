@@ -12,7 +12,7 @@ member has a running coffee count, valued at a global admin-set **price per cup*
 app where they add a coffee (and may **undo** a recent one within a grace period) and record their own bean
 purchases. Admins create and manage members, set the price, record expenses and kitty settlements, and
 correct anyone's count. Settling up is a **settlement** (real money paid into the kitty); there is no reset.
-Every change — consumptions, prices, expenses, and payments — is recorded in an append-only **event log**,
+Every change (consumptions, prices, expenses, and payments) is recorded in an append-only **event log**,
 the only persistence model, from which a **unified ledger** (coffees, purchases, and settlements with a
 running balance) is read. Money is stored as integer **euro cents** end to end. See
 `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`.
@@ -27,7 +27,7 @@ The project uses a **multi-module Gradle structure** (Kotlin DSL) with four modu
 frontend.
 
 ### Module Dependencies
-- **domain**: Core business logic, domain models, and port interfaces (no external dependencies except validation).
+- **domain**: Core business logic, domain models, and port interfaces. It depends on Bean Validation and, by design, on Spring (`@Service`/`@Component`/`@Transactional`/`@Value`/slf4j and `spring-tx`); it does not depend on the api, data, or application layers.
 - **api**: REST API layer with controllers, DTOs, and DTO mappers (depends on: domain).
 - **data**: Data layer with JPA entities, repositories, the event sourcing machinery, and the QR/capability token adapters (depends on: domain).
 - **application**: Main Spring Boot application that wires everything together (depends on: domain, api, data).
@@ -74,11 +74,14 @@ source of truth, and the relational tables are a **read model** projected from i
 Two additions versus CampusCoffee's event machinery:
 
 1. **`created_by` and `note` metadata on the generic event.** `events` and `EventEntity` carry a
-   `created_by` (the actor's **login name** as a string — a member via their token, an admin, or `"system"`
+   `created_by` (the actor's **login name** as a string: a member via their token, an admin, or `"system"`
    for startup fixtures/bootstrap) and a nullable `note` (an admin's free-text reason for an absolute count
-   correction or a kitty adjustment). Both are set at the `EventStore.append*` boundary from the
-   request-scoped `ActorProvider` (reads the `SecurityContext`) and `ChangeNoteContext` (a thread-local the
-   services set only around an operation that takes a reason). Neither is part of the full-state JSON body,
+   correction). Both are set at the `EventStore.append*` boundary from the
+   request-scoped `ActorProvider` (reads the `SecurityContext`) and `ChangeNoteContext` (a thread-local that
+   the coffee-consumption service sets only around the count correction, the one operation that takes a
+   reason). A settlement, kitty adjustment, or expense note is written into that entity's own event body
+   (by its `Event*Serializer`), not into this metadata `note` column, so a `note` query over `events`
+   returns null for those. Neither metadata field is part of the full-state JSON body,
    and the generic mutator/decorator signatures are untouched. `created_by` is a login string, not a user
    id, so the audit trail is human-readable, represents the non-user `"system"` actor naturally, and does
    not foreign key into the mutable users read model.
@@ -86,12 +89,12 @@ Two additions versus CampusCoffee's event machinery:
    `CoffeePrice`, `Expense`, and `Payment` are all logged the same way: a domain model, a JPA read-model
    entity, a relational `*DataServiceImpl`, and a `@Primary` event-sourced decorator. Each flattens its user
    reference to an id in the event body (mirroring how a review flattened its author): a consumption and a
-   payment to `userId` (a payment's is nullable — a pure kitty adjustment has none), an expense to
+   payment to `userId` (a payment's is nullable, a pure kitty adjustment has none), an expense to
    `buyerUserId`. `EventJsonMapper` has a serializer per type, and `ReadModelProjector` has a branch per
    type (resolving the user reference against the users read table). A new **`LoggedEntityType`** enum (data
    layer) is the `events.entity_type` discriminator: each constant carries the persisted label
    (`User`, `CoffeeConsumption`, `CoffeePrice`, `Expense`, `Payment`) and its domain class. The projector
-   dispatches a `when` over this enum, so the compiler forces a projection branch for every logged type — a
+   dispatches a `when` over this enum, so the compiler forces a projection branch for every logged type, so a
    new logged entity cannot be forgotten. The `events.entity_type` column stays an unconstrained varchar
    (the log must remain extensible); the valid set is enforced in the application via the enum.
 
@@ -103,13 +106,13 @@ the read tables from the log on startup, an event sourcing demonstration.
 The four logged entities reuse the same event-first `upsert` path; there is no new ledger-table machinery.
 A coffee `+1` (a member self-scan or an admin step), an admin absolute count correction, and a price change,
 expense, or payment is each a plain `upsert` of the relevant entity with its new full state, which the
-decorator records as a full-state event — identical to how a review's approval count advanced. The services
+decorator records as a full-state event, identical to how a review's approval count advanced. The services
 expose:
 
 - `CoffeeConsumptionService.applyDelta(userId, delta, actingUser)` and `setTotal(userId, total, note,
   actingUser)` (the admin absolute count correction; no separate reset).
 - `CoffeePriceService` sets the global price (the first write creates the singleton, later writes update it
-  in place — no fixed sentinel id, no special insert path).
+  in place; no fixed sentinel id, no special insert path).
 - `ExpenseService` records and corrects bean purchases; `PaymentService` records settlements and kitty
   adjustments.
 
@@ -122,14 +125,14 @@ undo past the grace period or with nothing to undo → 409; a count correction b
 #### The Money Model and the `seq`-based As-of Valuation
 
 Money is integer **euro cents** end to end (the read side accumulates in `Long`); there is no
-floating-point arithmetic — cents are formatted to euros only in the UI. A member's **balance** is a
+floating-point arithmetic; cents are formatted to euros only in the UI. A member's **balance** is a
 prepaid-card figure: **negative means they owe the fund**, positive means the fund owes them. A coffee `+1`
 lowers it by the price; an undo raises it by the price of the `+1` it reverses; a member's own bean purchase
 raises it; a settlement raises it (and feeds the kitty). The **kitty** is fed by settlements and admin
 adjustments and drawn down by the kitty portion of admin expenses.
 
-The kitty must never go negative. Any operation that would drive it below zero — the kitty portion of an
-admin expense or a negative kitty adjustment — is refused with a 409 (`ConflictException`). The check and the
+The kitty must never go negative. Any operation that would drive it below zero (the kitty portion of an
+admin expense or a negative kitty adjustment) is refused with a 409 (`ConflictException`). The check and the
 write are serialized by a Postgres advisory lock (the `KittyLock` domain port, implemented by
 `PostgresKittyLock` in the data layer via `pg_advisory_xact_lock`) so two concurrent draws cannot both read
 a sufficient balance and overdraw the fund (a TOCTOU race). `ExpenseService` and `PaymentService` take the
@@ -153,8 +156,8 @@ carries the `count` at that time; the event row carries `created_at`, `created_b
 entry's `delta` is the difference from the previous event.
 
 The **unified ledger** is the same idea, broadened. `LedgerDataService` (in the event-sourcing package)
-walks the log with no ledger table: a member's ledger is one ascending `seq` pass over their three streams —
-consumptions, the expenses they bought, and the settlements they paid — keyed on the owning user id in each
+walks the log with no ledger table: a member's ledger is one ascending `seq` pass over their three streams
+(consumptions, the expenses they bought, and the settlements they paid), keyed on the owning user id in each
 body (`userId` for consumptions and payments, `buyerUserId` for expenses), each entry carrying a signed
 effect and the running balance (only the **private** portion of an expense touches a member's balance, so an
 admin split never leaks the kitty portion into the member's view). The member balance is the last running
@@ -178,7 +181,7 @@ Domain-specific controllers/services extend these base classes (e.g., `UserContr
 - Docker daemon must be running to use a database in the `dev` profile or to run the tests that use *Testcontainers*.
 - Java 25 and Gradle 9.5, provisioned via `mise.toml` (no Gradle wrapper). Run Gradle through mise
   (CI uses `jdx/mise-action`). The build pins a **Java 25 toolchain with no auto-download**, so a
-  JDK 25 must be present on the machine — mise supplies it.
+  JDK 25 must be present on the machine (mise supplies it).
 - Node 24 is provisioned via `mise.toml` for the frontend build, lint, and tests.
 - The Java major version has a **single source of truth**: the `java` entry in
   `gradle/libs.versions.toml`. The convention plugins resolve it for the Gradle toolchain and the Kotlin
@@ -248,7 +251,7 @@ The `dev` profile:
 ### Rebuild the read model from the event log (optional)
 
 Event sourcing is always on. To rebuild the relational read tables from the log on startup (clear the
-tables, replay the whole log in append order — an event sourcing demonstration), restart with:
+tables, replay the whole log in append order, an event sourcing demonstration), restart with:
 
 ```shell
 gradle :application:bootRun --args='--spring.profiles.active=dev --campus-coffee.persistence.events-to-data-on-startup=true'
@@ -294,7 +297,7 @@ gradle :domain:test --tests "CoffeeConsumptionServiceTest.decrementing a count a
   `pitest` task (e.g., `gradle :domain:pitest -Pmutation`). The `application` cross-module run
   (`gradle :application:pitest -Pmutation`) additionally mutates `api.*`/`data.*` against the system and
   acceptance tests. The generated `*MapperImpl` classes are excluded, mirroring the JaCoCo gate.
-- **"Both" coverage — the e2e run feeds both gates.** The Playwright e2e contributes coverage to *both*
+- **"Both" coverage, the e2e run feeds both gates.** The Playwright e2e contributes coverage to *both*
   sides:
   - **Backend (JVM) e2e coverage merged into the JaCoCo gate.** `gradle :coverage:runE2eCoverage`
     (`scripts/run-e2e-coverage.sh`) builds the source-mapped SPA + jar, launches it under the JaCoCo agent
@@ -310,7 +313,7 @@ gradle :domain:test --tests "CoffeeConsumptionServiceTest.decrementing a count a
   - **Frontend unit coverage (Vitest).** `npm run test:coverage` (the `coverage` configuration of the
     Angular `@angular/build:unit-test` builder, `@vitest/coverage-v8`) writes lcov + HTML + text-summary
     under `frontend/coverage/`. The thresholds in `angular.json` are a deliberately *low floor*
-    (statements/functions/lines 1%, branches 0%) — the suite is a single service spec (~1% of the app), so
+    (statements/functions/lines 1%, branches 0%): the suite is a single service spec (~1% of the app), so
     the floor only guards against a regression to zero, not a real coverage target. Raise it as the unit
     suite grows.
   - **Frontend e2e (browser) coverage.** The e2e run also captures the SPA TypeScript coverage the JaCoCo
@@ -338,7 +341,7 @@ cd frontend && npm start
 ```
 
 **Frontend static analysis (wired into `gradle check`).** The `frontendLint` Gradle task (in
-`application/build.gradle.kts`) runs `npm run lint` — **angular-eslint** plus **Stylelint** for the SCSS —
+`application/build.gradle.kts`) runs `npm run lint` (**angular-eslint** plus **Stylelint** for the SCSS)
 and is bound to `check`, so `gradle build` and CI fail on a lint violation. **Prettier** (`npm run format` /
 `format:check`) and **Knip** (`npm run knip`, dead-code/unused-dependency detection) round out the toolset.
 
@@ -349,7 +352,7 @@ OpenAPI spec, not written by hand. The `generateFrontendDtos` Gradle task runs
 of `frontendBuild` and `frontendLint`, so the build keeps the DTOs current. `frontend/src/app/models.ts`
 re-exports the generated DTOs (aliasing request bodies and surfacing the enum unions), so the rest of the
 SPA imports from `models.ts` and the frontend/backend contracts cannot drift. **Do not hand-edit
-`frontend/src/app/api/model/`** — regenerate it.
+`frontend/src/app/api/model/`**: regenerate it.
 
 **Frontend tests and coverage** (run via mise's Node): `npm test` (Vitest unit tests), `npm run
 test:coverage` (the same with a coverage report under `frontend/coverage/`), `npm run e2e` (Playwright
@@ -387,7 +390,7 @@ The project follows [Semantic Versioning](https://semver.org/) and keeps a [Keep
   `Fixed` / etc.). Patch bump for tooling, CI, and internal cleanups; minor for features; major for
   breaking changes.
 - **`version` in the root `gradle.properties` is the single source of truth** (applied to every module's
-  `project.version`). The newest `## [x.y.z]` release header in `CHANGELOG.md` must equal it — enforced by
+  `project.version`). The newest `## [x.y.z]` release header in `CHANGELOG.md` must equal it, enforced by
   `scripts/check-version-sync.sh`, a `build.yml` CI step that fails the build on drift.
 - **Every released version is tagged.** Create an annotated git tag `vX.Y.Z` on the release commit (the one
   that sets the version and adds the changelog entry) and push it: `git tag -a vX.Y.Z -m "vX.Y.Z" && git
@@ -402,30 +405,33 @@ The project follows [Semantic Versioning](https://semver.org/) and keeps a [Keep
 - **Connection**: Configured in `application/src/main/resources/application.yaml`.
 
 The schema is a seven-migration set:
-- `V1__create_users_table.sql` — `users` (uuid PK, timestamps, `login_name` unique, `email_address` unique,
+- `V1__create_users_table.sql`: `users` (uuid PK, timestamps, `login_name` unique, `email_address` unique,
   `first_name`, `last_name`, a single `role` column (`USER`/`ADMIN`, no `user_roles` table), `active`,
   `password_hash` nullable, `capability_token` unique).
-- `V2__create_coffee_consumptions_table.sql` — `coffee_consumptions` (uuid PK, timestamps, `user_id` unique
+- `V2__create_coffee_consumptions_table.sql`: `coffee_consumptions` (uuid PK, timestamps, `user_id` unique
   FK with `ON DELETE CASCADE`, `count` not null default 0, `version` for optimistic locking).
-- `V3__create_events_table.sql` — the append-only `events` log, including the `created_by` (varchar) and
+- `V3__create_events_table.sql`: the append-only `events` log, including the `created_by` (varchar) and
   nullable `note` columns and the `idx_events_seq`, `idx_events_entity_type`, `idx_events_body_id` indexes.
   The `entity_type` column is an unconstrained varchar; the valid set (`User`, `CoffeeConsumption`,
   `CoffeePrice`, `Expense`, `Payment`) is enforced in the application by the `LoggedEntityType` enum.
-- `V4__create_coffee_prices_table.sql` — `coffee_prices` (uuid PK, timestamps, `amount_cents`, `version`); a
-  single global row whose every change is a full-state event, so the log is the price history.
-- `V5__create_expenses_table.sql` — `expenses` (uuid PK, timestamps, `buyer_user_id` FK with the default
+- `V4__create_coffee_prices_table.sql`: `coffee_prices` (uuid PK, timestamps, `amount_cents`, `version`,
+  plus an `is_singleton boolean` column (NOT NULL DEFAULT true, with a CHECK) and a
+  `uq_coffee_prices_singleton` UNIQUE constraint over it that enforces the one-row invariant at the schema
+  level; the entity does not map the column, the DB default supplies it); a single global row whose every
+  change is a full-state event, so the log is the price history.
+- `V5__create_expenses_table.sql`: `expenses` (uuid PK, timestamps, `buyer_user_id` FK with the default
   RESTRICT, `weight_grams`, `amount_cents`, `private_amount_cents`, `kitty_amount_cents`, `note`, `version`,
   and a `ck_expenses_split` CHECK that `private_amount_cents + kitty_amount_cents = amount_cents`).
-- `V6__create_payments_table.sql` — `payments` (uuid PK, timestamps, nullable `user_id` FK with the default
-  RESTRICT — present is a settlement, null is a pure kitty adjustment — `amount_cents` signed, `note`,
+- `V6__create_payments_table.sql`: `payments` (uuid PK, timestamps, nullable `user_id` FK with the default
+  RESTRICT (present is a settlement, null is a pure kitty adjustment), `amount_cents` signed, `note`,
   `version`).
-- `V7__add_event_owner_indexes.sql` — the owner-key expression indexes on `events`
+- `V7__add_event_owner_indexes.sql`: the owner-key expression indexes on `events`
   (`idx_events_body_user_id` on `body->>'userId'`, `idx_events_body_buyer_id` on `body->>'buyerUserId'`)
   that keep the unified-ledger and kitty walks efficient.
 
 The `expenses` and `payments` FKs keep PostgreSQL's default RESTRICT (NO ACTION) so a member's financial
 history is never silently dropped
-(the user service refuses to hard-delete a member with any financial footprint — see Error Handling — so an
+(the user service refuses to hard-delete a member with any financial footprint, see Error Handling, so an
 admin deactivates them instead); `coffee_consumptions` stays `CASCADE` because every user always has a
 (often zero) consumption row, so a `RESTRICT` there would make no user deletable.
 
@@ -451,7 +457,7 @@ admin deactivates them instead); `coffee_consumptions` stays `CASCADE` because e
 
 Test methods (those annotated with `@Test` or `@ParameterizedTest`) use Kotlin backtick names that read as
 a sentence describing the behavior under test: active voice, present tense, the subject under test first,
-then the **outcome stated as the fact the test actually asserts** — the explicit HTTP status for system
+then the **outcome stated as the fact the test actually asserts**: the explicit HTTP status for system
 tests (`409 Conflict`, `404 Not Found`), the exception type, or the returned value. Avoid `should` and
 vague status nouns. Examples:
 
@@ -481,14 +487,14 @@ keep conventional camelCase names.
 
 ## Authentication and Authorization
 
-Two authentication mechanisms, one per audience — there is **no HTTP Basic**:
+Two authentication mechanisms, one per audience; there is **no HTTP Basic**:
 
-- **Admins — JWT bearer.** `POST /api/auth/token` exchanges a username and password for a signed JWT (a
+- **Admins, JWT bearer.** `POST /api/auth/token` exchanges a username and password for a signed JWT (a
   work-session TTL of ~10 hours, no refresh flow). The SPA sends it as `Authorization: Bearer …`. The
   resource server maps the token's `roles` claim to a `ROLE_ADMIN` authority. The
   `AuthenticationManager` / `DaoAuthenticationProvider` / `CampusUserDetailsService` / password-encoder
   beans exist only for this login step.
-- **Members — capability token.** `CapabilityTokenAuthenticationFilter` reads the `X-Coffee-Token` header,
+- **Members, capability token.** `CapabilityTokenAuthenticationFilter` reads the `X-Coffee-Token` header,
   resolves it to a member via `UserService.findByCapabilityToken`, and sets a `ROLE_USER` principal. The
   capability principal is **always** `ROLE_USER`, never `ROLE_ADMIN`, so an admin's own token grants only
   self-service. A missing, unknown, or rotated token leaves the request unauthenticated → 401. A
@@ -502,8 +508,8 @@ endpoints, and the SPA routes are public); the finer ownership rules live in the
 current principal's login for `created_by`; `CurrentUserProvider` resolves the principal to a domain
 `User`. CORS is not configured (the SPA is same-origin); a default-empty `campus-coffee.cors.allowed-origins`
 allowlist is the escape hatch if the SPA is ever hosted on a separate origin. The capability URL handling
-follows the W3C "Good Practices for Capability URLs" finding — see
-`doc/2026-06-20_coffee-consumption-event-sourcing-and-capability-urls.md`.
+follows the W3C "Good Practices for Capability URLs" finding (see
+`doc/2026-06-20_coffee-consumption-event-sourcing-and-capability-urls.md`).
 
 ## REST API Endpoints
 
@@ -512,53 +518,54 @@ controllers map paths relative to the resource.
 
 ### Member self-service (auth: `X-Coffee-Token` header; principal = the token's member)
 
-- `GET  /summary?ledgerLimit=10&ledgerOffset=0` — the member landing in one call (`MemberSummaryDto`):
+- `GET  /summary?ledgerLimit=10&ledgerOffset=0`: the member landing in one call (`MemberSummaryDto`):
   current total, balance, the current price, the kitty balance, whether the most recent coffee is still
   `cancellable`, and the first page of the unified `ledger` (`ledgerLimit` defaults to 10).
-- `POST /consumption` (no body) — add one coffee, returns the summary.
-- `POST /consumption/cancel` — undo the most recent un-cancelled own coffee within the grace period (nothing
+- `POST /consumption` (no body): add one coffee, returns the summary.
+- `POST /consumption/cancel`: undo the most recent un-cancelled own coffee within the grace period (nothing
   to undo / past the grace period → 409).
-- `GET  /ledger?limit=5&offset=0` — own unified ledger (coffees, own purchases, settlements) newest-first,
+- `GET  /ledger?limit=20&offset=0`: own unified ledger (coffees, own purchases, settlements) newest-first,
   each entry with a running balance.
-- `POST /expenses` `{ amountCents, weightGrams?, note? }` — record an own bean purchase (booked 100% private
+- `POST /expenses` `{ amountCents, weightGrams, note? }`: record an own bean purchase (booked 100% private
   to the member; the buyer and split are server-derived).
-- `GET  /profile` / `PUT /profile` — view / edit own `firstName`, `lastName`, `emailAddress`; the response includes the assembled capability URL.
-- `GET  /profile/qr.png` — own capability QR code (high-resolution PNG, the single format).
+- `GET  /profile` / `PUT /profile`: view / edit own `firstName`, `lastName`, `emailAddress`; the response includes the assembled capability URL.
+- `GET  /profile/qr.png`: own capability QR code (high-resolution PNG, the single format).
 
 ### Admin and user management (auth: JWT, `ROLE_ADMIN`)
 
 - `GET /users`, `POST /users` (create; the server assigns the capability token and creates the consumption at 0), `GET/PUT/DELETE /users/{id}`.
 - `PUT /users/{id}` edits the profile, `role`, and `active` (deactivate/reactivate).
 - `DELETE /users/{id}` hard-deletes a member; refused (409) if the member has any financial history (deactivate instead).
-- `GET /users/me` — the signed-in admin's own user (the admin landing default).
-- `GET /users/overview` — a per-member overview (counts and balances); it now renders in the member-management page (`/admin/users`).
+- `GET /users/me`: the signed-in admin's own user (the admin landing default).
+- `GET /users/filter?login_name=…`: filter users by query params (e.g. by login name).
+- `GET /users/overview`: a per-member overview (counts and balances); it now renders in the member-management page (`/admin/users`).
 - `GET /users/{id}/link`, `POST /users/{id}/link/rotate`, `GET /users/{id}/qr.png` (downloads as
   `<loginName>.png`, transparent background).
-- `GET /users/qr.zip` — a streamed ZIP of every member's QR code as `<loginName>.png` (capped at 1000
+- `GET /users/qr.zip`: a streamed ZIP of every member's QR code as `<loginName>.png` (capped at 1000
   members; powers the admin "Download all QR codes" button).
-- `GET  /users/{id}/consumption?limit=5&offset=0` — a member's total plus a page of the change log.
-- `GET  /users/{id}/ledger?limit=5&offset=0` — a member's unified ledger.
-- `POST /users/{id}/consumption` `{ delta: 1 | -1 }` — a single-step change.
-- `PUT  /users/{id}/consumption` `{ total, note? }` — the absolute count correction (`note` is the optional admin reason, ≤ 500 chars).
-- `POST/PUT/DELETE /users/{id}/expenses` `{ amountCents, privateAmountCents, kittyAmountCents, weightGrams?, note? }` — record / correct / delete a member's bean purchase with an explicit private/kitty split (must sum to the total) attributed to the member as buyer.
-- `GET /price` — read the current global price (admin-only; members receive it through their landing summary).
-- `PUT /price` `{ amountCents }` — set the global price; `GET /price/history` — the full price history from the log.
-- `POST /payments/settlement` `{ userId, amountCents, note? }` — a member pays money into the kitty (credits the member, feeds the kitty).
-- `POST /payments/adjustment` `{ amountCents, note? }` — a pure kitty adjustment (an initial float or a correction).
-- `GET /kitty/ledger?limit=5&offset=0` — the kitty ledger (settlements and admin expenses, with the running kitty balance).
+- `GET  /users/{id}/consumption?limit=5&offset=0`: a member's total plus a page of the change log.
+- `GET  /users/{id}/ledger?limit=20&offset=0`: a member's unified ledger.
+- `POST /users/{id}/consumption` `{ delta: 1 | -1 }`: a single-step change.
+- `PUT  /users/{id}/consumption` `{ total, note? }`: the absolute count correction (`note` is the optional admin reason, ≤ 500 chars).
+- `POST/PUT/DELETE /users/{id}/expenses` `{ amountCents, privateAmountCents, kittyAmountCents, weightGrams, note? }`: record / correct / delete a member's bean purchase with an explicit private/kitty split (must sum to the total) attributed to the member as buyer.
+- `GET /price`: read the current global price (admin-only; members receive it through their landing summary).
+- `PUT /price` `{ amountCents }`: set the global price; `GET /price/history` reads the full price history from the log.
+- `POST /payments/settlement` `{ userId, amountCents, note? }`: a member pays money into the kitty (credits the member, feeds the kitty).
+- `POST /payments/adjustment` `{ amountCents, note? }`: a pure kitty adjustment (an initial float or a correction).
+- `GET /kitty/ledger?limit=50&offset=0`: the kitty ledger (settlements and admin expenses, with the running kitty balance).
 
 ### Auth and dev
 
-- `POST /auth/token` — username + password → JWT (the only admin credential; no Basic).
-- `GET/PUT/DELETE /dev/data` (dev profile only) — report counts / seed fixtures / clear.
+- `POST /auth/token`: username + password → JWT (the only admin credential; no Basic).
+- `GET/PUT/DELETE /dev/data` (dev profile only): report counts / seed fixtures / clear.
 
 Notes on semantics:
 - `/consumption` is the change log; the running `total` is a derived field in the response. Paths name
-  resources, not verbs — there is no `/increment`, `/decrement`, `/reset`, or `/transactions`. The HTTP
+  resources, not verbs; there is no `/increment`, `/decrement`, `/reset`, or `/transactions`. The HTTP
   method carries the semantics: `GET` reads (safe), member `POST /consumption` adds one coffee
   (non-idempotent), `POST /consumption/cancel` undoes the most recent one within the grace period, and admin
   `PUT` sets the absolute total (idempotent, admin-only). There is no reset; settling up is a settlement
-  (real money) and an admin count change is a correction — both keep the prior entries in the append-only
+  (real money) and an admin count change is a correction; both keep the prior entries in the append-only
   log.
 - A member adds one coffee at a time and may undo a recent one; any other count adjustment is the admin's
   `PUT`. Money is integer **euro cents** in every request and response.
@@ -609,12 +616,12 @@ the admin (and the demo loader does not run).
 Domain exceptions in `domain/.../exceptions/`:
 - `NotFoundException`: Entity not found (404).
 - `DuplicationException`: Duplicate unique fields (409).
-- `ValidationException`: Malformed input / business rule violation (400) — e.g. a `delta` other than `±1`, a count correction below zero, or an expense whose split does not sum to its total.
+- `ValidationException`: Malformed input / business rule violation (400), e.g. a `delta` other than `±1`, a count correction below zero, or an expense whose split does not sum to its total.
 - `MissingFieldException`: Required field missing (400).
-- `ConflictException`: A well-formed request that conflicts with the resource's current state (409) — a `−1` at 0, an undo with nothing to undo or past the grace period, or an operation that would drive the kitty below zero (the kitty-overdraw guard, see below).
-- `ConcurrentUpdateException`: Optimistic-locking conflict (409) — a concurrent self-scan; the SPA retries.
-- `ForbiddenException`: Authorization failure (403) — not the owner / not an admin, or a deactivated member mutating.
-- `DeletionConflictException`: Deletion blocked because other data references the entity (409) — e.g. hard-deleting a member who has any financial history (a non-zero count, or any expense or settlement); the admin deactivates them instead.
+- `ConflictException`: A well-formed request that conflicts with the resource's current state (409), e.g. a `−1` at 0, an undo with nothing to undo or past the grace period, or an operation that would drive the kitty below zero (the kitty-overdraw guard, see below).
+- `ConcurrentUpdateException`: Optimistic-locking conflict (409), a concurrent self-scan; the SPA retries.
+- `ForbiddenException`: Authorization failure (403), not the owner / not an admin, or a deactivated member mutating.
+- `DeletionConflictException`: Deletion blocked because other data references the entity (409), e.g. hard-deleting a member who has any financial history (a non-zero count, or any expense or settlement); the admin deactivates them instead.
 
 Global exception handler: `api/.../exceptions/GlobalExceptionHandler.kt`. It extends
 `ResponseEntityExceptionHandler`, so the standard Spring MVC exceptions also map to their proper status
@@ -669,7 +676,7 @@ Custom OpenAPI annotations in `api/.../openapi/`: `@CrudOperation` for common CR
 7. Create the entity mapper in `data/.../mapper/` (extend `EntityMapper`).
 8. Create the data service implementation in `data/.../implementations/` (extend `CrudDataServiceImpl<DOMAIN, ENTITY, REPOSITORY, ID>`).
 9. Register it as a logged entity: add a constant to the `LoggedEntityType` enum (the `events.entity_type`
-   discriminator — the projector's `when` is exhaustive over it, so the compiler will require the next
+   discriminator; the projector's `when` is exhaustive over it, so the compiler will require the next
    step), add a serializer to `EventJsonMapper`, a branch to `ReadModelProjector` (with its
    `DOMAIN_CLASSES`/`DUPLICATION_RULES` entries), and an `EventSourced…DataService` decorator. An entity
    with no database-unique key passes `emptySet()` constraints (and contributes no `DUPLICATION_RULES`).

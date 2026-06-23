@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * resolve that key in `application.yaml`, mirroring the other `*Properties` classes.
  *
  * @property eventsToDataOnStartup when true, rebuild the relational read tables from the event log on
- *   startup (clear the tables and replay the whole log in append order) — an event sourcing demonstration.
+ *   startup (clear the tables and replay the whole log in append order): an event sourcing demonstration.
  *   `EventsToDataRunner` activates on this key via `@ConditionalOnProperty`. Off by default.
  */
 @ConfigurationProperties("campus-coffee.persistence")

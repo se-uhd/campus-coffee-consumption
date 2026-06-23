@@ -3,11 +3,11 @@ import { Injectable, signal } from '@angular/core';
 /**
  * Holds the member the admin is currently viewing, shared across the admin subpages (the landing, expenses,
  * and any other per-member admin view) so a member selected on one page carries over to the next. The
- * default — and the target of {@link resetToOwnAccount} — is the signed-in admin's own user id, set once
+ * default (and the target of {@link resetToOwnAccount}) is the signed-in admin's own user id, set once
  * from `/api/users/me`, so every admin page lands on the admin's own account by default.
  *
  * The URL is the source of truth for the selection: each admin page mirrors the `member` query param into
- * this service (via {@link selectFromParam}) and navigates — rather than calling {@link select} directly —
+ * this service (via {@link selectFromParam}) and navigates, rather than calling {@link select} directly,
  * when the admin picks a member, so the browser Back/Forward buttons traverse the selection. This service is
  * the in-memory mirror the templates bind to, not the authority.
  */
@@ -43,8 +43,8 @@ export class AdminSelectionService {
   }
 
   /**
-   * Mirrors the URL's `member` query param into the selection: selects that member, or — when the param is
-   * absent (a bare admin page, or after Back has popped the param off) — falls back to the admin's own
+   * Mirrors the URL's `member` query param into the selection: selects that member, or, when the param is
+   * absent (a bare admin page, or after Back has popped the param off), falls back to the admin's own
    * account. Returns the effective selection so a page can load it. The URL stays authoritative: a page
    * subscribes to its `member` param and calls this, rather than mutating the selection directly.
    *

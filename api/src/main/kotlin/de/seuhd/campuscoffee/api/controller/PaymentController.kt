@@ -10,11 +10,12 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.ResponseBody
+import org.springframework.web.bind.annotation.ResponseStatus
 
 /**
  * Admin controller for kitty money movements (JWT, admin only): record a member's settlement (money in,
@@ -34,10 +35,12 @@ class PaymentController(
      * @param dto the settlement (member, positive amount, optional note)
      */
     @Operation(summary = "Record a member's settlement (money paid into the kitty).")
+    @ResponseStatus(HttpStatus.CREATED)
+    @ResponseBody
     @PostMapping("/settlement")
     fun settle(
         @RequestBody @Valid dto: SettlementRequestDto
-    ): ResponseEntity<PaymentDto> {
+    ): PaymentDto {
         val admin = currentUserProvider.currentUser()
         val payment =
             paymentService.recordSettlement(
@@ -46,7 +49,7 @@ class PaymentController(
                 dto.note,
                 admin
             )
-        return ResponseEntity.status(HttpStatus.CREATED).body(paymentDtoMapper.toDto(payment))
+        return paymentDtoMapper.toDto(payment)
     }
 
     /**
@@ -55,12 +58,14 @@ class PaymentController(
      * @param dto the adjustment (signed amount, optional note)
      */
     @Operation(summary = "Adjust the kitty (initial float or correction).")
+    @ResponseStatus(HttpStatus.CREATED)
+    @ResponseBody
     @PostMapping("/adjustment")
     fun adjust(
         @RequestBody @Valid dto: AdjustmentRequestDto
-    ): ResponseEntity<PaymentDto> {
+    ): PaymentDto {
         val admin = currentUserProvider.currentUser()
         val payment = paymentService.adjustKitty(requireNotNull(dto.amountCents), dto.note, admin)
-        return ResponseEntity.status(HttpStatus.CREATED).body(paymentDtoMapper.toDto(payment))
+        return paymentDtoMapper.toDto(payment)
     }
 }

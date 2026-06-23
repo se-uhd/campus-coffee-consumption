@@ -36,7 +36,7 @@ enum class Operation(
             CrudResponseSpecification(HttpStatus.CREATED, "The new %s as a JSON object."),
             CrudResponseSpecification(
                 HttpStatus.BAD_REQUEST,
-                "Validation failed (e.g., bean validation error, or the request body carries an ID — " +
+                "Validation failed (e.g., bean validation error, or the request body carries an ID; " +
                     "IDs are assigned by the server).",
                 isErrorResponse = true
             ),

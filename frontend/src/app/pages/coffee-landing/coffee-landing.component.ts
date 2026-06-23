@@ -1,4 +1,5 @@
 import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -133,13 +134,14 @@ const LEDGER_PAGE_SIZE = 10;
                 matInput
                 type="number"
                 min="0"
+                step="1"
                 name="weight"
                 #weightModel="ngModel"
                 [(ngModel)]="expenseWeightGrams"
                 required
               />
               @if (weightModel.invalid && weightModel.touched) {
-                <mat-error>Enter the weight in grams.</mat-error>
+                <mat-error>Enter the weight as a whole number of grams.</mat-error>
               }
             </mat-form-field>
             <mat-form-field class="full-width">
@@ -295,12 +297,16 @@ export class CoffeeLandingComponent implements OnInit {
 
   /** Adds a coffee: bumps the displayed count optimistically, then reconciles to the server summary. */
   async addCoffee(): Promise<void> {
+    // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
+    if (this.busy) {
+      return;
+    }
     this.busy = true;
     if (this.displayCount != null) {
       this.displayCount += 1;
     }
     try {
-      this.applySummary(await this.summaryService.addCoffee());
+      this.applySummary(await this.addCoffeeWithRetry());
     } catch (error) {
       this.notifications.error(error, 'Could not record that coffee. Reloading.');
       await this.reload();
@@ -309,8 +315,27 @@ export class CoffeeLandingComponent implements OnInit {
     }
   }
 
+  /**
+   * Posts one coffee, retrying once on a concurrent-update 409. The same member scanning from two tabs (or a
+   * double-tap) loses the @Version optimistic-lock race on one write; the documented contract is that the SPA
+   * retries it, so the dropped tap is re-applied rather than surfaced as an error.
+   */
+  private async addCoffeeWithRetry(): Promise<MemberSummaryDto> {
+    try {
+      return await this.summaryService.addCoffee();
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.status === 409) {
+        return await this.summaryService.addCoffee();
+      }
+      throw error;
+    }
+  }
+
   /** Undoes the most recent coffee within the grace period; a 409 means it is no longer cancellable. */
   async undo(): Promise<void> {
+    if (this.busy) {
+      return;
+    }
     this.busy = true;
     if (this.displayCount != null && this.displayCount > 0) {
       this.displayCount -= 1;
@@ -327,14 +352,18 @@ export class CoffeeLandingComponent implements OnInit {
 
   /** Records the member's own bean purchase; money is sent as integer cents, never as euros. */
   async recordExpense(): Promise<void> {
+    if (this.busy) {
+      return;
+    }
     const amountCents = toCents(this.expenseAmountEuros);
     if (
       this.expenseWeightGrams == null ||
       this.expenseWeightGrams < 0 ||
+      !Number.isInteger(this.expenseWeightGrams) ||
       amountCents == null ||
       amountCents < 0
     ) {
-      this.notifications.error(null, 'Enter a weight and a valid amount.');
+      this.notifications.error(null, 'Enter a whole-gram weight and a valid amount.');
       return;
     }
     this.busy = true;

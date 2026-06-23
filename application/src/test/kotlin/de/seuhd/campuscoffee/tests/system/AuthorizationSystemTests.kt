@@ -144,7 +144,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
                 .exchange()
                 .statusCode()
 
-        assertThat(status).isIn(401, 403)
+        assertThat(status).isEqualTo(401)
     }
 
     @Test
@@ -166,7 +166,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
                 .statusCode()
 
         // a disabled account is refused at login (DisabledException -> 401 via the global handler)
-        assertThat(status).isIn(401, 403)
+        assertThat(status).isEqualTo(401)
     }
 
     @Test

@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * Event sourcing coffee-consumption data adapter — the only persistence path. A copy of
+ * Event sourcing coffee-consumption data adapter, the only persistence path. A copy of
  * [EventSourcedUserDataService]: a Decorator around the relational [CoffeeConsumptionDataServiceImpl] (both
  * adapters for the same `CoffeeConsumptionDataService` port, so it is `@Primary`), delegating reads and
  * `getByUserId` and writing each `+1`/`-1`/override event-first. Every mutation is recorded as a

@@ -4,7 +4,9 @@ spring:
   datasource:
     driver-class-name: org.postgresql.Driver
   jpa:
-    open-in-view: true
+    # All lazy access happens inside @Transactional methods and there are no lazy associations, so the
+    # request-scoped open session (an anti-pattern that pins a DB connection for the whole request) is off.
+    open-in-view: false
     hibernate:
       # Flyway owns the schema; Hibernate only validates that the entities match it at startup.
       ddl-auto: validate
@@ -16,9 +18,6 @@ spring:
     error:
       whitelabel:
         enabled: false
-logging:
-  file:
-    name: campus-coffee-consumption.log
 springdoc:
   api-docs:
     enabled: false
@@ -29,8 +28,8 @@ springdoc:
 # ConsumptionProperties), not here.
 campus-coffee:
   app:
-    # Public origin used to build the capability URLs and QR codes; https in prod (the token never travels
-    # over plain HTTP).
+    # Public origin used to build the capability URLs and QR codes. Must be https in prod (the token never
+    # travels over plain HTTP); the prod profile fails fast if this is still http/localhost (ProdConfigGuard).
     base-url: ${CAMPUS_COFFEE_APP_BASE_URL:http://localhost:8080}
   id:
     entity-seed: ${CAMPUS_COFFEE_ID_ENTITY_SEED:42}
@@ -38,7 +37,9 @@ campus-coffee:
   persistence:
     events-to-data-on-startup: ${CAMPUS_COFFEE_EVENTS_TO_DATA_ON_STARTUP:false}
   jwt:
-    secret: ${JWT_SECRET:dev-only-insecure-jwt-secret-change-me-in-production}
+    # No default: a missing JWT_SECRET must fail fast everywhere except dev (which supplies an insecure
+    # fallback below). The system tests inject a secret via SystemTestUtils.configurePostgresContainers.
+    secret: ${JWT_SECRET}
   fixtures:
     load-on-startup: false
   price:
@@ -59,6 +60,10 @@ spring:
     error:
       include-message: always
       include-binding-errors: always
+logging:
+  # A rolling file log is a dev convenience; prod logs go to stdout (captured by the platform).
+  file:
+    name: campus-coffee-consumption.log
 management: # https://docs.spring.io/spring-boot/reference/actuator/endpoints.html
   # Exposing an endpoint only makes it reachable; the access rules live in SecurityConfig.
   endpoints:
@@ -76,6 +81,9 @@ springdoc:
     enabled: true
     path: /api/swagger-ui.html
 campus-coffee:
+  jwt:
+    # Dev-only insecure fallback so a local run needs no JWT_SECRET; every other profile must supply one.
+    secret: ${JWT_SECRET:dev-only-insecure-jwt-secret-change-me-in-production}
   fixtures:
     load-on-startup: true
     # dev: clear + reseed every start so a persisted database can't collide with the restarted seeded ids
@@ -93,7 +101,20 @@ spring:
     url: "jdbc:postgresql:///postgres?cloudSqlInstance=se-uhd:europe-west3:campus-coffee-consumption&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD} # Secret Manager
+  lifecycle:
+    # Drain in-flight requests on a Cloud Run SIGTERM before the context closes.
+    timeout-per-shutdown-phase: 20s
+server:
+  shutdown: graceful
 campus-coffee:
+  app:
+    # The public https origin; required in prod (ProdConfigGuard rejects an empty or non-https base at startup).
+    base-url: ${CAMPUS_COFFEE_APP_BASE_URL:}
+  id:
+    # Random ids in prod: the deterministic seeded generator would re-issue the same first UUIDs on every
+    # restart and collide with existing rows (prod has no reset-on-startup to clear them first).
+    entity-seed: ${CAMPUS_COFFEE_ID_ENTITY_SEED:random}
+    event-seed: ${CAMPUS_COFFEE_ID_EVENT_SEED:random}
   jwt:
     secret: ${JWT_SECRET} # required, no fallback
   fixtures:

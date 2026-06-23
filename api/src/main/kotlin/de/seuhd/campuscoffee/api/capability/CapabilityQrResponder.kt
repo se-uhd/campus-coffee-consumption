@@ -40,7 +40,7 @@ class CapabilityQrResponder(
      * Builds a streaming ZIP archive of the capability QR codes of all [users] that have a token, one PNG
      * entry per member named `<loginName>.png`, downloaded as `coffee-qr-codes.zip`. The archive is written
      * straight to the response stream (each entry flushed in turn) rather than buffered in memory, and at
-     * most [MAX_MEMBERS] members are bundled — beyond that the cap is bundled and a warning is logged, so an
+     * most [MAX_MEMBERS] members are bundled: beyond that the cap is bundled and a warning is logged, so an
      * unexpectedly large member set cannot exhaust memory.
      *
      * @param users the members whose QR codes to bundle
