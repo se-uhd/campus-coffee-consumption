@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Log messages identify an entity consistently by its **id, in single quotes**, never by a login name. A
+  login name is PII; the id is the canonical, privacy-preserving key. The `UserServiceImpl.describe` /
+  `describeId` overrides that appended the user's login name to the create/update/delete audit log are
+  removed (along with the now-unused `CrudServiceImpl` extension hooks, so the base type+id format is used
+  everywhere); `AuthController` logs the bare `Token requested.` event without the supplied login name (no id
+  is resolvable at the credential boundary, and a failed attempt has no user); and `BootstrapAdminLoader`
+  logs the created admin's id. The dev-only demo loader still names its hardcoded demo fixtures (compile-time
+  constants, not user data) for readable startup output.
+
 ## [0.3.1] - 2026-06-22
 
 A hardening release working through an extensive adversarial review of the whole project (code, docs,

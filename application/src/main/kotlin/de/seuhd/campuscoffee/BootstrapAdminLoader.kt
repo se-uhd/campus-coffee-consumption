@@ -53,7 +53,7 @@ class BootstrapAdminLoader(
                 )
             )
         coffeeConsumptionService.createForUser(created)
-        log.info { "Created the bootstrap admin '$loginName'." }
+        log.info { "Created the bootstrap admin with id '${created.id}'." }
     }
 
     private companion object {
