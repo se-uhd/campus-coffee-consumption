@@ -12,13 +12,13 @@
 name: Qodana
 
 on:
-  # Run on PRs to main (the review gate, where findings matter) and on pushes to main (to keep the
-  # main-branch results / any future baseline current). Intentionally NOT on every feature-branch push the
-  # way build.yml is: a Qodana scan is much heavier than the Gradle build.
+  # Run on every push (every branch, like build.yml) so feature-branch work is scanned before it reaches
+  # main, and on PRs to main (the review gate). A Qodana scan is heavier than the Gradle build, but catching
+  # the idiomatic findings on the feature branch (rather than only at merge) is worth it.
   pull_request:
     branches: [ "main" ]
   push:
-    branches: [ "main" ]
+    branches: [ "**" ]
   workflow_dispatch: {} # allow manual runs
 
 permissions:
@@ -89,6 +89,11 @@ jobs:
 
       - name: Qodana Scan (frontend)
         uses: JetBrains/qodana-action@v2026.1.3
+        # The JS/TS linter (unlike the JVM Community linter) requires a Qodana Cloud token, so without the
+        # QODANA_TOKEN secret this scan cannot run. Allow the step to fail so it never blocks CI: the backend
+        # `qodana` job and the eslint/stylelint `frontendLint` gate (in build.yml) still cover the frontend.
+        # To make this a real gate, set the QODANA_TOKEN repository secret and drop this continue-on-error.
+        continue-on-error: true
         with:
           # Scan only the Angular SPA; its frontend/qodana.yaml selects the JS linter and sets
           # failThreshold: 0, so this job fails on any problem above the baseline. (Space-separated args;

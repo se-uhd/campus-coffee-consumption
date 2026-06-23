@@ -26,7 +26,7 @@ class CoffeePriceDataServiceImpl(
         entityMapper,
         CoffeePrice::class.java,
         setOf(
-            ConstraintMapping<CoffeePrice>(
+            ConstraintMapping(
                 { "the coffee price" },
                 CoffeePriceEntity.SINGLETON_COLUMN,
                 CoffeePriceEntity.SINGLETON_UNIQUE_CONSTRAINT
