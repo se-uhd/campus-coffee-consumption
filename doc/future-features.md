@@ -41,7 +41,7 @@ someone buys beans before the supply runs out.
 ## Per-member or per-bean pricing
 
 The price is currently one global value per cup. A future variant could price by cup size, by bean type, or
-offer a member discount — each would extend `CoffeePrice` (or add a price dimension) and the as-of valuation.
+offer a member discount; each would extend `CoffeePrice` (or add a price dimension) and the as-of valuation.
 
 ## Consumption insights
 

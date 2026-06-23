@@ -1,6 +1,5 @@
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
-import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.ConsumptionChange
 import de.seuhd.campuscoffee.domain.ports.data.ConsumptionHistoryDataService
 import org.springframework.stereotype.Service
@@ -49,7 +48,10 @@ class ConsumptionHistoryDataServiceImpl(
     private fun countOf(event: EventEntity): Int = (event.body?.get("count") as? Number)?.toInt() ?: 0
 
     private companion object {
-        private val ENTITY_TYPE = requireNotNull(CoffeeConsumption::class.simpleName)
+        // The stored discriminator is the LoggedEntityType label, not the class simple name; key on the
+        // label so a future rename of the domain class cannot silently empty the change log (they happen to
+        // be equal today, which is exactly the coincidence to not depend on).
+        private val ENTITY_TYPE = LoggedEntityType.COFFEE_CONSUMPTION.label
         private const val MAX_LIMIT = 100
         private const val SYSTEM_ACTOR = "system"
     }

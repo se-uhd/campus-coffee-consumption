@@ -1,7 +1,7 @@
 // Global, mobile-first styles for the SE@UHD coffee fund.
 //
 // The Material theme is a custom M3 theme built around the official Universität Heidelberg house color
-// (Pantone 1805 C / RAL 3000 — brand red #C61826). The tonal palettes in `theme-colors.scss` were generated
+// (Pantone 1805 C / RAL 3000, brand red #C61826). The tonal palettes in `theme-colors.scss` were generated
 // by `ng generate @angular/material:theme-color --primary-color "#C61826"`; this file turns them into a
 // theme and applies it. The app stays on the system-ui font stack (no web font).
 
@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 
 // `use-system-variables: true` makes every component token reference a `--mat-sys-*` CSS variable instead
-// of baking a hex literal, so the whole palette is steerable from one place at runtime — that is how the
+// of baking a hex literal, so the whole palette is steerable from one place at runtime; that is how the
 // brand red and the white-card / sand-fond overrides below take effect everywhere.
 $cc-theme: mat.define-theme(
   (
@@ -37,8 +37,8 @@ $cc-theme: mat.define-theme(
 :root {
   // Brand constants. The generated tonal palette rounds the seed to #bd0e21; we pin the system tokens to
   // the exact house red below so every primary control is true #C61826.
-  --cc-brand: #c61826; // Pantone 1805 C / RAL 3000 — official Universität Heidelberg house red
-  --cc-brand-dark: #590d08; // seal-border "Ochsenblut" — hover / pressed / emphasis
+  --cc-brand: #c61826; // Pantone 1805 C / RAL 3000, official Universität Heidelberg house red
+  --cc-brand-dark: #590d08; // seal-border "Ochsenblut": hover / pressed / emphasis
   --cc-sand: #f4f1ea; // page background ("Sand")
   --cc-surface: #fff; // cards stay white
   --cc-ink: #1f1f1f; // near-black body text
@@ -135,7 +135,7 @@ a {
   gap: 16px;
 }
 
-// The admin pages need room to breathe — especially the members table. Same vertical rhythm, more width.
+// The admin pages need more width, especially the members table. Same vertical rhythm, more width.
 .page--wide {
   max-width: 920px;
   padding: 24px 24px 48px;
@@ -241,7 +241,7 @@ mat-card.card h2:last-child {
   line-height: 1.5;
 }
 
-// Negative / error text uses the Material error token (#BA1A1A), never the brand red — the brand red is
+// Negative / error text uses the Material error token (#BA1A1A), never the brand red; the brand red is
 // reserved for brand/primary/active accents, so a negative balance no longer clashes with a `color="warn"`
 // destructive button.
 .warn {
@@ -368,10 +368,23 @@ table.mat-mdc-table {
   white-space: nowrap;
   text-align: right;
 
-  // breathing room so the preceding right-aligned Balance number does not crowd the action icon
+  // extra left padding so the preceding right-aligned Balance number does not crowd the action icon
   padding-left: 16px;
 }
 
 .mat-mdc-paginator {
   background: transparent;
+}
+
+// Respect an operating-system "reduce motion" preference: drop the Material transitions/animations to a
+// near-instant duration rather than playing them (WCAG 2.3.3).
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

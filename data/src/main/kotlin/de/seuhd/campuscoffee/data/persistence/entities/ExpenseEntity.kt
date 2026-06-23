@@ -9,7 +9,7 @@ import jakarta.persistence.Version
 /**
  * Database entity for a recorded bean purchase (the projected read model row). It references the [buyer]
  * (the `buyer_user_id` foreign key), carries the bean [weightGrams] and total [amountCents], and the
- * [privateAmountCents]/[kittyAmountCents] split (which always sum to the total — a database CHECK backs the
+ * [privateAmountCents]/[kittyAmountCents] split (which always sum to the total, a database CHECK backs the
  * domain-service validation). [version] backs optimistic locking. All money is in euro cents.
  */
 @jakarta.persistence.Entity

@@ -302,7 +302,7 @@ export class MemberProfileComponent implements OnInit {
   /**
    * Loads the member list and resolves the shared admin selection: records the admin's own id (from
    * `/api/users/me`) as the shared default, then takes the selection from the URL's `member` param (the
-   * source of truth) — the admin's own account when it is absent — so a deep link or a refresh on
+   * source of truth, the admin's own account when it is absent), so a deep link or a refresh on
    * `/admin/profile?member=<id>` lands on that member.
    */
   private async initAdminSelection(): Promise<void> {
@@ -319,7 +319,7 @@ export class MemberProfileComponent implements OnInit {
   /**
    * Pushes the newly-selected member onto the URL as the `member` query param (a history entry, so Back
    * undoes the switch). The `queryParamMap` subscription then mirrors it into the shared selection and
-   * reloads the profile — the URL stays the source of truth.
+   * reloads the profile; the URL stays the source of truth.
    *
    * @param memberId the member id picked in the selector
    */
@@ -334,7 +334,7 @@ export class MemberProfileComponent implements OnInit {
 
   /**
    * Selects the member named by the URL's `member` param (or the admin's own account when it is absent) and
-   * reloads the profile — unless that member's profile is already loaded, so a redundant re-emission of the
+   * reloads the profile, unless that member's profile is already loaded, so a redundant re-emission of the
    * same param does not reload. `loadedId` (the member actually loaded) is the guard, not the bound
    * `selectedId` (which the dropdown already advanced before navigating).
    *

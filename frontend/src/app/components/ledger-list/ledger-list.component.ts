@@ -76,7 +76,7 @@ type LedgerFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
           <div matListItemLine class="muted">
             new balance {{ entry.runningBalanceCents | euros }}
             @if (entry.count != null) {
-              · Σ {{ entry.count }} cups
+              · total {{ entry.count }} cups
               @if (deltaLabel(entry); as dl) {
                 ({{ dl }})
               }
@@ -206,7 +206,7 @@ export class LedgerListComponent {
       case 'CONSUMPTION':
         return 'Coffee cup';
       case 'CONSUMPTION_CANCEL':
-        return 'Canceled transaction';
+        return 'Coffee undone';
       case 'PRIVATE_EXPENSE':
         return 'Expense';
       case 'KITTY_EXPENSE':
@@ -240,7 +240,7 @@ export class LedgerListComponent {
   }
 
   /**
-   * Whether the entry is an admin split bean purchase that carries a kitty portion — only then is the
+   * Whether the entry is an admin split bean purchase that carries a kitty portion; only then is the
    * condensed split shown (an unsplit, 100%-private expense shows none). Both expense rows can carry it: a
    * `PRIVATE_EXPENSE` on a member's ledger and a `KITTY_EXPENSE` on the kitty history. The portions are
    * present only on the admin views (the member-serving read strips them), so a member's own ledger never

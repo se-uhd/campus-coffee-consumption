@@ -4,7 +4,7 @@
 #
 # Input : frontend/src-gen/api-docs.json   (the OpenAPI spec; refreshed when the API changes, see
 #                                            frontend/src-gen/README.md)
-# Output: frontend/src/app/api/model/*.ts  (MODELS ONLY — no api/client/supporting service stubs)
+# Output: frontend/src/app/api/model/*.ts  (MODELS ONLY: no api/client/supporting service stubs)
 #
 # The generated files are kept in the tree (not gitignored) so a standalone `npm run build` works
 # without a generation step. This script is a hash-skip wrapper: it regenerates only when the spec has

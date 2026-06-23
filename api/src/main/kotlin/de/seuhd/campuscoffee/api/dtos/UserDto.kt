@@ -15,10 +15,10 @@ import java.util.UUID
  * [de.seuhd.campuscoffee.domain.model.User].
  *
  * [password] is write-only and applies only to an admin: it is required (at least 8 characters) when
- * creating or promoting an admin, and a member (USER) never has one — a member authenticates solely with
+ * creating or promoting an admin, and a member (USER) never has one; a member authenticates solely with
  * their capability link, so any password sent for a member is ignored. No response serializes it (and the
  * stored hash is never exposed at all). [role] and [active] appear in responses and may be set by an
- * admin; a non-admin self-update that sends them is ignored by the domain. [capabilityUrl] is read-only —
+ * admin; a non-admin self-update that sends them is ignored by the domain. [capabilityUrl] is read-only:
  * the assembled "your coffee link" the controller fills in from the member's secret token (the raw token
  * is never a field of its own).
  */

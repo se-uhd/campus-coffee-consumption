@@ -3,7 +3,7 @@
 #
 # Two independent jobs, one per stack:
 #   - `qodana` scans the Kotlin/JVM backend (the JVM Community linter; the linter, profile, JDK, and
-#     enforcement settings live in the root qodana.yaml). It catches what ktlint/detekt do not — a
+#     enforcement settings live in the root qodana.yaml). It catches what ktlint/detekt do not: a
 #     redundant SAM constructor, a lambda that belongs outside the parentheses, a redundant `public`
 #     modifier, unused symbols, and the rest of the IDE's default Kotlin checks.
 #   - `qodana-frontend` scans the Angular SPA (the JS Community linter; settings in frontend/qodana.yaml).
@@ -56,7 +56,7 @@ jobs:
       # github/codeql-action/upload-sarif cannot push to the Security tab (it 403s with "Resource not
       # accessible by integration"). Qodana surfaces findings as check-run annotations (the checks: write
       # permission) and the full report is kept as the artifact below. If GHAS is enabled later, re-add that
-      # step with `security-events: write` — and use codeql-action@v4 (v3 is deprecated and runs on Node 20).
+      # step with `security-events: write`, and use codeql-action@v4 (v3 is deprecated and runs on Node 20).
 
       - name: Upload Qodana SARIF as an artifact
         # Keeps the full SARIF report downloadable from the run for inspection (and to seed a baseline later
@@ -69,7 +69,7 @@ jobs:
           path: ${{ runner.temp }}/qodana/results/qodana.sarif.json
           if-no-files-found: warn
 
-  # The Angular SPA scan — the JS/TS counterpart to the `qodana` job above. Independent job (separate
+  # The Angular SPA scan: the JS/TS counterpart to the `qodana` job above. Independent job (separate
   # runner) so a frontend finding does not block the backend report and vice versa; it mirrors that job's
   # triggers, permissions, failThreshold (0, via frontend/qodana.yaml), and artifact upload.
   qodana-frontend:

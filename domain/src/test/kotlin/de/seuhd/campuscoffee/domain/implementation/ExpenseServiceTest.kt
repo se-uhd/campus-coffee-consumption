@@ -16,6 +16,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.any
+import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
@@ -246,6 +247,92 @@ class ExpenseServiceTest {
             )
         }
         verify(expenseDataService, never()).upsert(any())
+    }
+
+    @Test
+    fun `update that raises the kitty portion beyond the available balance throws ConflictException`() {
+        val expenseId = UUID(0L, 5L)
+        val existing =
+            Expense(
+                id = expenseId,
+                buyer = buyer,
+                weightGrams = 1000,
+                amountCents = 900,
+                privateAmountCents = 400,
+                kittyAmountCents = 500
+            )
+        whenever(expenseDataService.getById(expenseId)).thenReturn(existing)
+        // the kitty holds 300; raising this expense's kitty portion from 500 to 1000 draws 500 more than the
+        // old portion, and 300 + 500 - 1000 = -200 < 0, so the differential overdraw guard refuses it
+        whenever(ledgerDataService.kittyLedger()).thenReturn(kittyWith(300))
+
+        assertThrows<ConflictException> {
+            service.update(
+                expenseId = expenseId,
+                buyerUserId = buyerId,
+                weightGrams = 1000,
+                amountCents = 1100,
+                privateAmountCents = 100,
+                kittyAmountCents = 1000,
+                note = null,
+                actingUser = admin
+            )
+        }
+        verify(expenseDataService, never()).upsert(any())
+    }
+
+    @Test
+    fun `record acquires the kitty lock before reading the kitty balance`() {
+        whenever(ledgerDataService.kittyLedger()).thenReturn(kittyWith(10000))
+        whenever(userDataService.getById(buyerId)).thenReturn(buyer)
+        whenever(expenseDataService.upsert(any())).thenAnswer { it.arguments[0] as Expense }
+
+        service.record(
+            buyerUserId = buyerId,
+            weightGrams = 1000,
+            amountCents = 900,
+            privateAmountCents = 400,
+            kittyAmountCents = 500,
+            note = null,
+            actingUser = admin
+        )
+
+        // the overdraw guard is only sound if the lock is taken before the balance is read
+        val ordered = inOrder(kittyLock, ledgerDataService)
+        ordered.verify(kittyLock).lockForUpdate()
+        ordered.verify(ledgerDataService).kittyLedger()
+    }
+
+    @Test
+    fun `update acquires the kitty lock before reading the kitty balance`() {
+        val expenseId = UUID(0L, 5L)
+        val existing =
+            Expense(
+                id = expenseId,
+                buyer = buyer,
+                weightGrams = 1000,
+                amountCents = 900,
+                privateAmountCents = 400,
+                kittyAmountCents = 500
+            )
+        whenever(expenseDataService.getById(expenseId)).thenReturn(existing)
+        whenever(ledgerDataService.kittyLedger()).thenReturn(kittyWith(10000))
+        whenever(expenseDataService.upsert(any())).thenAnswer { it.arguments[0] as Expense }
+
+        service.update(
+            expenseId = expenseId,
+            buyerUserId = buyerId,
+            weightGrams = 1000,
+            amountCents = 900,
+            privateAmountCents = 400,
+            kittyAmountCents = 500,
+            note = null,
+            actingUser = admin
+        )
+
+        val ordered = inOrder(kittyLock, ledgerDataService)
+        ordered.verify(kittyLock).lockForUpdate()
+        ordered.verify(ledgerDataService).kittyLedger()
     }
 
     @Test

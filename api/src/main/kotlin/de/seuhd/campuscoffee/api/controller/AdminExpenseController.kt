@@ -18,12 +18,14 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.ResponseBody
+import org.springframework.web.bind.annotation.ResponseStatus
 import java.util.UUID
 
 /**
  * Admin controller for recording and correcting a member's bean purchases (JWT, admin only). The buyer is
  * the `{userId}` path variable; the body carries the weight, total, and the kitty/private split. A member
- * records their own purchases through `/api/expenses` instead — only an admin reaches these split,
+ * records their own purchases through `/api/expenses` instead; only an admin reaches these split,
  * attribution, and correction operations.
  */
 @Tag(name = "Admin expenses", description = "Recording, correcting, and deleting members' bean purchases (admin only).")
@@ -55,11 +57,13 @@ class AdminExpenseController(
      * @param dto    the purchase (weight, total, split, optional note)
      */
     @Operation(summary = "Record a bean purchase for a member, with a kitty/private split.")
+    @ResponseStatus(HttpStatus.CREATED)
+    @ResponseBody
     @PostMapping("")
     fun create(
         @PathVariable userId: UUID,
         @RequestBody @Valid dto: AdminExpenseDto
-    ): ResponseEntity<ExpenseDto> {
+    ): ExpenseDto {
         val admin = currentUserProvider.currentUser()
         val expense =
             expenseService.record(
@@ -71,7 +75,7 @@ class AdminExpenseController(
                 note = dto.note,
                 actingUser = admin
             )
-        return ResponseEntity.status(HttpStatus.CREATED).body(expenseDtoMapper.toDto(expense))
+        return expenseDtoMapper.toDto(expense)
     }
 
     /**

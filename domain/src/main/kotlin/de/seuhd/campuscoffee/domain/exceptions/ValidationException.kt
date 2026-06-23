@@ -1,34 +1,13 @@
 package de.seuhd.campuscoffee.domain.exceptions
 
-import jakarta.validation.ConstraintViolation
-
 /**
- * Base exception thrown when an entity fails Bean Validation or violates a business rule.
+ * Thrown when a request is malformed or violates a business rule (a 400): a `delta` other than `±1`, a count
+ * correction below zero, an expense whose split does not sum to its total, and the like. Carries a
+ * human-readable message; the controller-layer Bean Validation handles field-level constraint reporting
+ * before a DTO ever reaches the domain.
+ *
+ * @param message the validation error message
  */
-class ValidationException : RuntimeException {
-    val violations: Set<ConstraintViolation<*>>
-
-    @Suppress("unused") // will later be used when manually validating objects
-    constructor(violations: Set<ConstraintViolation<*>>) : super(formatViolations(violations)) {
-        this.violations = violations
-    }
-
-    /**
-     * Creates a validation exception with a custom message for business rule violations.
-     *
-     * @param message the validation error message
-     */
-    constructor(message: String) : super(message) {
-        this.violations = emptySet()
-    }
-
-    private companion object {
-        /**
-         * Formats constraint violations into a readable message.
-         *
-         * @param violations the constraint violations to format
-         */
-        fun formatViolations(violations: Set<ConstraintViolation<*>>): String =
-            violations.joinToString(", ") { "${it.propertyPath}: ${it.message}" }
-    }
-}
+class ValidationException(
+    message: String
+) : RuntimeException(message)

@@ -9,7 +9,7 @@ import java.util.UUID
 
 /**
  * Service interface for kitty money movements. A port implemented by the domain and consumed by the API.
- * Every operation is admin-only — only an admin manages the communal kitty. Payments are never edited; a
+ * Every operation is admin-only: only an admin manages the communal kitty. Payments are never edited; a
  * mistake is corrected with a compensating entry.
  */
 interface PaymentService {

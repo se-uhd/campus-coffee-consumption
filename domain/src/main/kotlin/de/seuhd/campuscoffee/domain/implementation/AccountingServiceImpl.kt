@@ -85,11 +85,15 @@ class AccountingServiceImpl(
             .getAll()
             .sortedBy { it.loginName }
             .map { user ->
+                // isolate per-member failures: one member's malformed stream must not 500 the whole overview,
+                // so a failed balance walk falls back to 0 for that member rather than failing every row
                 val balance =
-                    ledgerDataService
-                        .memberLedger(user.persistedId, user.loginName)
-                        .lastOrNull()
-                        ?.runningBalanceCents ?: 0L
+                    runCatching {
+                        ledgerDataService
+                            .memberLedger(user.persistedId, user.loginName)
+                            .lastOrNull()
+                            ?.runningBalanceCents ?: 0L
+                    }.getOrDefault(0L)
                 MemberBalance(user, coffeeConsumptionDataService.getByUserId(user.persistedId).count, balance)
             }
     }

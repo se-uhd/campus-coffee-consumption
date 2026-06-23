@@ -21,12 +21,12 @@ owes them. A payment or purchase raises it; consuming a coffee lowers it.
 
 | Event | Member balance effect | Kitty effect |
 |---|---|---|
-| Consumption `+1` (at the price in effect then) | `−price` | — |
-| Member undoes a recent `+1` within the grace period | `+(price of that +1)` | — |
-| Member records own bean purchase €X | `+X` | — |
+| Consumption `+1` (at the price in effect then) | `−price` | n/a |
+| Member undoes a recent `+1` within the grace period | `+(price of that +1)` | n/a |
+| Member records own bean purchase €X | `+X` | n/a |
 | Admin expense: €K from kitty + €V private (buyer B) | B: `+V` | `−K` |
 | Admin settlement: member M pays €S (S > 0) | M: `+S` | `+S` |
-| Admin kitty adjustment €A (float/correction, signed) | — | `+A` |
+| Admin kitty adjustment €A (float/correction, signed) | n/a | `+A` |
 
 So `memberBalance = privateExpenses + settlements − coffeeCost` and
 `kitty = settlements + adjustments − kittyExpenses`. All money is stored as integer **euro cents**; the
@@ -85,8 +85,8 @@ lump at the override-time price; that never touches the kitty.
 
 There is no ledger table. `LedgerDataService` (implemented in the event-sourcing package) walks the log:
 
-- A member's **unified ledger** is one ascending pass over their three streams — consumption, the expenses
-  they bought, and the settlements they paid — keyed on the owning user id in each body (`userId` for
+- A member's **unified ledger** is one ascending pass over their three streams (consumption, the expenses
+  they bought, and the settlements they paid), keyed on the owning user id in each body (`userId` for
   consumptions and payments, `buyerUserId` for expenses), ordered by `seq`. Each entry contributes a signed
   effect and carries the running balance. Only the **private** portion of an expense affects the member's
   balance, so an admin split never leaks the kitty portion into the member's view. The member balance is the
@@ -101,7 +101,7 @@ those scans efficient.
 ## Deleting members preserves financial history
 
 `expenses` and `payments` reference `users` with `RESTRICT` (not `CASCADE`), and the user service refuses to
-hard-delete a member with any financial footprint — a non-zero count, or any expense or settlement — with a
+hard-delete a member with any financial footprint (a non-zero count, or any expense or settlement) with a
 409 (an admin deactivates them instead). The `coffee_consumptions` FK stays `CASCADE` because every user
 always has a (often zero) consumption row, so a RESTRICT there would make no user deletable; the financial
 history is preserved by the service rule, and the FK arrangement is just a backstop.

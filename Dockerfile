@@ -14,8 +14,14 @@ RUN mise exec -- gradle :application:bootJar --no-daemon
 # Runtime stage. The Java major version in the tag below is hand-pinned. A CI check
 # (scripts/check-toolchain-versions.sh) fails the build if it drifts from mise.toml and the version catalog.
 FROM eclipse-temurin:25-jre-alpine
-RUN mkdir /opt/app
-COPY --from=build /app/application/build/libs/application.jar /opt/app
+# Run as a dedicated non-root user (baseline container hardening; the jar needs no write access to /opt/app).
+RUN addgroup -S app && adduser -S -G app app && mkdir /opt/app && chown app:app /opt/app
+COPY --from=build --chown=app:app /app/application/build/libs/application.jar /opt/app
 WORKDIR /opt/app
-ENTRYPOINT ["java", "-jar", "application.jar"]
+USER app
 EXPOSE 8080
+# Report unhealthy if the actuator health endpoint (public) is not UP, so a started-but-degraded app is
+# visible to the orchestrator rather than reporting running.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+    CMD wget -q -O - http://localhost:8080/actuator/health | grep -q '"status":"UP"' || exit 1
+ENTRYPOINT ["java", "-jar", "application.jar"]

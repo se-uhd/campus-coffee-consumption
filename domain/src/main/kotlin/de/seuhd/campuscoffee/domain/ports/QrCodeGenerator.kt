@@ -5,7 +5,7 @@ package de.seuhd.campuscoffee.domain.ports
  * asks for the image, the data/application layer supplies the adapter (backed by a QR library), so the
  * encoding library never leaks into the web layer. QR codes are generated in the backend so a member can
  * print their wall code and an admin can re-download any member's. A high-resolution PNG is the single
- * output format — it prints and embeds everywhere (Docs/Slides/Word, label printers).
+ * output format: it prints and embeds everywhere (Docs/Slides/Word, label printers).
  */
 fun interface QrCodeGenerator {
     /**

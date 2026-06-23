@@ -6,7 +6,7 @@ import { EurosPipe } from '../../pipes/euros.pipe';
  * A shared, presentational summary block reused by the member and admin landing pages so the top looks
  * identical for both: a big coffee count with the per-cup price, then the balance and the kitty as signed /
  * plain euro amounts. Money is always rendered via `EurosPipe`; the balance is signed (negative shown in
- * red) and there is no "settled / owes / credit" wording — just the signed amount. Action buttons (the +1
+ * red) and there is no "settled / owes / credit" wording, just the signed amount. Action buttons (the +1
  * hero, the admin +/- controls) are projected in via `<ng-content>` so each page keeps its own controls.
  */
 @Component({
@@ -72,7 +72,7 @@ import { EurosPipe } from '../../pipes/euros.pipe';
       }
 
       /* Pin the personal-balance size so the .warn modifier (which carries its own smaller font-size for
-         inline messages) only recolors a negative balance red — it must not shrink the figure. The balance
+         inline messages) only recolors a negative balance red; it must not shrink the figure. The balance
          stays one deliberate step above the muted kitty figure regardless of sign. */
       .cc-amount--balance {
         font-size: 1rem;

@@ -7,7 +7,7 @@ version: 2
 updates:
   # Workflow actions in .github/workflows/ (actions/checkout, actions/upload-artifact, jdx/mise-action,
   # JetBrains/qodana-action). The wildcard group already covers every `uses:` action, qodana-action
-  # included. Caveat: dependabot bumps the action only — the Qodana linter image pinned in qodana.yaml
+  # included. Caveat: dependabot bumps the action only; the Qodana linter image pinned in qodana.yaml
   # (jetbrains/qodana-jvm-community) is not a manifest dependabot parses, so bump that tag by hand to keep
   # it on the same Qodana release as the action.
   - package-ecosystem: github-actions
@@ -45,6 +45,8 @@ updates:
   # mise tool version, independent of the bundled JDK. The runtime stage's eclipse-temurin tag is the
   # hand-maintained Java pin (kept in sync with the version catalog and mise.toml by
   # scripts/check-toolchain-versions.sh), so it is ignored to keep that single source of truth intact.
+  # Note: the postgres:18-alpine tag in compose.yaml/compose.prod.yaml (and the same tag used by CI and
+  # Testcontainers) is NOT a Dockerfile dependency and is bumped by hand; keep those occurrences in sync.
   - package-ecosystem: docker
     directory: /
     schedule:

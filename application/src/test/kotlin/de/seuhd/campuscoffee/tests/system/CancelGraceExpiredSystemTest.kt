@@ -26,7 +26,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 
 /**
  * System test for the cancel grace period having expired: a dedicated context with a zero-length grace
- * period (`campus-coffee.consumption.cancel-grace-period=0s`), so a coffee can never be undone — the cancel
+ * period (`campus-coffee.consumption.cancel-grace-period=0s`), so a coffee can never be undone: the cancel
  * is immediately too late and returns 409.
  */
 @SpringBootTest(classes = [Application::class], webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)

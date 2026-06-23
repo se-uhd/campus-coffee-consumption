@@ -18,8 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping
 
 /**
  * Member self-service controller for recording the member's own bean purchases (capability token). The
- * purchase is always booked 100% from the member's own pocket — the server attributes it to the calling
- * member, never to anyone the request names — and the response is the refreshed member summary. Correcting
+ * purchase is always booked 100% from the member's own pocket (the server attributes it to the calling
+ * member, never to anyone the request names), and the response is the refreshed member summary. Correcting
  * or deleting a purchase is admin-only (the SPA states this to the member).
  */
 @Tag(name = "Expenses", description = "A member recording their own bean purchases (X-Coffee-Token).")

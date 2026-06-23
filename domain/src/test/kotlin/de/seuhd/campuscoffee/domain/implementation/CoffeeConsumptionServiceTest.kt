@@ -205,7 +205,7 @@ class CoffeeConsumptionServiceTest {
     @Test
     fun `cancel by the owner within the grace period decrements the count by one`() {
         whenever(ledgerDataService.lastCancellableIncrement(memberId, "max"))
-            .thenReturn(CancellableIncrement(seq = 10L, createdAt = now(), priceCents = 50))
+            .thenReturn(CancellableIncrement(createdAt = now(), priceCents = 50))
         whenever(dataService.getByUserId(memberId)).thenReturn(consumption(3))
         whenever(dataService.upsert(any())).thenAnswer { it.arguments[0] as CoffeeConsumption }
 
@@ -239,7 +239,7 @@ class CoffeeConsumptionServiceTest {
     @Test
     fun `cancel of a coffee whose grace period has passed throws ConflictException`() {
         whenever(ledgerDataService.lastCancellableIncrement(memberId, "max"))
-            .thenReturn(CancellableIncrement(seq = 10L, createdAt = now().minusHours(1), priceCents = 50))
+            .thenReturn(CancellableIncrement(createdAt = now().minusHours(1), priceCents = 50))
 
         assertThrows<ConflictException> { service.cancel(memberId, member) }
         verify(dataService, never()).upsert(any())
@@ -247,7 +247,7 @@ class CoffeeConsumptionServiceTest {
 
     @Test
     fun `cancellableIncrement returns the candidate within the grace period`() {
-        val candidate = CancellableIncrement(seq = 10L, createdAt = now(), priceCents = 50)
+        val candidate = CancellableIncrement(createdAt = now(), priceCents = 50)
         whenever(userDataService.getById(memberId)).thenReturn(member)
         whenever(ledgerDataService.lastCancellableIncrement(memberId, "max")).thenReturn(candidate)
 
@@ -258,7 +258,7 @@ class CoffeeConsumptionServiceTest {
     fun `cancellableIncrement returns null once the grace period has passed`() {
         whenever(userDataService.getById(memberId)).thenReturn(member)
         whenever(ledgerDataService.lastCancellableIncrement(memberId, "max"))
-            .thenReturn(CancellableIncrement(seq = 10L, createdAt = now().minusHours(1), priceCents = 50))
+            .thenReturn(CancellableIncrement(createdAt = now().minusHours(1), priceCents = 50))
 
         assertThat(service.cancellableIncrement(memberId, member)).isNull()
     }

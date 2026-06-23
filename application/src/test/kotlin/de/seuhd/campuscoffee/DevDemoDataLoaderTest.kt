@@ -25,7 +25,7 @@ import java.util.UUID
  * Unit tests for the dev demo data loader's contract, mocking the services. They assert that the loader
  * creates its full set of extra demo members, layers consumption, bean-purchase, and settlement history on
  * top of them (plus one kitty float), deactivates a member marked inactive only after seeding their history,
- * and is idempotent — a second [DevDemoDataLoader.loadDemoData] call skips because the demo members already
+ * and is idempotent: a second [DevDemoDataLoader.loadDemoData] call skips because the demo members already
  * exist.
  */
 class DevDemoDataLoaderTest {
@@ -58,7 +58,7 @@ class DevDemoDataLoaderTest {
     private fun stubCreatePath() {
         whenever(userService.getByLoginName("jane_doe")).thenReturn(admin)
         // the loader also resolves the primary demo member and the enriched fixture members by login to seed
-        // their histories — each must be an active member with a persisted id
+        // their histories: each must be an active member with a persisted id
         whenever(userService.getByLoginName("maxmustermann")).thenReturn(fixtureMember("maxmustermann"))
         whenever(userService.getByLoginName("student2023")).thenReturn(fixtureMember("student2023"))
         whenever(userService.getByLoginName("lisa_lee")).thenReturn(fixtureMember("lisa_lee"))
