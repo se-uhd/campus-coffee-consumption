@@ -42,7 +42,7 @@ class CoffeeConsumptionServiceImpl(
     private val changeNoteContext: ChangeNoteContext,
     // the grace-period default lives once in application.yaml (campus-coffee.consumption.cancel-grace-period,
     // defaulting to 5m there); the domain binds the key directly because it cannot depend on the api module
-    @param:Value("\${campus-coffee.consumption.cancel-grace-period}") private val cancelGracePeriod: Duration
+    @param:Value($$"${campus-coffee.consumption.cancel-grace-period}") private val cancelGracePeriod: Duration
 ) : CrudServiceImpl<CoffeeConsumption, UUID>(CoffeeConsumption::class.java),
     CoffeeConsumptionService {
     override fun dataService(): CrudDataService<CoffeeConsumption, UUID> = coffeeConsumptionDataService

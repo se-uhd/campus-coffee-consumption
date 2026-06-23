@@ -115,6 +115,13 @@ rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
   (`limit` `@Max`/`@Positive`, `offset` `@Min`) and the kitty deposit/adjustment validation; and
   `frontend/package.json` now declares a Node `engines` floor. The Gradle daemon's `MaxMetaspaceSize` was
   also raised to 768m (the growing test suite exhausted 384m during the CI coverage aggregation pass).
+- The Qodana static-analysis workflow now runs on every push (not only `main` and PRs), so its IntelliJ
+  inspections catch idiomatic findings on the feature branch rather than only at merge. Its 8 backend
+  findings were fixed (a redundant nullable return type, three redundant type arguments, a multi-dollar
+  string, and three duplicated fragments DRYed into the shared `EventJsonMapper.writeEntityHeader` and
+  `LedgerDataServiceImpl.deltaEffect` helpers). The frontend Qodana job, whose JS linter needs a paid Qodana
+  Cloud token the project does not set, is marked `continue-on-error` so it never blocks CI (the eslint and
+  stylelint `frontendLint` gate still covers the SPA). A commit-message convention was added to `CLAUDE.md`.
 
 ### Added
 

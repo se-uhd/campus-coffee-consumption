@@ -406,6 +406,18 @@ The project follows [Semantic Versioning](https://semver.org/) and keeps a [Keep
   push origin vX.Y.Z`. Add the matching `[x.y.z]: …/releases/tag/vX.Y.Z` link reference at the bottom of
   `CHANGELOG.md`. No workflow triggers on tags, so pushing a tag does not run CI.
 
+## Commit Messages
+
+Write commit messages that stand on their own in the permanent history: a reader of `git log` (with no
+access to your working notes or any review document) must understand the change from the message alone.
+
+- **No ephemeral or internal references.** Never cite review-finding IDs (`review M13`, `H1-H3`, `L20-L27`),
+  ticket shorthands, batch numbers, or any artifact that does not live in the repository. They mean nothing
+  to a future reader and are noise; describe *what* changed and *why* in plain words instead.
+- A concise imperative subject line, then a body that explains the why and any non-obvious decisions. Group
+  related work into a few cohesive commits rather than many tiny ones keyed to an external checklist.
+- End every commit message with the `Co-Authored-By:` trailer (see the harness instructions).
+
 ## Database
 
 - **Database**: PostgreSQL 18.
