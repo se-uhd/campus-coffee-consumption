@@ -75,7 +75,7 @@ rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
   adapter, so no Spring persistence exception is caught in the domain; the event-store `seq` is removed from
   the domain `CancellableIncrement`; the ArchUnit rules now cover the `web`/`configuration` packages and
   assert every class belongs to a layer; and dead code is removed (`ConsumptionProperties`,
-  `EventSourcedMutator.create`, the no-op `OnCreate` group, `ValidationException`'s unused constructor).
+  `EventSourcedWriter.create`, the no-op `OnCreate` group, `ValidationException`'s unused constructor).
 - **API and OpenAPI.** Settlement, adjustment, and admin-expense create declare `201`; the QR endpoints
   advertise `image/png` and `application/zip`; a dedicated `ProfileUpdateDto` carries the profile edit; and
   the hand-written controllers document their `400/401/403/404/409` responses. The committed OpenAPI spec
@@ -121,7 +121,7 @@ rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
   string, and three duplicated fragments DRYed into the shared `EventJsonMapper.writeEntityHeader` and
   `LedgerDataServiceImpl.deltaEffect` helpers). The frontend Qodana job, whose JS linter needs a paid Qodana
   Cloud token the project does not set, is marked `continue-on-error` so it never blocks CI (the eslint and
-  stylelint `frontendLint` gate still covers the SPA). A commit-message convention was added to `CLAUDE.md`.
+  stylelint `frontendLint` gate still covers the SPA). A commit-message convention was added to `CLAUDE.md`. The `EventSourcedMutator` event-write helper was renamed to `EventSourcedWriter` (the `Mutator` name collided with the project's mutation-testing vocabulary).
 
 ### Added
 

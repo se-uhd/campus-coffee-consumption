@@ -20,7 +20,7 @@ import kotlin.reflect.KClass
  * assigned entity ids are produced by the same generator the relational delegate (the read model) uses.
  */
 @Component
-class EventSourcedMutator(
+class EventSourcedWriter(
     private val eventStore: EventStore,
     private val projector: ReadModelProjector,
     private val idGenerator: IdGenerator
