@@ -1,6 +1,5 @@
 package de.seuhd.campuscoffee.data.implementations
 
-import de.seuhd.campuscoffee.data.constraints.ConstraintMapping
 import de.seuhd.campuscoffee.data.mapper.PaymentEntityMapper
 import de.seuhd.campuscoffee.data.persistence.entities.PaymentEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.PaymentRepository
@@ -23,7 +22,7 @@ class PaymentDataServiceImpl(
         repository,
         entityMapper,
         Payment::class.java,
-        emptySet<ConstraintMapping<Payment>>(),
+        emptySet(),
         idGenerator
     ),
     PaymentDataService {
