@@ -43,8 +43,9 @@ interface MemberRow {
  * table (login name, full name, role, cup count, and signed balance). The table's leading column is a "View
  * profile" jump that opens the admin profile page for the member (carrying their id as the `member` query
  * param); the trailing actions column carries the active/deactivate toggle, a rotate-link action, a QR
- * download, and a delete. A "Download all QR codes" action sits in the Members card header (right-aligned in
- * the same row as the "Members" heading), streaming a ZIP of every member's QR code.
+ * download, and a delete. Two bulk actions sit in the Members card header (right-aligned with the "Members"
+ * heading): a ZIP of every active member's QR code, and a printable PDF grid of the same codes labelled by
+ * login name.
  */
 @Component({
   selector: 'cc-admin-users',
@@ -195,7 +196,21 @@ interface MemberRow {
               } @else {
                 <mat-icon>folder_zip</mat-icon>
               }
-              Download all
+              ZIP
+            </button>
+            <button
+              mat-stroked-button
+              (click)="downloadAllQrPdf()"
+              [disabled]="downloadingAllPdf"
+              aria-label="Download all QR codes as a PDF sheet"
+              matTooltip="Download all QR codes (PDF sheet)"
+            >
+              @if (downloadingAllPdf) {
+                <mat-spinner diameter="20"></mat-spinner>
+              } @else {
+                <mat-icon>picture_as_pdf</mat-icon>
+              }
+              PDF
             </button>
           </div>
           @if (dataSource.data.length > 0) {
@@ -338,6 +353,11 @@ interface MemberRow {
         white-space: nowrap;
         padding-right: 0;
       }
+
+      /* Space the two bulk-download buttons in the Members card header apart. */
+      .row button + button {
+        margin-left: 8px;
+      }
     `
   ]
 })
@@ -346,6 +366,7 @@ export class AdminUsersComponent implements OnInit {
   createdLink = '';
   busy = false;
   downloadingAll = false;
+  downloadingAllPdf = false;
   loading = false;
   loadError = '';
 
@@ -499,7 +520,7 @@ export class AdminUsersComponent implements OnInit {
     }
   }
 
-  /** Downloads a ZIP archive of every member's QR code (each entry named `<loginName>.png`). */
+  /** Downloads a ZIP archive of every active member's QR code (each entry named `<loginName>.png`). */
   async downloadAllQr(): Promise<void> {
     this.downloadingAll = true;
     try {
@@ -508,6 +529,18 @@ export class AdminUsersComponent implements OnInit {
       this.notifications.error(error, 'Could not download the QR codes.');
     } finally {
       this.downloadingAll = false;
+    }
+  }
+
+  /** Downloads a printable PDF grid of every active member's QR code (each labelled by login name). */
+  async downloadAllQrPdf(): Promise<void> {
+    this.downloadingAllPdf = true;
+    try {
+      this.triggerDownload(await this.userService.qrPdfBlob(), 'coffee-qr-codes.pdf');
+    } catch (error) {
+      this.notifications.error(error, 'Could not download the QR PDF.');
+    } finally {
+      this.downloadingAllPdf = false;
     }
   }
 

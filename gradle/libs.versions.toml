@@ -16,6 +16,8 @@ cucumber = "7.34.3"
 archunit = "1.4.2"
 # ZXing for backend QR-code generation (the member capability URL codes); not in the Boot BOM.
 zxing = "3.5.4"
+# Apache PDFBox renders the printable PDF grid of every member's QR code; Apache-2.0, not in the Boot BOM.
+pdfbox = "3.0.7"
 # Cloud SQL Java connector (postgres socket factory) for the prod datasource URL; not in the Boot BOM.
 cloud-sql = "1.28.4"
 # Testcontainers is not managed by the Boot 4 BOM at these coordinates, so pin it explicitly.
@@ -79,6 +81,8 @@ archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" 
 # ZXing QR-code generation: core builds the bit matrix, javase writes it to a PNG via ImageIO.
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 zxing-javase = { module = "com.google.zxing:javase", version.ref = "zxing" }
+# Apache PDFBox: draws the QR images and labels into the printable all-member QR sheet (PDF).
+pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 # Cloud SQL connector: TLS + IAM auth for the prod Cloud SQL datasource (the socketFactory in the URL).
 cloud-sql-postgres = { module = "com.google.cloud.sql:postgres-socket-factory", version.ref = "cloud-sql" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }

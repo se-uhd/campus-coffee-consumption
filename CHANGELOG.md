@@ -7,6 +7,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- Add an admin "Download all QR codes (PDF sheet)" action that renders every active member's capability QR
+  code into one printable A4 PDF grid, each code labelled with the member's login name, next to the existing
+  ZIP download (`GET /api/users/qr.pdf`, admin-only). Backed by Apache PDFBox (Apache-2.0) behind a new
+  `QrGridPdfGenerator` domain port, so the PDF library stays out of the web and domain layers.
+- Restrict the bulk QR downloads to active members: both the new PDF sheet and the existing
+  `GET /api/users/qr.zip` now skip deactivated members, whose wall codes are retired.
 - Encrypt the admin login payload in the browser. `POST /api/auth/token` now takes a compact JWE
   (`RSA-OAEP-256` + `A256GCM`) of `{ loginName, password }` instead of a plaintext body: the backend
   publishes its RSA public key at the new public `GET /api/auth/public-key` (a JWK), and the SPA encrypts the
