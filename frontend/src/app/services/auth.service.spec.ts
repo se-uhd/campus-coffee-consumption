@@ -62,7 +62,7 @@ describe('AuthService', () => {
     localStorage.clear();
   });
 
-  it('fetches the public key, posts the credentials as an encrypted payload (no plaintext), and stores the token', async () => {
+  it('fetches the public key, posts the credentials as an encrypted payload (no plaintext), and marks the session active', async () => {
     const jwk = { kty: 'RSA', n: 'modulus', e: 'AQAB', alg: 'RSA-OAEP-256', use: 'enc', kid: 'k1' };
     const promise = service.login('jane_doe', 's3cret-pw');
 
@@ -76,14 +76,16 @@ describe('AuthService', () => {
     expect(tokenReq.request.body).toEqual({ encryptedPayload: 'compact.jwe.value' });
 
     // the bytes handed to the encrypter are exactly the credentials JSON (so the credentials are what is
-    // encrypted, not sent in the clear)
+    // encrypted, not sent in the clear), plus a fresh `iat` for the backend's replay-freshness check
     const encrypted = JSON.parse(new TextDecoder().decode(mocks.capturedPlaintext.value));
-    expect(encrypted).toEqual({ loginName: 'jane_doe', password: 's3cret-pw' });
+    expect(encrypted).toMatchObject({ loginName: 'jane_doe', password: 's3cret-pw' });
+    expect(typeof encrypted.iat).toBe('number');
     expect(mocks.importJWK).toHaveBeenCalledWith(jwk, 'RSA-OAEP-256');
     expect(mocks.setHeader).toHaveBeenCalledWith({ alg: 'RSA-OAEP-256', enc: 'A256GCM', kid: 'k1' });
 
+    // the backend sets the JWT in an httpOnly cookie; the body token is ignored and only a session marker is kept
     tokenReq.flush({ token: 'jwt-123' });
     await promise;
-    expect(service.token).toBe('jwt-123');
+    expect(service.isLoggedIn).toBe(true);
   });
 });

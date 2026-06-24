@@ -29,7 +29,8 @@ springdoc:
 campus-coffee:
   app:
     # Public origin used to build the capability URLs and QR codes. Must be https in prod (the token never
-    # travels over plain HTTP); the prod profile fails fast if this is still http/localhost (ProdConfigGuard).
+    # travels over plain HTTP); the prod profile fails fast if this is empty, non-https, loopback, or a bare
+    # hostname (PublicBaseUrlGuard).
     base-url: ${CAMPUS_COFFEE_APP_BASE_URL:http://localhost:8080}
   id:
     entity-seed: ${CAMPUS_COFFEE_ID_ENTITY_SEED:42}
@@ -97,6 +98,11 @@ campus-coffee:
     load-on-startup: true
     # dev: clear + reseed every start so a persisted database can't collide with the restarted seeded ids
     reset-on-startup: true
+  auth:
+    cookie:
+      # dev is served over plain http on localhost, so the admin session cookie cannot be Secure there
+      # (a Secure cookie is dropped over http); prod keeps the default Secure=true.
+      secure: false
 
 ---
 spring:
@@ -108,8 +114,11 @@ spring:
     # The named socket factory ships in the com.google.cloud.sql:postgres-socket-factory runtime dependency
     # (declared in application/build.gradle.kts).
     url: "jdbc:postgresql:///postgres?cloudSqlInstance=${CLOUD_SQL_INSTANCE}&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD} # Secret Manager
+    # Least privilege: the app (and Flyway, which shares this connection) runs as a dedicated non-superuser
+    # role that owns only this schema, not the Cloud SQL master `postgres` user. Provision it once with
+    # scripts/sql/create-app-role.sql. Override with DB_USERNAME if the role is named differently.
+    username: ${DB_USERNAME:campus_coffee_app}
+    password: ${DB_PASSWORD} # supplied from Secret Manager (see scripts/deploy-cloudrun.sh and deploy.env.example)
   lifecycle:
     # Drain in-flight requests on a Cloud Run SIGTERM before the context closes.
     timeout-per-shutdown-phase: 20s
@@ -117,7 +126,8 @@ server:
   shutdown: graceful
 campus-coffee:
   app:
-    # The public https origin; required in prod (ProdConfigGuard rejects an empty or non-https base at startup).
+    # The public https origin; required in prod (PublicBaseUrlGuard rejects an empty, non-https, loopback, or
+    # bare-hostname base at startup; WeakDevSecretGuard rejects the committed dev fallback secrets).
     base-url: ${CAMPUS_COFFEE_APP_BASE_URL:}
   id:
     # Random ids in prod: the deterministic seeded generator would re-issue the same first UUIDs on every

@@ -16,6 +16,13 @@
 #   gcloud components install beta
 #   # a Cloud SQL Postgres instance named in application.yaml's prod datasource URL, the Cloud SQL Admin API
 #   # enabled, and the Cloud Run runtime service account granted the Cloud SQL Client role
+#   # the least-privilege app role provisioned once (scripts/sql/create-app-role.sql), so the service runs as
+#   # campus_coffee_app rather than the Cloud SQL master postgres superuser
+#
+# Hardening: deploy.env is the simple path, but the three secrets (JWT_SECRET, LOGIN_PRIVATE_KEY_PEM,
+# DB_PASSWORD) are better held in Secret Manager and bound after the compose deploy with
+#   gcloud run services update "$service" --set-secrets=DB_PASSWORD=db-app-password:latest,JWT_SECRET=jwt-secret:latest,LOGIN_PRIVATE_KEY_PEM=login-key:latest
+# so they never sit in a plaintext file or the build context.
 #
 # `gcloud run compose up` has no flag to set environment variables, so all secrets and the public URL are
 # supplied through the Compose file's `env_file: deploy.env`. This script generates deploy.env on first run
@@ -26,6 +33,11 @@
 # app-level authentication still gates every write.
 
 set -euo pipefail
+
+# deploy.env carries the JWT secret, the RSA login key, the DB password, and the admin credential, so every
+# file this script creates (deploy.env and the mktemp work file) must be owner-only. umask 077 makes that the
+# default; an explicit chmod below is the belt-and-suspenders.
+umask 077
 
 cd "$(dirname "$0")/.."
 
@@ -47,13 +59,15 @@ if [[ ! -f deploy.env ]]; then
   {
     printf 'JWT_SECRET=%s\n' "$(openssl rand -hex 32)"
     printf 'LOGIN_PRIVATE_KEY_PEM=%s\n' "$login_private_key_pem"
+    printf 'DB_USERNAME=%s\n' "${DB_USERNAME:-campus_coffee_app}"
     printf 'DB_PASSWORD=%s\n' "$DB_PASSWORD"
     printf 'CAMPUS_COFFEE_APP_BASE_URL=%s\n' "https://pending.invalid"
     printf 'BOOTSTRAP_ADMIN_LOGIN=%s\n' "admin"
     printf 'BOOTSTRAP_ADMIN_PASSWORD=%s\n' "$admin_password"
     printf 'BOOTSTRAP_ADMIN_EMAIL=%s\n' "admin@se.uni-heidelberg.de"
   } > deploy.env
-  echo "Generated deploy.env (gitignored)."
+  chmod 600 deploy.env
+  echo "Generated deploy.env (gitignored, mode 600)."
   echo "  First-admin login:    admin"
   echo "  First-admin password: $admin_password   (printed once; store it now)"
 fi

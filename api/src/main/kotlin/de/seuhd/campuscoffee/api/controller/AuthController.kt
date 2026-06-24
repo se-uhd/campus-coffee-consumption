@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.api.controller
 
+import de.seuhd.campuscoffee.api.configuration.AuthCookieProperties
 import de.seuhd.campuscoffee.api.dtos.PublicKeyDto
 import de.seuhd.campuscoffee.api.dtos.TokenRequestDto
 import de.seuhd.campuscoffee.api.dtos.TokenResponseDto
@@ -8,6 +9,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springframework.http.HttpHeaders
+import org.springframework.http.ResponseCookie
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -43,7 +47,8 @@ class AuthController(
     private val authenticationManager: AuthenticationManager,
     private val jwtEncoder: JwtEncoder,
     private val loginPayloadDecryptor: LoginPayloadDecryptor,
-    private val loginPublicKey: PublicKeyDto
+    private val loginPublicKey: PublicKeyDto,
+    private val cookieProperties: AuthCookieProperties
 ) {
     /**
      * Returns the RSA public key (as a JWK) the client uses to encrypt the login payload. Public material
@@ -95,8 +100,49 @@ class AuthController(
         // encoder to select that key
         val header = JwsHeader.with(MacAlgorithm.HS256).build()
         val token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).tokenValue
-        return ResponseEntity.ok(TokenResponseDto(token))
+        // set the JWT as an httpOnly, SameSite=Strict cookie so the browser stores it where JavaScript
+        // cannot read it (an XSS cannot exfiltrate it) and sends it automatically; the token is also returned
+        // in the body for non-browser API clients (and the system tests), which authenticate with the header
+        return ResponseEntity
+            .ok()
+            .header(HttpHeaders.SET_COOKIE, sessionCookie(token, Duration.ofHours(TOKEN_TTL_HOURS)).toString())
+            .body(TokenResponseDto(token))
     }
+
+    /**
+     * Clears the admin session cookie. Idempotent and open (clearing one's own cookie needs no auth); the
+     * SPA calls it on logout so the httpOnly cookie, which it cannot clear itself, is removed.
+     *
+     * @return 204 No Content with a Set-Cookie that expires the session cookie.
+     */
+    @Operation(summary = "Clear the admin session cookie.")
+    @PostMapping("/logout")
+    fun logout(): ResponseEntity<Void> =
+        ResponseEntity
+            .noContent()
+            .header(HttpHeaders.SET_COOKIE, sessionCookie("", Duration.ZERO).toString())
+            .build()
+
+    /**
+     * Builds the admin session cookie carrying the JWT: httpOnly and SameSite=Strict always, Secure in any
+     * real deployment (see [AuthCookieProperties.secure]), scoped to the whole site. A zero [maxAge] expires
+     * it (logout).
+     *
+     * @param value the JWT to carry (empty to clear the cookie).
+     * @param maxAge the cookie lifetime (zero to expire it immediately).
+     */
+    private fun sessionCookie(
+        value: String,
+        maxAge: Duration
+    ): ResponseCookie =
+        ResponseCookie
+            .from(cookieProperties.name, value)
+            .httpOnly(true)
+            .secure(cookieProperties.secure)
+            .sameSite("Strict")
+            .path("/")
+            .maxAge(maxAge)
+            .build()
 
     /** Strips the `ROLE_` prefix from the granted authorities to produce the bare role names. */
     private fun rolesOf(authentication: Authentication): List<String> =
