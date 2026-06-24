@@ -102,4 +102,7 @@ detekt-test-utils = { module = "dev.detekt:detekt-test-utils", version.ref = "de
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+# Declared only to be applied (with `apply false`) once at the root, so the Kotlin Gradle plugin is loaded by
+# a single classloader for every subproject's convention plugins. The version tracks the `kotlin` entry above.
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 dependency-management = { id = "io.spring.dependency-management", version.ref = "dependency-management" }
