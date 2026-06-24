@@ -89,4 +89,9 @@ if [[ -n "${MIN_INSTANCES:-}" ]]; then
   gcloud run services update "$service" --min-instances="$MIN_INSTANCES"
 fi
 
+# Startup CPU boost: extra CPU during container startup so the JVM and the Spring context boot faster, which
+# shortens a scale-to-zero cold start. Not separately billed and harmless when the instance is kept warm.
+echo "Enabling startup CPU boost on ${service}..."
+gcloud run services update "$service" --cpu-boost
+
 echo "Service URL: ${url}"

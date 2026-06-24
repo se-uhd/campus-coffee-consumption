@@ -26,6 +26,37 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `scripts/deploy-cloudrun.sh` gains a `MIN_INSTANCES` knob (mirroring `MAX_INSTANCES`); `MIN_INSTANCES=1`
   keeps one Cloud Run instance always warm, so the demo never cold-starts (and never reseeds on an idle
   wake).
+- Unify the form and panel vertical rhythm: tighten the gap between form fields (and `.form-row` groups) to
+  12px, give every panel heading the same 16px gap to its first element (the profile "Your details", the
+  "Members" card, and the collapsible "Record expense" headers were flush against their content), and
+  balance the count card so the visible gap above the number matches the gap below the action button (the
+  empty "undo" slot no longer reserves space, and extra bottom padding offsets the big number's line-box and
+  the button's drop-shadow).
+- Center the members-table row controls vertically (the slide-toggle now shares the icon buttons' center)
+  and render the table only once its data has loaded, so the active/inactive toggles no longer animate into
+  place on first paint. Center the admin member-select dropdown in its card (its empty subscript row is no
+  longer reserved).
+- Tidy form and table copy: shorten the "Download all QR codes" button to "Download all" (the tooltip and
+  aria-label keep the full text), remove the amount-format hints (the euro input already flags a bad value),
+  drop the standing private/kitty split hint (the rule is still enforced and shown on a mismatched submit),
+  show "Member"/"Admin" in the role dropdown and chips instead of the raw enum, match the activity filter
+  labels to the entry labels (Coffee/Expense/Deposit), phrase the delete-confirmation titles as statements,
+  and trim several redundant or jargon-laden hints.
+- Compact the unified activity list: replace Material's airy three-line list item (a fixed ~88px height that
+  spread the title, date, and balance apart) with a tight custom row, so an entry's lines sit close together
+  while entries stay clearly separated.
+- Reserve a form field's subscript row only when it has an error to show (`subscriptSizing: dynamic`), so a
+  field with no visible error no longer leaves an empty row below it, keeping the field rhythm and the
+  field-to-button gap tight.
+- Pin every page to one width (`max-width: 740px`) sized to the members table at its minimum content width
+  (no column overflows), replacing the old 480px / 920px split, and give the cards 24px horizontal padding
+  so content is not cramped against the side edges.
+- `scripts/deploy-cloudrun.sh` enables Cloud Run startup CPU boost (`--cpu-boost`) so the JVM and Spring
+  context boot faster, shortening a scale-to-zero cold start.
+- Declare the Kotlin Gradle plugin once at the root project (a new `build.gradle.kts`, `apply false`, version
+  from a new `kotlin-jvm` catalog alias that tracks the existing `kotlin` version), so a single classloader
+  provides it to every subproject's `build-logic` convention plugin. This silences Gradle's "The Kotlin
+  Gradle plugin was loaded multiple times in different subprojects" warning; the build output is unchanged.
 
 ## [0.4.0] - 2026-06-23
 

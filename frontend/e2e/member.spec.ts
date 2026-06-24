@@ -78,7 +78,7 @@ test.describe('member flow', () => {
     const activity = page.locator('mat-card', {
       has: page.getByRole('heading', { name: 'Recent activity' })
     });
-    const expenseRow = activity.locator('mat-list-item').filter({ hasText: 'Expense' }).first();
+    const expenseRow = activity.locator('.cc-entry').filter({ hasText: 'Expense' }).first();
     await expect(expenseRow).toBeVisible();
     await expect(expenseRow.locator('.amount')).toHaveText(/\+4\.20 €/);
   });
