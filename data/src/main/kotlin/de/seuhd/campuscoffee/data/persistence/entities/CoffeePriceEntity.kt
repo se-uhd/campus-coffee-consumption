@@ -17,7 +17,7 @@ class CoffeePriceEntity : Entity() {
 
     @field:Version
     @field:Column(name = "version")
-    var version: Long? = null
+    var version: Long? = 0
 
     companion object {
         const val SINGLETON_COLUMN = "is_singleton"
