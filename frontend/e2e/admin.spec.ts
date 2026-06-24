@@ -193,7 +193,9 @@ test.describe('admin flow', () => {
     await expect(page.getByRole('heading', { name: 'Add a member' })).toBeVisible();
 
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Download all QR codes' }).click();
+    // exact match: the sibling "Download all QR codes as a PDF sheet" button's accessible name also starts
+    // with "Download all QR codes", so a non-exact name matches both and trips strict mode
+    await page.getByRole('button', { name: 'Download all QR codes', exact: true }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe('coffee-qr-codes.zip');
   });

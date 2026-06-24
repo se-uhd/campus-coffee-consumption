@@ -401,7 +401,17 @@ export class ProfileComponent implements OnInit {
     this.busy = true;
     try {
       const updated = this.adminMode
-        ? await this.userService.update(this.profile.id!, this.profile)
+        ? // send only the editable profile fields, with role/active nulled so the backend keeps the stored
+          // values: echoing the loaded snapshot would silently revert a role or active-state change a
+          // concurrent admin committed between this page load and this save (last-write-wins on stale data)
+          await this.userService.update(this.profile.id!, {
+            loginName: this.profile.loginName!,
+            firstName: this.profile.firstName!,
+            lastName: this.profile.lastName!,
+            emailAddress: this.profile.emailAddress!,
+            role: null,
+            active: null
+          })
         : await this.profileService.update({
             firstName: this.profile.firstName!,
             lastName: this.profile.lastName!,

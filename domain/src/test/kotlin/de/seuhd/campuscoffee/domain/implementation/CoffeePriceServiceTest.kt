@@ -90,22 +90,17 @@ class CoffeePriceServiceTest {
     }
 
     @Test
-    fun `setPrice on a concurrent first write re-reads the winner and updates it to the requested amount`() {
-        // no price on the initial read, so this write tries to insert the singleton...
-        whenever(
-            coffeePriceDataService.findCurrent()
-        ).thenReturn(null, CoffeePrice(id = UUID(0L, 5L), amountCents = 50))
-        // ...but the concurrent winner already inserted it, so the insert hits the singleton uniqueness guard,
-        // which the data adapter surfaces as a domain DuplicationException (not a raw Spring exception)
+    fun `setPrice on a concurrent first write surfaces the conflict as a DuplicationException`() {
+        // no price on the read, so this write tries to insert the singleton...
+        whenever(coffeePriceDataService.findCurrent()).thenReturn(null)
+        // ...but a concurrent winner already inserted it, so the insert hits the singleton uniqueness guard,
+        // surfaced as a domain DuplicationException. A constraint violation aborts the PostgreSQL transaction,
+        // so the service cannot re-read and "recover" in place; it surfaces a clean 409 instead. In practice
+        // the bootstrap seeder creates the singleton before any admin call, so this branch is unreachable.
         whenever(coffeePriceDataService.upsert(any()))
             .thenThrow(DuplicationException(CoffeePrice::class.java, "is_singleton", "the coffee price"))
-            .thenAnswer { it.arguments[0] as CoffeePrice }
 
-        val price = service.setPrice(70, admin)
-
-        // the winner's row is re-read and updated to the requested amount rather than failing with a 500
-        assertThat(price.id).isEqualTo(UUID(0L, 5L))
-        assertThat(price.amountCents).isEqualTo(70)
+        assertThrows<DuplicationException> { service.setPrice(70, admin) }
     }
 
     @Test
