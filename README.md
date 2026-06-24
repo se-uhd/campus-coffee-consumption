@@ -21,10 +21,12 @@ Angular 22 single-page frontend, derived from the CampusCoffee teaching project.
   entry point, so it stays out of API access logs. A member adds one coffee at a time, may **undo** the most
   recent one within a short grace period, records their own bean purchases, and sees their balance, the
   current price, the kitty balance, and a unified activity feed of their coffees, purchases, and deposits.
-- **Admins** authenticate with a **JWT**, minted from a username-and-password login (`POST /api/auth/token`,
-  ~10-hour work-session token, no refresh flow). The credentials are encrypted in the browser (a compact JWE
-  under the backend's published RSA public key) before they are sent, so the raw password never travels as
-  plaintext. An admin manages members (create, edit, deactivate, change
+- **Admins** authenticate with a **JWT** held in an httpOnly, `SameSite=Strict` session cookie, minted from a
+  username-and-password login (`POST /api/auth/token`, ~10-hour work-session token, no refresh flow). The
+  credentials are encrypted in the browser (a compact JWE under the backend's published RSA public key, with
+  an `iat` so a captured ciphertext cannot be replayed) before they are sent, so the raw password never
+  travels as plaintext, and the cookie keeps the token out of JavaScript's reach (an XSS cannot steal it). An
+  admin manages members (create, edit, deactivate, change
   role, view and rotate capability links, download any member's QR or all of them as a ZIP or printable PDF
   sheet), sets the global price, records expenses
   with a private/kitty split and kitty deposits and adjustments, corrects any member's count, and reviews
@@ -148,15 +150,17 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `PUT  /users/{id}/consumption` `{ "total": N, "note": "…" }`: absolute count correction (`note` optional).
 - `GET/POST/PUT/DELETE /users/{id}/expenses`: list, record, correct, or delete a member's purchases with a private/kitty split (the buyer cannot be changed on a correction).
 - `GET /price`: read the current global price (admin-only; members receive it through their landing summary).
-- `PUT /price` `{ "amountCents": N }`, `GET /price/history`: set the global price, or view its full history.
+- `PUT /price` `{ "amountCents": N }`, `GET /price/history?limit=50&offset=0`: set the global price, or view a page of its history (newest first).
 - `POST /kitty/deposit` `{ "userId", "amountCents", "note"? }`: a member pays money into the kitty.
 - `POST /kitty/adjustment` `{ "amountCents", "note"? }`: a pure kitty adjustment (an initial float or a correction).
 - `GET /kitty/history?limit=50&offset=0`: the kitty history with the running kitty balance.
 
 **Auth:** `GET /auth/public-key` returns the backend's RSA public key as a JWK; `POST /auth/token`
-`{ "encryptedPayload": "<compact JWE of { loginName, password }>" }` → `{ "token": "<jwt>" }`. The SPA
-encrypts the credentials with the published key (`RSA-OAEP-256` + `A256GCM`) so the raw password never
-travels as plaintext (defense in depth on top of TLS); a malformed or undecryptable payload returns 400.
+`{ "encryptedPayload": "<compact JWE of { loginName, password, iat }>" }` sets the JWT in an httpOnly
+`SameSite=Strict` cookie and also returns `{ "token": "<jwt>" }` for header-based API clients;
+`POST /auth/logout` clears the cookie. The SPA encrypts the credentials with the published key
+(`RSA-OAEP-256` + `A256GCM`) so the raw password never travels as plaintext (defense in depth on top of TLS);
+a malformed, undecryptable, or stale (replayed) payload returns 400.
 
 Money is in integer euro cents throughout. The HTTP method carries the semantics: `GET` reads, member
 `POST /consumption` adds one coffee (and `/cancel` undoes a recent one), and admin `PUT` sets an absolute
