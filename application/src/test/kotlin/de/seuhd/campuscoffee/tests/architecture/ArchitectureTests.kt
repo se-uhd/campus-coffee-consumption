@@ -1,8 +1,11 @@
 package de.seuhd.campuscoffee.tests.architecture
 
+import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.library.Architectures.layeredArchitecture
+import com.tngtech.archunit.library.dependencies.SliceAssignment
+import com.tngtech.archunit.library.dependencies.SliceIdentifier
 import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
 import org.junit.jupiter.api.Test
 
@@ -62,10 +65,34 @@ class ArchitectureTests {
                 .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
                 .importPackages("de.seuhd.campuscoffee")
 
+        // A `matching("...(**)")` pattern cannot capture a class that sits directly in the root package
+        // (there is no sub-package segment to match), so the application main class and the startup loaders
+        // would be silently excluded from cycle analysis. Assign slices explicitly instead, giving root-package
+        // classes their own "(root)" slice so they participate too.
         slices()
-            .matching("de.seuhd.campuscoffee.(**)")
+            .assignedFrom(RootInclusiveSliceAssignment)
             .should()
             .beFreeOfCycles()
             .check(productionClasses)
+    }
+
+    /**
+     * Slices every production class by its package path relative to `de.seuhd.campuscoffee`, assigning a
+     * class that sits directly in the root package to a dedicated `(root)` slice so it is not dropped from
+     * cycle analysis (an unqualified `matching("...(**)")` would ignore it).
+     */
+    private object RootInclusiveSliceAssignment : SliceAssignment {
+        private const val BASE_PACKAGE = "de.seuhd.campuscoffee"
+
+        override fun getIdentifierOf(javaClass: JavaClass): SliceIdentifier {
+            val packageName = javaClass.packageName
+            if (packageName != BASE_PACKAGE && !packageName.startsWith("$BASE_PACKAGE.")) {
+                return SliceIdentifier.ignore()
+            }
+            val relative = packageName.removePrefix(BASE_PACKAGE).removePrefix(".")
+            return SliceIdentifier.of(relative.ifEmpty { "(root)" })
+        }
+
+        override fun getDescription(): String = "campus-coffee package slices, including the root package"
     }
 }

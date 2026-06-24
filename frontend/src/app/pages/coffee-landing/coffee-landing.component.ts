@@ -26,6 +26,12 @@ import { appendActivityPage } from '../../util/activity';
 /** The page size for one activity page; "Load more" appends another page of this size. */
 const ACTIVITY_PAGE_SIZE = 10;
 
+/** How many extra times to re-post a coffee after a concurrent-update 409 before surfacing the error. */
+const MAX_ADD_RETRIES = 4;
+
+/** Base backoff between add retries (ms); grows per attempt so concurrent writers de-synchronize. */
+const ADD_RETRY_BASE_DELAY_MS = 40;
+
 /**
  * Member landing reached by scanning the wall QR code (`/login/:token`). Reads the capability token from
  * the route, holds it for the interceptor, and shows the prepaid-card view: the big count and a +1 hero,
@@ -312,18 +318,23 @@ export class CoffeeLandingComponent implements OnInit {
   }
 
   /**
-   * Posts one coffee, retrying once on a concurrent-update 409. The same member scanning from two tabs (or a
-   * double-tap) loses the @Version optimistic-lock race on one write; the documented contract is that the SPA
-   * retries it, so the dropped tap is re-applied rather than surfaced as an error.
+   * Posts one coffee, retrying a bounded number of times on a concurrent-update 409. The same member scanning
+   * from several tabs or devices loses the @Version optimistic-lock race on all but one concurrent write; the
+   * documented contract is that the SPA retries, so each loser re-applies its tap rather than dropping it. A
+   * small growing backoff de-synchronizes N concurrent writers so they converge instead of colliding again in
+   * lockstep; only after MAX_ADD_RETRIES exhausted conflicts is the error surfaced.
    */
   private async addCoffeeWithRetry(): Promise<UserSummaryDto> {
-    try {
-      return await this.summaryService.addCoffee();
-    } catch (error) {
-      if (error instanceof HttpErrorResponse && error.status === 409) {
+    for (let attempt = 0; ; attempt++) {
+      try {
         return await this.summaryService.addCoffee();
+      } catch (error) {
+        const isConflict = error instanceof HttpErrorResponse && error.status === 409;
+        if (!isConflict || attempt >= MAX_ADD_RETRIES) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, ADD_RETRY_BASE_DELAY_MS * (attempt + 1)));
       }
-      throw error;
     }
   }
 

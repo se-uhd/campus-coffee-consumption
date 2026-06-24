@@ -182,7 +182,15 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         return ResponseEntity.status(status).headers(headers).body(body)
     }
 
-    /** Renders every exception handled by [ResponseEntityExceptionHandler] as a standard [ErrorResponse]. */
+    /**
+     * Renders every exception handled by [ResponseEntityExceptionHandler] (a malformed body, an unsupported
+     * method or media type, a missing parameter, a type mismatch, ...) as a standard [ErrorResponse]. The
+     * framework exception's own message and class name are deliberately not echoed: for a body-parse failure
+     * `ex.message` carries Jackson parser detail (line/column and a fragment of the request body) and
+     * `ex.javaClass.simpleName` is an internal framework type, both of which prod's error config intends to
+     * suppress. A neutral, status-derived message and code are returned instead, in every profile; the full
+     * detail is logged server-side only. The author-controlled overrides above keep their own messages.
+     */
     override fun handleExceptionInternal(
         ex: Exception,
         body: Any?,
@@ -190,8 +198,10 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         statusCode: HttpStatusCode,
         request: WebRequest
     ): ResponseEntity<Any>? {
-        log.warn { "${ex.javaClass.simpleName} -> $statusCode" }
-        val responseBody: Any = errorBody(ex, statusCode, request, ex.message)
+        log.warn { "${ex.javaClass.simpleName} -> $statusCode: ${ex.message}" }
+        val status = HttpStatus.valueOf(statusCode.value())
+        val responseBody: Any =
+            errorBody(ex, statusCode, request, status.reasonPhrase, errorCode = status.reasonPhrase.replace(" ", ""))
         return ResponseEntity.status(statusCode).headers(headers).body(responseBody)
     }
 

@@ -28,10 +28,11 @@ test.describe('validation and error states', () => {
     const submit = page.getByRole('button', { name: 'Sign in' });
     await expect(submit).toBeDisabled();
 
-    // touch and blur the required login-name field while empty
-    const loginName = page.getByLabel('Login name');
-    await loginName.click();
-    await page.getByLabel('Password').click();
+    // touch and blur the required login-name field while empty. Focus (not click) the fields: when the field
+    // is empty the floating label sits over the input, and its required-marker asterisk can intercept a
+    // pointer click; focusing drives the same touched-then-blurred state without the pointer interception.
+    await page.getByLabel('Login name').focus();
+    await page.getByLabel('Password').focus();
 
     await expect(page.getByText('Enter your login name.')).toBeVisible();
     await expect(submit).toBeDisabled();

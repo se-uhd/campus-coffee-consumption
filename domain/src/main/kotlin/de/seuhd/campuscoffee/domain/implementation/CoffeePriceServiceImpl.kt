@@ -1,6 +1,5 @@
 package de.seuhd.campuscoffee.domain.implementation
 
-import de.seuhd.campuscoffee.domain.exceptions.DuplicationException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
 import de.seuhd.campuscoffee.domain.model.CoffeePrice
@@ -38,31 +37,28 @@ class CoffeePriceServiceImpl(
             throw ValidationException("The coffee price cannot be negative.")
         }
         val current = coffeePriceDataService.findCurrent()
-        // An existing row is updated in place; the first write inserts the singleton. Two concurrent first
-        // writes would both miss the existing row and both try to insert, so the loser hits the single-row
-        // guard, which the data adapter maps to a domain DuplicationException (not a raw Spring exception):
-        // handle it the way ensureInitialPrice does (re-read the winner's row and update it) rather than fail.
-        if (current != null) {
-            return coffeePriceDataService.upsert(current.copy(amountCents = amountCents))
-        }
-        return try {
+        // An existing row is updated in place; the first-ever write inserts the singleton. The bootstrap
+        // seeder (CoffeePriceStartupLoader) creates the singleton before the web server accepts requests, so
+        // an admin setPrice always sees an existing row and this insert branch is effectively unreachable at
+        // runtime. If it were reached and two writes raced, the loser would hit the single-row guard and
+        // surface a 409 DuplicationException: a constraint violation aborts the PostgreSQL transaction, so a
+        // pretend "re-read the winner and update" recovery cannot run in the same transaction. A clean
+        // conflict is the honest outcome.
+        return if (current != null) {
+            coffeePriceDataService.upsert(current.copy(amountCents = amountCents))
+        } else {
             coffeePriceDataService.upsert(CoffeePrice(amountCents = amountCents))
-        } catch (_: DuplicationException) {
-            val winner = currentOrThrow()
-            coffeePriceDataService.upsert(winner.copy(amountCents = amountCents))
         }
     }
 
     @Transactional
     override fun ensureInitialPrice(amountCents: Int): CoffeePrice {
         coffeePriceDataService.findCurrent()?.let { return it }
-        return try {
-            coffeePriceDataService.upsert(CoffeePrice(amountCents = amountCents))
-        } catch (_: DuplicationException) {
-            // two instances seeding the singleton at once: the loser hits the single-row guard (surfaced as a
-            // domain DuplicationException by the data adapter). The winner's row is committed, so re-read it.
-            currentOrThrow()
-        }
+        // The first instance to seed wins; a concurrent instance's insert loses the single-row guard and
+        // throws a DuplicationException. That aborts this transaction, so the winner's row cannot be re-read
+        // here; the caller (CoffeePriceStartupLoader) catches the conflict and reads the price in a fresh
+        // transaction instead.
+        return coffeePriceDataService.upsert(CoffeePrice(amountCents = amountCents))
     }
 
     override fun priceHistory(actingUser: User): List<PriceChange> {
@@ -72,15 +68,6 @@ class CoffeePriceServiceImpl(
     }
 
     override fun clear() = coffeePriceDataService.clear()
-
-    /**
-     * Re-reads the current price after a singleton-uniqueness conflict, when the winning concurrent write
-     * has already committed the row. The row must exist by then, so its absence is unreachable.
-     */
-    private fun currentOrThrow(): CoffeePrice =
-        requireNotNull(coffeePriceDataService.findCurrent()) {
-            "The price singleton insert was rejected but no price exists; this should be unreachable."
-        }
 
     /** Requires [actingUser] to be an admin, else 403. */
     private fun requireAdmin(actingUser: User) {

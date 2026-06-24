@@ -94,6 +94,9 @@ class UserServiceImpl(
         }
         return super.upsert(
             domainObject.copy(
+                // normalize the email so the case-sensitive UNIQUE constraint treats Jane@x and jane@x as the
+                // same address: two accounts for one human would split their coffee balance and kitty history
+                emailAddress = domainObject.emailAddress.trim().lowercase(),
                 role = role,
                 active = domainObject.active ?: existing?.active ?: true,
                 capabilityToken = capabilityToken,

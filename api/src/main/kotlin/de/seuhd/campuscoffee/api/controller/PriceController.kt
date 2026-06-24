@@ -9,6 +9,7 @@ import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller
 import org.springframework.web.bind.annotation.GetMapping
@@ -47,14 +48,35 @@ class PriceController(
     /** Returns the current global price per cup. */
     @Operation(summary = "Get the current global coffee price per cup.")
     @GetMapping("")
-    fun getCurrent(): ResponseEntity<PriceDto> =
-        ResponseEntity.ok(PriceDto(coffeePriceService.getCurrent().amountCents))
+    fun getCurrent(): ResponseEntity<PriceDto> {
+        // re-resolve the live admin so a deactivated or demoted admin's in-flight JWT is rejected here too,
+        // matching every other admin endpoint (the static roles claim alone would still let it through)
+        currentUserProvider.currentUser()
+        return ResponseEntity.ok(PriceDto(coffeePriceService.getCurrent().amountCents))
+    }
 
-    /** Returns the global price history, newest first. */
-    @Operation(summary = "Get the global coffee price history (newest first).")
+    /**
+     * Returns a page of the global price history, newest first.
+     *
+     * @param page the validated paging window (limit/offset)
+     */
+    @Operation(summary = "Get a page of the global coffee price history (newest first).")
     @GetMapping("/history")
-    fun history(): ResponseEntity<List<PriceChangeDto>> {
+    fun history(
+        @Valid @ParameterObject page: PageQuery
+    ): ResponseEntity<List<PriceChangeDto>> {
         val admin = currentUserProvider.currentUser()
-        return ResponseEntity.ok(accountingDtoMapper.toPriceChangeDtos(coffeePriceService.priceHistory(admin)))
+        // the price stream is small; page it in memory (the service already returns it newest-first) so the
+        // response is bounded, consistent with the other history reads
+        val history =
+            coffeePriceService
+                .priceHistory(admin)
+                .drop(page.offset)
+                .take(page.limitOr(HISTORY_LIMIT))
+        return ResponseEntity.ok(accountingDtoMapper.toPriceChangeDtos(history))
+    }
+
+    private companion object {
+        private const val HISTORY_LIMIT = 50
     }
 }
