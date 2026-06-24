@@ -23,6 +23,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   deployed profile (defense in depth; `DevController` is already `@Profile("dev")`).
 - `scripts/check-version-sync.sh` compares the full version token (including any pre-release or build
   suffix), not just `x.y.z`.
+- `scripts/deploy-cloudrun.sh` gains a `MIN_INSTANCES` knob (mirroring `MAX_INSTANCES`); `MIN_INSTANCES=1`
+  keeps one Cloud Run instance always warm, so the demo never cold-starts (and never reseeds on an idle
+  wake).
 
 ## [0.4.0] - 2026-06-23
 
