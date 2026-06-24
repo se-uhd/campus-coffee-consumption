@@ -132,24 +132,3 @@ management:
     web:
       exposure:
         include: health, metrics
-
----
-# The demo profile is a thin overlay on prod for a public, throwaway demo (activate them together:
-# SPRING_PROFILES_ACTIVE=prod,demo). It keeps every prod hardening (managed Cloud SQL, required https base
-# URL via PublicBaseUrlGuard, real JWT secret, Swagger and the /api/dev endpoints off) and only adds the seed
-# data, so the demo is internet-safe. The fixture + DevDemoDataLoader dataset is cleared and reseeded on
-# every boot, so the demo is deterministic, self-cleaning, and discards any prior deployment's data. Run it
-# at a single Cloud Run instance (--max-instances=1) so two instances never reset the database at once.
-spring:
-  config:
-    activate:
-      on-profile: demo
-campus-coffee:
-  id:
-    # Deterministic ids (like dev), so the seeded ids and capability/QR tokens are stable and reset-on-startup
-    # re-creates them; prod uses random ids only because it never resets, so its seeds cannot collide.
-    entity-seed: ${CAMPUS_COFFEE_ID_ENTITY_SEED:42}
-    event-seed: ${CAMPUS_COFFEE_ID_EVENT_SEED:100}
-  fixtures:
-    load-on-startup: true
-    reset-on-startup: true
