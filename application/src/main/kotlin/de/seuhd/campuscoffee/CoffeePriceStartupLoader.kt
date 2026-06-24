@@ -1,6 +1,7 @@
 package de.seuhd.campuscoffee
 
 import de.seuhd.campuscoffee.configuration.CoffeePriceProperties
+import de.seuhd.campuscoffee.domain.exceptions.DuplicationException
 import de.seuhd.campuscoffee.domain.ports.StartupTask
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -25,7 +26,15 @@ class CoffeePriceStartupLoader(
 
     /** Creates the initial price at the configured default unless one already exists. */
     fun seedInitialPrice() {
-        val price = coffeePriceService.ensureInitialPrice(coffeePriceProperties.initialCents)
+        val price =
+            try {
+                coffeePriceService.ensureInitialPrice(coffeePriceProperties.initialCents)
+            } catch (_: DuplicationException) {
+                // another instance won the seed race and committed the singleton; its insert aborted our
+                // transaction, so read the now-existing price in a fresh transaction rather than retrying.
+                log.info { "The coffee price was already seeded by another instance." }
+                coffeePriceService.getCurrent()
+            }
         log.info { "The coffee price is ${price.amountCents} cents per cup." }
     }
 

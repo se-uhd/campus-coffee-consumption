@@ -478,7 +478,16 @@ export class AdminUsersComponent implements OnInit {
   /** Toggles a member's active state (deactivate/reactivate). */
   async toggleActive(user: UserDto): Promise<void> {
     try {
-      await this.userService.update(user.id!, { ...user, active: !(user.active === true) });
+      // change only `active`; null out `role` so a concurrent role change is not reverted by the stale
+      // snapshot, and send the required identity fields the backend pins to the stored values anyway
+      await this.userService.update(user.id!, {
+        loginName: user.loginName,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        emailAddress: user.emailAddress,
+        role: null,
+        active: !(user.active === true)
+      });
       this.notifications.success(user.active === true ? 'Member deactivated.' : 'Member reactivated.');
       await this.reload();
     } catch (error) {
