@@ -13,8 +13,8 @@ import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 
 /**
- * Demo-data loader (`@Profile("dev", "demo")`, so it runs in local dev and in the cloud `demo` deployment)
- * that layers extra members and some consumption, bean-purchase and deposit history on top of the
+ * Demo-data loader (`@Profile("dev")`, so it runs in local dev only) that layers extra members and some
+ * consumption, bean-purchase and deposit history on top of the
  * five-user fixture set, so the app comes up with enough members to paginate (5 per page) and with non-empty
  * activity and change-log views. It also layers a representative
  * history (cups, own purchases, and a deposit) onto the primary fixture member `maxmustermann` (the member
@@ -28,13 +28,13 @@ import org.springframework.stereotype.Component
  * demo the empty state: the freshly created member [EMPTY_DEMO_LOGIN] (`new_user`, no history at all) and the
  * inactive demo member `hannes_schulz` (its spec carries no coffees, expenses, or deposit).
  *
- * It is deliberately a separate `@Profile("dev", "demo")` [StartupTask] (order [ORDER], after the fixture
+ * It is deliberately a separate `@Profile("dev")` [StartupTask] (order [ORDER], after the fixture
  * reset+seed at 200 and the price seed at 250) rather than a change to
  * [de.seuhd.campuscoffee.domain.tests.TestFixtures]: the fixture set is asserted exactly by the system and
- * acceptance tests, which activate neither the dev nor the demo profile, so this loader never runs in the
+ * acceptance tests, which do not activate the dev profile, so this loader never runs in the
  * test context and leaves those assertions untouched.
  *
- * Determinism: the id generator is reset on every boot (the dev/demo `reset-on-startup`), and the fixture
+ * Determinism: the id generator is reset on every boot (the dev `reset-on-startup`), and the fixture
  * loader clears all data and reseeds before this runs, so every start reproduces the same demo data with the
  * same assigned ids. The loader is also idempotent within a run (it skips if its demo members already exist),
  * so a restart without a reset does not duplicate them.
@@ -44,7 +44,7 @@ import org.springframework.stereotype.Component
  * acting user only satisfies the domain authorization checks).
  */
 @Component
-@Profile("dev", "demo")
+@Profile("dev")
 class DevDemoDataLoader(
     private val userService: UserService,
     private val coffeeConsumptionService: CoffeeConsumptionService,
