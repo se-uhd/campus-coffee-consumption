@@ -1,5 +1,14 @@
 # The CoffeeConsumption event sourcing model and the capability URL scheme
 
+> **Partly superseded (noted 2026-06-24).** The event-sourcing and capability-URL design below still holds,
+> but some consumption specifics here are out of date: there is no member free `-1` and no reset. A member
+> adds one coffee at a time and may undo a recent one within a grace period, and an admin makes an absolute
+> count correction (never a `PUT { total: 0 }` reset); settling up is a deposit, not a reset. The member
+> header is `X-Capability-Token` (this note's `X-Coffee-Token` is stale), and `events.note` now carries the
+> note for every event, not only the count-correction reason. For current behavior see `CLAUDE.md`,
+> `README.md`, `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`, and
+> `doc/2026-06-24_security-hardening-and-cookie-auth.md`.
+
 This note records two design decisions in CampusCoffeeConsumption: how a member's coffee count is modeled
 as a logged entity on top of the event sourcing machinery inherited from CampusCoffee, and how the secret
 capability URLs follow the W3C "Good Practices for Capability URLs" finding.
