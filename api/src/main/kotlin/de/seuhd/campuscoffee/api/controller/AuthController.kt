@@ -1,7 +1,9 @@
 package de.seuhd.campuscoffee.api.controller
 
+import de.seuhd.campuscoffee.api.dtos.PublicKeyDto
 import de.seuhd.campuscoffee.api.dtos.TokenRequestDto
 import de.seuhd.campuscoffee.api.dtos.TokenResponseDto
+import de.seuhd.campuscoffee.api.security.LoginPayloadDecryptor
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -16,6 +18,7 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet
 import org.springframework.security.oauth2.jwt.JwtEncoder
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters
 import org.springframework.stereotype.Controller
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -38,16 +41,28 @@ import java.time.temporal.ChronoUnit
 @RequestMapping("/auth")
 class AuthController(
     private val authenticationManager: AuthenticationManager,
-    private val jwtEncoder: JwtEncoder
+    private val jwtEncoder: JwtEncoder,
+    private val loginPayloadDecryptor: LoginPayloadDecryptor,
+    private val loginPublicKey: PublicKeyDto
 ) {
     /**
-     * Authenticates the credentials with the shared [AuthenticationManager] and returns a signed JWT
-     * carrying the subject, the user's role, and a work-session expiry.
+     * Returns the RSA public key (as a JWK) the client uses to encrypt the login payload. Public material
+     * only; published openly so the SPA can fetch it before logging in.
      *
-     * @param request the login name and password to authenticate
+     * @return 200 OK with the public key JWK
+     */
+    @Operation(summary = "The RSA public key (JWK) used to encrypt the login payload.")
+    @GetMapping("/public-key")
+    fun publicKey(): ResponseEntity<PublicKeyDto> = ResponseEntity.ok(loginPublicKey)
+
+    /**
+     * Decrypts the credentials, authenticates them with the shared [AuthenticationManager], and returns a
+     * signed JWT carrying the subject, the user's role, and a work-session expiry.
+     *
+     * @param request the encrypted credentials (a compact JWE) to authenticate
      * @return 200 OK with the issued bearer token
      */
-    @Operation(summary = "Authenticate with a login name and password and issue a JWT bearer token.")
+    @Operation(summary = "Authenticate with an encrypted login payload and issue a JWT bearer token.")
     @PostMapping("/token")
     fun token(
         @RequestBody
@@ -56,11 +71,13 @@ class AuthController(
         // do not log the supplied login name: it is PII, and the canonical identifier (the user id) is not
         // resolved at the credential boundary (a failed attempt has no user). Logging the bare event is enough.
         log.info { "Token requested." }
-        // authenticate the credentials; wrong credentials raise an AuthenticationException that the
-        // global exception handler renders as a JSON 401 (the endpoint never returns a token for them)
+        // decrypt the payload (a malformed/undecryptable one raises a LoginPayloadException -> 400), then
+        // authenticate; wrong credentials raise an AuthenticationException that the global exception handler
+        // renders as a JSON 401 (the endpoint never returns a token for them)
+        val credentials = loginPayloadDecryptor.decrypt(request.encryptedPayload.orEmpty())
         val authentication =
             authenticationManager.authenticate(
-                UsernamePasswordAuthenticationToken(request.loginName, request.password)
+                UsernamePasswordAuthenticationToken(credentials.loginName, credentials.password)
             )
 
         val now = Instant.now()

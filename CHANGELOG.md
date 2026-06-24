@@ -7,6 +7,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- Encrypt the admin login payload in the browser. `POST /api/auth/token` now takes a compact JWE
+  (`RSA-OAEP-256` + `A256GCM`) of `{ loginName, password }` instead of a plaintext body: the backend
+  publishes its RSA public key at the new public `GET /api/auth/public-key` (a JWK), and the SPA encrypts the
+  credentials with it (via the `jose` library) before signing in. This keeps the raw password out of
+  TLS-terminating proxies and request-body logs (defense in depth on top of TLS). The RSA private key is
+  configured like the JWT secret, `campus-coffee.login-encryption.private-key-pem` (a PKCS#8 PEM, at least
+  2048 bits), required in prod via `LOGIN_PRIVATE_KEY_PEM` (delivered as one line with `\n` separators) with
+  an insecure dev fallback; the same key must be present on every instance, so it is configured rather than
+  generated per startup. A malformed or undecryptable payload returns 400, distinct from the 401 for
+  wrong-but-readable credentials, so it is not a credential oracle. This is defense in depth, not a new trust
+  boundary: it does not replace TLS, does not protect against a compromised client or XSS, and is not
+  zero-knowledge (the server decrypts and still verifies the password with bcrypt).
 - Fix the member landing page: the count/hero card and the balance card sat flush with no gap (the hero
   "+" button overlapped the balance card); they now keep the same 16px spacing as the rest of the page.
 - Tidy the browser tab titles: capitalized, with SE@UHD in parentheses and no middle-dot separator, e.g.

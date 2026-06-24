@@ -40,8 +40,13 @@ service="$(sed -n 's/^name: *//p' "$compose" | head -1)"
 if [[ ! -f deploy.env ]]; then
   : "${DB_PASSWORD:?Set DB_PASSWORD to your Cloud SQL password for the first deploy, e.g. DB_PASSWORD=... $0}"
   admin_password="$(openssl rand -hex 16)"
+  # The login-payload RSA key as a single line with literal \n separators (an env_file value cannot span
+  # lines); the app turns the \n back into real newlines.
+  login_private_key_pem="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null \
+    | awk 'BEGIN{ORS="\\n"}{print}' | sed 's/\\n$//')"
   {
     printf 'JWT_SECRET=%s\n' "$(openssl rand -hex 32)"
+    printf 'LOGIN_PRIVATE_KEY_PEM=%s\n' "$login_private_key_pem"
     printf 'DB_PASSWORD=%s\n' "$DB_PASSWORD"
     printf 'CAMPUS_COFFEE_APP_BASE_URL=%s\n' "https://pending.invalid"
     printf 'BOOTSTRAP_ADMIN_LOGIN=%s\n' "admin"
