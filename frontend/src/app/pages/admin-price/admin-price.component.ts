@@ -46,7 +46,7 @@ import { euroInputError, toCents } from '../../util/money';
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
-    <div class="page page--wide">
+    <div class="page">
       @if (loadError) {
         <mat-card class="card">
           <p class="warn">{{ loadError }}</p>
@@ -73,7 +73,6 @@ import { euroInputError, toCents } from '../../util/money';
                 ccEuroAmount
                 required
               />
-              <mat-hint>Use a comma or a point, e.g. 0,50 or 0.50.</mat-hint>
               @if (priceModel.touched && priceError()) {
                 <mat-error>{{ priceError() }}</mat-error>
               }

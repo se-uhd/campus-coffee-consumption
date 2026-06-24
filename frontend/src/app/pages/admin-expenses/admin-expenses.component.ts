@@ -67,7 +67,7 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
-    <div class="page page--wide">
+    <div class="page">
       @if (loadError) {
         <mat-card class="card">
           <p class="warn">{{ loadError }}</p>
@@ -118,7 +118,6 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                 ccEuroAmount
                 required
               />
-              <mat-hint>Use a comma or a point, e.g. 8,50 or 8.50.</mat-hint>
               @if (amountModel.touched && amountError()) {
                 <mat-error>{{ amountError() }}</mat-error>
               }
@@ -137,7 +136,6 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                   ccEuroAmount
                   required
                 />
-                <mat-hint>Use a comma or a point, e.g. 8,50 or 8.50.</mat-hint>
                 @if (privateModel.touched && privateError()) {
                   <mat-error>{{ privateError() }}</mat-error>
                 }
@@ -155,13 +153,11 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                   ccEuroAmount
                   required
                 />
-                <mat-hint>Use a comma or a point, e.g. 8,50 or 8.50.</mat-hint>
                 @if (kittyModel.touched && kittyError()) {
                   <mat-error>{{ kittyError() }}</mat-error>
                 }
               </mat-form-field>
             </div>
-            <p class="muted">The private and kitty shares must sum to the total.</p>
             <mat-form-field class="full-width">
               <mat-label>Note (optional)</mat-label>
               <input matInput name="note" [(ngModel)]="note" />
@@ -458,7 +454,7 @@ export class AdminExpensesComponent implements OnInit {
       this.dialog
         .open(ConfirmDialogComponent, {
           data: {
-            title: 'Delete this purchase?',
+            title: 'Delete this purchase',
             message: `Delete the ${formatEuros(expense.amountCents)} purchase? This cannot be undone.`,
             confirmLabel: 'Delete',
             destructive: true
