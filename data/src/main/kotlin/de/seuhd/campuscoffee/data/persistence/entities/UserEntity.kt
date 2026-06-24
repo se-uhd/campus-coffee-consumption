@@ -5,9 +5,11 @@ import jakarta.persistence.Column
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Table
+import jakarta.persistence.Version
 
 /**
- * Database entity for a member.
+ * Database entity for a member. [version] backs optimistic locking, so two concurrent admin edits of the
+ * same member cannot silently overwrite each other.
  */
 @jakarta.persistence.Entity
 @Table(name = "users")
@@ -36,6 +38,10 @@ class UserEntity : Entity() {
 
     @field:Column(name = CAPABILITY_TOKEN_COLUMN)
     var capabilityToken: String? = null
+
+    @field:Version
+    @field:Column(name = "version")
+    var version: Long? = 0
 
     companion object {
         const val LOGIN_NAME_COLUMN = "login_name"

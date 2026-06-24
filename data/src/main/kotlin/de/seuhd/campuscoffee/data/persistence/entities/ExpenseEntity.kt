@@ -36,5 +36,5 @@ class ExpenseEntity : Entity() {
 
     @field:Version
     @field:Column(name = "version")
-    var version: Long? = null
+    var version: Long? = 0
 }

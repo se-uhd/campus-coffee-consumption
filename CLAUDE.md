@@ -434,15 +434,22 @@ access to your working notes or any review document) must understand the change 
 - **ORM**: JPA with Spring Data.
 - **Connection**: Configured in `application/src/main/resources/application.yaml`.
 
-The schema is a seven-migration set:
+The schema is a six-migration set, one `CREATE` per table: the incremental index/version migrations were
+folded into their table's create before the first production deployment, so each table is defined in one
+place (there is no deployed database whose checksums this would break; from here the migrations are
+append-only, see below).
 - `V1__create_users_table.sql`: `users` (uuid PK, timestamps, `login_name` unique, `email_address` unique,
   `first_name`, `last_name`, a single `role` column (`USER`/`ADMIN`, no `user_roles` table), `active`,
-  `password_hash` nullable, `capability_token` unique).
+  `password_hash` nullable, `capability_token` unique, and `version` for optimistic locking).
 - `V2__create_coffee_consumptions_table.sql`: `coffee_consumptions` (uuid PK, timestamps, `user_id` unique
   FK with `ON DELETE CASCADE`, `count` not null default 0, `version` for optimistic locking).
 - `V3__create_events_table.sql`: the append-only `events` log, including the `created_by` (varchar) and
-  nullable `note` columns and the `idx_events_seq`, `idx_events_entity_type`, `idx_events_body_id` indexes.
-  The `entity_type` column is an unconstrained varchar; the valid set (`User`, `CoffeeConsumption`,
+  nullable `note` columns and its indexes: a UNIQUE `idx_events_seq` on `seq` (the authoritative append/
+  replay order), the composite `idx_events_type_seq` on `(entity_type, seq)` (type-filtered, seq-ordered
+  stream reads, e.g. the kitty walk and the price history), `idx_events_entity_type`, `idx_events_body_id`
+  on `body->>'id'`, and the owner-key expression indexes `idx_events_body_user_id`/`idx_events_body_buyer_id`
+  (`body->>'userId'` / `body->>'buyerUserId'`) that keep the per-member unified-activity and kitty walks
+  efficient. The `entity_type` column is an unconstrained varchar; the valid set (`User`, `CoffeeConsumption`,
   `CoffeePrice`, `Expense`, `Payment`) is enforced in the application by the `LoggedEntityType` enum.
 - `V4__create_coffee_prices_table.sql`: `coffee_prices` (uuid PK, timestamps, `amount_cents`, `version`,
   plus an `is_singleton boolean` column (NOT NULL DEFAULT true, with a CHECK) and a
@@ -455,9 +462,16 @@ The schema is a seven-migration set:
 - `V6__create_payments_table.sql`: `payments` (uuid PK, timestamps, nullable `user_id` FK with the default
   RESTRICT (present is a deposit, null is a pure kitty adjustment), `amount_cents` signed, `note`,
   `version`).
-- `V7__add_event_owner_indexes.sql`: the owner-key expression indexes on `events`
-  (`idx_events_body_user_id` on `body->>'userId'`, `idx_events_body_buyer_id` on `body->>'buyerUserId'`)
-  that keep the unified-activity and kitty walks efficient.
+
+Each of `users`, `coffee_consumptions`, `coffee_prices`, `expenses`, and `payments` carries a `version`
+column for optimistic locking; the append-only `events` log is deliberately unversioned.
+
+**Keep the migration files lean: plain DDL, no explanatory comments.** A column's or constraint's rationale
+belongs in the entity class's KDoc and the changelog, never in the `.sql`. And never edit an applied
+migration in place: Flyway's `validate-on-migrate` checksums the whole file, so even a comment change on an
+applied migration fails startup (needing a `flyway repair` or a fresh migration); land a schema change as a
+new migration. The consolidation above was a one-time pre-production exception, safe only because no database
+had the old migrations applied yet.
 
 The `expenses` and `payments` FKs keep PostgreSQL's default RESTRICT (NO ACTION) so a member's financial
 history is never silently dropped

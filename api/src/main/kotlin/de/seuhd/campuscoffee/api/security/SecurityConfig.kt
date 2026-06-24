@@ -2,6 +2,7 @@ package de.seuhd.campuscoffee.api.security
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.env.Environment
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -43,6 +44,7 @@ class SecurityConfig {
      * @param accessDeniedHandler renders an authorization denial as a 403 JSON response
      * @param jwtAuthenticationConverter maps a validated Bearer token to a principal with ROLE_* authorities
      * @param capabilityTokenAuthenticationFilter authenticates a member by their X-Capability-Token header
+     * @param environment the active environment, used to open the dev data endpoints only under `dev`
      */
     @Bean
     fun securityFilterChain(
@@ -50,17 +52,21 @@ class SecurityConfig {
         authenticationEntryPoint: AuthenticationEntryPoint,
         accessDeniedHandler: AccessDeniedHandler,
         jwtAuthenticationConverter: JwtAuthenticationConverter,
-        capabilityTokenAuthenticationFilter: CapabilityTokenAuthenticationFilter
+        capabilityTokenAuthenticationFilter: CapabilityTokenAuthenticationFilter,
+        environment: Environment
     ): SecurityFilterChain {
         http {
             authorizeHttpRequests {
-                // The token endpoint, the API docs, and the dev-only data endpoints stay reachable (the dev
-                // endpoints are registered only under the dev profile, but the matcher is harmless otherwise).
+                // The token endpoint and the API docs stay reachable.
                 authorize("/api/auth/token", permitAll)
                 authorize("/api/swagger-ui.html", permitAll)
                 authorize("/api/swagger-ui/**", permitAll)
                 authorize("/api/api-docs/**", permitAll)
-                authorize("/api/dev/**", permitAll)
+                // The dev data endpoints are opened only under the dev profile, never in a deployed profile;
+                // the DevController is itself `@Profile("dev")`, so this couples the open rule to its scoping.
+                if (environment.matchesProfiles("dev")) {
+                    authorize("/api/dev/**", permitAll)
+                }
                 // Actuator: health is public (only UP/DOWN); every other actuator endpoint is admin-only.
                 // The catch-all `/actuator/**` rule must precede the SPA GET catch-all below, which would
                 // otherwise make any exposed endpoint (e.g. /actuator/env, /actuator/metrics) anonymous.
