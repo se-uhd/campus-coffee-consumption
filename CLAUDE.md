@@ -592,8 +592,11 @@ controllers map paths relative to the resource.
 - `GET /users/overview`: a per-member overview (counts and balances); it now renders in the member-management page (`/admin/users`).
 - `GET /users/{id}/link`, `POST /users/{id}/link/rotate`, `GET /users/{id}/qr.png` (downloads as
   `<loginName>.png`, transparent background).
-- `GET /users/qr.zip`: a streamed ZIP of every member's QR code as `<loginName>.png` (capped at 1000
-  members; powers the admin "Download all QR codes" button).
+- `GET /users/qr.zip`: a streamed ZIP of every active member's QR code as `<loginName>.png` (capped at 1000
+  members).
+- `GET /users/qr.pdf`: a printable PDF grid of every active member's QR code, each labelled by login name
+  (the same active-member selection and 1000-member cap as the ZIP). Both power the admin bulk QR-download
+  buttons on the members page.
 - `GET  /users/{id}/consumption?limit=5&offset=0`: a member's total plus a page of the change log.
 - `GET  /users/{id}/activity?limit=20&offset=0`: a member's unified activity feed.
 - `POST /users/{id}/consumption` `{ delta: 1 | -1 }`: a single-step change.
