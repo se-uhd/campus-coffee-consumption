@@ -1,5 +1,7 @@
 package de.seuhd.campuscoffee.tests.system
 
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import de.seuhd.campuscoffee.api.dtos.PublicKeyDto
 import de.seuhd.campuscoffee.api.dtos.TokenRequestDto
 import de.seuhd.campuscoffee.api.dtos.UserDto
 import de.seuhd.campuscoffee.domain.model.Role
@@ -8,13 +10,17 @@ import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import de.seuhd.campuscoffee.tests.SystemTestUtils.CAPABILITY_TOKEN_HEADER
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
+import de.seuhd.campuscoffee.tests.SystemTestUtils.encryptCredentials
 import de.seuhd.campuscoffee.tests.SystemTestUtils.jwtFor
+import de.seuhd.campuscoffee.tests.SystemTestUtils.postToken
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
+import de.seuhd.campuscoffee.tests.SystemTestUtils.tokenErrorFor
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.test.web.servlet.client.returnResult
 
 /**
  * System tests for the authentication and authorization rules of the two mechanisms: a member capability
@@ -201,20 +207,105 @@ class AuthorizationSystemTests : AbstractSystemTest() {
         val secondAdmin = createSecondAdmin()
         val seededAdmin = seededUser("jane_doe")
         val (login, password) = TestFixtures.rawCredentialsFor(Role.ADMIN)
-        // deactivate the seeded admin, then try to log in as them
+        // encrypt the (well-formed) credentials, then deactivate the seeded admin and try to log in as them
+        val encrypted = encryptCredentials(login, password)
         userService.update(seededAdmin.copy(active = false), secondAdmin)
 
+        // a disabled account is refused at login (DisabledException -> 401 via the global handler)
+        assertThat(postToken(encrypted)).isEqualTo(401)
+    }
+
+    @Test
+    fun `the public key endpoint returns a usable RSA encryption JWK without authentication`() {
+        val result =
+            client()
+                .get()
+                .uri("/api/auth/public-key")
+                .exchange()
+                .returnResult<PublicKeyDto>()
+
+        assertThat(result.status.value()).isEqualTo(200)
+        val jwk = result.responseBody!!
+        assertThat(jwk.kty).isEqualTo("RSA")
+        assertThat(jwk.alg).isEqualTo("RSA-OAEP-256")
+        assertThat(jwk.use).isEqualTo("enc")
+        assertThat(jwk.n).isNotBlank()
+        assertThat(jwk.e).isNotBlank()
+        assertThat(jwk.kid).isNotBlank()
+    }
+
+    @Test
+    fun `a valid encrypted login issues a token that authorizes an admin endpoint`() {
+        val (login, password) = TestFixtures.rawCredentialsFor(Role.ADMIN)
+
+        val token = jwtFor(login, password)
+
+        assertThat(token).isNotBlank()
+        val status =
+            client()
+                .get()
+                .uri("/api/users/me")
+                .accept(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                .exchange()
+                .statusCode()
+        assertThat(status).isEqualTo(200)
+    }
+
+    @Test
+    fun `a malformed login payload returns 400 Bad Request`() {
+        // a body that is not a parseable JWE cannot be read, so it is a client error (400), distinct from the
+        // 401 a readable-but-wrong credential gets: a 400 reveals nothing about whether the login exists
+        assertThat(postToken("not-a-valid-jwe")).isEqualTo(400)
+    }
+
+    @Test
+    fun `a login payload encrypted with a wrong key returns 400 Bad Request`() {
+        val (login, password) = TestFixtures.rawCredentialsFor(Role.ADMIN)
+        // a JWE encrypted under a key the server does not hold cannot be decrypted, so it is a malformed payload
+        val wrongKey = RSAKeyGenerator(2048).keyID("wrong-key").generate()
+        assertThat(postToken(encryptCredentials(login, password, wrongKey.toPublicJWK()))).isEqualTo(400)
+    }
+
+    @Test
+    fun `a correctly encrypted payload with a wrong password returns 401 Unauthorized`() {
+        val (login, _) = TestFixtures.rawCredentialsFor(Role.ADMIN)
+        // a payload that decrypts cleanly but carries a wrong password is an authentication failure (401),
+        // distinct from the 400 an undecryptable payload gets
+        assertThat(postToken(encryptCredentials(login, "definitely-wrong"))).isEqualTo(401)
+    }
+
+    @Test
+    fun `a blank login payload returns 400 Bad Request`() {
+        // the @NotBlank bean-validation path (rejected before the decryptor is reached)
+        assertThat(postToken("")).isEqualTo(400)
+    }
+
+    @Test
+    fun `a missing login payload returns 400 Bad Request`() {
         val status =
             client()
                 .post()
                 .uri("/api/auth/token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(TokenRequestDto(login, password))
+                .body(TokenRequestDto(null))
                 .exchange()
                 .statusCode()
 
-        // a disabled account is refused at login (DisabledException -> 401 via the global handler)
-        assertThat(status).isEqualTo(401)
+        assertThat(status).isEqualTo(400)
+    }
+
+    @Test
+    fun `a malformed and a wrong-key payload return the same fixed 400 message, revealing nothing`() {
+        val (login, password) = TestFixtures.rawCredentialsFor(Role.ADMIN)
+        val wrongKey = RSAKeyGenerator(2048).keyID("wrong-key").generate()
+
+        val malformed = tokenErrorFor("not-a-valid-jwe")
+        val wrongKeyError = tokenErrorFor(encryptCredentials(login, password, wrongKey.toPublicJWK()))
+
+        // both undecryptable cases produce the identical fixed message, so the 400 is not a decryption oracle
+        assertThat(malformed.message).isEqualTo("Malformed login payload.")
+        assertThat(wrongKeyError.message).isEqualTo("Malformed login payload.")
     }
 
     @Test

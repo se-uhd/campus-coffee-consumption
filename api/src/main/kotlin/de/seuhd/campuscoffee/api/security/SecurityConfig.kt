@@ -57,8 +57,9 @@ class SecurityConfig {
     ): SecurityFilterChain {
         http {
             authorizeHttpRequests {
-                // The token endpoint and the API docs stay reachable.
+                // The token endpoint, the login-encryption public key, and the API docs stay reachable.
                 authorize("/api/auth/token", permitAll)
+                authorize("/api/auth/public-key", permitAll)
                 authorize("/api/swagger-ui.html", permitAll)
                 authorize("/api/swagger-ui/**", permitAll)
                 authorize("/api/api-docs/**", permitAll)

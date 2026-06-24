@@ -24,8 +24,8 @@ springdoc:
   swagger-ui:
     enabled: false
 # Custom properties; documented in their @ConfigurationProperties classes (AppProperties, IdProperties,
-# JwtProperties, FixturesProperties, BootstrapAdminProperties, CoffeePriceProperties,
-# ConsumptionProperties), not here.
+# JwtProperties, LoginEncryptionProperties, FixturesProperties, BootstrapAdminProperties,
+# CoffeePriceProperties, ConsumptionProperties), not here.
 campus-coffee:
   app:
     # Public origin used to build the capability URLs and QR codes. Must be https in prod (the token never
@@ -40,6 +40,11 @@ campus-coffee:
     # No default: a missing JWT_SECRET must fail fast everywhere except dev (which supplies an insecure
     # fallback below). The system tests inject a secret via SystemTestUtils.configurePostgresContainers.
     secret: ${JWT_SECRET}
+  login-encryption:
+    # The RSA private key (PKCS#8 PEM) that decrypts the login payload; its public half is published as a
+    # JWK so the SPA can encrypt the credentials. No default here: a missing key must fail fast everywhere
+    # except dev (insecure fallback below). The system tests inject a key via SystemTestUtils.
+    private-key-pem: ${LOGIN_PRIVATE_KEY_PEM}
   fixtures:
     load-on-startup: false
   price:
@@ -84,6 +89,10 @@ campus-coffee:
   jwt:
     # Dev-only insecure fallback so a local run needs no JWT_SECRET; every other profile must supply one.
     secret: ${JWT_SECRET:dev-only-insecure-jwt-secret-change-me-in-production}
+  login-encryption:
+    # Dev-only insecure fallback key so a local run needs no LOGIN_PRIVATE_KEY_PEM; every other profile must
+    # supply one. Double-quoted so the \n escapes become the real newlines a PEM needs.
+    private-key-pem: "${LOGIN_PRIVATE_KEY_PEM:-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCMOOezSrpFsR9K\nq97QmshS+ieeoI8YPLsXQI1ofgwmMFmz/sz+t2dt0GD3Pa55s7a52b/l202uRcE4\nLJz4xBw8oKP52lrVUvuWeGNgkPnBANOY/QzX9xN4vU1QG8lZbG7fxeCpX9NnNrpB\nTEyDThYS5mNuuoriXNU9ZaGnAhhGCUbB079uF0PE1PB2LE2ykjxKDk1JSR7Gks55\nkoLPxIKEcqz5kG63uAU0dLPrz2mynnmTdy4syl2wMd/U/3Z6Cm9+8QdOG8h5Z+YH\nG5ug8Uw7ZYjMhWY7mS+owYgCLXIsDdVdzl9TjufV5cjEGpmGjIOrabIH1o2+yiwH\n/LQ/XpWzAgMBAAECggEADBDzgz6pc8jPmAXdKRdAqL9E/IX1elDziocwA+9gzUJ4\n3Z/N9RdEK7N0PKJOqsNXtHtz42wxLY9sFpDkOxXpFiB+q8fp7BR1eNfIOW2QSFbx\nXmdcHRNyVf/4MK4LcAoAKnplID4SO33+nhLaPKxSAvNXWBZuUBdL9DoUJIJuI0yV\ncAi45chRtvIV5+EqAosEGTJjHRSfIEm2izDh5+R+Y/yd8WSfDm7KMdobCTB46zP+\n1wyqwj2KGUcGYr4pcZaLaHa5W0rjDUEFZMmEvfUWHVrPtFCQNzH6E0qBFGOqQqmY\nE1Lnxi+AbW+ySo38DlpF2DSx5PBko64/YfTr1kNrGQKBgQDBuJvoOBGX8DwpTGL9\nuaAyDZnlaPo6Pfeyu2g8U0JbgIfkAwL5ZkM/punL9XykBt4QsKdPI2xla4PP+AuK\nloXlA9bgoyBfk6L6hJR0bI/kwrerqrVPS0clj9cZ0HGzVBlzozrpey6Q0IRluhMs\n2xkr1p1iwvb24pw5FDopAHOwCQKBgQC5TU1Qr3bWvRGrUMbX6xleF5KZ+FVrii3l\n13nHWQPI+3k2USgBOGfUHjMv5gD3kuEo2wbOikAEWfbSQEuutXdJOfpzkJMIeV1k\nW4+j+KwendZrtY74bBQnrp8yExqcwqvgZ56CZH7RIkpz2KaAyWVOr2/cKo3xx/Yo\nJREblzKO2wKBgC1n2NswMSd8vo0rg1RXKu4wc+7qkSQPnDw/Yuoo1bfew3s1HYBZ\ncM+9jrUooANOPMSKs1yAQArxjV60k/fy2gVYxge3FIJyd1PiuW0keQG0hhptk7u3\nOEDcmx1I1y2iO6j4DHnnTn3Q8gdp+s6buCWnUxJwAjTR3q4eSJeNrJAJAoGAGI2x\nrPtTF+k9qiGt93ZjiiA9gMFzMCjDJC2FKXEWG0+XJCdk0aSTvXuy9KnZfvSreSps\noHmZOfphxkJWxPOutrlEAoQpt3m9ckrfoa6VwAjSHLuWEjzf/tIYrh3x7Muu0rFo\nQ4bldvjAPNF8XpxRHDgK7nWFEYCZkYA34BwMyvkCgYAt8w9ClP73fWCfd9+RRWKj\nnoxv1P1tp6AKkWD8fZuKQmbyuSvdA7nfntvOSPEbzfCQtBVaVhbtzcdNaK/rrhIv\nNH9Di8f32Ny/HLs58NnrstnrtMA4qt8u1AOvwTLEu5TPnl7r+n6mbqy9sFbc+i+j\n+4KbDU0zX6Z6zoEhFzIPsQ==\n-----END PRIVATE KEY-----}"
   fixtures:
     load-on-startup: true
     # dev: clear + reseed every start so a persisted database can't collide with the restarted seeded ids
@@ -117,6 +126,8 @@ campus-coffee:
     event-seed: ${CAMPUS_COFFEE_ID_EVENT_SEED:random}
   jwt:
     secret: ${JWT_SECRET} # required, no fallback
+  login-encryption:
+    private-key-pem: ${LOGIN_PRIVATE_KEY_PEM} # required, no fallback (Secret Manager)
   fixtures:
     load-on-startup: false # prod has real members, not fixtures
   bootstrap-admin: # create one admin on first startup if none exists; all defaults live here, not in the class
