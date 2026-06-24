@@ -22,7 +22,7 @@ import org.springframework.security.web.access.AccessDeniedHandler
  * Spring Security configuration. Two authentication mechanisms, one per audience (there is no HTTP Basic):
  * - **Admins** authenticate with a **JWT bearer token** (minted by the token endpoint from a
  *   username+password login), mapped by the resource server to a `ROLE_ADMIN` principal.
- * - **Members** authenticate with their secret **capability token** (the `X-Coffee-Token` header), resolved
+ * - **Members** authenticate with their secret **capability token** (the `X-Capability-Token` header), resolved
  *   by [CapabilityTokenAuthenticationFilter] to a `ROLE_USER` principal; even an admin's own token grants
  *   only self-service.
  *
@@ -42,7 +42,7 @@ class SecurityConfig {
      * @param authenticationEntryPoint renders a missing or invalid credential as a 401 JSON response
      * @param accessDeniedHandler renders an authorization denial as a 403 JSON response
      * @param jwtAuthenticationConverter maps a validated Bearer token to a principal with ROLE_* authorities
-     * @param capabilityTokenAuthenticationFilter authenticates a member by their X-Coffee-Token header
+     * @param capabilityTokenAuthenticationFilter authenticates a member by their X-Capability-Token header
      */
     @Bean
     fun securityFilterChain(

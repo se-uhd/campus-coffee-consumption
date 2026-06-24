@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component
 /**
  * Builds a member's capability URL (the secret "your coffee link" embedded in their QR code) from their
  * capability token and the configured public base URL. The token appears in a URL only here, at the SPA
- * entry point (`/login/{token}`); API calls forward it as the `X-Coffee-Token` header instead, keeping it
+ * entry point (`/login/{token}`); API calls forward it as the `X-Capability-Token` header instead, keeping it
  * out of API access logs.
  */
 @Component

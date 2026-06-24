@@ -14,19 +14,19 @@ import java.util.UUID
  */
 interface PaymentService {
     /**
-     * Records that a member paid money into the kitty (a settlement): credits the member's balance and
+     * Records that a member paid money into the kitty (a deposit): credits the member's balance and
      * feeds the kitty.
      *
      * @param userId      the member who paid
      * @param amountCents the amount paid in euro cents (must be positive)
      * @param note        an optional free-text note
      * @param actingUser  the authenticated user attempting the record
-     * @return the recorded settlement
+     * @return the recorded deposit
      * @throws ForbiddenException if [actingUser] is not an admin
      * @throws NotFoundException if no user exists for [userId]
      * @throws ValidationException if [amountCents] is not positive
      */
-    fun recordSettlement(
+    fun recordDeposit(
         userId: UUID,
         amountCents: Int,
         note: String?,

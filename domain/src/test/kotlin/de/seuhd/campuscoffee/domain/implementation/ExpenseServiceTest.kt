@@ -3,14 +3,14 @@ package de.seuhd.campuscoffee.domain.implementation
 import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
+import de.seuhd.campuscoffee.domain.model.ActivityEntry
+import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.model.Expense
-import de.seuhd.campuscoffee.domain.model.LedgerEntry
-import de.seuhd.campuscoffee.domain.model.LedgerEntryType
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
+import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
 import de.seuhd.campuscoffee.domain.ports.data.KittyLock
-import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -32,9 +32,9 @@ import java.util.UUID
 class ExpenseServiceTest {
     private val expenseDataService: ExpenseDataService = mock()
     private val userDataService: UserDataService = mock()
-    private val ledgerDataService: LedgerDataService = mock()
+    private val activityDataService: ActivityDataService = mock()
     private val kittyLock: KittyLock = mock()
-    private val service = ExpenseServiceImpl(expenseDataService, userDataService, ledgerDataService, kittyLock)
+    private val service = ExpenseServiceImpl(expenseDataService, userDataService, activityDataService, kittyLock)
 
     private val memberId: UUID = UUID(0L, 1L)
     private val buyerId: UUID = UUID(0L, 2L)
@@ -95,7 +95,7 @@ class ExpenseServiceTest {
 
     @Test
     fun `record by an admin with a matching split stores the kitty and private portions`() {
-        whenever(ledgerDataService.kittyLedger()).thenReturn(kittyWith(10000))
+        whenever(activityDataService.kittyHistory()).thenReturn(kittyWith(10000))
         whenever(userDataService.getById(buyerId)).thenReturn(buyer)
         whenever(expenseDataService.upsert(any())).thenAnswer { it.arguments[0] as Expense }
 
@@ -117,7 +117,7 @@ class ExpenseServiceTest {
 
     @Test
     fun `record whose kitty portion exceeds the kitty balance throws ConflictException`() {
-        whenever(ledgerDataService.kittyLedger()).thenReturn(kittyWith(300))
+        whenever(activityDataService.kittyHistory()).thenReturn(kittyWith(300))
 
         assertThrows<ConflictException> {
             service.record(
@@ -264,7 +264,7 @@ class ExpenseServiceTest {
         whenever(expenseDataService.getById(expenseId)).thenReturn(existing)
         // the kitty holds 300; raising this expense's kitty portion from 500 to 1000 draws 500 more than the
         // old portion, and 300 + 500 - 1000 = -200 < 0, so the differential overdraw guard refuses it
-        whenever(ledgerDataService.kittyLedger()).thenReturn(kittyWith(300))
+        whenever(activityDataService.kittyHistory()).thenReturn(kittyWith(300))
 
         assertThrows<ConflictException> {
             service.update(
@@ -283,7 +283,7 @@ class ExpenseServiceTest {
 
     @Test
     fun `record acquires the kitty lock before reading the kitty balance`() {
-        whenever(ledgerDataService.kittyLedger()).thenReturn(kittyWith(10000))
+        whenever(activityDataService.kittyHistory()).thenReturn(kittyWith(10000))
         whenever(userDataService.getById(buyerId)).thenReturn(buyer)
         whenever(expenseDataService.upsert(any())).thenAnswer { it.arguments[0] as Expense }
 
@@ -298,9 +298,9 @@ class ExpenseServiceTest {
         )
 
         // the overdraw guard is only sound if the lock is taken before the balance is read
-        val ordered = inOrder(kittyLock, ledgerDataService)
+        val ordered = inOrder(kittyLock, activityDataService)
         ordered.verify(kittyLock).lockForUpdate()
-        ordered.verify(ledgerDataService).kittyLedger()
+        ordered.verify(activityDataService).kittyHistory()
     }
 
     @Test
@@ -316,7 +316,7 @@ class ExpenseServiceTest {
                 kittyAmountCents = 500
             )
         whenever(expenseDataService.getById(expenseId)).thenReturn(existing)
-        whenever(ledgerDataService.kittyLedger()).thenReturn(kittyWith(10000))
+        whenever(activityDataService.kittyHistory()).thenReturn(kittyWith(10000))
         whenever(expenseDataService.upsert(any())).thenAnswer { it.arguments[0] as Expense }
 
         service.update(
@@ -330,9 +330,9 @@ class ExpenseServiceTest {
             actingUser = admin
         )
 
-        val ordered = inOrder(kittyLock, ledgerDataService)
+        val ordered = inOrder(kittyLock, activityDataService)
         ordered.verify(kittyLock).lockForUpdate()
-        ordered.verify(ledgerDataService).kittyLedger()
+        ordered.verify(activityDataService).kittyHistory()
     }
 
     @Test
@@ -359,10 +359,10 @@ class ExpenseServiceTest {
         assertThat(expenses).containsExactly(expense)
     }
 
-    private fun kittyWith(balanceCents: Long): List<LedgerEntry> =
+    private fun kittyWith(balanceCents: Long): List<ActivityEntry> =
         listOf(
-            LedgerEntry(
-                type = LedgerEntryType.KITTY_ADJUSTMENT,
+            ActivityEntry(
+                type = ActivityEntryType.KITTY_ADJUSTMENT,
                 id = UUID.fromString("00000000-0000-0000-0000-000000000001"),
                 createdAt = LocalDateTime.of(2026, 1, 1, 0, 0),
                 createdBy = "system",

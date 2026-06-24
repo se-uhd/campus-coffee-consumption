@@ -37,15 +37,15 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
 
     /**
      * Returns every event of the given type in append order, for reading a whole stream (e.g. the price
-     * history, or one side of the kitty ledger).
+     * history, or one side of the kitty history).
      *
      * @param entityType the entity type label (the [LoggedEntityType] label)
      */
     fun findByEntityTypeOrderBySeqAsc(entityType: String): List<EventEntity>
 
     /**
-     * Returns a member's full unified-ledger stream in append order: their consumption events, the expenses
-     * they bought, and the settlements they paid. Keyed on the owning user id embedded in each body
+     * Returns a member's full unified-activity stream in append order: their consumption events, the expenses
+     * they bought, and the deposits they paid. Keyed on the owning user id embedded in each body
      * (`userId` for consumptions and payments, `buyerUserId` for expenses), so it survives a consumption row
      * being recreated. A native query because the match is on the `jsonb` body (the V7 owner-key indexes).
      *
@@ -60,12 +60,12 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
                 "ORDER BY seq ASC",
         nativeQuery = true
     )
-    fun findMemberLedger(
+    fun findUserActivity(
         @Param("userId") userId: String
     ): List<EventEntity>
 
     /**
-     * Returns the whole kitty money stream in append order: every payment (a settlement or a kitty
+     * Returns the whole kitty money stream in append order: every payment (a deposit or a kitty
      * adjustment) and every expense, ordered by `seq` in SQL so the kitty walk reads one ordered stream
      * instead of concatenating two type streams and re-sorting them in memory. The `(entity_type, seq)`
      * index (V8) serves this directly.

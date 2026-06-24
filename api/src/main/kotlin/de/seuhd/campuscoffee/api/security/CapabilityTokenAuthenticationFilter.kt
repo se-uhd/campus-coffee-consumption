@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 
 /**
- * Authenticates a member by their secret capability token. Reads the `X-Coffee-Token` header, resolves it
+ * Authenticates a member by their secret capability token. Reads the `X-Capability-Token` header, resolves it
  * to a [de.seuhd.campuscoffee.domain.model.User] via [UserService.findByCapabilityToken], and on a
  * match sets a `ROLE_USER` principal (the member's login name) on the security context. The capability
  * principal is **always** `ROLE_USER`, never `ROLE_ADMIN`, so an admin's own token grants only
@@ -32,7 +32,7 @@ class CapabilityTokenAuthenticationFilter(
         response: HttpServletResponse,
         filterChain: FilterChain
     ) {
-        val token = request.getHeader(COFFEE_TOKEN_HEADER)
+        val token = request.getHeader(CAPABILITY_TOKEN_HEADER)
         // a blank token (empty or whitespace-only header) never matches a real token; skip the lookup and
         // leave the request unauthenticated so it answers 401 rather than running a doomed query
         if (!token.isNullOrBlank() && SecurityContextHolder.getContext().authentication == null) {
@@ -51,7 +51,7 @@ class CapabilityTokenAuthenticationFilter(
     }
 
     private companion object {
-        private const val COFFEE_TOKEN_HEADER = "X-Coffee-Token"
+        private const val CAPABILITY_TOKEN_HEADER = "X-Capability-Token"
         private const val ROLE_USER = "ROLE_USER"
     }
 }

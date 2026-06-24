@@ -18,8 +18,7 @@ export const routes: Routes = [
   {
     path: 'login/:token/profile',
     title: 'Profile · SE@UHD',
-    loadComponent: () =>
-      import('./pages/member-profile/member-profile.component').then((m) => m.MemberProfileComponent)
+    loadComponent: () => import('./pages/profile/profile.component').then((m) => m.ProfileComponent)
   },
   {
     path: 'admin/login',
@@ -65,8 +64,7 @@ export const routes: Routes = [
     path: 'admin/profile',
     title: 'Profile · SE@UHD',
     canActivate: [adminGuard],
-    loadComponent: () =>
-      import('./pages/member-profile/member-profile.component').then((m) => m.MemberProfileComponent)
+    loadComponent: () => import('./pages/profile/profile.component').then((m) => m.ProfileComponent)
   },
   { path: '', redirectTo: 'admin', pathMatch: 'full' },
   {

@@ -7,8 +7,8 @@ import de.seuhd.campuscoffee.domain.model.CoffeePrice
 import de.seuhd.campuscoffee.domain.model.PriceChange
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
+import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeePriceDataService
-import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -27,8 +27,8 @@ import java.util.UUID
  */
 class CoffeePriceServiceTest {
     private val coffeePriceDataService: CoffeePriceDataService = mock()
-    private val ledgerDataService: LedgerDataService = mock()
-    private val service = CoffeePriceServiceImpl(coffeePriceDataService, ledgerDataService)
+    private val activityDataService: ActivityDataService = mock()
+    private val service = CoffeePriceServiceImpl(coffeePriceDataService, activityDataService)
 
     private val member =
         User(
@@ -67,7 +67,7 @@ class CoffeePriceServiceTest {
 
     @Test
     fun `priceHistory by an admin returns the history newest-first`() {
-        whenever(ledgerDataService.priceHistory())
+        whenever(activityDataService.priceHistory())
             .thenReturn(
                 listOf(
                     PriceChange(50, LocalDateTime.now(), "jane"),

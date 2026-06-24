@@ -72,7 +72,7 @@ class SecurityComponentsTest {
     @Test
     fun `the capability filter authenticates a known token as a ROLE_USER principal`() {
         whenever(userService.findByCapabilityToken("the-token")).thenReturn(member())
-        val request = MockHttpServletRequest().apply { addHeader("X-Coffee-Token", "the-token") }
+        val request = MockHttpServletRequest().apply { addHeader("X-Capability-Token", "the-token") }
         val chain = mock<FilterChain>()
 
         CapabilityTokenAuthenticationFilter(userService).doFilter(request, MockHttpServletResponse(), chain)
@@ -86,7 +86,7 @@ class SecurityComponentsTest {
     @Test
     fun `the capability filter leaves an unknown token unauthenticated`() {
         whenever(userService.findByCapabilityToken("unknown")).thenReturn(null)
-        val request = MockHttpServletRequest().apply { addHeader("X-Coffee-Token", "unknown") }
+        val request = MockHttpServletRequest().apply { addHeader("X-Capability-Token", "unknown") }
         val chain = mock<FilterChain>()
 
         CapabilityTokenAuthenticationFilter(userService).doFilter(request, MockHttpServletResponse(), chain)

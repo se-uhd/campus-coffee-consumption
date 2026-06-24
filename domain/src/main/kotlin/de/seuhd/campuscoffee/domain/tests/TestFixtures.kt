@@ -97,8 +97,8 @@ object TestFixtures {
     /** Returns the fixture users. */
     fun getUserFixtures(): List<User> = USER_LIST
 
-    /** A fixture member holding [Role.USER]. */
-    fun member(): User = getUserFixtures().first { it.role == Role.USER }
+    /** A fixture regular user, holding [Role.USER]. */
+    fun regularUser(): User = getUserFixtures().first { it.role == Role.USER }
 
     /** A fixture user holding [Role.ADMIN]. */
     fun admin(): User = getUserFixtures().first { it.role == Role.ADMIN }
@@ -117,7 +117,7 @@ object TestFixtures {
 
     /**
      * The raw capability token of the fixture member with the given [loginName], used by the system tests
-     * to authenticate as a member via the `X-Coffee-Token` header.
+     * to authenticate as a member via the `X-Capability-Token` header.
      *
      * @param loginName the login name of the fixture member
      */

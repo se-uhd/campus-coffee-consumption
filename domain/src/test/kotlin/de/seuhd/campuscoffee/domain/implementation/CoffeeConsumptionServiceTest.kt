@@ -9,9 +9,9 @@ import de.seuhd.campuscoffee.domain.model.ConsumptionChange
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.ChangeNoteContext
+import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.ConsumptionHistoryDataService
-import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -36,7 +36,7 @@ import java.util.UUID
 class CoffeeConsumptionServiceTest {
     private val dataService: CoffeeConsumptionDataService = mock()
     private val historyService: ConsumptionHistoryDataService = mock()
-    private val ledgerDataService: LedgerDataService = mock()
+    private val activityDataService: ActivityDataService = mock()
     private val userDataService: UserDataService = mock()
     private val changeNoteContext = ChangeNoteContext()
     private val gracePeriod: Duration = Duration.ofMinutes(5)
@@ -84,7 +84,7 @@ class CoffeeConsumptionServiceTest {
             CoffeeConsumptionServiceImpl(
                 dataService,
                 historyService,
-                ledgerDataService,
+                activityDataService,
                 userDataService,
                 changeNoteContext,
                 gracePeriod
@@ -204,7 +204,7 @@ class CoffeeConsumptionServiceTest {
 
     @Test
     fun `cancel by the owner within the grace period decrements the count by one`() {
-        whenever(ledgerDataService.lastCancellableIncrement(memberId, "max"))
+        whenever(activityDataService.lastCancellableIncrement(memberId, "max"))
             .thenReturn(CancellableIncrement(createdAt = now(), priceCents = 50))
         whenever(dataService.getByUserId(memberId)).thenReturn(consumption(3))
         whenever(dataService.upsert(any())).thenAnswer { it.arguments[0] as CoffeeConsumption }
@@ -230,7 +230,7 @@ class CoffeeConsumptionServiceTest {
 
     @Test
     fun `cancel with no recent coffee to undo throws ConflictException`() {
-        whenever(ledgerDataService.lastCancellableIncrement(memberId, "max")).thenReturn(null)
+        whenever(activityDataService.lastCancellableIncrement(memberId, "max")).thenReturn(null)
 
         assertThrows<ConflictException> { service.cancel(memberId, member) }
         verify(dataService, never()).upsert(any())
@@ -238,7 +238,7 @@ class CoffeeConsumptionServiceTest {
 
     @Test
     fun `cancel of a coffee whose grace period has passed throws ConflictException`() {
-        whenever(ledgerDataService.lastCancellableIncrement(memberId, "max"))
+        whenever(activityDataService.lastCancellableIncrement(memberId, "max"))
             .thenReturn(CancellableIncrement(createdAt = now().minusHours(1), priceCents = 50))
 
         assertThrows<ConflictException> { service.cancel(memberId, member) }
@@ -249,7 +249,7 @@ class CoffeeConsumptionServiceTest {
     fun `cancellableIncrement returns the candidate within the grace period`() {
         val candidate = CancellableIncrement(createdAt = now(), priceCents = 50)
         whenever(userDataService.getById(memberId)).thenReturn(member)
-        whenever(ledgerDataService.lastCancellableIncrement(memberId, "max")).thenReturn(candidate)
+        whenever(activityDataService.lastCancellableIncrement(memberId, "max")).thenReturn(candidate)
 
         assertThat(service.cancellableIncrement(memberId, member)).isEqualTo(candidate)
     }
@@ -257,7 +257,7 @@ class CoffeeConsumptionServiceTest {
     @Test
     fun `cancellableIncrement returns null once the grace period has passed`() {
         whenever(userDataService.getById(memberId)).thenReturn(member)
-        whenever(ledgerDataService.lastCancellableIncrement(memberId, "max"))
+        whenever(activityDataService.lastCancellableIncrement(memberId, "max"))
             .thenReturn(CancellableIncrement(createdAt = now().minusHours(1), priceCents = 50))
 
         assertThat(service.cancellableIncrement(memberId, member)).isNull()

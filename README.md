@@ -5,10 +5,10 @@ group member has a running coffee count, valued at a global admin-set **price pe
 per-member **balance** and a communal **kitty**. A member bumps their own count by scanning a **QR code on
 the wall**: a secret per-member **capability link**. Scanning it opens a small mobile-first web app where
 they add a coffee, **undo** a recent one within a grace period, record their own bean purchases, and see
-their balance. Admins create and manage members, set the price, record expenses and kitty settlements, and
-correct anyone's count. Settling up records a **settlement** (real money into the kitty); there is no reset.
-Every change is recorded in an append-only **event log**, from which a **unified ledger** (coffees,
-purchases, and settlements with a running balance) is read. Money is tracked in **euro cents**.
+their balance. Admins create and manage members, set the price, record expenses and kitty deposits, and
+correct anyone's count. Settling up records a **deposit** (real money into the kitty); there is no reset.
+Every change is recorded in an append-only **event log**, from which a **unified activity feed** (coffees,
+purchases, and deposits with a running balance) is read. Money is tracked in **euro cents**.
 
 The app is a Spring Boot / Kotlin backend (hexagonal architecture, event sourcing persistence) with an
 Angular 22 single-page frontend, derived from the CampusCoffee teaching project.
@@ -17,15 +17,15 @@ Angular 22 single-page frontend, derived from the CampusCoffee teaching project.
 
 - **Members** authenticate with their secret **capability token**. The token is encoded in their wall QR
   code as `https://<host>/login/{token}`; scanning it opens the SPA, which sends the token as the
-  `X-Coffee-Token` header on its API calls. The token never appears in an API URL path, only at the SPA
+  `X-Capability-Token` header on its API calls. The token never appears in an API URL path, only at the SPA
   entry point, so it stays out of API access logs. A member adds one coffee at a time, may **undo** the most
   recent one within a short grace period, records their own bean purchases, and sees their balance, the
-  current price, the kitty balance, and a unified ledger of their coffees, purchases, and settlements.
+  current price, the kitty balance, and a unified activity feed of their coffees, purchases, and deposits.
 - **Admins** authenticate with a **JWT**, minted from a username-and-password login (`POST /api/auth/token`,
   ~10-hour work-session token, no refresh flow). An admin manages members (create, edit, deactivate, change
   role, view and rotate capability links, download any member's QR), sets the global price, records expenses
-  with a private/kitty split and kitty settlements and adjustments, corrects any member's count, and reviews
-  the kitty ledger and a per-member overview. There is no reset: settling up is a settlement, and a count
+  with a private/kitty split and kitty deposits and adjustments, corrects any member's count, and reviews
+  the kitty history and a per-member overview. There is no reset: settling up is a deposit, and a count
   change is a correction (optionally with a note).
 - **SPA routing.** A member's capability link `/login/{token}` opens the member landing, with the member
   profile at `/login/{token}/profile`. The admin area is consolidated under `/admin/`: the login form at
@@ -37,7 +37,7 @@ Angular 22 single-page frontend, derived from the CampusCoffee teaching project.
   when it was consumed.
 - **The event log is the source of truth.** Each change (to a count, the price, an expense, or a payment)
   appends one full-state event; the relational tables are a read model projected from the log, and the
-  unified ledger and balances are read straight from the event rows (each carries who made the change, when,
+  unified activity feed and balances are read straight from the event rows (each carries who made the change, when,
   and an optional note). See `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`.
 
 ## Architecture
@@ -114,7 +114,7 @@ fixtures (reassigning the same seeded ids), or clears the data.
 On top of these fixtures, the `dev` profile runs a dev-only `DevDemoDataLoader` that adds about nine more
 members and an initial kitty float, and also enriches **every existing fixture user** (the admin `jane_doe`
 included) with varied consumption, bean-purchase, and deposit history, so the members list paginates and the
-ledger and history views are not empty on a fresh start. Two members are deliberately left **empty** to demo
+activity and history views are not empty on a fresh start. Two members are deliberately left **empty** to demo
 the empty state: a freshly created active member `new_user` (no history at all) and the inactive demo member
 `hannes_schulz`. It is `@Profile("dev")`, so the tests still see exactly the five-member fixture set above.
 The `dev` profile also reseeds on every startup (`campus-coffee.fixtures.reset-on-startup`), returning to
@@ -124,12 +124,12 @@ this deterministic state on each restart.
 
 All paths are under `/api`. JSON only. See Swagger for the full contract.
 
-**Member (auth: `X-Coffee-Token`):**
+**Member (auth: `X-Capability-Token`):**
 
-- `GET  /summary`: the member landing in one call (current count, balance, the current price, the kitty balance, and the first page of the unified ledger).
+- `GET  /summary`: the member landing in one call (current count, balance, the current price, the kitty balance, and the first page of the unified activity feed).
 - `POST /consumption` (no body): add one coffee.
 - `POST /consumption/cancel`: undo the most recent coffee within the grace period (nothing to undo, or past the grace period, returns 409 Conflict).
-- `GET  /activity?limit=20&offset=0`: own unified ledger (coffees, purchases, settlements) with a running balance.
+- `GET  /activity?limit=20&offset=0`: own unified activity feed (coffees, purchases, deposits) with a running balance.
 - `POST /expenses` `{ "weightGrams": N, "amountCents": N, "note"?: "…" }`: record an own bean purchase (booked 100% to the member).
 - `GET  /profile`, `PUT /profile`: view and edit own name and email (the response includes the capability URL).
 - `GET  /profile/qr.png`: own QR code (high-resolution PNG).
@@ -148,20 +148,20 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `PUT /price` `{ "amountCents": N }`, `GET /price/history`: set the global price, or view its full history.
 - `POST /kitty/deposit` `{ "userId", "amountCents", "note"? }`: a member pays money into the kitty.
 - `POST /kitty/adjustment` `{ "amountCents", "note"? }`: a pure kitty adjustment (an initial float or a correction).
-- `GET /kitty/history?limit=50&offset=0`: the kitty ledger with the running kitty balance.
+- `GET /kitty/history?limit=50&offset=0`: the kitty history with the running kitty balance.
 
 **Auth:** `POST /auth/token` `{ "loginName": "…", "password": "…" }` → `{ "token": "<jwt>" }`.
 
 Money is in integer euro cents throughout. The HTTP method carries the semantics: `GET` reads, member
 `POST /consumption` adds one coffee (and `/cancel` undoes a recent one), and admin `PUT` sets an absolute
-total. Consumption has no reset, no `−1`, and no `DELETE`. Settling up records a settlement; a count change
+total. Consumption has no reset, no `−1`, and no `DELETE`. Settling up records a deposit; a count change
 records a correction; both stay in the append-only log.
 
 ## Inspecting the event log
 
 Every change (to a count, the price, an expense, or a payment) is one row in the append-only `events`
 table. The `created_by` column records the actor's login (a member, an admin, or `"system"` for the
-fixtures), and `note` records an admin's reason for an absolute count correction (a settlement, kitty
+fixtures), and `note` records an admin's reason for an absolute count correction (a deposit, kitty
 adjustment, or expense note lives in that entity's own event body, not this column):
 
 ```sql

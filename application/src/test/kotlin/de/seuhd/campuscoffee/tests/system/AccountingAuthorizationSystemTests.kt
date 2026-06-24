@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.tests.system
 
-import de.seuhd.campuscoffee.api.dtos.MemberSummaryDto
 import de.seuhd.campuscoffee.api.dtos.PriceUpdateDto
+import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
@@ -12,7 +12,7 @@ import org.springframework.test.web.servlet.client.returnResult
 
 /**
  * System tests for the money-feature authorization split: a member may read their own landing summary (which
- * includes the kitty balance) but may not set the price or reach the admin-only kitty ledger and expense
+ * includes the kitty balance) but may not set the price or reach the admin-only kitty history and expense
  * routes.
  */
 class AccountingAuthorizationSystemTests : AbstractSystemTest() {
@@ -34,7 +34,7 @@ class AccountingAuthorizationSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a member cannot read the kitty ledger and is forbidden`() {
+    fun `a member cannot read the kitty history and is forbidden`() {
         val status =
             client()
                 .get()
@@ -56,7 +56,7 @@ class AccountingAuthorizationSystemTests : AbstractSystemTest() {
                 .accept(MediaType.APPLICATION_JSON)
                 .withMember(member)
                 .exchange()
-                .returnResult<MemberSummaryDto>()
+                .returnResult<UserSummaryDto>()
 
         assertThat(result.status.value()).isEqualTo(200)
         // the kitty balance is present (zero with no money movements yet), readable by the member

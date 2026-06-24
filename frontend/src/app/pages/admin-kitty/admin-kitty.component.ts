@@ -11,13 +11,13 @@ import { UserService } from '../../services/user.service';
 import { KittyService } from '../../services/kitty.service';
 import { NotificationService } from '../../services/notification.service';
 import { EurosPipe } from '../../pipes/euros.pipe';
-import { LedgerListComponent } from '../../components/ledger-list/ledger-list.component';
+import { ActivityListComponent } from '../../components/activity-list/activity-list.component';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { CollapsibleCardComponent } from '../../components/collapsible-card/collapsible-card.component';
 import { EuroAmountDirective } from '../../directives/euro-amount.directive';
-import { KittyDto, LedgerEntryDto, UserDto } from '../../models';
+import { KittyDto, ActivityEntryDto, UserDto } from '../../models';
 import { euroInputError, toCents } from '../../util/money';
-import { appendLedgerPage } from '../../util/ledger';
+import { appendActivityPage } from '../../util/activity';
 
 /** The page size for one kitty-history page; "Load more" appends another page of this size. */
 const PAGE_SIZE = 20;
@@ -39,7 +39,7 @@ const PAGE_SIZE = 20;
     MatProgressBarModule,
     MatProgressSpinnerModule,
     EurosPipe,
-    LedgerListComponent,
+    ActivityListComponent,
     AppHeaderComponent,
     CollapsibleCardComponent,
     EuroAmountDirective
@@ -70,7 +70,7 @@ const PAGE_SIZE = 20;
           <form #depositForm="ngForm">
             <mat-form-field class="full-width">
               <mat-label>Member</mat-label>
-              <mat-select name="member" #memberModel="ngModel" [(ngModel)]="settlementUserId" required>
+              <mat-select name="member" #memberModel="ngModel" [(ngModel)]="depositUserId" required>
                 @for (user of users; track user.id) {
                   <mat-option [value]="user.id">
                     {{ user.loginName }} ({{ user.firstName }} {{ user.lastName }})
@@ -87,26 +87,26 @@ const PAGE_SIZE = 20;
                 matInput
                 type="text"
                 inputmode="decimal"
-                name="settlementAmount"
-                #settlementModel="ngModel"
-                [(ngModel)]="settlementEuros"
+                name="depositAmount"
+                #depositModel="ngModel"
+                [(ngModel)]="depositEuros"
                 ccEuroAmount
                 required
               />
               <mat-hint>Use a comma or a point, e.g. 5,00 or 5.00.</mat-hint>
-              @if (settlementModel.touched && settlementError()) {
-                <mat-error>{{ settlementError() }}</mat-error>
+              @if (depositModel.touched && depositError()) {
+                <mat-error>{{ depositError() }}</mat-error>
               }
             </mat-form-field>
             <mat-form-field class="full-width">
               <mat-label>Note (optional)</mat-label>
-              <input matInput name="settlementNote" [(ngModel)]="settlementNote" />
+              <input matInput name="depositNote" [(ngModel)]="depositNote" />
             </mat-form-field>
             <button
               mat-flat-button
               color="primary"
-              (click)="recordSettlement()"
-              [disabled]="depositForm.invalid || settlementError() != null || busy"
+              (click)="recordDeposit()"
+              [disabled]="depositForm.invalid || depositError() != null || busy"
             >
               @if (busy) {
                 <mat-spinner diameter="20"></mat-spinner>
@@ -119,13 +119,13 @@ const PAGE_SIZE = 20;
 
         <mat-card class="card">
           <h2>Kitty history</h2>
-          <cc-ledger-list
+          <cc-activity-list
             [entries]="entries"
             [showFilter]="false"
             [canLoadMore]="hasMore"
             [loadingMore]="loadingMore"
             (loadMore)="loadMore()"
-          ></cc-ledger-list>
+          ></cc-activity-list>
         </mat-card>
 
         <!-- Adjusting the kitty directly is uncommon, so it is folded into a collapsed card (matching the
@@ -183,11 +183,11 @@ const PAGE_SIZE = 20;
 export class AdminKittyComponent implements OnInit {
   users: UserDto[] = [];
   kitty: KittyDto | null = null;
-  entries: LedgerEntryDto[] = [];
+  entries: ActivityEntryDto[] = [];
 
-  settlementUserId = '';
-  settlementEuros = '';
-  settlementNote = '';
+  depositUserId = '';
+  depositEuros = '';
+  depositNote = '';
 
   adjustmentEuros = '';
   adjustmentNote = '';
@@ -207,8 +207,8 @@ export class AdminKittyComponent implements OnInit {
   ) {}
 
   /** The validation message for the deposit amount (e.g. the ambiguous comma+point case), or null. */
-  settlementError(): string | null {
-    return euroInputError(this.settlementEuros, '5.00');
+  depositError(): string | null {
+    return euroInputError(this.depositEuros, '5.00');
   }
 
   /** The validation message for the kitty-adjustment amount; a negative amount is allowed here (unlike a deposit). */
@@ -220,7 +220,7 @@ export class AdminKittyComponent implements OnInit {
     await this.reload();
   }
 
-  /** Loads the members and the first page of the kitty ledger; surfaces a retryable error on failure. */
+  /** Loads the members and the first page of the kitty history; surfaces a retryable error on failure. */
   async reload(): Promise<void> {
     this.loading = true;
     this.loadError = '';
@@ -237,12 +237,12 @@ export class AdminKittyComponent implements OnInit {
     }
   }
 
-  /** Appends the next page of the kitty ledger. */
+  /** Appends the next page of the kitty history. */
   async loadMore(): Promise<void> {
     this.loadingMore = true;
     try {
       const next = await this.kittyService.history(PAGE_SIZE, this.entries.length);
-      const { entries, appended } = appendLedgerPage(this.entries, next.entries);
+      const { entries, appended } = appendActivityPage(this.entries, next.entries);
       this.entries = entries;
       // base "Load more" on the rows actually gained: a full page that collapsed to fewer new rows (its
       // boundary row was a duplicate) means there is nothing more to fetch
@@ -254,25 +254,25 @@ export class AdminKittyComponent implements OnInit {
     }
   }
 
-  /** Records a member settlement; the euro input is converted to integer cents before sending. */
-  async recordSettlement(): Promise<void> {
+  /** Records a member deposit; the euro input is converted to integer cents before sending. */
+  async recordDeposit(): Promise<void> {
     if (this.busy) {
       return;
     }
-    const amountCents = toCents(this.settlementEuros);
-    if (!this.settlementUserId || amountCents == null || amountCents <= 0) {
+    const amountCents = toCents(this.depositEuros);
+    if (!this.depositUserId || amountCents == null || amountCents <= 0) {
       this.notifications.error(null, 'Choose a member and a positive amount.');
       return;
     }
     this.busy = true;
     try {
       await this.kittyService.deposit({
-        userId: this.settlementUserId,
+        userId: this.depositUserId,
         amountCents,
-        note: this.settlementNote || undefined
+        note: this.depositNote || undefined
       });
-      this.settlementEuros = '';
-      this.settlementNote = '';
+      this.depositEuros = '';
+      this.depositNote = '';
       this.notifications.success('Deposit recorded.');
       await this.reload();
     } catch (error) {

@@ -8,7 +8,7 @@ import { CapabilityTokenService } from '../services/capability-token.service';
 /** Admin endpoint prefixes, authenticated by the JWT (`Authorization: Bearer`). */
 const ADMIN_PREFIXES = ['/api/users', '/api/price', '/api/kitty'];
 
-/** Member endpoint prefixes, authenticated by the capability token (`X-Coffee-Token`). */
+/** Member endpoint prefixes, authenticated by the capability token (`X-Capability-Token`). */
 const MEMBER_PREFIXES = [
   '/api/summary',
   '/api/activity',
@@ -73,7 +73,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   } else if (MEMBER_PREFIXES.some((prefix) => req.url.startsWith(prefix))) {
     const token = capability.token;
     if (token) {
-      return next(req.clone({ setHeaders: { 'X-Coffee-Token': token } })).pipe(
+      return next(req.clone({ setHeaders: { 'X-Capability-Token': token } })).pipe(
         catchError((error: unknown) => {
           // an unknown or rotated capability token: drop it so the page falls back to its invalid-link state
           // (a member has no login form to redirect to; the page shows "your link may be invalid")
