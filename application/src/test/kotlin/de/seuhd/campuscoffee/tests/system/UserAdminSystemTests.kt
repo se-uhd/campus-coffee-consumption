@@ -236,6 +236,81 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
+    fun `downloading all QR codes as a PDF returns a PDF sheet`() {
+        val result =
+            client()
+                .get()
+                .uri("/api/users/qr.pdf")
+                .withAdmin()
+                .exchange()
+                .returnResult<ByteArray>()
+
+        assertThat(result.status.value()).isEqualTo(200)
+        assertThat(result.responseHeaders.contentType.toString()).isEqualTo(MediaType.APPLICATION_PDF_VALUE)
+        assertThat(result.responseHeaders.contentDisposition.filename).isEqualTo("coffee-qr-codes.pdf")
+        // a well-formed PDF starts with the %PDF magic bytes
+        assertThat(result.responseBody!!.copyOfRange(0, 4).decodeToString()).isEqualTo("%PDF")
+    }
+
+    @Test
+    fun `a member capability token downloading the QR PDF returns 403 Forbidden`() {
+        val status =
+            client()
+                .get()
+                .uri("/api/users/qr.pdf")
+                .withMember("maxmustermann")
+                .exchange()
+                .statusCode()
+        assertThat(status).isEqualTo(403)
+    }
+
+    @Test
+    fun `a deactivated member is excluded from the bulk QR downloads`() {
+        // deactivate one member; they must drop out of the ZIP (and the PDF, which shares the selection)
+        val id = memberId()
+        client()
+            .put()
+            .uri("/api/users/{id}", id)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(
+                mapOf(
+                    "id" to id.toString(),
+                    "loginName" to "maxmustermann",
+                    "emailAddress" to "max.mustermann@se.uni-heidelberg.de",
+                    "firstName" to "Max",
+                    "lastName" to "Mustermann",
+                    "role" to "USER",
+                    "active" to false
+                )
+            ).withAdmin()
+            .exchange()
+
+        val entries =
+            zipEntryNames(
+                client()
+                    .get()
+                    .uri("/api/users/qr.zip")
+                    .withAdmin()
+                    .exchange()
+                    .returnResult<ByteArray>()
+                    .responseBody!!
+            )
+        // four of the five seeded members remain; the deactivated one is gone
+        assertThat(entries).hasSize(4)
+        assertThat(entries).doesNotContain("maxmustermann.png")
+
+        // the PDF still serves (its rendered content is asserted in the data-layer adapter test)
+        val pdfStatus =
+            client()
+                .get()
+                .uri("/api/users/qr.pdf")
+                .withAdmin()
+                .exchange()
+                .statusCode()
+        assertThat(pdfStatus).isEqualTo(200)
+    }
+
+    @Test
     fun `an admin increments a member's count by id`() {
         val id = memberId()
 
