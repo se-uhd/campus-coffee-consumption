@@ -19,6 +19,7 @@ export type { ConsumptionDeltaDto } from './api/model/consumptionDeltaDto';
 export type { ConsumptionOverrideDto } from './api/model/consumptionOverrideDto';
 export type { TokenRequestDto } from './api/model/tokenRequestDto';
 export type { TokenResponseDto } from './api/model/tokenResponseDto';
+export type { PublicKeyDto } from './api/model/publicKeyDto';
 export type { ActivityEntryDto } from './api/model/activityEntryDto';
 export type { UserSummaryDto } from './api/model/userSummaryDto';
 export type { PriceDto } from './api/model/priceDto';

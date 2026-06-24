@@ -533,10 +533,19 @@ keep conventional camelCase names.
 Two authentication mechanisms, one per audience; there is **no HTTP Basic**:
 
 - **Admins, JWT bearer.** `POST /api/auth/token` exchanges a username and password for a signed JWT (a
-  work-session TTL of ~10 hours, no refresh flow). The SPA sends it as `Authorization: Bearer …`. The
-  resource server maps the token's `roles` claim to a `ROLE_ADMIN` authority. The
+  work-session TTL of ~10 hours, no refresh flow). The credentials are **encrypted in the browser**: the
+  request body is a compact JWE (`RSA-OAEP-256` + `A256GCM`), not plaintext. The backend publishes its RSA
+  public key at the public `GET /api/auth/public-key` (a JWK); the SPA encrypts `{ loginName, password }`
+  with it (the `jose` library), and `LoginPayloadDecryptor` (api layer) decrypts it with the configured
+  private key before authentication. This keeps the raw password out of TLS-terminating proxies and
+  request-body logs (defense in depth on top of TLS); it does not replace TLS, defend against a compromised
+  client or XSS, or make the login zero-knowledge (the server decrypts and still bcrypt-checks). A malformed
+  or undecryptable payload is a 400 (`LoginPayloadException`), distinct from the 401 for wrong-but-readable
+  credentials, so it is not a credential oracle. The SPA sends the issued token as `Authorization: Bearer …`.
+  The resource server maps the token's `roles` claim to a `ROLE_ADMIN` authority. The
   `AuthenticationManager` / `DaoAuthenticationProvider` / `CampusUserDetailsService` / password-encoder
-  beans exist only for this login step.
+  beans exist only for this login step. See `doc/2026-06-24_login-payload-encryption.md` for the threat
+  model, the choice of asymmetric over a shared symmetric key, and the key management.
 - **Members, capability token.** `CapabilityTokenAuthenticationFilter` reads the `X-Capability-Token` header,
   resolves it to a member via `UserService.findByCapabilityToken`, and sets a `ROLE_USER` principal. The
   capability principal is **always** `ROLE_USER`, never `ROLE_ADMIN`, so an admin's own token grants only
@@ -544,8 +553,8 @@ Two authentication mechanisms, one per audience; there is **no HTTP Basic**:
   deactivated member is still authenticated (reads work), but the domain rejects their mutations → 403.
 
 The access rules gate the API by audience (`/api/users/**`, `/api/price/**`, and `/api/kitty/**` → `ROLE_ADMIN`; `/api/consumption/**`, `/api/expenses/**`, `/api/profile/**`,
-`/api/summary`, and `/api/activity` → `ROLE_USER`; `/api/auth/token`, actuator health, Swagger, dev
-endpoints, and the SPA routes are public); the finer ownership rules live in the domain services.
+`/api/summary`, and `/api/activity` → `ROLE_USER`; `/api/auth/token`, `/api/auth/public-key`, actuator
+health, Swagger, dev endpoints, and the SPA routes are public); the finer ownership rules live in the domain services.
 `ActorProvider` returns the
 current principal's login for `created_by`; `CurrentUserProvider` resolves the principal to a domain
 `User`. CORS is not configured: the SPA is same-origin, so the security chain needs no CORS source (add one
@@ -598,7 +607,8 @@ controllers map paths relative to the resource.
 
 ### Auth and dev
 
-- `POST /auth/token`: username + password → JWT (the only admin credential; no Basic).
+- `GET  /auth/public-key`: the RSA public key (a JWK) the SPA uses to encrypt the login payload (public, no auth).
+- `POST /auth/token`: `{ encryptedPayload }`, a compact JWE of `{ loginName, password }` → JWT (the only admin credential; no Basic). The server decrypts it before authenticating; a malformed/undecryptable payload is a 400.
 - `GET/PUT/DELETE /dev/data` (dev profile only): report counts / seed fixtures / clear.
 
 Notes on semantics:
@@ -633,6 +643,14 @@ Notes on semantics:
   - `campus-coffee.jwt.secret` (`JwtProperties`, api module): HMAC signing secret for the JWTs.
     Required and at least 32 bytes; supplied via `JWT_SECRET` (the dev profile has an insecure fallback,
     the prod profile none).
+  - `campus-coffee.login-encryption.private-key-pem` (`LoginEncryptionProperties`, api module): the RSA
+    private key (PKCS#8 PEM, at least 2048 bits) that decrypts the login payload; its public half is
+    published as a JWK at `GET /api/auth/public-key`. Required, supplied via `LOGIN_PRIVATE_KEY_PEM` (the dev
+    profile has an insecure committed fallback, the prod profile none). It must be the **same key on every
+    instance** (a client may fetch the public key from one instance and post the ciphertext to another), so
+    it is configured rather than generated per startup; in prod it is delivered as one line with literal
+    `\n` separators (`LoginEncryptionConfig` restores the newlines), parsed via Spring Security's
+    `RsaKeyConverters`.
   - `campus-coffee.fixtures.load-on-startup` (`FixturesProperties`, application module): when `true` and
     the database has no users yet, load the fixtures on startup (on in dev, off in prod).
   - `campus-coffee.fixtures.reset-on-startup` (`FixturesProperties`, application module): when `true`, clear

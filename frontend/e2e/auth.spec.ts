@@ -30,6 +30,25 @@ test.describe('auth and routing', () => {
     await expect(page.getByText('Personal balance')).toBeVisible();
   });
 
+  test('the sign-in request sends an encrypted payload, never the plaintext password', async ({ page }) => {
+    await page.goto('/admin/login');
+    await page.getByLabel('Login name').fill(ADMIN.loginName);
+    await page.getByLabel('Password').fill(ADMIN.password);
+
+    const tokenRequest = page.waitForRequest(
+      (request) => request.url().endsWith('/api/auth/token') && request.method() === 'POST'
+    );
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    const request = await tokenRequest;
+
+    // the body carries an encrypted payload, and the raw password appears nowhere in the request
+    const body = request.postDataJSON() as { encryptedPayload?: string };
+    expect(typeof body.encryptedPayload).toBe('string');
+    expect(request.postData() ?? '').not.toContain(ADMIN.password);
+    // and the encrypted sign-in still succeeds end to end
+    await expect(page).toHaveURL(/\/admin$/);
+  });
+
   test('wrong credentials keep the user on the login page with an error', async ({ page }) => {
     await page.goto('/admin/login');
     await page.getByLabel('Login name').fill(ADMIN.loginName);

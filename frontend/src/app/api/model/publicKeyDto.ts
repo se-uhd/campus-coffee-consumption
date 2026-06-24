@@ -9,7 +9,12 @@
  */
 
 
-export interface TokenRequestDto { 
-    encryptedPayload: string;
+export interface PublicKeyDto { 
+    kty: string;
+    n: string;
+    e: string;
+    alg: string;
+    use: string;
+    kid: string;
 }
 

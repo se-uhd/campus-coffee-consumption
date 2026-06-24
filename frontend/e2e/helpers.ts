@@ -1,4 +1,5 @@
 import { APIRequestContext, Page, expect, request } from '@playwright/test';
+import { CompactEncrypt, importJWK } from 'jose';
 
 /**
  * Shared constants and helpers for the end-to-end specs. The credentials and capability tokens are the
@@ -48,9 +49,29 @@ export async function pinPrice(api: APIRequestContext, token: string, amountCent
 
 /** Obtains an admin JWT directly from the auth endpoint (faster than driving the login form). */
 export async function adminToken(api: APIRequestContext): Promise<string> {
-  const response = await api.post('/api/auth/token', { data: ADMIN });
+  const encryptedPayload = await encryptCredentials(api, ADMIN.loginName, ADMIN.password);
+  const response = await api.post('/api/auth/token', { data: { encryptedPayload } });
   expect(response.ok()).toBeTruthy();
   return ((await response.json()) as { token: string }).token;
+}
+
+/** Encrypts the credentials as a compact JWE under the backend's published public key (mirrors the SPA). */
+async function encryptCredentials(
+  api: APIRequestContext,
+  loginName: string,
+  password: string
+): Promise<string> {
+  const keyResponse = await api.get('/api/auth/public-key');
+  expect(
+    keyResponse.ok(),
+    `fetching the public key should succeed, got ${keyResponse.status()}`
+  ).toBeTruthy();
+  const jwk = (await keyResponse.json()) as { n: string; e: string; kid: string };
+  const publicKey = await importJWK({ ...jwk, kty: 'RSA', alg: 'RSA-OAEP-256' }, 'RSA-OAEP-256');
+  const plaintext = new TextEncoder().encode(JSON.stringify({ loginName, password }));
+  return new CompactEncrypt(plaintext)
+    .setProtectedHeader({ alg: 'RSA-OAEP-256', enc: 'A256GCM', kid: jwk.kid })
+    .encrypt(publicKey);
 }
 
 /**

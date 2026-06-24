@@ -85,6 +85,26 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
     }
 
     /**
+     * Maps a failure to read the encrypted login payload to 400. A [LoginPayloadException] means the JWE
+     * could not be parsed, decrypted, or deserialized; the client-facing message is fixed and the detail is
+     * logged server-side only, so the response is not a decryption oracle. This is kept distinct from a
+     * wrong-credentials failure (which decrypts cleanly and then raises an authentication failure -> 401).
+     *
+     * @param exception the login-payload failure
+     * @param request   the current web request
+     */
+    @ExceptionHandler(LoginPayloadException::class)
+    fun handleLoginPayloadException(
+        exception: LoginPayloadException,
+        request: WebRequest
+    ): ResponseEntity<ErrorResponse> {
+        log.warn(exception) { "Login payload could not be read" }
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(errorBody(exception, HttpStatus.BAD_REQUEST, request, "Malformed login payload."))
+    }
+
+    /**
      * Maps a method-parameter constraint violation (a `@Validated` query/path-param bound, such as the paging
      * `@Max`/`@Min`/`@Positive` limits) to 400. Without this, a `ConstraintViolationException` would fall
      * through to the generic 500 handler even though an out-of-range parameter is a client error.

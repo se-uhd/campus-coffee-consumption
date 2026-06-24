@@ -22,7 +22,9 @@ Angular 22 single-page frontend, derived from the CampusCoffee teaching project.
   recent one within a short grace period, records their own bean purchases, and sees their balance, the
   current price, the kitty balance, and a unified activity feed of their coffees, purchases, and deposits.
 - **Admins** authenticate with a **JWT**, minted from a username-and-password login (`POST /api/auth/token`,
-  ~10-hour work-session token, no refresh flow). An admin manages members (create, edit, deactivate, change
+  ~10-hour work-session token, no refresh flow). The credentials are encrypted in the browser (a compact JWE
+  under the backend's published RSA public key) before they are sent, so the raw password never travels as
+  plaintext. An admin manages members (create, edit, deactivate, change
   role, view and rotate capability links, download any member's QR), sets the global price, records expenses
   with a private/kitty split and kitty deposits and adjustments, corrects any member's count, and reviews
   the kitty history and a per-member overview. There is no reset: settling up is a deposit, and a count
@@ -149,7 +151,10 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `POST /kitty/adjustment` `{ "amountCents", "note"? }`: a pure kitty adjustment (an initial float or a correction).
 - `GET /kitty/history?limit=50&offset=0`: the kitty history with the running kitty balance.
 
-**Auth:** `POST /auth/token` `{ "loginName": "…", "password": "…" }` → `{ "token": "<jwt>" }`.
+**Auth:** `GET /auth/public-key` returns the backend's RSA public key as a JWK; `POST /auth/token`
+`{ "encryptedPayload": "<compact JWE of { loginName, password }>" }` → `{ "token": "<jwt>" }`. The SPA
+encrypts the credentials with the published key (`RSA-OAEP-256` + `A256GCM`) so the raw password never
+travels as plaintext (defense in depth on top of TLS); a malformed or undecryptable payload returns 400.
 
 Money is in integer euro cents throughout. The HTTP method carries the semantics: `GET` reads, member
 `POST /consumption` adds one coffee (and `/cancel` undoes a recent one), and admin `PUT` sets an absolute
@@ -200,15 +205,19 @@ resources, so the browser loads the app and calls `/api` under one origin (no CO
 The prod profile connects to a **Cloud SQL for PostgreSQL 18** instance
 (`se-uhd:europe-west3:campus-coffee-consumption`, project `se-uhd`) via the **Cloud SQL Java connector**,
 which does TLS and IAM auth itself (no authorized-networks or client-cert setup). The non-secret connection
-details are baked into the prod profile; the DB password, `JWT_SECRET`, and the bootstrap-admin credentials
-come from the environment / Secret Manager. Fixtures are off in prod; instead, a **bootstrap admin** is
-created on first startup from `campus-coffee.bootstrap-admin.*` when no admin exists.
+details are baked into the prod profile; the DB password, `JWT_SECRET`, the login-encryption private key
+(`LOGIN_PRIVATE_KEY_PEM`), and the bootstrap-admin credentials come from the environment / Secret Manager.
+Fixtures are off in prod; instead, a **bootstrap admin** is created on first startup from
+`campus-coffee.bootstrap-admin.*` when no admin exists.
 
 Deploy notes:
 - Attach the instance with `--add-cloudsql-instances se-uhd:europe-west3:campus-coffee-consumption` and
   grant the runtime service account the **Cloud SQL Client** role.
-- Inject `DB_PASSWORD`, `JWT_SECRET`, and the `BOOTSTRAP_ADMIN_*` values from Secret Manager, and set
-  `CAMPUS_COFFEE_APP_BASE_URL` to the deployed HTTPS origin (used to build the capability URLs).
+- Inject `DB_PASSWORD`, `JWT_SECRET`, `LOGIN_PRIVATE_KEY_PEM` (a PKCS#8 RSA private key, at least 2048 bits,
+  as one line with literal `\n` separators), and the `BOOTSTRAP_ADMIN_*` values from Secret Manager, and set
+  `CAMPUS_COFFEE_APP_BASE_URL` to the deployed HTTPS origin (used to build the capability URLs). The same
+  login key must be present on every instance, so it is configured, not generated per startup;
+  `scripts/deploy-cloudrun.sh` generates one into `deploy.env` on first run.
 - The `com.google.cloud.sql:postgres-socket-factory` runtime dependency (named by the prod datasource URL)
   is already declared in `application/build.gradle.kts`.
 
