@@ -11,65 +11,65 @@ import { adminGuard } from './guards/admin.guard';
 export const routes: Routes = [
   {
     path: 'login/:token',
-    title: 'My coffee · SE@UHD',
+    title: 'My Coffee (SE@UHD)',
     loadComponent: () =>
       import('./pages/coffee-landing/coffee-landing.component').then((m) => m.CoffeeLandingComponent)
   },
   {
     path: 'login/:token/profile',
-    title: 'Profile · SE@UHD',
+    title: 'Profile (SE@UHD)',
     loadComponent: () => import('./pages/profile/profile.component').then((m) => m.ProfileComponent)
   },
   {
     path: 'admin/login',
-    title: 'Sign in · SE@UHD',
+    title: 'Sign in (SE@UHD)',
     loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent)
   },
   {
     path: 'admin',
-    title: 'Dashboard · SE@UHD',
+    title: 'Dashboard (SE@UHD)',
     canActivate: [adminGuard],
     loadComponent: () =>
       import('./pages/admin-landing/admin-landing.component').then((m) => m.AdminLandingComponent)
   },
   {
     path: 'admin/users',
-    title: 'Members · SE@UHD',
+    title: 'Members (SE@UHD)',
     canActivate: [adminGuard],
     loadComponent: () =>
       import('./pages/admin-users/admin-users.component').then((m) => m.AdminUsersComponent)
   },
   {
     path: 'admin/price',
-    title: 'Price · SE@UHD',
+    title: 'Price (SE@UHD)',
     canActivate: [adminGuard],
     loadComponent: () =>
       import('./pages/admin-price/admin-price.component').then((m) => m.AdminPriceComponent)
   },
   {
     path: 'admin/expenses',
-    title: 'Expenses · SE@UHD',
+    title: 'Expenses (SE@UHD)',
     canActivate: [adminGuard],
     loadComponent: () =>
       import('./pages/admin-expenses/admin-expenses.component').then((m) => m.AdminExpensesComponent)
   },
   {
     path: 'admin/kitty',
-    title: 'Kitty · SE@UHD',
+    title: 'Kitty (SE@UHD)',
     canActivate: [adminGuard],
     loadComponent: () =>
       import('./pages/admin-kitty/admin-kitty.component').then((m) => m.AdminKittyComponent)
   },
   {
     path: 'admin/profile',
-    title: 'Profile · SE@UHD',
+    title: 'Profile (SE@UHD)',
     canActivate: [adminGuard],
     loadComponent: () => import('./pages/profile/profile.component').then((m) => m.ProfileComponent)
   },
   { path: '', redirectTo: 'admin', pathMatch: 'full' },
   {
     path: '**',
-    title: 'Page not found · SE@UHD',
+    title: 'Page not found (SE@UHD)',
     loadComponent: () => import('./pages/not-found/not-found.component').then((m) => m.NotFoundComponent)
   }
 ];
