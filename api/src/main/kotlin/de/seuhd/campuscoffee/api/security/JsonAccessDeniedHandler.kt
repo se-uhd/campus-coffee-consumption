@@ -1,4 +1,4 @@
-package de.seuhd.campuscoffee.security
+package de.seuhd.campuscoffee.api.security
 
 import de.seuhd.campuscoffee.api.exceptions.ErrorResponse
 import jakarta.servlet.http.HttpServletRequest

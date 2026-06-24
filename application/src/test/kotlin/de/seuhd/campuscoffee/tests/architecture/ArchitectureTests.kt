@@ -16,15 +16,13 @@ class ArchitectureTests {
             ClassFileImporter()
                 .importPackages("de.seuhd.campuscoffee") // imports all sub-packages
 
-        // the application module's own wiring: the root package (the Spring Boot app + startup loaders), its
-        // security (Spring Security, JWT, UserDetailsService), web (SPA forwarding), and configuration
-        // (CORS, the prod guard, the @ConfigurationProperties), plus the test sources. All of it is the
-        // application layer, which no other layer may access.
+        // the application module's own wiring: the root package (the Spring Boot app, the startup loaders,
+        // and StartupDataInitializer) and the bootstrap/seeding @ConfigurationProperties under
+        // `configuration`, plus the test sources. All of it is the application layer, which no other layer
+        // may access. The web/security adapters and their config now live in the `api` layer, not here.
         val applicationPackages =
             arrayOf(
                 "de.seuhd.campuscoffee",
-                "de.seuhd.campuscoffee.security..",
-                "de.seuhd.campuscoffee.web..",
                 "de.seuhd.campuscoffee.configuration..",
                 "de.seuhd.campuscoffee.tests.."
             )

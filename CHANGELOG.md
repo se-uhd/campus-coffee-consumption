@@ -5,6 +5,44 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Log messages identify an entity consistently by its **id, in single quotes**, never by a login name. A
+  login name is PII; the id is the canonical, privacy-preserving key. The `UserServiceImpl.describe` /
+  `describeId` overrides that appended the user's login name to the create/update/delete audit log are
+  removed (along with the now-unused `CrudServiceImpl` extension hooks, so the base type+id format is used
+  everywhere); `AuthController` logs the bare `Token requested.` event without the supplied login name (no id
+  is resolvable at the credential boundary, and a failed attempt has no user); and `BootstrapAdminLoader`
+  logs the created admin's id. The dev-only demo loader still names its hardcoded demo fixtures (compile-time
+  constants, not user data) for readable startup output.
+- **The runtimes are guarded to stay on LTS.** `scripts/check-toolchain-versions.sh` now also validates the
+  pinned **Node** major (`mise.toml`) against the official Node release schedule, failing CI on a non-LTS
+  line: an odd "Current" major (e.g. 25) or an even-but-not-yet-LTS major (e.g. 26, "Current" until October
+  2026). It also asserts `@types/node` and the `engines.node` floor track that major. Paired with the
+  Dependabot rule that ignores `@types/node` major bumps, this keeps the frontend toolchain on the Node 24
+  LTS line; the runtime is bumped by hand only when moving to the next Node LTS.
+- **A `demo` Spring profile for a public, throwaway demo on Cloud Run.** Activated together with prod as
+  `prod,demo`, it is a thin overlay: it keeps every prod hardening (managed Cloud SQL, required https base
+  URL, real JWT secret, Swagger and the `/api/dev` endpoints off) and only adds the seed data, loading the
+  full fixture + `DevDemoDataLoader` dataset (~15 members with populated ledgers, balances, and a kitty
+  float) with deterministic ids and clearing+reseeding it on every boot, so the demo is deterministic,
+  self-cleaning, and discards any prior deployment's data. `DevDemoDataLoader` now runs on `dev` and `demo`;
+  `scripts/deploy-cloudrun.sh` takes a compose file (`compose.demo.yaml`) plus a `MAX_INSTANCES=1` cap so the
+  boot-time reset runs on a single instance. The https base-URL fail-fast `ProdConfigGuard` is renamed
+  `PublicBaseUrlGuard` and now guards both internet-facing profiles (`prod` and `demo`).
+- **Web security moved into the `api` layer, where the inbound HTTP adapter belongs.** The Spring Security
+  filter chain, the capability-token filter, the `UserDetailsService`, the JSON auth entry-point/handlers,
+  the `ActorProvider` adapter, the JWT config + `JwtProperties`, and the public base-url guard all moved from
+  `application` (the composition root) into `api` (packages `de.seuhd.campuscoffee.api.security` / `.api.web`
+  / `.api.configuration`). The ArchUnit layer definition is updated to match; `application` now holds only
+  the Spring Boot main class and the bootstrap/seeding (the loaders plus the `Fixtures`/`CoffeePrice`/
+  `BootstrapAdmin` properties). `SpaForwardingController` is renamed `SinglePageAppController`.
+- The unused CORS configuration (`CorsConfig` + `CorsProperties` + `campus-coffee.cors.allowed-origins`) is
+  removed: the SPA is same-origin, so the security chain needs no CORS source (re-add it in `api` if the SPA
+  ever moves to a separate origin).
+- `BootstrapAdminProperties` declares only the structure; its default values (the admin email and name) move
+  into `application.yaml`'s prod `campus-coffee.bootstrap-admin` block, so a default has a single source.
+
 ## [0.3.1] - 2026-06-22
 
 A hardening release working through an extensive adversarial review of the whole project (code, docs,
@@ -78,7 +116,7 @@ rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
   `EventSourcedWriter.create`, the no-op `OnCreate` group, `ValidationException`'s unused constructor).
 - **API and OpenAPI.** Settlement, adjustment, and admin-expense create declare `201`; the QR endpoints
   advertise `image/png` and `application/zip`; a dedicated `ProfileUpdateDto` carries the profile edit; and
-  the hand-written controllers document their `400/401/403/404/409` responses. The committed OpenAPI spec
+  the handwritten controllers document their `400/401/403/404/409` responses. The committed OpenAPI spec
   and the generated frontend DTOs are regenerated to match.
 - **Frontend UX.** A human browser-tab title with per-route titles, a real not-found page for unknown URLs,
   a `prefers-reduced-motion` block, a `theme-color` meta and a web manifest, one consistent snackbar action

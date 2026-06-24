@@ -1,12 +1,12 @@
-package de.seuhd.campuscoffee.tests.security
+package de.seuhd.campuscoffee.api.security
 
+import de.seuhd.campuscoffee.api.security.CapabilityTokenAuthenticationFilter
+import de.seuhd.campuscoffee.api.security.DomainUserDetailsService
+import de.seuhd.campuscoffee.api.security.SecurityContextActorProvider
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.UserService
-import de.seuhd.campuscoffee.security.CampusUserDetailsService
-import de.seuhd.campuscoffee.security.CapabilityTokenAuthenticationFilter
-import de.seuhd.campuscoffee.security.SecurityContextActorProvider
 import jakarta.servlet.FilterChain
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -111,7 +111,7 @@ class SecurityComponentsTest {
     fun `the user details service defaults a null role to ROLE_USER`() {
         whenever(userService.getByLoginName("norole")).thenReturn(member().copy(role = null))
 
-        val details = CampusUserDetailsService(userService).loadUserByUsername("norole")
+        val details = DomainUserDetailsService(userService).loadUserByUsername("norole")
 
         assertThat(details.authorities.map { it.authority }).containsExactly("ROLE_USER")
     }
@@ -120,7 +120,7 @@ class SecurityComponentsTest {
     fun `the user details service rejects a user without a stored password hash`() {
         whenever(userService.getByLoginName("nohash")).thenReturn(member().copy(passwordHash = null))
 
-        assertThatThrownBy { CampusUserDetailsService(userService).loadUserByUsername("nohash") }
+        assertThatThrownBy { DomainUserDetailsService(userService).loadUserByUsername("nohash") }
             .isInstanceOf(UsernameNotFoundException::class.java)
     }
 
@@ -130,7 +130,7 @@ class SecurityComponentsTest {
             userService.getByLoginName("ghost")
         ).thenThrow(NotFoundException(User::class.java, "loginName", "ghost"))
 
-        assertThatThrownBy { CampusUserDetailsService(userService).loadUserByUsername("ghost") }
+        assertThatThrownBy { DomainUserDetailsService(userService).loadUserByUsername("ghost") }
             .isInstanceOf(UsernameNotFoundException::class.java)
     }
 }

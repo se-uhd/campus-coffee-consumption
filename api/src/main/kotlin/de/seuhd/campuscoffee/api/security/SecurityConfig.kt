@@ -1,4 +1,4 @@
-package de.seuhd.campuscoffee.security
+package de.seuhd.campuscoffee.api.security
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -17,7 +17,6 @@ import org.springframework.security.oauth2.server.resource.web.authentication.Be
 import org.springframework.security.web.AuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.access.AccessDeniedHandler
-import org.springframework.web.cors.CorsConfigurationSource
 
 /**
  * Spring Security configuration. Two authentication mechanisms, one per audience (there is no HTTP Basic):
@@ -44,7 +43,6 @@ class SecurityConfig {
      * @param accessDeniedHandler renders an authorization denial as a 403 JSON response
      * @param jwtAuthenticationConverter maps a validated Bearer token to a principal with ROLE_* authorities
      * @param capabilityTokenAuthenticationFilter authenticates a member by their X-Coffee-Token header
-     * @param corsConfigurationSource the (default-empty) CORS allowlist; unused while the SPA is same-origin
      */
     @Bean
     fun securityFilterChain(
@@ -52,8 +50,7 @@ class SecurityConfig {
         authenticationEntryPoint: AuthenticationEntryPoint,
         accessDeniedHandler: AccessDeniedHandler,
         jwtAuthenticationConverter: JwtAuthenticationConverter,
-        capabilityTokenAuthenticationFilter: CapabilityTokenAuthenticationFilter,
-        corsConfigurationSource: CorsConfigurationSource
+        capabilityTokenAuthenticationFilter: CapabilityTokenAuthenticationFilter
     ): SecurityFilterChain {
         http {
             authorizeHttpRequests {
@@ -92,7 +89,6 @@ class SecurityConfig {
                 // Any other (non-API, non-GET) request requires authentication.
                 authorize(anyRequest, authenticated)
             }
-            cors { configurationSource = corsConfigurationSource }
             csrf { disable() }
             sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
             // Bearer-token (JWT) resource server: a valid token authenticates an admin request, its `roles`

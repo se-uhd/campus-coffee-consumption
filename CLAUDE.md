@@ -28,9 +28,9 @@ frontend.
 
 ### Module Dependencies
 - **domain**: Core business logic, domain models, and port interfaces. It depends on Bean Validation and, by design, on Spring (`@Service`/`@Component`/`@Transactional`/`@Value`/slf4j and `spring-tx`); it does not depend on the api, data, or application layers.
-- **api**: REST API layer with controllers, DTOs, and DTO mappers (depends on: domain).
+- **api**: REST API layer: controllers, DTOs, DTO mappers, and the inbound web security (the Spring Security filter chain, the capability-token filter, the `UserDetailsService`, the JWT config, and the public base-url guard) (depends on: domain).
 - **data**: Data layer with JPA entities, repositories, the event sourcing machinery, and the QR/capability token adapters (depends on: domain).
-- **application**: Main Spring Boot application that wires everything together (depends on: domain, api, data).
+- **application**: The composition root: the Spring Boot main class plus the startup/bootstrap seeders and their `@ConfigurationProperties`. It holds no web, security, or business code (depends on: domain, api, data).
 - **frontend**: Angular SPA (sibling of the modules), built by Gradle and bundled into the application's `static/` resources.
 
 ### Layer Rules (Enforced by ArchUnit)
@@ -182,11 +182,19 @@ Domain-specific controllers/services extend these base classes (e.g., `UserContr
 - Java 25 and Gradle 9.5, provisioned via `mise.toml` (no Gradle wrapper). Run Gradle through mise
   (CI uses `jdx/mise-action`). The build pins a **Java 25 toolchain with no auto-download**, so a
   JDK 25 must be present on the machine (mise supplies it).
-- Node 24 is provisioned via `mise.toml` for the frontend build, lint, and tests.
+- Node 24 (an LTS) is provisioned via `mise.toml` for the frontend build, lint, and tests.
 - The Java major version has a **single source of truth**: the `java` entry in
   `gradle/libs.versions.toml`. The convention plugins resolve it for the Gradle toolchain and the Kotlin
   `jvmTarget`; `mise.toml` and the Dockerfile runtime image pin the same major by hand.
   `scripts/check-toolchain-versions.sh` (a CI step) fails the build if they drift.
+- **The runtimes stay on LTS releases.** That same `scripts/check-toolchain-versions.sh` also validates the
+  pinned **Node** major (`mise.toml`, the source of truth) against the official Node release schedule, so a
+  non-LTS line is rejected in CI: both an odd "Current" major (e.g. 25, never LTS) and an even-but-not-yet
+  LTS major (e.g. 26, which is "Current" until October 2026). It also asserts `@types/node` and the
+  `frontend/package.json` `engines.node` floor track that same major. Dependabot does not manage `mise.toml`
+  (so a non-LTS Node can only enter by a human edit, which the guard then catches), and a Dependabot rule
+  ignores `@types/node` major bumps so the types never run ahead of the runtime. Bump the Node line by hand
+  (mise + `@types/node` + `engines`, together) only when moving to the next Node LTS.
 
 ### Build
 
@@ -235,7 +243,8 @@ The `dev` profile:
   consumption at zero, so the app comes up with the seeded ids and demo-able coffee links ready.
 - Resets the data on every dev start (`campus-coffee.fixtures.reset-on-startup: true`): clears the data and
   reseeds the fixtures (and the demo data below), so each restart returns to the same deterministic state.
-- Layers on **dev demo data** via the dev-only `DevDemoDataLoader` (`@Profile("dev")`, a `StartupTask` at
+- Layers on **dev demo data** via `DevDemoDataLoader` (`@Profile("dev", "demo")`, so the cloud demo gets the
+  same dataset; a `StartupTask` at
   order 260, after the fixture reset+reseed and the price seed): about nine extra members (a mix of roles and
   active states) and an initial kitty float, and it also enriches **every existing fixture user** (the admin
   `jane_doe` included) with varied consumption, bean-purchase, and deposit history, so the members list
@@ -526,14 +535,14 @@ The access rules gate the API by audience (`/api/users/**`, `/api/price/**`, and
 endpoints, and the SPA routes are public); the finer ownership rules live in the domain services.
 `ActorProvider` returns the
 current principal's login for `created_by`; `CurrentUserProvider` resolves the principal to a domain
-`User`. CORS is not configured (the SPA is same-origin); a default-empty `campus-coffee.cors.allowed-origins`
-allowlist is the escape hatch if the SPA is ever hosted on a separate origin. The capability URL handling
+`User`. CORS is not configured: the SPA is same-origin, so the security chain needs no CORS source (add one
+in `api` if the SPA is ever hosted on a separate origin). The capability URL handling
 follows the W3C "Good Practices for Capability URLs" finding (see
 `doc/2026-06-20_coffee-consumption-event-sourcing-and-capability-urls.md`).
 
 ## REST API Endpoints
 
-Base URL: `http://localhost:8080/api`. JSON only. The `/api` base is applied centrally by `ApiPathConfig`;
+Base URL: `http://localhost:8080/api`. JSON only. The `/api` base is applied centrally by `ApiWebConfig`;
 controllers map paths relative to the resource.
 
 ### Member self-service (auth: `X-Coffee-Token` header; principal = the token's member)
@@ -594,7 +603,12 @@ Notes on semantics:
 ## Configuration
 
 - Main config: `application/src/main/resources/application.yaml`.
-- The dev and prod profiles activate on `spring.config.activate.on-profile`.
+- The dev, prod, and demo profiles activate on `spring.config.activate.on-profile`. The **demo** profile is a
+  thin overlay activated together with prod (`SPRING_PROFILES_ACTIVE=prod,demo`) for a public, throwaway
+  Cloud Run demo: it keeps every prod hardening (managed Cloud SQL, required https base URL, real JWT,
+  Swagger and `/api/dev` off) and only adds the seed data (the fixtures + `DevDemoDataLoader` dataset,
+  deterministic ids, cleared and reseeded on every boot). Deploy it with
+  `MAX_INSTANCES=1 scripts/deploy-cloudrun.sh compose.demo.yaml`.
 - Custom properties (each has a `@ConfigurationProperties` class so the keys resolve in the IDE's
   `application.yaml` editor):
   - `campus-coffee.app.base-url` (`AppProperties`, api module): the public origin used to build the
@@ -608,7 +622,7 @@ Notes on semantics:
     cup, in euro cents, seeded on first startup when no price exists yet. Default 50.
   - `campus-coffee.consumption.cancel-grace-period` (`ConsumptionProperties`, api module): how long after
     adding a coffee a member may still undo it. A `Duration`, default 5 minutes.
-  - `campus-coffee.jwt.secret` (`JwtProperties`, application module): HMAC signing secret for the JWTs.
+  - `campus-coffee.jwt.secret` (`JwtProperties`, api module): HMAC signing secret for the JWTs.
     Required and at least 32 bytes; supplied via `JWT_SECRET` (the dev profile has an insecure fallback,
     the prod profile none).
   - `campus-coffee.fixtures.load-on-startup` (`FixturesProperties`, application module): when `true` and
@@ -617,17 +631,17 @@ Notes on semantics:
     the data and reseed the fixtures on every startup (on in dev, off in prod), so each dev restart returns
     to the deterministic seeded state.
   - `campus-coffee.bootstrap-admin.*` (`BootstrapAdminProperties`, application module): when set and no
-    admin exists yet, create one admin on startup (used in prod, where fixtures are off).
-  - `campus-coffee.cors.allowed-origins` (`CorsProperties`, application module): a default-empty CORS
-    allowlist; unused while the SPA is same-origin.
+    admin exists yet, create one admin on startup (used in prod, where fixtures are off). The class declares
+    only the structure; the values and defaults live in `application.yaml`'s prod block.
 
 The startup tasks run before the embedded web server accepts requests (via a `SmartInitializingSingleton`,
 `StartupDataInitializer`, that runs every registered `StartupTask` in `order`): the optional event-log
 rebuild (order 100), then the fixture loader (200), then the price seeder (`CoffeePriceStartupLoader`, 250,
 seeds `campus-coffee.price.initial-cents` when no price exists yet so a price exists before any coffee is
-consumed), then the dev-only `DevDemoDataLoader` (260, `@Profile("dev")`), then the bootstrap admin (300).
-So in dev the fixtures seed an admin and the bootstrap step is a no-op; in prod the bootstrap step creates
-the admin (and the demo loader does not run).
+consumed), then `DevDemoDataLoader` (260, `@Profile("dev", "demo")`, so it runs in local dev and the cloud
+demo), then the bootstrap admin (300). So in dev and demo the fixtures seed an admin and the bootstrap step
+is a no-op; in plain prod the fixtures are off, so the bootstrap step creates the admin (and the demo loader
+does not run).
 
 ## Important Patterns
 
@@ -648,7 +662,7 @@ Global exception handler: `api/.../exceptions/GlobalExceptionHandler.kt`. It ext
 codes (an unmapped path returns 404, a wrong HTTP method 405) instead of a generic 500. It also maps a
 Jakarta `ConstraintViolationException` (an out-of-range paging `limit`/`offset` that violates the
 `@Max`/`@Min`/`@Positive` bounds) to a clean 400 instead of letting it fall through to a generic 500. The
-REST API is JSON-only (`ApiPathConfig` removes the XML message converter and pins UTF-8 on JSON).
+REST API is JSON-only (`ApiWebConfig` removes the XML message converter and pins UTF-8 on JSON).
 
 ### MapStruct Configuration
 
@@ -702,7 +716,7 @@ Custom OpenAPI annotations in `api/.../openapi/`: `@CrudOperation` for common CR
    with no database-unique key passes `emptySet()` constraints (and contributes no `DUPLICATION_RULES`).
 10. Create the DTO in `api/.../dtos/` (extend `Dto<ID>`) and the DTO mapper in `api/.../mapper/`.
 11. Create the controller in `api/.../controller/` (extend `CrudController<DOMAIN, DTO, ID>`). Map paths
-    relative to the resource; the `/api` base is applied centrally by `ApiPathConfig`.
+    relative to the resource; the `/api` base is applied centrally by `ApiWebConfig`.
 12. Create a Flyway migration in `data/src/main/resources/db/migration/`.
 
 ### Constraint Violations

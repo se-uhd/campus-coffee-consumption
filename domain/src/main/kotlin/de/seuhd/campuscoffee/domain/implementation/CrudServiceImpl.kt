@@ -50,12 +50,12 @@ abstract class CrudServiceImpl<DOMAIN : DomainModel<ID>, ID>(
         } else {
             // no existence pre-read here: the data adapter's update path reads the row by id and throws
             // NotFoundException itself if it is missing, so a pre-read would only duplicate that lookup
-            log.debug { "Updating ${describe(domainObject)}." }
+            log.debug { "Updating ${domainClass.simpleName} with id '$id'." }
         }
 
         try {
             val upserted = dataService().upsert(domainObject)
-            log.debug { "Upserted ${describe(upserted)}." }
+            log.debug { "Upserted ${domainClass.simpleName} with id '${upserted.id}'." }
             return upserted
         } catch (e: DuplicationException) {
             log.warn { "Failed to upsert ${domainClass.simpleName}: ${e.message}" }
@@ -64,30 +64,10 @@ abstract class CrudServiceImpl<DOMAIN : DomainModel<ID>, ID>(
     }
 
     override fun delete(id: ID) {
-        // resolve the label before deleting, while the entity (and its natural key) still exists
-        val label = describeId(id)
-        log.debug { "Deleting $label." }
+        log.debug { "Deleting ${domainClass.simpleName} with id '$id'." }
         dataService().delete(id)
-        log.info { "Deleted $label." }
+        log.info { "Deleted ${domainClass.simpleName} with id '$id'." }
     }
-
-    /**
-     * Renders a human-readable label for [domainObject] used in the upsert log messages. The default is the
-     * type name and the id; a subclass with a natural key (e.g. a user's login name) overrides this to add it,
-     * so the audit trail is not identifiable by an opaque UUID alone.
-     *
-     * @param domainObject the domain object to describe
-     */
-    protected open fun describe(domainObject: DOMAIN): String = "${domainClass.simpleName} with id '${domainObject.id}'"
-
-    /**
-     * Renders a human-readable label for the entity with the given [id], used in the delete log message.
-     * The default is the type name and the id; a subclass that can resolve a natural key for the id overrides
-     * this to add it. Resolving may require a read, so it is a separate hook from [describe].
-     *
-     * @param id the id of the entity to describe
-     */
-    protected open fun describeId(id: ID): String = "${domainClass.simpleName} with id '$id'"
 
     private companion object {
         private val log = KotlinLogging.logger {}
