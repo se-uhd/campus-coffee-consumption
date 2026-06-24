@@ -16,7 +16,7 @@ data class AdminExpenseDto(
     @field:Max(value = MAX_WEIGHT_GRAMS, message = "Weight is implausibly large.")
     val weightGrams: Int?,
     @field:NotNull(message = "Amount is required.")
-    @field:Min(value = 0, message = "Amount must not be negative.")
+    @field:Min(value = 1, message = "Amount must be at least one cent.")
     @field:Max(value = MAX_MONEY_CENTS, message = "Amount is implausibly large.")
     val amountCents: Int?,
     @field:NotNull(message = "Private amount is required.")

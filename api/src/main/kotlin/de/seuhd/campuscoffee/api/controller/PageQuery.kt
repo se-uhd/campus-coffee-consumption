@@ -17,13 +17,14 @@ import jakarta.validation.constraints.Positive
  * skips the upper bound.
  *
  * @property limit  the requested page size, or null to use the endpoint's default; must be `1..`[MAX_PAGE_LIMIT]
- * @property offset the number of newest entries to skip; must not be negative
+ * @property offset the number of newest entries to skip; must be `0..`[MAX_PAGE_OFFSET]
  */
 data class PageQuery(
     @field:Positive
     @field:Max(MAX_PAGE_LIMIT)
     val limit: Int? = null,
     @field:Min(0)
+    @field:Max(MAX_PAGE_OFFSET)
     val offset: Int = 0
 ) {
     /**
@@ -36,5 +37,12 @@ data class PageQuery(
     companion object {
         /** The maximum page size any paged read accepts; an out-of-range value is a 400, not a silent clamp. */
         const val MAX_PAGE_LIMIT = 100L
+
+        /**
+         * The maximum offset any paged read accepts; bounds `offset` symmetrically with `limit` so an
+         * out-of-range skip is a clean 400 rather than an unbounded input. A coffee group's feeds never
+         * reach this depth, so it never constrains a real page.
+         */
+        const val MAX_PAGE_OFFSET = 1_000_000L
     }
 }
