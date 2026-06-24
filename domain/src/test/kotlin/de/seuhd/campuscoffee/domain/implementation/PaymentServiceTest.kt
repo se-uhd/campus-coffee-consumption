@@ -3,12 +3,10 @@ package de.seuhd.campuscoffee.domain.implementation
 import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
-import de.seuhd.campuscoffee.domain.model.ActivityEntry
-import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
-import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
+import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
 import de.seuhd.campuscoffee.domain.ports.data.KittyLock
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
@@ -21,7 +19,6 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import java.time.LocalDateTime
 import java.util.UUID
 
 /**
@@ -32,9 +29,9 @@ import java.util.UUID
 class PaymentServiceTest {
     private val paymentDataService: PaymentDataService = mock()
     private val userDataService: UserDataService = mock()
-    private val activityDataService: ActivityDataService = mock()
+    private val balanceDataService: BalanceDataService = mock()
     private val kittyLock: KittyLock = mock()
-    private val service = PaymentServiceImpl(paymentDataService, userDataService, activityDataService, kittyLock)
+    private val service = PaymentServiceImpl(paymentDataService, userDataService, balanceDataService, kittyLock)
 
     private val memberId: UUID = UUID(0L, 1L)
 
@@ -84,7 +81,7 @@ class PaymentServiceTest {
 
     @Test
     fun `adjustKitty by an admin stores a signed adjustment carrying no member`() {
-        whenever(activityDataService.kittyHistory()).thenReturn(kittyWith(1000))
+        whenever(balanceDataService.kittyBalanceCents()).thenReturn(1000L)
         whenever(paymentDataService.upsert(any())).thenAnswer { it.arguments[0] as Payment }
 
         val payment = service.adjustKitty(-250, "correction", admin)
@@ -95,7 +92,7 @@ class PaymentServiceTest {
 
     @Test
     fun `adjustKitty that would overdraw the kitty throws ConflictException`() {
-        whenever(activityDataService.kittyHistory()).thenReturn(kittyWith(100))
+        whenever(balanceDataService.kittyBalanceCents()).thenReturn(100L)
 
         assertThrows<ConflictException> { service.adjustKitty(-250, "overdraw", admin) }
         verify(paymentDataService, never()).upsert(any())
@@ -115,28 +112,15 @@ class PaymentServiceTest {
 
     @Test
     fun `adjustKitty acquires the kitty lock before reading the kitty balance`() {
-        whenever(activityDataService.kittyHistory()).thenReturn(kittyWith(1000))
+        whenever(balanceDataService.kittyBalanceCents()).thenReturn(1000L)
         whenever(paymentDataService.upsert(any())).thenAnswer { it.arguments[0] as Payment }
 
         service.adjustKitty(-250, "correction", admin)
 
         // the overdraw guard is only sound if the lock is taken before the balance is read; a refactor that
         // reordered or dropped the lock would keep every other test green but reintroduce the TOCTOU race
-        val ordered = inOrder(kittyLock, activityDataService)
+        val ordered = inOrder(kittyLock, balanceDataService)
         ordered.verify(kittyLock).lockForUpdate()
-        ordered.verify(activityDataService).kittyHistory()
+        ordered.verify(balanceDataService).kittyBalanceCents()
     }
-
-    private fun kittyWith(balanceCents: Long): List<ActivityEntry> =
-        listOf(
-            ActivityEntry(
-                type = ActivityEntryType.KITTY_ADJUSTMENT,
-                id = UUID.fromString("00000000-0000-0000-0000-000000000001"),
-                createdAt = LocalDateTime.of(2026, 1, 1, 0, 0),
-                createdBy = "system",
-                note = null,
-                amountCents = balanceCents,
-                runningBalanceCents = balanceCents
-            )
-        )
 }
