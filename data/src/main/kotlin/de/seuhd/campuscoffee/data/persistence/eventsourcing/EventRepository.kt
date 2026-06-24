@@ -13,6 +13,22 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
     fun findAllByOrderBySeqAsc(): List<EventEntity>
 
     /**
+     * The next batch of events after a given append position, in append order, for replaying the log in
+     * bounded chunks (keyset paging by `seq`) so a rebuild does not load the whole log into memory at once.
+     *
+     * @param afterSeq the exclusive lower bound on `seq` (0 to start from the beginning)
+     * @param limit    the maximum number of events to return
+     */
+    @Query(
+        value = "SELECT * FROM events WHERE seq > :afterSeq ORDER BY seq ASC LIMIT :limit",
+        nativeQuery = true
+    )
+    fun findBatchAfterSeq(
+        @Param("afterSeq") afterSeq: Long,
+        @Param("limit") limit: Int
+    ): List<EventEntity>
+
+    /**
      * Returns the events for one domain object (matched by the id embedded in the body) of a given type,
      * newest first, for reading an entity's history from the log. A native query because the match is on
      * the `jsonb` body's `id` (indexed by `idx_events_body_id`), which JPQL cannot express.

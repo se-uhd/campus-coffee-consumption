@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional
 class EventsToDataRunner(
     private val eventRepository: EventRepository,
     private val projector: ReadModelProjector,
+    private val balanceProjection: BalanceProjection,
     private val userRepository: UserRepository,
     private val coffeeConsumptionRepository: CoffeeConsumptionRepository,
     private val coffeePriceRepository: CoffeePriceRepository,
@@ -50,9 +51,23 @@ class EventsToDataRunner(
             return
         }
         clearReadTables()
-        val events = eventRepository.findAllByOrderBySeqAsc()
-        events.forEach { projector.apply(it) }
-        log.info { "Rebuilt the read model from ${events.size} events in the log." }
+        // replay the log in bounded, seq-ordered batches (keyset paging) so the rebuild never holds the whole
+        // log in memory at once
+        var afterSeq = 0L
+        var total = 0
+        while (true) {
+            val batch = eventRepository.findBatchAfterSeq(afterSeq, BATCH_SIZE)
+            if (batch.isEmpty()) {
+                break
+            }
+            batch.forEach { projector.apply(it) }
+            afterSeq = requireNotNull(batch.last().seq) { "A replayed event must carry a seq." }
+            total += batch.size
+        }
+        // the projector rebuilds only the relational rows; recompute the balance projections from the log
+        // once the read tables (and member logins) are in place
+        balanceProjection.rebuildAll()
+        log.info { "Rebuilt the read model and balances from $total events in the log." }
     }
 
     /**
@@ -70,6 +85,10 @@ class EventsToDataRunner(
     companion object {
         /** The rebuild runs before the fixture loader, so the loader's empty-users check sees the rebuilt data. */
         const val ORDER = 100
+
+        /** How many events to load per replay batch, bounding the rebuild's memory footprint. */
+        private const val BATCH_SIZE = 500
+
         private val log = KotlinLogging.logger {}
     }
 }

@@ -117,7 +117,13 @@ class EventStore(
                 this.body = body
                 createdAt = LocalDateTime.now(UTC)
                 createdBy = actorProvider.currentActor()
-                note = changeNoteContext.currentNote()
+                // Unify the event note at this one boundary: an admin count-correction reason (from the
+                // ChangeNoteContext, the only context-set note) when present, else the entity's own note
+                // carried in the body (a deposit, kitty-adjustment, or expense note). So `events.note` is the
+                // single, queryable note for every event, and the activity reads read one field rather than
+                // falling back between the metadata column and the body. A DELETE body carries only the id, so
+                // it contributes no note.
+                note = changeNoteContext.currentNote() ?: (body["note"] as? String)
             }
         // flush the event before the projection runs; if the projection then fails, the transaction rolls
         // back the event together with the projection, so the log never keeps an invalid event

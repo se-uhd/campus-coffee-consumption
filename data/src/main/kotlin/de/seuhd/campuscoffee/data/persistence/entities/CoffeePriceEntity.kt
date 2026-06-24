@@ -8,6 +8,11 @@ import jakarta.persistence.Version
  * Database entity for the global coffee price (the projected read model row). There is a single row,
  * created once and updated in place; [version] backs optimistic locking so two concurrent admin price
  * changes cannot silently lose one. The amount is held in euro cents.
+ *
+ * Being an event-sourced entity, its `id` is the per-write UUID carried in the event body, so the single-row
+ * invariant is enforced by a separate `is_singleton` guard column (the id cannot also be the guard). A plain
+ * single-row table with no entity id of its own uses the lighter `id integer CHECK (id = 1)` form instead;
+ * see `KittyBalanceEntity`.
  */
 @jakarta.persistence.Entity
 @Table(name = "coffee_prices")

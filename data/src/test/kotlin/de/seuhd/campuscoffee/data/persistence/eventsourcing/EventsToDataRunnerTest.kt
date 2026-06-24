@@ -20,6 +20,9 @@ class EventsToDataRunnerTest : AbstractEventSourcingDataIntegrationTest() {
     private lateinit var readModelProjector: ReadModelProjector
 
     @Autowired
+    private lateinit var balanceProjection: BalanceProjection
+
+    @Autowired
     private lateinit var coffeePriceRepository: CoffeePriceRepository
 
     @Autowired
@@ -32,6 +35,7 @@ class EventsToDataRunnerTest : AbstractEventSourcingDataIntegrationTest() {
         EventsToDataRunner(
             eventRepository,
             readModelProjector,
+            balanceProjection,
             userRepository,
             coffeeConsumptionRepository,
             coffeePriceRepository,

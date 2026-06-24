@@ -11,6 +11,7 @@ import de.seuhd.campuscoffee.domain.ports.api.AccountingService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
+import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.springframework.stereotype.Service
@@ -25,6 +26,7 @@ import java.util.UUID
 @Service
 class AccountingServiceImpl(
     private val activityDataService: ActivityDataService,
+    private val balanceDataService: BalanceDataService,
     private val coffeePriceService: CoffeePriceService,
     private val coffeeConsumptionDataService: CoffeeConsumptionDataService,
     private val coffeeConsumptionService: CoffeeConsumptionService,
@@ -43,7 +45,9 @@ class AccountingServiceImpl(
             count = count,
             priceCents = coffeePriceService.getCurrent().amountCents,
             balanceCents = fullActivity.lastOrNull()?.runningBalanceCents ?: 0L,
-            kittyBalanceCents = kittyBalanceCents(),
+            // the kitty balance is a single maintained number, so reading it never replays the global money
+            // stream the way every member landing load used to
+            kittyBalanceCents = balanceDataService.kittyBalanceCents(),
             // only offer undo when there is actually a coffee to remove (a stale stack entry could otherwise
             // mark a zero count cancellable)
             cancellable = count > 0 && coffeeConsumptionService.cancellableIncrement(userId, actingUser) != null,
@@ -66,7 +70,7 @@ class AccountingServiceImpl(
         return if (includeKittyPortion) page else page.map { it.withoutKittyPortion() }
     }
 
-    override fun kittyBalanceCents(): Long = activityDataService.kittyHistory().lastOrNull()?.runningBalanceCents ?: 0L
+    override fun kittyBalanceCents(): Long = balanceDataService.kittyBalanceCents()
 
     override fun kittyHistory(
         limit: Int,
@@ -79,22 +83,17 @@ class AccountingServiceImpl(
 
     override fun allBalances(actingUser: User): List<UserBalance> {
         requireAdmin(actingUser)
+        // read every member's balance from the maintained projection in one query instead of replaying each
+        // member's whole stream; a member with no recorded activity is absent from the map and defaults to 0
+        val balances = balanceDataService.allMemberBalancesCents()
         // sort by login name so the per-member overview keeps a stable, human-readable order; a mutation
         // (a deactivation, a token rotation) must never reshuffle the admin's overview
         return userDataService
             .getAll()
             .sortedBy { it.loginName }
             .map { user ->
-                // isolate per-member failures: one member's malformed stream must not 500 the whole overview,
-                // so a failed balance walk falls back to 0 for that member rather than failing every row
-                val balance =
-                    runCatching {
-                        activityDataService
-                            .userActivity(user.persistedId, user.loginName)
-                            .lastOrNull()
-                            ?.runningBalanceCents ?: 0L
-                    }.getOrDefault(0L)
-                UserBalance(user, coffeeConsumptionDataService.getByUserId(user.persistedId).count, balance)
+                val count = coffeeConsumptionDataService.getByUserId(user.persistedId).count
+                UserBalance(user, count, balances[user.persistedId] ?: 0L)
             }
     }
 

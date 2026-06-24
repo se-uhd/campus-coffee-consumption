@@ -18,11 +18,15 @@ import kotlin.reflect.KClass
  * The decorators pass the per-type steps in as lambdas (how to build the domain object via `copy`, and how
  * to read one back), so this holds no per-type knowledge. Ids come from the primary [IdGenerator], so the
  * assigned entity ids are produced by the same generator the relational delegate (the read model) uses.
+ *
+ * After projecting an event it also refreshes the [BalanceProjection] in the same transaction, so the
+ * materialized member and kitty balances stay consistent with the log (and roll back together with it).
  */
 @Component
 class EventSourcedWriter(
     private val eventStore: EventStore,
     private val projector: ReadModelProjector,
+    private val balanceProjection: BalanceProjection,
     private val idGenerator: IdGenerator
 ) {
     /**
@@ -94,10 +98,16 @@ class EventSourcedWriter(
     ) {
         eventStore.clear(eventStore.entityTypeOf(domainType))
         clearReadModel()
+        // the balances are derived from every stream, so any cleared type invalidates them; emptying both
+        // here keeps a full reset (which clears each type) consistent, and a reseed rebuilds them on write
+        balanceProjection.clear()
     }
 
-    /** Projects an appended event onto the read tables via the [ReadModelProjector]. */
-    private fun project(event: EventEntity) = projector.apply(event)
+    /** Projects an appended event onto the read tables and refreshes the balances it affects. */
+    private fun project(event: EventEntity) {
+        projector.apply(event)
+        balanceProjection.maintain(event)
+    }
 
     /** The current UTC timestamp used for the assigned `createdAt`/`updatedAt`. */
     private fun now() = LocalDateTime.now(UTC)
