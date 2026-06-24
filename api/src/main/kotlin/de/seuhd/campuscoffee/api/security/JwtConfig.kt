@@ -1,6 +1,6 @@
-package de.seuhd.campuscoffee.security
+package de.seuhd.campuscoffee.api.security
 import com.nimbusds.jose.jwk.source.ImmutableSecret
-import de.seuhd.campuscoffee.configuration.JwtProperties
+import de.seuhd.campuscoffee.api.configuration.JwtProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.oauth2.jwt.JwtDecoder

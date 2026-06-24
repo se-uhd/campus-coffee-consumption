@@ -30,35 +30,56 @@ class BootstrapAdminLoader(
 
     /** Creates the bootstrap admin unless its credentials are absent or an admin already exists. */
     fun createBootstrapAdmin() {
-        val loginName = bootstrapAdminProperties.loginName
-        val password = bootstrapAdminProperties.password
-        if (loginName.isNullOrBlank() || password.isNullOrBlank()) {
-            log.info { "Skipping the bootstrap admin: no bootstrap-admin credentials configured." }
-            return
-        }
-        if (userService.getAll().any { it.role == Role.ADMIN }) {
-            log.info { "Skipping the bootstrap admin: an admin already exists." }
-            return
-        }
-        val created =
-            userService.upsert(
-                User(
-                    loginName = loginName,
-                    emailAddress = bootstrapAdminProperties.emailAddress,
-                    firstName = bootstrapAdminProperties.firstName,
-                    lastName = bootstrapAdminProperties.lastName,
-                    role = Role.ADMIN,
-                    active = true,
-                    password = password
+        with(bootstrapAdminProperties) {
+            if (loginName.isNullOrBlank() && password.isNullOrBlank()) {
+                log.info { "Skipping the bootstrap admin: no bootstrap-admin credentials configured." }
+                return
+            }
+            if (userService.getAll().any { it.role == Role.ADMIN }) {
+                log.info { "Skipping the bootstrap admin: an admin already exists." }
+                return
+            }
+            // at least one credential is set, so require the whole profile (non-blank and long enough): a
+            // partial or blank configuration fails fast instead of creating an admin with empty credentials
+            val created =
+                userService.upsert(
+                    User(
+                        loginName = loginName.required("login-name", MIN_LOGIN_NAME_LENGTH),
+                        emailAddress = emailAddress.required("email-address"),
+                        firstName = firstName.required("first-name"),
+                        lastName = lastName.required("last-name"),
+                        role = Role.ADMIN,
+                        active = true,
+                        password = password.required("password", MIN_PASSWORD_LENGTH)
+                    )
                 )
-            )
-        coffeeConsumptionService.createForUser(created)
-        log.info { "Created the bootstrap admin '$loginName'." }
+            coffeeConsumptionService.createForUser(created)
+            log.info { "Created the bootstrap admin with id '${created.id}'." }
+        }
+    }
+
+    /**
+     * Returns this value when it is set, non-blank, and at least [minLength] characters; otherwise fails
+     * startup with a message naming the offending `campus-coffee.bootstrap-admin` key.
+     *
+     * @param key       the property key, for the error message
+     * @param minLength the minimum number of characters the value must have
+     */
+    private fun String?.required(
+        key: String,
+        minLength: Int = 1
+    ): String {
+        require(!isNullOrBlank() && length >= minLength) {
+            "campus-coffee.bootstrap-admin.$key must be set, non-blank, and at least $minLength character(s) " +
+                "when the bootstrap admin is configured."
+        }
+        return this
     }
 
     private companion object {
-        // runs after the fixture loader (200), so a seeded admin in dev makes this a no-op
         private const val ORDER = 300
+        private const val MIN_LOGIN_NAME_LENGTH = 3
+        private const val MIN_PASSWORD_LENGTH = 8
         private val log = KotlinLogging.logger {}
     }
 }

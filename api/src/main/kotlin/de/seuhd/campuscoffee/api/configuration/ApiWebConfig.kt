@@ -1,4 +1,4 @@
-package de.seuhd.campuscoffee.api.config
+package de.seuhd.campuscoffee.api.configuration
 
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.MediaType
@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets
  * declared once here instead of repeated on each `@RequestMapping`.
  */
 @Configuration
-class ApiPathConfig : WebMvcConfigurer {
+class ApiWebConfig : WebMvcConfigurer {
     override fun configurePathMatch(configurer: PathMatchConfigurer) {
         configurer.addPathPrefix(
             API_BASE_PATH,

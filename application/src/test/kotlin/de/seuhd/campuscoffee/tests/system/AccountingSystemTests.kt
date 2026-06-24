@@ -267,7 +267,7 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
-                        weightGrams = 1200,
+                        weightGrams = 800,
                         amountCents = 1000,
                         privateAmountCents = 700,
                         kittyAmountCents = 300,
