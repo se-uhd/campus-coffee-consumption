@@ -32,6 +32,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    fun `handleLoginPayloadException returns 400 with a fixed non-revealing message`() {
+        val request = ServletWebRequest(MockHttpServletRequest("POST", "/api/auth/token"))
+
+        val response = handler.handleLoginPayloadException(LoginPayloadException(RuntimeException("bad jwe")), request)
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.BAD_REQUEST)
+        // the client-facing message is fixed and never echoes the cause, so the 400 is not a decryption oracle
+        assertThat(response.body?.message).isEqualTo("Malformed login payload.")
+        assertThat(response.body?.path).isEqualTo("/api/auth/token")
+    }
+
+    @Test
     fun `handleMappedException maps a mapped exception and falls back to 500 for an unmapped one`() {
         val request = ServletWebRequest(MockHttpServletRequest("GET", "/api/users/1"))
 
