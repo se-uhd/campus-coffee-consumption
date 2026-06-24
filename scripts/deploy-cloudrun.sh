@@ -8,7 +8,8 @@
 #
 # compose-file defaults to compose.prod.yaml (the prod profile, real members, no seed data). Pass
 # compose.demo.yaml for the public demo (the prod,demo profiles: prod hardening + the fixture/demo seed data,
-# cleared and reseeded each boot); set MAX_INSTANCES=1 for it so the boot-time reset runs on one instance.
+# cleared and reseeded each boot); set MAX_INSTANCES=1 for it so the boot-time reset runs on one instance,
+# and MIN_INSTANCES=1 to keep that instance always warm (no cold start, no idle-wake reseed).
 #
 # One-time prerequisites:
 #   gcloud auth login
@@ -78,6 +79,14 @@ fi
 if [[ -n "${MAX_INSTANCES:-}" ]]; then
   echo "Capping ${service} at ${MAX_INSTANCES} instance(s)..."
   gcloud run services update "$service" --max-instances="$MAX_INSTANCES"
+fi
+
+# Optional warm floor. With the default min of 0 the service scales to zero when idle, so the next request
+# cold-starts (and, for the demo, reruns the boot-time reseed). Pass MIN_INSTANCES=1 to keep one instance
+# always warm (it bills continuously). For the demo, pair it with MAX_INSTANCES=1.
+if [[ -n "${MIN_INSTANCES:-}" ]]; then
+  echo "Keeping ${service} warm at a floor of ${MIN_INSTANCES} instance(s)..."
+  gcloud run services update "$service" --min-instances="$MIN_INSTANCES"
 fi
 
 echo "Service URL: ${url}"
