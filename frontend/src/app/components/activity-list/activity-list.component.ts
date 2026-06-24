@@ -1,7 +1,6 @@
 import { Component, computed, input, output, signal, ChangeDetectionStrategy } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -28,7 +27,6 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
   imports: [
     DatePipe,
     FormsModule,
-    MatListModule,
     MatIconModule,
     MatButtonModule,
     MatButtonToggleModule,
@@ -46,54 +44,54 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
         name="activityFilter"
       >
         <mat-button-toggle value="ALL">All</mat-button-toggle>
-        <mat-button-toggle value="COFFEES">Cups</mat-button-toggle>
-        <mat-button-toggle value="PURCHASES">Expenses</mat-button-toggle>
-        <mat-button-toggle value="PAYMENTS">Deposits</mat-button-toggle>
+        <mat-button-toggle value="COFFEES">Coffee</mat-button-toggle>
+        <mat-button-toggle value="PURCHASES">Expense</mat-button-toggle>
+        <mat-button-toggle value="PAYMENTS">Deposit</mat-button-toggle>
       </mat-button-toggle-group>
     }
 
-    <mat-list>
+    <ul class="cc-activity">
       @for (entry of visibleEntries(); track entry.id) {
-        <mat-list-item lines="3">
-          <mat-icon matListItemIcon>{{ iconFor(entry.type) }}</mat-icon>
-          <div matListItemTitle class="cc-activity-title">
-            <span>{{ labelFor(entry.type) }}</span>
-            @if (showsExpenseTotal(entry)) {
-              <!-- a member's split purchase: show the full purchase total, broken down in the footer -->
-              <span class="amount">+{{ expenseTotal(entry) }}</span>
-            } @else {
-              <span class="amount" [class.warn]="entry.amountCents < 0">
-                {{ signed(entry.amountCents) }}
-              </span>
-            }
-          </div>
-          <div matListItemLine class="muted">
-            {{ entry.createdAt | utcDate | date: 'short' }} · {{ entry.createdBy }}
-            @if (entry.note) {
-              · {{ entry.note }}
-            }
-          </div>
-          <div matListItemLine class="muted">
-            new balance {{ entry.runningBalanceCents | euros }}
-            @if (entry.count != null) {
-              · total {{ entry.count }} cups
-              @if (deltaLabel(entry); as dl) {
-                ({{ dl }})
+        <li class="cc-entry">
+          <mat-icon class="cc-entry-icon">{{ iconFor(entry.type) }}</mat-icon>
+          <div class="cc-entry-body">
+            <div class="cc-activity-title">
+              <span>{{ labelFor(entry.type) }}</span>
+              @if (showsExpenseTotal(entry)) {
+                <!-- a member's split purchase: show the full purchase total, broken down below -->
+                <span class="amount">+{{ expenseTotal(entry) }}</span>
+              } @else {
+                <span class="amount" [class.warn]="entry.amountCents < 0">{{ signed(entry.amountCents) }}</span>
               }
-            }
-            @if (entry.weightGrams != null) {
-              · {{ entry.weightGrams }} g
-            }
-            @if (hasKittySplit(entry)) {
-              · <mat-icon class="cc-split-glyph">person</mat-icon> {{ splitPrivate(entry) }} +
-              <mat-icon class="cc-split-glyph">savings</mat-icon> {{ splitKitty(entry) }}
-            }
+            </div>
+            <div class="muted">
+              {{ entry.createdAt | utcDate | date: 'short' }} · {{ entry.createdBy }}
+              @if (entry.note) {
+                · {{ entry.note }}
+              }
+            </div>
+            <div class="muted">
+              new balance {{ entry.runningBalanceCents | euros }}
+              @if (entry.count != null) {
+                · total {{ entry.count }} cups
+                @if (deltaLabel(entry); as dl) {
+                  ({{ dl }})
+                }
+              }
+              @if (entry.weightGrams != null) {
+                · {{ entry.weightGrams }} g
+              }
+              @if (hasKittySplit(entry)) {
+                · <mat-icon class="cc-split-glyph">person</mat-icon> {{ splitPrivate(entry) }} +
+                <mat-icon class="cc-split-glyph">savings</mat-icon> {{ splitKitty(entry) }}
+              }
+            </div>
           </div>
-        </mat-list-item>
+        </li>
       } @empty {
         <p class="muted">Nothing to show.</p>
       }
-    </mat-list>
+    </ul>
 
     @if (canLoadMore()) {
       <div class="cc-activity-more">
@@ -118,6 +116,37 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
 
       .cc-activity-filter .mat-button-toggle {
         flex: 1 1 0;
+      }
+
+      .cc-activity {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* A compact activity row: the type icon beside a tight stack of the title, the date/author, and the
+         running balance. The 8px block padding separates entries (16px between rows) while the small body
+         gap keeps one entry's three lines tight (Material's 3-line list item spread them across a fixed
+         88px height, which read as loose). */
+      .cc-entry {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 8px 0;
+      }
+
+      .cc-entry-icon {
+        flex: 0 0 auto;
+        margin-top: 2px;
+        color: var(--cc-ink-muted);
+      }
+
+      .cc-entry-body {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
       }
 
       .cc-activity-title {
@@ -206,7 +235,7 @@ export class ActivityListComponent {
       case 'CONSUMPTION':
         return 'Coffee cup';
       case 'CONSUMPTION_CANCEL':
-        return 'Coffee undone';
+        return 'Coffee cancelled';
       case 'PRIVATE_EXPENSE':
         return 'Expense';
       case 'KITTY_EXPENSE':

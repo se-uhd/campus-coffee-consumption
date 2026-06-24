@@ -124,10 +124,13 @@ a {
 // Layout: the 8dp spacing grid
 // ---------------------------------------------------------------------------
 
-// The member pages stay narrow and mobile-first (a wall QR sends them here on a phone). On a wide desktop
-// the column is centered on the sand fond so it reads as an intentional card column, not lost in a void.
+// One width for every page so the panels keep a consistent width as you navigate. The widest content is the
+// members table; 720px fits it at the width it needs with no column overflowing, and every other page (the
+// forms and the mobile-first member landing) uses the same width. On a narrow phone the page is full-width
+// (the max-width does not bind); on a wide desktop the column is centered so it reads as an intentional
+// card column, not lost in a void.
 .page {
-  max-width: 480px;
+  max-width: 740px;
   margin: 0 auto;
   padding: 24px 16px 48px;
   display: flex;
@@ -135,14 +138,9 @@ a {
   gap: 16px;
 }
 
-// The admin pages need more width, especially the members table. Same vertical rhythm, more width.
-.page--wide {
-  max-width: 920px;
-  padding: 24px 24px 48px;
-}
-
-// Cards: white surface, 16px padding, consistent radius and a soft elevation. The 16px `gap` on `.page`
-// owns the vertical rhythm between cards, so cards carry no bottom margin of their own.
+// Cards: white surface, a soft elevation, and 16px vertical / 24px horizontal padding so the content has
+// breathing room from the side edges. The 16px `gap` on `.page` owns the vertical rhythm between cards, so
+// cards carry no bottom margin of their own.
 .card,
 mat-card.card {
   background: var(--cc-surface);
@@ -150,7 +148,7 @@ mat-card.card {
   box-shadow:
     0 1px 2px rgb(var(--cc-shadow-rgb), 0.06),
     0 2px 8px rgb(var(--cc-shadow-rgb), 0.06);
-  padding: 16px;
+  padding: 16px 24px;
   margin: 0;
 }
 
@@ -188,11 +186,11 @@ mat-card.card .mat-mdc-card-content:last-child {
 }
 
 // Field rhythm is the single source of truth (not Material's incidental subscript margin): every form field
-// inside a card is a block with a consistent 16px gap to the next element, so stacked inputs sit on the grid.
+// inside a card is a block with a consistent 12px gap to the next element, so stacked inputs sit on the grid.
 .card mat-form-field,
 mat-card.card mat-form-field {
   display: block;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 // A field that is the last child of a card (or shares a wrapping `.form-row`, which owns its own gap) needs
@@ -202,6 +200,27 @@ mat-card.card mat-form-field:last-child,
 .card .form-row mat-form-field,
 mat-card.card .form-row mat-form-field {
   margin-bottom: 0;
+}
+
+// A `.form-row` groups fields side by side and owns the horizontal gap between them; as a block it carries
+// the same vertical rhythm to the next element as a standalone field (its inner fields are zeroed above).
+.card .form-row,
+mat-card.card .form-row {
+  margin-bottom: 12px;
+}
+
+.card .form-row:last-child,
+mat-card.card .form-row:last-child {
+  margin-bottom: 0;
+}
+
+// A panel header that pairs the heading with an action sits in a `.row` (which zeroes the h2 margin). Give
+// that header row the same 16px gap to the first element as a plain `.card h2`, so the heading-to-content
+// rhythm is uniform whether or not the heading carries an action. Skip it when the row is the only child
+// (a collapsed card), so a collapsed body adds no trailing gap.
+.card .row:has(> h2):not(:last-child),
+mat-card.card .row:has(> h2):not(:last-child) {
+  margin-bottom: 16px;
 }
 
 // ---------------------------------------------------------------------------
@@ -344,10 +363,13 @@ table.mat-mdc-table {
   background: transparent;
 }
 
-// Comfortable, readable row height and aligned cells.
+// Comfortable, readable row height and aligned cells; center cell content vertically so a single-line cell
+// (the role chip, the action buttons) sits in the middle of a taller two-line row (the name column) rather
+// than riding the baseline.
 .mat-mdc-header-cell,
 .mat-mdc-cell {
   padding: 12px 16px;
+  vertical-align: middle;
 }
 
 .mat-mdc-header-cell {

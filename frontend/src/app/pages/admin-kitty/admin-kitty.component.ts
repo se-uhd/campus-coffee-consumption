@@ -52,7 +52,7 @@ const PAGE_SIZE = 20;
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
-    <div class="page page--wide">
+    <div class="page">
       @if (loadError) {
         <mat-card class="card">
           <p class="warn">{{ loadError }}</p>
@@ -93,7 +93,6 @@ const PAGE_SIZE = 20;
                 ccEuroAmount
                 required
               />
-              <mat-hint>Use a comma or a point, e.g. 5,00 or 5.00.</mat-hint>
               @if (depositModel.touched && depositError()) {
                 <mat-error>{{ depositError() }}</mat-error>
               }
@@ -137,9 +136,7 @@ const PAGE_SIZE = 20;
           expandTooltip="Adjust the kitty directly"
           collapseTooltip="Hide the adjustment form"
         >
-          <p class="muted">
-            A positive amount adds money to the kitty; a negative amount removes it. Zero is not allowed.
-          </p>
+          <p class="muted">A positive amount adds money to the kitty; a negative amount removes it.</p>
           <form #adjustForm="ngForm">
             <mat-form-field class="full-width">
               <mat-label>Amount (€, may be negative)</mat-label>
@@ -153,7 +150,6 @@ const PAGE_SIZE = 20;
                 ccEuroAmount="allow-negative"
                 required
               />
-              <mat-hint>Use a comma or a point, e.g. 5,00 or 5.00 (zero is not allowed).</mat-hint>
               @if (adjustmentModel.touched && adjustmentError()) {
                 <mat-error>{{ adjustmentError() }}</mat-error>
               }

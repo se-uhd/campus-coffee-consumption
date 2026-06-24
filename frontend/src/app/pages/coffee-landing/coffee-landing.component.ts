@@ -104,13 +104,13 @@ const ACTIVITY_PAGE_SIZE = 10;
               <mat-icon>add</mat-icon>
             }
           </button>
-          <div extra class="cc-undo">
-            @if (s?.cancellable) {
+          @if (s?.cancellable) {
+            <div extra class="cc-undo">
               <button mat-stroked-button (click)="undo()" [disabled]="busy">
                 <mat-icon>undo</mat-icon> Undo last cup
               </button>
-            }
-          </div>
+            </div>
+          }
         </cc-balance-summary>
 
         <cc-collapsible-card
@@ -121,11 +121,8 @@ const ACTIVITY_PAGE_SIZE = 10;
           collapseTooltip="Hide the expense form"
         >
           <p class="muted cc-expense-intro">
-            Bought coffee beans for the group? Record it here. The full amount counts as your contribution and
-            credits your balance.
-          </p>
-          <p class="muted">
-            Only an admin can correct or delete an expense, or record a kitty-funded expense.
+            Bought coffee beans for the group? Record it here; the full amount credits your balance. Only an
+            admin can correct or delete a purchase, or record a kitty-funded one.
           </p>
           <form #expenseForm="ngForm">
             <mat-form-field class="full-width">
@@ -141,7 +138,7 @@ const ACTIVITY_PAGE_SIZE = 10;
                 required
               />
               @if (weightModel.invalid && weightModel.touched) {
-                <mat-error>Enter the weight as a whole number of grams.</mat-error>
+                <mat-error>Enter the weight in whole grams.</mat-error>
               }
             </mat-form-field>
             <mat-form-field class="full-width">
@@ -156,7 +153,6 @@ const ACTIVITY_PAGE_SIZE = 10;
                 ccEuroAmount
                 required
               />
-              <mat-hint>Use a comma or a point, e.g. 4,20 or 4.20.</mat-hint>
               @if (amountModel.touched && amountError()) {
                 <mat-error>{{ amountError() }}</mat-error>
               }

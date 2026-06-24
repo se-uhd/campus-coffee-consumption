@@ -165,7 +165,7 @@ const ACTIVITY_PAGE_SIZE = 10;
           <div extra>
             @if (editMode) {
               <p class="muted cc-edit-hint">
-                Set the member's coffee count to an exact total (an absolute correction).
+                Set the member's total coffee count.
               </p>
               <form #correctionForm="ngForm" class="form-row cc-edit-total">
                 <mat-form-field>
