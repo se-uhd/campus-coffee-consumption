@@ -6,10 +6,8 @@
 #   DB_PASSWORD=... scripts/deploy-cloudrun.sh [compose-file]   # first deploy (DB_PASSWORD = Cloud SQL password)
 #   scripts/deploy-cloudrun.sh [compose-file]                   # later deploys (reuses deploy.env)
 #
-# compose-file defaults to compose.prod.yaml (the prod profile, real members, no seed data). Pass
-# compose.demo.yaml for the public demo (the prod,demo profiles: prod hardening + the fixture/demo seed data,
-# cleared and reseeded each boot); set MAX_INSTANCES=1 for it so the boot-time reset runs on one instance,
-# and MIN_INSTANCES=1 to keep that instance always warm (no cold start, no idle-wake reseed).
+# compose-file defaults to compose.prod.yaml (the prod profile, real members, no seed data). The service
+# scales to zero when idle; the startup CPU boost (below) shortens the resulting cold start.
 #
 # One-time prerequisites:
 #   gcloud auth login
@@ -31,7 +29,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# The compose file selects the deployment: compose.prod.yaml (default) or compose.demo.yaml. The Cloud Run
+# The compose file selects the deployment (compose.prod.yaml by default). The Cloud Run
 # service name is the Compose project `name:`.
 compose="${1:-compose.prod.yaml}"
 [ -f "$compose" ] || { echo "compose file not found: $compose" >&2; exit 1; }
@@ -74,23 +72,8 @@ if grep -q 'CAMPUS_COFFEE_APP_BASE_URL=https://pending.invalid' deploy.env; then
   gcloud beta run compose up "$compose" --allow-unauthenticated
 fi
 
-# Optional single-instance cap. The demo resets the database on boot, so it must run exactly one instance
-# (two instances resetting at once would race); pass MAX_INSTANCES=1 for it.
-if [[ -n "${MAX_INSTANCES:-}" ]]; then
-  echo "Capping ${service} at ${MAX_INSTANCES} instance(s)..."
-  gcloud run services update "$service" --max-instances="$MAX_INSTANCES"
-fi
-
-# Optional warm floor. With the default min of 0 the service scales to zero when idle, so the next request
-# cold-starts (and, for the demo, reruns the boot-time reseed). Pass MIN_INSTANCES=1 to keep one instance
-# always warm (it bills continuously). For the demo, pair it with MAX_INSTANCES=1.
-if [[ -n "${MIN_INSTANCES:-}" ]]; then
-  echo "Keeping ${service} warm at a floor of ${MIN_INSTANCES} instance(s)..."
-  gcloud run services update "$service" --min-instances="$MIN_INSTANCES"
-fi
-
-# Startup CPU boost: extra CPU during container startup so the JVM and the Spring context boot faster, which
-# shortens a scale-to-zero cold start. Not separately billed and harmless when the instance is kept warm.
+# Startup CPU boost: extra CPU during container startup so the JVM and the Spring context boot faster,
+# shortening the scale-to-zero cold start. Not separately billed.
 echo "Enabling startup CPU boost on ${service}..."
 gcloud run services update "$service" --cpu-boost
 

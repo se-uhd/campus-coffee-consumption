@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * deployment is reachable without fixtures (which are off in prod).
  *
  * The fields are nullable and the class carries no defaults: a field is null when its key is absent (so in
- * dev and demo, where the block is not set, the bootstrap is off). The values live in `application.yaml`
+ * dev, where the block is not set, the bootstrap is off). The values live in `application.yaml`
  * (the prod block). [de.seuhd.campuscoffee.BootstrapAdminLoader] rejects a blank or too-short value, so a
  * partial or blank configuration fails fast rather than creating an admin with empty credentials.
  *

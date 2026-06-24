@@ -9,13 +9,13 @@ import org.springframework.context.annotation.Profile
  * from [AppProperties.baseUrl], so an internet-facing deployment must point that base at a real https origin:
  * a missing value (the deploy forgot to set `CAMPUS_COFFEE_APP_BASE_URL`) or a plain-http/localhost value
  * would print dead or token-leaking links on the wall QR codes. This mirrors the fail-fast that
- * `JwtProperties` does for the signing secret. It is `@Profile("prod", "demo")` (the two internet-facing
- * profiles), so local dev and the tests (which use `http://localhost:8080`) are unaffected.
+ * `JwtProperties` does for the signing secret. It is `@Profile("prod")`, so local dev and the tests (which
+ * use `http://localhost:8080`) are unaffected.
  *
  * @property appProperties the application URL properties whose base URL is validated
  */
 @Configuration
-@Profile("prod", "demo")
+@Profile("prod")
 class PublicBaseUrlGuard(
     private val appProperties: AppProperties
 ) {
