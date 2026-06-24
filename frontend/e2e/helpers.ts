@@ -68,7 +68,8 @@ async function encryptCredentials(
   ).toBeTruthy();
   const jwk = (await keyResponse.json()) as { n: string; e: string; kid: string };
   const publicKey = await importJWK({ ...jwk, kty: 'RSA', alg: 'RSA-OAEP-256' }, 'RSA-OAEP-256');
-  const plaintext = new TextEncoder().encode(JSON.stringify({ loginName, password }));
+  // include a fresh `iat` so the backend's replay-freshness check accepts the payload (mirrors the SPA)
+  const plaintext = new TextEncoder().encode(JSON.stringify({ loginName, password, iat: Date.now() }));
   return new CompactEncrypt(plaintext)
     .setProtectedHeader({ alg: 'RSA-OAEP-256', enc: 'A256GCM', kid: jwk.kid })
     .encrypt(publicKey);

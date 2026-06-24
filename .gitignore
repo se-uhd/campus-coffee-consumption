@@ -92,3 +92,7 @@ ai-slop-report.md
 # Cloud Run deploy secrets (local, never committed)
 deploy*.env
 .env
+
+# Temporary working plan (local, never committed)
+/PROD_DEPLOY_PLAN.md
+/RELEASE_PLAN.md
