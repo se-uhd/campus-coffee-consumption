@@ -1,14 +1,14 @@
 package de.seuhd.campuscoffee.tests.system
 
+import de.seuhd.campuscoffee.api.dtos.ActivityEntryDto
 import de.seuhd.campuscoffee.api.dtos.AdjustmentRequestDto
 import de.seuhd.campuscoffee.api.dtos.AdminExpenseDto
 import de.seuhd.campuscoffee.api.dtos.ConsumptionOverrideDto
+import de.seuhd.campuscoffee.api.dtos.DepositRequestDto
 import de.seuhd.campuscoffee.api.dtos.ExpenseDto
 import de.seuhd.campuscoffee.api.dtos.KittyDto
-import de.seuhd.campuscoffee.api.dtos.LedgerEntryDto
-import de.seuhd.campuscoffee.api.dtos.MemberSummaryDto
-import de.seuhd.campuscoffee.api.dtos.SettlementRequestDto
-import de.seuhd.campuscoffee.domain.model.LedgerEntryType
+import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
+import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
@@ -23,11 +23,11 @@ import org.springframework.test.web.servlet.client.returnResult
 import java.util.UUID
 
 /**
- * System tests for the ledger and kitty projections under correction and deletion: an admin correcting and
- * deleting an expense, a settlement and a kitty adjustment, and an admin count override. These exercise the
- * UPDATE/DELETE and admin-override branches of the member and kitty ledger walks.
+ * System tests for the activity and kitty projections under correction and deletion: an admin correcting and
+ * deleting an expense, a deposit and a kitty adjustment, and an admin count override. These exercise the
+ * UPDATE/DELETE and admin-override branches of the member-activity and kitty-history walks.
  */
-class AccountingLedgerSystemTests : AbstractSystemTest() {
+class AccountingActivitySystemTests : AbstractSystemTest() {
     private val member = "maxmustermann"
 
     private fun memberId(): UUID = seededUser(member).persistedId
@@ -63,14 +63,14 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
             .withAdmin()
             .exchange()
 
-    private fun memberSummary(): MemberSummaryDto =
+    private fun userSummary(): UserSummaryDto =
         client()
             .get()
             .uri("/api/summary")
             .accept(MediaType.APPLICATION_JSON)
             .withMember(member)
             .exchange()
-            .returnResult<MemberSummaryDto>()
+            .returnResult<UserSummaryDto>()
             .responseBody!!
 
     private fun kitty(): KittyDto =
@@ -83,25 +83,25 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
             .returnResult<KittyDto>()
             .responseBody!!
 
-    private fun adminMemberLedger(): List<LedgerEntryDto> =
+    private fun adminUserActivity(): List<ActivityEntryDto> =
         client()
             .get()
             .uri("/api/users/{id}/activity", memberId())
             .accept(MediaType.APPLICATION_JSON)
             .withAdmin()
             .exchange()
-            .returnResult<Array<LedgerEntryDto>>()
+            .returnResult<Array<ActivityEntryDto>>()
             .responseBody!!
             .toList()
 
-    private fun ownMemberLedger(): List<LedgerEntryDto> =
+    private fun ownUserActivity(): List<ActivityEntryDto> =
         client()
             .get()
             .uri("/api/activity")
             .accept(MediaType.APPLICATION_JSON)
             .withMember(member)
             .exchange()
-            .returnResult<Array<LedgerEntryDto>>()
+            .returnResult<Array<ActivityEntryDto>>()
             .responseBody!!
             .toList()
 
@@ -128,7 +128,7 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
                 .post()
                 .uri("/api/kitty/deposit")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(SettlementRequestDto(userId = null, amountCents = 500, note = null))
+                .body(DepositRequestDto(userId = null, amountCents = 500, note = null))
                 .withAdmin()
                 .exchange()
                 .statusCode()
@@ -143,7 +143,7 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
                 .post()
                 .uri("/api/kitty/deposit")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(SettlementRequestDto(userId = memberId(), amountCents = amountCents, note = null))
+                .body(DepositRequestDto(userId = memberId(), amountCents = amountCents, note = null))
                 .withAdmin()
                 .exchange()
                 .statusCode()
@@ -174,7 +174,7 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
                 .returnResult<ExpenseDto>()
                 .responseBody!!
                 .id
-        assertThat(memberSummary().balanceCents).isEqualTo(400)
+        assertThat(userSummary().balanceCents).isEqualTo(400)
 
         // correct it to a larger private portion: 1000 = 700 private + 300 kitty
         client()
@@ -193,7 +193,7 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
             .exchange()
 
         // the member's balance reflects the corrected private portion (the full state, not a double count)
-        assertThat(memberSummary().balanceCents).isEqualTo(700)
+        assertThat(userSummary().balanceCents).isEqualTo(700)
         // the kitty reflects the corrected kitty portion (1000 float - 300, not - 500)
         assertThat(kitty().balanceCents).isEqualTo(700)
     }
@@ -208,7 +208,7 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
                 .returnResult<ExpenseDto>()
                 .responseBody!!
                 .id
-        assertThat(memberSummary().balanceCents).isEqualTo(400)
+        assertThat(userSummary().balanceCents).isEqualTo(400)
         // the float (1000) minus the kitty-funded portion (500)
         assertThat(kitty().balanceCents).isEqualTo(500)
 
@@ -221,24 +221,24 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
                 .statusCode()
         assertThat(deleteStatus).isEqualTo(204)
 
-        // the DELETE event carries the buyer id, so both the member ledger and the kitty reverse it:
+        // the DELETE event carries the buyer id, so both the member activity and the kitty reverse it:
         // the member balance returns to 0 and the kitty returns to the float (1000)
-        assertThat(memberSummary().balanceCents).isEqualTo(0)
+        assertThat(userSummary().balanceCents).isEqualTo(0)
         assertThat(kitty().balanceCents).isEqualTo(1000)
     }
 
     @Test
-    fun `a settlement appears on the member ledger as a SETTLEMENT entry`() {
+    fun `a deposit appears on the member activity as a DEPOSIT entry`() {
         client()
             .post()
             .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(SettlementRequestDto(userId = memberId(), amountCents = 1000, note = "paid"))
+            .body(DepositRequestDto(userId = memberId(), amountCents = 1000, note = "paid"))
             .withAdmin()
             .exchange()
 
-        val ledger = adminMemberLedger()
-        assertThat(ledger.filter { it.type == LedgerEntryType.SETTLEMENT }.map { it.amountCents })
+        val activity = adminUserActivity()
+        assertThat(activity.filter { it.type == ActivityEntryType.DEPOSIT }.map { it.amountCents })
             .containsExactly(1000)
     }
 
@@ -260,11 +260,11 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
             .exchange()
 
         assertThat(kitty().balanceCents).isEqualTo(750)
-        assertThat(kitty().entries.map { it.type }).contains(LedgerEntryType.KITTY_ADJUSTMENT)
+        assertThat(kitty().entries.map { it.type }).contains(ActivityEntryType.KITTY_ADJUSTMENT)
     }
 
     @Test
-    fun `an admin count override is valued as a lump on the member ledger`() {
+    fun `an admin count override is valued as a lump on the member activity`() {
         // the price is the seeded 50; an admin sets the count to 3 in one step -> a -150 lump
         client()
             .put()
@@ -274,19 +274,19 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
             .withAdmin()
             .exchange()
 
-        val summary = memberSummary()
+        val summary = userSummary()
         assertThat(summary.count).isEqualTo(3)
         assertThat(summary.balanceCents).isEqualTo(-150)
-        assertThat(summary.ledger.first { it.type == LedgerEntryType.CONSUMPTION }.amountCents).isEqualTo(-150)
+        assertThat(summary.activity.first { it.type == ActivityEntryType.CONSUMPTION }.amountCents).isEqualTo(-150)
     }
 
     @Test
-    fun `a member buys then an admin attributes a split purchase building the full ledger`() {
+    fun `a member buys then an admin attributes a split purchase building the full activity`() {
         // fund the kitty so the admin split purchase's kitty-funded portion (500) stays non-negative;
         // a pure kitty adjustment has no member, so the member balance assertion below is unaffected
         fundKitty(1000)
 
-        // a member's own purchase (100% private), an admin split purchase, a coffee, and a settlement
+        // a member's own purchase (100% private), an admin split purchase, a coffee, and a deposit
         client()
             .post()
             .uri("/api/expenses")
@@ -304,50 +304,50 @@ class AccountingLedgerSystemTests : AbstractSystemTest() {
             .post()
             .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(SettlementRequestDto(userId = memberId(), amountCents = 1000, note = null))
+            .body(DepositRequestDto(userId = memberId(), amountCents = 1000, note = null))
             .withAdmin()
             .exchange()
 
         // 300 + 400 - 50 + 1000 = 1650
-        assertThat(memberSummary().balanceCents).isEqualTo(1650)
-        val types = adminMemberLedger().map { it.type }.toSet()
+        assertThat(userSummary().balanceCents).isEqualTo(1650)
+        val types = adminUserActivity().map { it.type }.toSet()
         assertThat(types).contains(
-            LedgerEntryType.PRIVATE_EXPENSE,
-            LedgerEntryType.CONSUMPTION,
-            LedgerEntryType.SETTLEMENT
+            ActivityEntryType.PRIVATE_EXPENSE,
+            ActivityEntryType.CONSUMPTION,
+            ActivityEntryType.DEPOSIT
         )
     }
 
     @Test
-    fun `an admin sees the kitty split on a member's expense but the member's own ledger does not`() {
+    fun `an admin sees the kitty split on a member's expense but the member's own activity does not`() {
         // fund the kitty so the split purchase's kitty-funded portion (500) stays non-negative
         fundKitty(1000)
         // an admin records a split bean purchase on the member: 900 = 400 private + 500 kitty
         adminExpense(amountCents = 900, privateAmountCents = 400, kittyAmountCents = 500)
 
-        // the admin-by-id ledger breaks the split out: the private portion is the balance effect, and both
+        // the admin-by-id activity breaks the split out: the private portion is the balance effect, and both
         // portions are carried alongside on the PRIVATE_EXPENSE entry
-        val adminEntry = adminMemberLedger().first { it.type == LedgerEntryType.PRIVATE_EXPENSE }
+        val adminEntry = adminUserActivity().first { it.type == ActivityEntryType.PRIVATE_EXPENSE }
         assertThat(adminEntry.amountCents).isEqualTo(400)
         assertThat(adminEntry.privateAmountCents).isEqualTo(400)
         assertThat(adminEntry.kittyAmountCents).isEqualTo(500)
 
-        // the admin kitty ledger's KITTY_EXPENSE entry carries the same split breakdown (so the kitty history
+        // the admin kitty history's KITTY_EXPENSE entry carries the same split breakdown (so the kitty history
         // can render the identical `private + kitty` footer); its own effect is the negative kitty draw
-        val kittyEntry = kitty().entries.first { it.type == LedgerEntryType.KITTY_EXPENSE }
+        val kittyEntry = kitty().entries.first { it.type == ActivityEntryType.KITTY_EXPENSE }
         assertThat(kittyEntry.amountCents).isEqualTo(-500)
         assertThat(kittyEntry.privateAmountCents).isEqualTo(400)
         assertThat(kittyEntry.kittyAmountCents).isEqualTo(500)
 
-        // the SAME member's own ledger never exposes the kitty split (it is admin-only): the entry is still
+        // the SAME member's own activity never exposes the kitty split (it is admin-only): the entry is still
         // there with the private amount, but both split portions are null
-        val ownEntry = ownMemberLedger().first { it.type == LedgerEntryType.PRIVATE_EXPENSE }
+        val ownEntry = ownUserActivity().first { it.type == ActivityEntryType.PRIVATE_EXPENSE }
         assertThat(ownEntry.amountCents).isEqualTo(400)
         assertThat(ownEntry.privateAmountCents).isNull()
         assertThat(ownEntry.kittyAmountCents).isNull()
 
-        // and the member's summary ledger (the landing-page view) likewise strips it
-        val summaryEntry = memberSummary().ledger.first { it.type == LedgerEntryType.PRIVATE_EXPENSE }
+        // and the member's summary activity (the landing-page view) likewise strips it
+        val summaryEntry = userSummary().activity.first { it.type == ActivityEntryType.PRIVATE_EXPENSE }
         assertThat(summaryEntry.privateAmountCents).isNull()
         assertThat(summaryEntry.kittyAmountCents).isNull()
     }

@@ -7,11 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
-import { ActivityEntryDto } from './activityEntryDto';
 
 
-export interface KittyDto { 
-    balanceCents: number;
-    entries: Array<ActivityEntryDto>;
+export interface OwnExpenseDto { 
+    weightGrams: number;
+    amountCents: number;
+    note?: string | null;
 }
 

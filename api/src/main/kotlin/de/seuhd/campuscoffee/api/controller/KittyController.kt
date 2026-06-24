@@ -1,9 +1,9 @@
 package de.seuhd.campuscoffee.api.controller
 
 import de.seuhd.campuscoffee.api.dtos.AdjustmentRequestDto
+import de.seuhd.campuscoffee.api.dtos.DepositRequestDto
 import de.seuhd.campuscoffee.api.dtos.KittyDto
 import de.seuhd.campuscoffee.api.dtos.PaymentDto
-import de.seuhd.campuscoffee.api.dtos.SettlementRequestDto
 import de.seuhd.campuscoffee.api.mapper.AccountingDtoMapper
 import de.seuhd.campuscoffee.api.mapper.PaymentDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
@@ -51,7 +51,7 @@ class KittyController(
         @Valid @ParameterObject page: PageQuery
     ): ResponseEntity<KittyDto> {
         val admin = currentUserProvider.currentUser()
-        val entries = accountingService.kittyLedger(page.limitOr(HISTORY_LIMIT), page.offset, admin)
+        val entries = accountingService.kittyHistory(page.limitOr(HISTORY_LIMIT), page.offset, admin)
         return ResponseEntity.ok(accountingDtoMapper.toKittyDto(accountingService.kittyBalanceCents(), entries))
     }
 
@@ -65,11 +65,11 @@ class KittyController(
     @ResponseBody
     @PostMapping("/deposit")
     fun deposit(
-        @RequestBody @Valid dto: SettlementRequestDto
+        @RequestBody @Valid dto: DepositRequestDto
     ): PaymentDto {
         val admin = currentUserProvider.currentUser()
         val payment =
-            paymentService.recordSettlement(
+            paymentService.recordDeposit(
                 requireNotNull(dto.userId),
                 requireNotNull(dto.amountCents),
                 dto.note,

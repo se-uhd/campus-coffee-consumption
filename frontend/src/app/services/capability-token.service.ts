@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 
 /**
  * Holds the member's capability token read from the active `/login/:token` route, so the HTTP interceptor
- * can attach it as the `X-Coffee-Token` header on member API calls. The token only ever appears in the SPA
+ * can attach it as the `X-Capability-Token` header on member API calls. The token only ever appears in the SPA
  * route, never in an API path.
  */
 @Injectable({ providedIn: 'root' })

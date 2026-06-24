@@ -5,8 +5,37 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2026-06-23
 
+This release renames the API and code vocabulary to the words the UI and endpoints already use. It is a
+**breaking API change**: the bundled SPA, the committed OpenAPI spec, and the docs all move in lockstep.
+
+- **Breaking: the kitty "settlement" is now a "deposit".** The request body `SettlementRequestDto` is renamed
+  `DepositRequestDto` and `PaymentService.recordSettlement` becomes `recordDeposit`. The persisted entity
+  stays `Payment`, and the `POST /api/kitty/deposit` endpoint is unchanged.
+- **Breaking: the unified "ledger" becomes the member's "activity" feed, and the kitty's becomes its
+  "history".** `LedgerEntry`/`LedgerEntryType` become `ActivityEntry`/`ActivityEntryType` (the `SETTLEMENT`
+  value becomes `DEPOSIT`), `LedgerEntryDto` becomes `ActivityEntryDto`, `LedgerDataService` becomes
+  `ActivityDataService`, `AccountingService.kittyLedger()` becomes `kittyHistory()`, and the
+  `MemberSummaryDto.ledger` field becomes `activity`. The `/api/activity` and `/api/kitty/history` endpoints
+  are unchanged.
+- **Breaking: the read-side "Member" types become "User" types.** `MemberSummaryDto`/`MemberBalanceDto`
+  become `UserSummaryDto`/`UserBalanceDto`, `MemberExpenseDto` becomes `OwnExpenseDto`, the member
+  self-service controller becomes `SelfServiceController`, and `AccountingService.memberSummary`/`memberLedger`
+  become `userSummary`/`userActivity`. The persisted entity was already `User`; the SPA keeps "member" in its
+  UI copy.
+- **Breaking: the member capability header is renamed `X-Coffee-Token` to `X-Capability-Token`** (and the
+  `COFFEE_TOKEN_HEADER` constant to `CAPABILITY_TOKEN_HEADER`), matching the capability-token and
+  capability-URL vocabulary. The capability-token filter, the SPA HTTP interceptor, the tests, and the docs
+  move together.
+- Two small review cleanups land alongside the renames: a redundant clear-order comment is dropped from the
+  Cucumber test config (the ordering is already explained in `EventsToDataRunner`'s KDoc), and the
+  deactivation check in `CurrentUserProvider`/`DomainUserDetailsService` is unified on `active != true` to
+  match the domain services.
+- Guard tests pin the Actuator authorization contract: `/actuator/health` stays anonymously reachable (200),
+  while every other actuator path is refused to anonymous callers (401) and to members (403). Together they
+  fail loudly if the security matcher order ever regresses (the SPA `GET /** -> permitAll` slipping ahead of
+  the `/actuator/** -> ADMIN` rule), which would otherwise expose actuator endpoints anonymously.
 - Log messages identify an entity consistently by its **id, in single quotes**, never by a login name. A
   login name is PII; the id is the canonical, privacy-preserving key. The `UserServiceImpl.describe` /
   `describeId` overrides that appended the user's login name to the create/update/delete audit log are
@@ -453,6 +482,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.4.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.4.0
 [0.3.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.3.1
 [0.3.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.3.0
 [0.2.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.2.0

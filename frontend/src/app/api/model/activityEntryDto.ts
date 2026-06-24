@@ -9,8 +9,8 @@
  */
 
 
-export interface LedgerEntryDto { 
-    type: LedgerEntryDto.TypeEnum;
+export interface ActivityEntryDto { 
+    type: ActivityEntryDto.TypeEnum;
     id: string;
     createdAt: string;
     createdBy: string;
@@ -23,12 +23,12 @@ export interface LedgerEntryDto {
     privateAmountCents?: number | null;
     kittyAmountCents?: number | null;
 }
-export namespace LedgerEntryDto {
+export namespace ActivityEntryDto {
     export const TypeEnum = {
         Consumption: 'CONSUMPTION',
         ConsumptionCancel: 'CONSUMPTION_CANCEL',
         PrivateExpense: 'PRIVATE_EXPENSE',
-        Settlement: 'SETTLEMENT',
+        Deposit: 'DEPOSIT',
         KittyExpense: 'KITTY_EXPENSE',
         KittyAdjustment: 'KITTY_ADJUSTMENT'
     } as const;

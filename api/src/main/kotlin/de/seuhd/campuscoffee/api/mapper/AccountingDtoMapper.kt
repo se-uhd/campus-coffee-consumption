@@ -1,45 +1,45 @@
 package de.seuhd.campuscoffee.api.mapper
 
+import de.seuhd.campuscoffee.api.dtos.ActivityEntryDto
 import de.seuhd.campuscoffee.api.dtos.KittyDto
-import de.seuhd.campuscoffee.api.dtos.LedgerEntryDto
-import de.seuhd.campuscoffee.api.dtos.MemberBalanceDto
-import de.seuhd.campuscoffee.api.dtos.MemberSummaryDto
 import de.seuhd.campuscoffee.api.dtos.PriceChangeDto
-import de.seuhd.campuscoffee.domain.model.LedgerEntry
-import de.seuhd.campuscoffee.domain.model.MemberBalance
-import de.seuhd.campuscoffee.domain.model.MemberSummary
+import de.seuhd.campuscoffee.api.dtos.UserBalanceDto
+import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
+import de.seuhd.campuscoffee.domain.model.ActivityEntry
 import de.seuhd.campuscoffee.domain.model.PriceChange
+import de.seuhd.campuscoffee.domain.model.UserBalance
+import de.seuhd.campuscoffee.domain.model.UserSummary
 import de.seuhd.campuscoffee.domain.model.persistedId
 import org.mapstruct.Mapper
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 
 /**
  * MapStruct mapper assembling the read-side money response DTOs from the domain (one-way, domain to DTO):
- * ledger entries, a member's summary, the price history, the kitty, and the balance overview.
+ * activity entries, a member's summary, the price history, the kitty, and the balance overview.
  */
 @Mapper(componentModel = "spring")
 @ConditionalOnMissingBean // prevent IntelliJ warning about duplicate beans
 interface AccountingDtoMapper {
     /**
-     * Maps a single ledger entry to its response DTO.
+     * Maps a single activity entry to its response DTO.
      *
-     * @param entry the ledger entry to map
+     * @param entry the activity entry to map
      */
-    fun toEntryDto(entry: LedgerEntry): LedgerEntryDto
+    fun toEntryDto(entry: ActivityEntry): ActivityEntryDto
 
     /**
-     * Maps a page of ledger entries to their response DTOs.
+     * Maps a page of activity entries to their response DTOs.
      *
-     * @param entries the ledger entries to map
+     * @param entries the activity entries to map
      */
-    fun toEntryDtos(entries: List<LedgerEntry>): List<LedgerEntryDto>
+    fun toEntryDtos(entries: List<ActivityEntry>): List<ActivityEntryDto>
 
     /**
      * Maps a member summary to its response DTO.
      *
      * @param summary the member summary to map
      */
-    fun toSummaryDto(summary: MemberSummary): MemberSummaryDto
+    fun toSummaryDto(summary: UserSummary): UserSummaryDto
 
     /**
      * Maps one price-history entry to its response DTO.
@@ -63,7 +63,7 @@ interface AccountingDtoMapper {
      */
     fun toKittyDto(
         balanceCents: Long,
-        entries: List<LedgerEntry>
+        entries: List<ActivityEntry>
     ): KittyDto = KittyDto(balanceCents, toEntryDtos(entries))
 
     /**
@@ -71,8 +71,8 @@ interface AccountingDtoMapper {
      *
      * @param balance the member balance to map
      */
-    fun toBalanceDto(balance: MemberBalance): MemberBalanceDto =
-        MemberBalanceDto(
+    fun toBalanceDto(balance: UserBalance): UserBalanceDto =
+        UserBalanceDto(
             userId = balance.user.persistedId,
             loginName = balance.user.loginName,
             firstName = balance.user.firstName,
@@ -86,5 +86,5 @@ interface AccountingDtoMapper {
      *
      * @param balances the member balances to map
      */
-    fun toBalanceDtos(balances: List<MemberBalance>): List<MemberBalanceDto> = balances.map { toBalanceDto(it) }
+    fun toBalanceDtos(balances: List<UserBalance>): List<UserBalanceDto> = balances.map { toBalanceDto(it) }
 }

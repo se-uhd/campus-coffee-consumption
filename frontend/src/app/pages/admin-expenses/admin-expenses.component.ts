@@ -365,7 +365,7 @@ export class AdminExpensesComponent implements OnInit {
     this.cancelEdit();
     // unlike `reload()`, this post-navigation load runs outside a try/catch boundary (the queryParamMap
     // subscription only `void`s it), so a failed load for the navigated-to member would silently keep the
-    // previous member's purchases on screen; surface it as a retryable error instead (matching member-profile)
+    // previous member's purchases on screen; surface it as a retryable error instead (matching profile)
     try {
       await this.loadPurchases();
     } catch (error) {

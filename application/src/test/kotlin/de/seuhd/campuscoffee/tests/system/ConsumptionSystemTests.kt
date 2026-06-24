@@ -2,9 +2,9 @@ package de.seuhd.campuscoffee.tests.system
 
 import de.seuhd.campuscoffee.api.dtos.ConsumptionOverrideDto
 import de.seuhd.campuscoffee.api.dtos.MAX_MONEY_CENTS
-import de.seuhd.campuscoffee.api.dtos.MemberSummaryDto
 import de.seuhd.campuscoffee.api.dtos.PriceUpdateDto
 import de.seuhd.campuscoffee.api.dtos.UserDto
+import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
@@ -21,21 +21,21 @@ import java.util.concurrent.Executors
 
 /**
  * System tests for the member self-service consumption and profile flow, authenticated by the
- * `X-Coffee-Token` header. A member adds a coffee (`POST /consumption`, no body) and undoes the most recent
+ * `X-Capability-Token` header. A member adds a coffee (`POST /consumption`, no body) and undoes the most recent
  * one within the grace period (`POST /consumption/cancel`); reads come from `GET /summary`. The member is
  * the seeded `maxmustermann` fixture.
  */
 class ConsumptionSystemTests : AbstractSystemTest() {
     private val member = "maxmustermann"
 
-    private fun summary(): MemberSummaryDto =
+    private fun summary(): UserSummaryDto =
         client()
             .get()
             .uri("/api/summary")
             .accept(MediaType.APPLICATION_JSON)
             .withMember(member)
             .exchange()
-            .returnResult<MemberSummaryDto>()
+            .returnResult<UserSummaryDto>()
             .responseBody!!
 
     private fun add() =
@@ -73,17 +73,17 @@ class ConsumptionSystemTests : AbstractSystemTest() {
             .exchange()
 
     @Test
-    fun `getting the summary returns the count, price, and an empty ledger before any coffee`() {
+    fun `getting the summary returns the count, price, and an empty activity before any coffee`() {
         val dto = summary()
 
         assertThat(dto.count).isEqualTo(0)
         assertThat(dto.priceCents).isEqualTo(50)
-        assertThat(dto.ledger).isEmpty()
+        assertThat(dto.activity).isEmpty()
     }
 
     @Test
     fun `adding a coffee returns 200 with the new count`() {
-        val result = add().returnResult<MemberSummaryDto>()
+        val result = add().returnResult<UserSummaryDto>()
 
         assertThat(result.status.value()).isEqualTo(200)
         assertThat(result.responseBody!!.count).isEqualTo(1)
@@ -102,7 +102,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
         add()
         assertThat(summary().count).isEqualTo(1)
 
-        val result = cancel().returnResult<MemberSummaryDto>()
+        val result = cancel().returnResult<UserSummaryDto>()
 
         assertThat(result.status.value()).isEqualTo(200)
         assertThat(result.responseBody!!.count).isEqualTo(0)
@@ -147,7 +147,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
         // owes 50 + 200 = 250
         assertThat(summary().balanceCents).isEqualTo(-250)
 
-        val cancelled = cancel().returnResult<MemberSummaryDto>()
+        val cancelled = cancel().returnResult<UserSummaryDto>()
         assertThat(cancelled.status.value()).isEqualTo(200)
 
         // undoing the newest coffee credits exactly its 200, leaving only the first 50 owed
@@ -155,13 +155,13 @@ class ConsumptionSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `the ledger shows the added coffee newest first`() {
+    fun `the activity shows the added coffee newest first`() {
         add()
 
-        val ledger = summary().ledger
-        assertThat(ledger.first().count).isEqualTo(1)
-        assertThat(ledger.first().delta).isEqualTo(1)
-        assertThat(ledger.first().createdBy).isEqualTo(member)
+        val activity = summary().activity
+        assertThat(activity.first().count).isEqualTo(1)
+        assertThat(activity.first().delta).isEqualTo(1)
+        assertThat(activity.first().createdBy).isEqualTo(member)
     }
 
     @Test
@@ -260,7 +260,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
                 .responseBody!!
         assertThat(response.loginName).isEqualTo(member)
 
-        // the ledger classifies the member's own scan by the (unchanged) login, so undo and balance survive
+        // the activity classifies the member's own scan by the (unchanged) login, so undo and balance survive
         val after = summary()
         assertThat(after.count).isEqualTo(1)
         assertThat(after.balanceCents).isEqualTo(before.balanceCents)

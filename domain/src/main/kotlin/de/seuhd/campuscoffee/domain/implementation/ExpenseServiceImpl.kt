@@ -8,9 +8,9 @@ import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
+import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
 import de.seuhd.campuscoffee.domain.ports.data.KittyLock
-import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -27,7 +27,7 @@ import java.util.UUID
 class ExpenseServiceImpl(
     private val expenseDataService: ExpenseDataService,
     private val userDataService: UserDataService,
-    private val ledgerDataService: LedgerDataService,
+    private val activityDataService: ActivityDataService,
     private val kittyLock: KittyLock
 ) : ExpenseService {
     @Transactional
@@ -99,7 +99,7 @@ class ExpenseServiceImpl(
         requireAdmin(actingUser)
         validateAmounts(weightGrams, amountCents, privateAmountCents, kittyAmountCents)
         val existing = expenseDataService.getById(expenseId)
-        // the buyer cannot be changed: the member ledger keys on the buyer, so reassigning would leave the
+        // the buyer cannot be changed: the member activity keys on the buyer, so reassigning would leave the
         // old buyer credited and double-credit the new one. To move an expense, delete it and record a new one.
         if (buyerUserId != existing.buyer.persistedId) {
             throw ValidationException("An expense's buyer cannot be changed; delete it and record a new one.")
@@ -140,7 +140,7 @@ class ExpenseServiceImpl(
     override fun clear() = expenseDataService.clear()
 
     /** The current kitty balance in cents, read from the event log (the last running balance of its history). */
-    private fun kittyBalanceCents(): Long = ledgerDataService.kittyLedger().lastOrNull()?.runningBalanceCents ?: 0L
+    private fun kittyBalanceCents(): Long = activityDataService.kittyHistory().lastOrNull()?.runningBalanceCents ?: 0L
 
     /** Validates that nothing is negative and the private and kitty portions sum to the total. */
     private fun validateAmounts(

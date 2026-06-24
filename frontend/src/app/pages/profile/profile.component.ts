@@ -27,7 +27,7 @@ import { UserDto } from '../../models';
  * which is revoked on destroy to avoid a leak.
  */
 @Component({
-  selector: 'cc-member-profile',
+  selector: 'cc-profile',
   imports: [
     FormsModule,
     MatCardModule,
@@ -229,7 +229,7 @@ import { UserDto } from '../../models';
     `
   ]
 })
-export class MemberProfileComponent implements OnInit {
+export class ProfileComponent implements OnInit {
   profile: UserDto | null = null;
   qrObjectUrl: string | null = null;
   backLink: unknown[] = ['/admin'];

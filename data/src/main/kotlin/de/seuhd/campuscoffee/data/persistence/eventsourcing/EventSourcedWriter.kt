@@ -64,7 +64,7 @@ class EventSourcedWriter(
      * [DeletionConflictException][de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException]).
      *
      * The DELETE event carries the id, plus any owner-key body fields [ownerKeys] derives from the loaded
-     * object, so a deleted expense or settlement is still matched to its owner by the member/kitty ledger
+     * object, so a deleted expense or deposit is still matched to its owner by the member-activity and kitty-history
      * reads (which key on `buyerUserId`/`userId`) and the deletion is reversed there.
      *
      * @param domainType the domain type of the object to delete

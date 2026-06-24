@@ -10,7 +10,7 @@ import jakarta.validation.constraints.Size
  * or split: the server attributes the purchase to the calling member and books it 100% from their own
  * pocket, so a member cannot attribute it to someone else or fund it from the kitty.
  */
-data class MemberExpenseDto(
+data class OwnExpenseDto(
     @field:NotNull(message = "Weight is required.")
     @field:Min(value = 0, message = "Weight must not be negative.")
     @field:Max(value = MAX_WEIGHT_GRAMS, message = "Weight is implausibly large.")

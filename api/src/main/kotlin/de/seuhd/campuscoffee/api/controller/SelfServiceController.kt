@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.api.controller
 
-import de.seuhd.campuscoffee.api.dtos.LedgerEntryDto
-import de.seuhd.campuscoffee.api.dtos.MemberSummaryDto
+import de.seuhd.campuscoffee.api.dtos.ActivityEntryDto
+import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.api.mapper.AccountingDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
 import de.seuhd.campuscoffee.domain.model.persistedId
@@ -17,12 +17,15 @@ import org.springframework.web.bind.annotation.GetMapping
 /**
  * The authenticated member's own self-service reads (capability token). `GET /summary` returns everything
  * the landing page needs in one call; `GET /activity` pages through the member's full activity feed (their
- * unified ledger of coffees, purchases, and settlements, newest first). Both page through the shared
+ * unified activity of coffees, purchases, and deposits, newest first). Both page through the shared
  * [PageQuery] (`limit`/`offset`), validated via `@Valid` binding rather than a class-level `@Validated`.
  */
-@Tag(name = "Member", description = "The authenticated member's own landing summary and activity (X-Coffee-Token).")
+@Tag(
+    name = "Self-service",
+    description = "The authenticated member's own landing summary and activity (X-Capability-Token)."
+)
 @Controller
-class MemberController(
+class SelfServiceController(
     private val accountingService: AccountingService,
     private val accountingDtoMapper: AccountingDtoMapper,
     private val currentUserProvider: CurrentUserProvider
@@ -37,17 +40,18 @@ class MemberController(
     @GetMapping("/summary")
     fun summary(
         @Valid @ParameterObject page: PageQuery
-    ): ResponseEntity<MemberSummaryDto> {
-        val member = currentUserProvider.currentUser()
+    ): ResponseEntity<UserSummaryDto> {
+        val user = currentUserProvider.currentUser()
         return ResponseEntity.ok(
             accountingDtoMapper.toSummaryDto(
-                accountingService.memberSummary(member.persistedId, page.limitOr(SUMMARY_LIMIT), page.offset, member)
+                accountingService.userSummary(user.persistedId, page.limitOr(SUMMARY_LIMIT), page.offset, user)
             )
         )
     }
 
     /**
-     * Returns a page of the authenticated member's activity feed (their unified ledger, newest first).
+     * Returns a page of the authenticated member's activity feed (coffees, purchases, and deposits, newest
+     * first).
      *
      * @param page the validated paging window (limit/offset)
      */
@@ -55,11 +59,11 @@ class MemberController(
     @GetMapping("/activity")
     fun activity(
         @Valid @ParameterObject page: PageQuery
-    ): ResponseEntity<List<LedgerEntryDto>> {
-        val member = currentUserProvider.currentUser()
+    ): ResponseEntity<List<ActivityEntryDto>> {
+        val user = currentUserProvider.currentUser()
         return ResponseEntity.ok(
             accountingDtoMapper.toEntryDtos(
-                accountingService.memberLedger(member.persistedId, page.limitOr(ACTIVITY_LIMIT), page.offset, member)
+                accountingService.userActivity(user.persistedId, page.limitOr(ACTIVITY_LIMIT), page.offset, user)
             )
         )
     }

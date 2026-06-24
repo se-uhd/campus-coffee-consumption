@@ -43,7 +43,7 @@ class UserServiceImpl(
 
     /**
      * Refuses to hard-delete a member who has any financial footprint (a non-zero coffee count, or any
-     * expense or settlement) so the financial history is preserved (an admin deactivates them instead).
+     * expense or deposit) so the financial history is preserved (an admin deactivates them instead).
      * A pristine member (count zero, no money records) is deleted, cascading their zeroed consumption row.
      * Also refuses to delete the last remaining active admin, so the system never locks every admin out.
      *
@@ -157,7 +157,7 @@ class UserServiceImpl(
             requireNotLastActiveAdmin(existing, "demote or deactivate")
         }
         // the login name is immutable after creation (pinned to the stored value, mirroring the capability
-        // token): the append-only event log attributes each change to the actor's login name, and the ledger
+        // token): the append-only event log attributes each change to the actor's login name, and the activity
         // classifies an owner self-scan vs an admin step by that login, so a rename would silently break a
         // member's undo and could misvalue their balance.
         return upsert(user.copy(loginName = existing.loginName, role = newRole, active = newActive))
