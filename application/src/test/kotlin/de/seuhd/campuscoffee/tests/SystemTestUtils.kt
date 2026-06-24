@@ -127,7 +127,15 @@ object SystemTestUtils {
                     EncryptionMethod.A256GCM
                 ).keyID(publicKey.keyID)
                 .build()
-        val payload = Payload(mapOf<String, Any>("loginName" to loginName, "password" to password))
+        // include a fresh `iat` (epoch millis) so the decryptor's replay-freshness check accepts the payload
+        val payload =
+            Payload(
+                mapOf<String, Any>(
+                    "loginName" to loginName,
+                    "password" to password,
+                    "iat" to System.currentTimeMillis()
+                )
+            )
         val jwe = JWEObject(header, payload)
         jwe.encrypt(RSAEncrypter(publicKey.toRSAPublicKey()))
         return jwe.serialize()

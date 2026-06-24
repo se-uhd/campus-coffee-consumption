@@ -1,6 +1,7 @@
 package de.seuhd.campuscoffee.api.configuration
 
 import org.springframework.boot.context.properties.ConfigurationProperties
+import java.time.Duration
 
 /**
  * Configuration for the login-payload encryption key. The frontend encrypts the credentials with the
@@ -13,11 +14,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * @property privateKeyPem the RSA private key in PKCS#8 PEM form (`-----BEGIN PRIVATE KEY-----`); required.
  * @property keyId the JWK `kid` advertised with the public key, so a client (or a future rotation) can
  *   identify which key a ciphertext was encrypted under.
+ * @property maxPayloadAge how far the encrypted payload's `iat` timestamp may differ from the server clock
+ *   (in either direction, to tolerate skew) before the payload is rejected as stale; bounds the window in
+ *   which a captured ciphertext could be replayed against the token endpoint.
  */
 @ConfigurationProperties("campus-coffee.login-encryption")
 data class LoginEncryptionProperties(
     val privateKeyPem: String,
-    val keyId: String = "login-key-1"
+    val keyId: String = "login-key-1",
+    val maxPayloadAge: Duration = Duration.ofMinutes(2)
 ) {
     init {
         require(privateKeyPem.contains(PEM_MARKER)) {

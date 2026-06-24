@@ -27,10 +27,12 @@ class LoginEncryptionConfig(
 ) {
     private val privateKey: RSAPrivateCrtKey = parsePrivateKey(properties.privateKeyPem)
     private val publicJwk: RSAKey = buildPublicJwk(privateKey, properties.keyId)
+    private val maxPayloadAge = properties.maxPayloadAge
 
-    /** The decryptor that recovers the login credentials from the client's compact JWE. */
+    /** The decryptor that recovers the login credentials from the client's compact JWE, rejecting stale ones. */
     @Bean
-    fun loginPayloadDecryptor(): LoginPayloadDecryptor = LoginPayloadDecryptor(privateKey)
+    fun loginPayloadDecryptor(): LoginPayloadDecryptor =
+        LoginPayloadDecryptor(privateKey, java.time.Clock.systemUTC(), maxPayloadAge)
 
     /** The public key published at `GET /api/auth/public-key`, shaped as a JWK for the browser to import. */
     @Bean
