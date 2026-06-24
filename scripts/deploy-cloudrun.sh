@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 #
-# One-command deploy of CampusCoffeeConsumption (prod profile) to Google Cloud Run, against managed Cloud SQL.
+# One-command deploy of CampusCoffeeConsumption to Google Cloud Run, against managed Cloud SQL.
 #
 # Usage:
-#   DB_PASSWORD=... scripts/deploy-cloudrun.sh        # first deploy (DB_PASSWORD is the Cloud SQL password)
-#   scripts/deploy-cloudrun.sh                        # later deploys (reuses deploy.env)
+#   DB_PASSWORD=... scripts/deploy-cloudrun.sh [compose-file]   # first deploy (DB_PASSWORD = Cloud SQL password)
+#   scripts/deploy-cloudrun.sh [compose-file]                   # later deploys (reuses deploy.env)
+#
+# compose-file defaults to compose.prod.yaml (the prod profile, real members, no seed data). Pass
+# compose.demo.yaml for the public demo (the prod,demo profiles: prod hardening + the fixture/demo seed data,
+# cleared and reseeded each boot); set MAX_INSTANCES=1 for it so the boot-time reset runs on one instance.
 #
 # One-time prerequisites:
 #   gcloud auth login
@@ -26,7 +30,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-service="campus-coffee-consumption-prod"
+# The compose file selects the deployment: compose.prod.yaml (default) or compose.demo.yaml. The Cloud Run
+# service name is the Compose project `name:`.
+compose="${1:-compose.prod.yaml}"
+[ -f "$compose" ] || { echo "compose file not found: $compose" >&2; exit 1; }
+service="$(sed -n 's/^name: *//p' "$compose" | head -1)"
+[ -n "$service" ] || { echo "could not read 'name:' from $compose" >&2; exit 1; }
 
 # --- deploy.env: created once, reused afterwards ------------------------------------------------------------
 if [[ ! -f deploy.env ]]; then
@@ -45,8 +54,8 @@ if [[ ! -f deploy.env ]]; then
   echo "  First-admin password: $admin_password   (printed once; store it now)"
 fi
 
-echo "Deploying ${service} to Cloud Run..."
-gcloud beta run compose up compose.prod.yaml --allow-unauthenticated
+echo "Deploying ${service} from ${compose} to Cloud Run..."
+gcloud beta run compose up "$compose" --allow-unauthenticated
 
 # --- resolve the real service URL and redeploy if the base URL is still the placeholder --------------------
 url="$(gcloud run services describe "$service" --format='value(status.url)')"
@@ -61,7 +70,14 @@ if grep -q 'CAMPUS_COFFEE_APP_BASE_URL=https://pending.invalid' deploy.env; then
     esac
   done < deploy.env > "$tmp"
   mv "$tmp" deploy.env
-  gcloud beta run compose up compose.prod.yaml --allow-unauthenticated
+  gcloud beta run compose up "$compose" --allow-unauthenticated
+fi
+
+# Optional single-instance cap. The demo resets the database on boot, so it must run exactly one instance
+# (two instances resetting at once would race); pass MAX_INSTANCES=1 for it.
+if [[ -n "${MAX_INSTANCES:-}" ]]; then
+  echo "Capping ${service} at ${MAX_INSTANCES} instance(s)..."
+  gcloud run services update "$service" --max-instances="$MAX_INSTANCES"
 fi
 
 echo "Service URL: ${url}"

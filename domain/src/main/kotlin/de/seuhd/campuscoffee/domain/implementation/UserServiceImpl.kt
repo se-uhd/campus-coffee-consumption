@@ -41,16 +41,6 @@ class UserServiceImpl(
     UserService {
     override fun dataService(): CrudDataService<User, UUID> = userDataService
 
-    /** Labels a user by id and login name so the upsert audit trail is not an opaque UUID alone. */
-    override fun describe(domainObject: User): String =
-        "User with id '${domainObject.id}', login name '${domainObject.loginName}'"
-
-    /** Labels a user by id and login name for the delete log, resolving the login name from the store. */
-    override fun describeId(id: UUID): String {
-        val loginName = runCatching { userDataService.getById(id).loginName }.getOrNull()
-        return "User with id '$id'" + loginName?.let { ", login name '$it'" }.orEmpty()
-    }
-
     /**
      * Refuses to hard-delete a member who has any financial footprint (a non-zero coffee count, or any
      * expense or settlement) so the financial history is preserved (an admin deactivates them instead).

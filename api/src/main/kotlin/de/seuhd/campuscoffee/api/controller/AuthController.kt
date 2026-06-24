@@ -24,7 +24,7 @@ import java.time.temporal.ChronoUnit
 
 /**
  * Authentication endpoint that exchanges credentials for a stateless JWT bearer token. The path is
- * relative to the resource; the central `/api` base is applied by ApiPathConfig.
+ * relative to the resource; the central `/api` base is applied by ApiWebConfig.
  *
  * Like registration, this endpoint must work without an existing token (the security chain leaves it
  * open). It authenticates the credentials with the shared [AuthenticationManager] and returns a signed
@@ -53,7 +53,9 @@ class AuthController(
         @RequestBody
         @Valid request: TokenRequestDto
     ): ResponseEntity<TokenResponseDto> {
-        log.info { "Token requested for login name '${request.loginName}'." }
+        // do not log the supplied login name: it is PII, and the canonical identifier (the user id) is not
+        // resolved at the credential boundary (a failed attempt has no user). Logging the bare event is enough.
+        log.info { "Token requested." }
         // authenticate the credentials; wrong credentials raise an AuthenticationException that the
         // global exception handler renders as a JSON 401 (the endpoint never returns a token for them)
         val authentication =

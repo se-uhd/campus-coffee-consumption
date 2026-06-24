@@ -161,7 +161,7 @@ No balance/ledger tables, no row locks. A `−1` at 0 → 409 (no negative count
 
 ## REST API (build this first)
 
-All paths under `/api` (central `ApiPathConfig`). JSON only.
+All paths under `/api` (central `ApiWebConfig`). JSON only.
 
 **The consumption resource is the change log, not an action surface.** `/consumption` *is* the list of a
 member's coffee changes; the current `total` is a derived field carried in the response for convenience.

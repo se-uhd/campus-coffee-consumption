@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component
 import org.springframework.web.method.HandlerMethod
 
 /**
- * Documents the standard error responses (400, 401, 403, 404, 409) on every hand-written controller
+ * Documents the standard error responses (400, 401, 403, 404, 409) on every handwritten controller
  * operation, so the OpenAPI spec carries the real error contract for the whole money / consumption /
  * summary / ledger / expense / payment / auth surface, not just the inferred success code. Operations
  * annotated with [CrudOperation] already get rich, per-operation responses from [CrudOperationCustomizer],
