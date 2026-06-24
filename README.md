@@ -25,7 +25,8 @@ Angular 22 single-page frontend, derived from the CampusCoffee teaching project.
   ~10-hour work-session token, no refresh flow). The credentials are encrypted in the browser (a compact JWE
   under the backend's published RSA public key) before they are sent, so the raw password never travels as
   plaintext. An admin manages members (create, edit, deactivate, change
-  role, view and rotate capability links, download any member's QR), sets the global price, records expenses
+  role, view and rotate capability links, download any member's QR or all of them as a ZIP or printable PDF
+  sheet), sets the global price, records expenses
   with a private/kitty split and kitty deposits and adjustments, corrects any member's count, and reviews
   the kitty history and a per-member overview. There is no reset: settling up is a deposit, and a count
   change is a correction (optionally with a note).
@@ -140,7 +141,8 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `GET /users`, `POST /users`, `GET/PUT/DELETE /users/{id}`, `GET /users/me`, `GET /users/filter?login_name=…`, `GET /users/overview` (the per-member overview now renders in the member-management page, `/admin/users`).
 - `DELETE /users/{id}`: refused (409) if the member has financial history; deactivate instead.
 - `GET /users/{id}/link`, `POST /users/{id}/link/rotate`, `GET /users/{id}/qr.png`.
-- `GET /users/qr.zip`: a streamed ZIP of every member's QR code (one `<loginName>.png` per member).
+- `GET /users/qr.zip`: a streamed ZIP of every active member's QR code (one `<loginName>.png` per member).
+- `GET /users/qr.pdf`: a printable PDF grid of every active member's QR code, each labelled by login name.
 - `GET  /users/{id}/consumption?limit=5&offset=0`, `GET /users/{id}/activity?limit=20&offset=0`.
 - `POST /users/{id}/consumption` `{ "delta": 1 | -1 }`.
 - `PUT  /users/{id}/consumption` `{ "total": N, "note": "…" }`: absolute count correction (`note` optional).

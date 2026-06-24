@@ -182,13 +182,24 @@ class UserController(
     ): ResponseEntity<ByteArray> =
         capabilityQrResponder.qrResponse(userService.getById(id, currentUserProvider.currentUser()))
 
-    /** Downloads a ZIP archive of every member's capability QR code, each entry named `<loginName>.png`. */
-    @Operation(summary = "Download a ZIP archive of every member's capability QR code (one PNG per member).")
+    /** Downloads a ZIP archive of every active member's capability QR code, each entry named `<loginName>.png`. */
+    @Operation(summary = "Download a ZIP archive of every active member's capability QR code (one PNG per member).")
     @GetMapping("/qr.zip", produces = ["application/zip"])
     fun qrCodesZip(): ResponseEntity<StreamingResponseBody> {
         // resolve the principal so a deactivated admin's in-flight JWT is rejected here too
         currentUserProvider.currentUser()
         return capabilityQrResponder.zipResponse(userService.getAll())
+    }
+
+    /** Downloads a printable PDF grid of every active member's capability QR code, labelled by login name. */
+    @Operation(
+        summary = "Download a printable PDF grid of every active member's QR code, labelled by login name."
+    )
+    @GetMapping("/qr.pdf", produces = [MediaType.APPLICATION_PDF_VALUE])
+    fun qrCodesPdf(): ResponseEntity<ByteArray> {
+        // resolve the principal so a deactivated admin's in-flight JWT is rejected here too
+        currentUserProvider.currentUser()
+        return capabilityQrResponder.pdfResponse(userService.getAll())
     }
 
     /** Maps a user to its DTO and fills in the assembled capability URL from the member's secret token. */
