@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.api.security
 
+import de.seuhd.campuscoffee.api.configuration.AuthCookieProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.env.Environment
@@ -22,17 +23,21 @@ import org.springframework.security.web.access.AccessDeniedHandler
 /**
  * Spring Security configuration. Two authentication mechanisms, one per audience (there is no HTTP Basic):
  * - **Admins** authenticate with a **JWT bearer token** (minted by the token endpoint from a
- *   username+password login), mapped by the resource server to a `ROLE_ADMIN` principal.
+ *   username+password login), mapped by the resource server to a `ROLE_ADMIN` principal. The browser SPA
+ *   carries the token in an httpOnly, `SameSite=Strict` session cookie; API clients and the tests carry it in
+ *   the `Authorization` header. [CookieOrHeaderBearerTokenResolver] reads it from either.
  * - **Members** authenticate with their secret **capability token** (the `X-Capability-Token` header), resolved
  *   by [CapabilityTokenAuthenticationFilter] to a `ROLE_USER` principal; even an admin's own token grants
  *   only self-service.
  *
- * The filter chain is stateless (no server-side session) with CSRF disabled: CSRF protects the
- * cookie-based sessions this token-based API never uses. The access rules gate the API surface by
- * audience; the finer ownership rules (a member acting only on their own count; a user editing only their
- * own account; the deactivated-member read-only rule) depend on the targeted resource, so they live in the
- * domain services. Non-`/api` GET routes serve the bundled Angular SPA (its `index.html` and assets, plus
- * deep links), so they are public; the SPA makes the authenticated API calls.
+ * The filter chain is stateless (no server-side session). CSRF token protection is disabled because the only
+ * cookie (the admin session) is `SameSite=Strict` (never sent cross-site, so it cannot be ridden by a forged
+ * request) and the member and API flows authenticate with a custom header a cross-site page cannot set. A
+ * Content-Security-Policy and the other security headers are set on the chain. The access rules gate the API
+ * surface by audience; the finer ownership rules (a member acting only on their own count; a user editing
+ * only their own account; the deactivated-member read-only rule) depend on the targeted resource, so they
+ * live in the domain services. Non-`/api` GET routes serve the bundled Angular SPA (its `index.html` and
+ * assets, plus deep links), so they are public; the SPA makes the authenticated API calls.
  */
 @Configuration
 class SecurityConfig {
@@ -45,6 +50,7 @@ class SecurityConfig {
      * @param jwtAuthenticationConverter maps a validated Bearer token to a principal with ROLE_* authorities
      * @param capabilityTokenAuthenticationFilter authenticates a member by their X-Capability-Token header
      * @param environment the active environment, used to open the dev data endpoints only under `dev`
+     * @param authCookieProperties the admin session-cookie settings (the cookie name the bearer resolver reads)
      */
     @Bean
     fun securityFilterChain(
@@ -53,12 +59,15 @@ class SecurityConfig {
         accessDeniedHandler: AccessDeniedHandler,
         jwtAuthenticationConverter: JwtAuthenticationConverter,
         capabilityTokenAuthenticationFilter: CapabilityTokenAuthenticationFilter,
-        environment: Environment
+        environment: Environment,
+        authCookieProperties: AuthCookieProperties
     ): SecurityFilterChain {
         http {
             authorizeHttpRequests {
-                // The token endpoint, the login-encryption public key, and the API docs stay reachable.
+                // The token endpoint, the logout endpoint, the login-encryption public key, and the API
+                // docs stay reachable without an existing session.
                 authorize("/api/auth/token", permitAll)
+                authorize("/api/auth/logout", permitAll)
                 authorize("/api/auth/public-key", permitAll)
                 authorize("/api/swagger-ui.html", permitAll)
                 authorize("/api/swagger-ui/**", permitAll)
@@ -96,11 +105,32 @@ class SecurityConfig {
                 // Any other (non-API, non-GET) request requires authentication.
                 authorize(anyRequest, authenticated)
             }
+            // CSRF token protection is unnecessary here: the admin JWT cookie is SameSite=Strict (so the
+            // browser never sends it on a cross-site request, which is the CSRF vector), and the member and
+            // API flows authenticate with a custom header (X-Capability-Token / Authorization), which a
+            // cross-site page cannot set. A token-based CSRF scheme would instead force a token onto those
+            // header-authenticated, CSRF-immune endpoints (and the system tests) for no added protection.
             csrf { disable() }
             sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
+            // Security response headers. The Content-Security-Policy is the structural XSS mitigation: the
+            // SPA and all its resources are same-origin, so `default-src 'self'` plus `connect-src 'self'`
+            // means even an injected script could not load from or exfiltrate to another origin; Angular
+            // Material injects runtime <style> tags, so style-src allows inline styles. `frame-ancestors
+            // 'none'` blocks clickjacking. Spring's defaults already add X-Content-Type-Options and
+            // X-Frame-Options.
+            headers {
+                contentSecurityPolicy {
+                    policyDirectives =
+                        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+                        "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; " +
+                        "object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+                }
+            }
             // Bearer-token (JWT) resource server: a valid token authenticates an admin request, its `roles`
-            // claim mapped to ROLE_* authorities so the rules above apply.
+            // claim mapped to ROLE_* authorities so the rules above apply. The token is read from the
+            // SameSite httpOnly session cookie (the SPA) or the Authorization header (API clients, tests).
             oauth2ResourceServer {
+                bearerTokenResolver = CookieOrHeaderBearerTokenResolver(authCookieProperties.name)
                 jwt { this.jwtAuthenticationConverter = jwtAuthenticationConverter }
             }
             // Render auth failures as the application's JSON ErrorResponse: a missing or invalid credential

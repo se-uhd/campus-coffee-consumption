@@ -46,12 +46,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
 
   if (ADMIN_PREFIXES.some((prefix) => req.url.startsWith(prefix))) {
-    const jwt = auth.token;
-    // attach the JWT when present; a token-less admin request (e.g. the JWT was cleared in another tab and an
-    // open admin page then fires a request) still flows through the same 401 handler below, so it redirects
-    // to the login form instead of silently staying put
-    const adminReq = jwt ? req.clone({ setHeaders: { Authorization: `Bearer ${jwt}` } }) : req;
-    return next(adminReq).pipe(
+    // admin requests authenticate with the httpOnly session cookie the browser sends automatically (the SPA
+    // cannot read it, so it attaches no token header). The request is passed through unchanged; a 401 means
+    // the session is missing or expired.
+    return next(req).pipe(
       tap((event) => {
         // a successful admin response means the session is valid again, so defensively clear the redirect
         // guard; it cannot stay wedged even if an earlier redirect navigation never settled its `finally`
@@ -60,11 +58,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         }
       }),
       catchError((error: unknown) => {
-        // an expired, invalid, or missing admin session: drop the token and return to the login form, but
-        // only redirect once even when several requests 401 at the same time (the parallel landing reloads)
+        // an expired, invalid, or missing admin session: sign out and return to the login form, but only
+        // redirect once even when several requests 401 at the same time (the parallel landing reloads)
         if (error instanceof HttpErrorResponse && error.status === 401 && !redirectingToAdminLogin) {
           redirectingToAdminLogin = true;
-          auth.logout();
+          void auth.logout();
           void router.navigate(['/admin/login']).finally(() => (redirectingToAdminLogin = false));
         }
         return throwError(() => error);

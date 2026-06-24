@@ -511,7 +511,7 @@ export class AdminLandingComponent implements OnInit {
 
   /** Signs the admin out and returns to login. */
   logout(): void {
-    this.auth.logout();
+    void this.auth.logout();
     this.router.navigate(['/admin/login']);
   }
 }
