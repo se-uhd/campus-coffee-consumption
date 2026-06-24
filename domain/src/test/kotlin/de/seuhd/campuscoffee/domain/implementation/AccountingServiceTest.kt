@@ -11,6 +11,7 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
+import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.assertj.core.api.Assertions.assertThat
@@ -31,6 +32,7 @@ import java.util.UUID
  */
 class AccountingServiceTest {
     private val activityDataService: ActivityDataService = mock()
+    private val balanceDataService: BalanceDataService = mock()
     private val coffeePriceService: CoffeePriceService = mock()
     private val coffeeConsumptionDataService: CoffeeConsumptionDataService = mock()
     private val coffeeConsumptionService: CoffeeConsumptionService = mock()
@@ -39,6 +41,7 @@ class AccountingServiceTest {
     private val service =
         AccountingServiceImpl(
             activityDataService,
+            balanceDataService,
             coffeePriceService,
             coffeeConsumptionDataService,
             coffeeConsumptionService,
@@ -91,7 +94,7 @@ class AccountingServiceTest {
             coffeeConsumptionDataService.getByUserId(memberId)
         ).thenReturn(CoffeeConsumption(user = member, count = 1))
         whenever(coffeePriceService.getCurrent()).thenReturn(CoffeePrice(amountCents = 50))
-        whenever(activityDataService.kittyHistory()).thenReturn(emptyList())
+        whenever(balanceDataService.kittyBalanceCents()).thenReturn(0L)
         whenever(coffeeConsumptionService.cancellableIncrement(memberId, member))
             .thenReturn(CancellableIncrement(LocalDateTime.now(), 50))
 
@@ -114,7 +117,6 @@ class AccountingServiceTest {
             coffeeConsumptionDataService.getByUserId(memberId)
         ).thenReturn(CoffeeConsumption(user = member, count = 0))
         whenever(coffeePriceService.getCurrent()).thenReturn(CoffeePrice(amountCents = 50))
-        whenever(activityDataService.kittyHistory()).thenReturn(emptyList())
 
         val summary = service.userSummary(memberId, 10, 0, member)
 
@@ -147,14 +149,8 @@ class AccountingServiceTest {
     }
 
     @Test
-    fun `kittyBalanceCents returns the last running balance of the kitty history`() {
-        whenever(activityDataService.kittyHistory())
-            .thenReturn(
-                listOf(
-                    entry(ActivityEntryType.KITTY_ADJUSTMENT, 500, 500),
-                    entry(ActivityEntryType.KITTY_EXPENSE, -200, 300)
-                )
-            )
+    fun `kittyBalanceCents returns the maintained kitty projection`() {
+        whenever(balanceDataService.kittyBalanceCents()).thenReturn(300)
 
         assertThat(service.kittyBalanceCents()).isEqualTo(300)
     }
@@ -172,8 +168,7 @@ class AccountingServiceTest {
     @Test
     fun `allBalances returns each member's count and balance for an admin`() {
         whenever(userDataService.getAll()).thenReturn(listOf(member))
-        whenever(activityDataService.userActivity(memberId, "max"))
-            .thenReturn(listOf(entry(ActivityEntryType.CONSUMPTION, -50, -50)))
+        whenever(balanceDataService.allMemberBalancesCents()).thenReturn(mapOf(memberId to -50L))
         whenever(
             coffeeConsumptionDataService.getByUserId(memberId)
         ).thenReturn(CoffeeConsumption(user = member, count = 1))
@@ -186,9 +181,9 @@ class AccountingServiceTest {
     }
 
     @Test
-    fun `allBalances reports a zero balance for a member with no activity entries`() {
+    fun `allBalances reports a zero balance for a member absent from the projection`() {
         whenever(userDataService.getAll()).thenReturn(listOf(member))
-        whenever(activityDataService.userActivity(any(), any())).thenReturn(emptyList())
+        whenever(balanceDataService.allMemberBalancesCents()).thenReturn(emptyMap())
         whenever(
             coffeeConsumptionDataService.getByUserId(memberId)
         ).thenReturn(CoffeeConsumption(user = member, count = 0))

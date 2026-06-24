@@ -7,7 +7,7 @@ import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
-import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
+import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
 import de.seuhd.campuscoffee.domain.ports.data.KittyLock
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
@@ -25,7 +25,7 @@ import java.util.UUID
 class PaymentServiceImpl(
     private val paymentDataService: PaymentDataService,
     private val userDataService: UserDataService,
-    private val activityDataService: ActivityDataService,
+    private val balanceDataService: BalanceDataService,
     private val kittyLock: KittyLock
 ) : PaymentService {
     @Transactional
@@ -64,8 +64,8 @@ class PaymentServiceImpl(
 
     override fun clear() = paymentDataService.clear()
 
-    /** The current kitty balance in cents, read from the event log (the last running balance of its history). */
-    private fun kittyBalanceCents(): Long = activityDataService.kittyHistory().lastOrNull()?.runningBalanceCents ?: 0L
+    /** The current kitty balance in cents, read O(1) from the maintained projection (held under the lock). */
+    private fun kittyBalanceCents(): Long = balanceDataService.kittyBalanceCents()
 
     /** Requires [actingUser] to be an admin, else 403. */
     private fun requireAdmin(actingUser: User) {
