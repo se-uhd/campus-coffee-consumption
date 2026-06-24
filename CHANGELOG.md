@@ -5,6 +5,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Fix the member landing page: the count/hero card and the balance card sat flush with no gap (the hero
+  "+" button overlapped the balance card); they now keep the same 16px spacing as the rest of the page.
+- Tidy the browser tab titles: capitalized, with SE@UHD in parentheses and no middle-dot separator, e.g.
+  "My Coffee (SE@UHD)".
+
 ## [0.4.0] - 2026-06-23
 
 This release renames the API and code vocabulary to the words the UI and endpoints already use. It is a

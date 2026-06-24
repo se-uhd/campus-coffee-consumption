@@ -43,6 +43,16 @@ import { EurosPipe } from '../../pipes/euros.pipe';
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: [
     `
+      /* The count card and the balance card render inside this component's host, so they are not direct
+         children of the page's flex column and would otherwise sit flush against each other (0 gap), making
+         the count card's hero FAB overlap the balance card. Give the host the same 16px vertical rhythm the
+         page uses between its cards. */
+      :host {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
       .cc-count-card {
         text-align: center;
       }
