@@ -73,7 +73,7 @@ interface MemberRow {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
-    <div class="page page--wide">
+    <div class="page">
       <mat-card class="card">
         <h2>Add a member</h2>
         <form #form="ngForm">
@@ -137,8 +137,8 @@ interface MemberRow {
             <mat-form-field>
               <mat-label>Role</mat-label>
               <mat-select name="role" [(ngModel)]="draft.role">
-                <mat-option value="USER">USER</mat-option>
-                <mat-option value="ADMIN">ADMIN</mat-option>
+                <mat-option value="USER">Member</mat-option>
+                <mat-option value="ADMIN">Admin</mat-option>
               </mat-select>
             </mat-form-field>
             <!-- only an admin has a password; a member authenticates with their capability link -->
@@ -195,111 +195,112 @@ interface MemberRow {
               } @else {
                 <mat-icon>folder_zip</mat-icon>
               }
-              Download all QR codes
+              Download all
             </button>
           </div>
-          <div class="table-scroll">
-            <table mat-table [dataSource]="dataSource">
-              <caption class="cc-visually-hidden">
-                Members with their role, cup count, balance, and per-member actions.
-              </caption>
-              <ng-container matColumnDef="view">
-                <th mat-header-cell *matHeaderCellDef class="col-view">
-                  <span class="cc-visually-hidden">View profile</span>
-                </th>
-                <td mat-cell *matCellDef="let row" class="col-view">
-                  <button
-                    mat-icon-button
-                    (click)="viewProfile(row.user)"
-                    aria-label="View profile"
-                    matTooltip="View profile"
-                  >
-                    <!-- Deliberate glyph split: account_box = "open this row's detail" (here), distinct from
+          @if (dataSource.data.length > 0) {
+            <div class="table-scroll">
+              <table mat-table [dataSource]="dataSource">
+                <caption class="cc-visually-hidden">
+                  Members with their role, cup count, balance, and per-member actions.
+                </caption>
+                <ng-container matColumnDef="view">
+                  <th mat-header-cell *matHeaderCellDef class="col-view">
+                    <span class="cc-visually-hidden">View profile</span>
+                  </th>
+                  <td mat-cell *matCellDef="let row" class="col-view">
+                    <button
+                      mat-icon-button
+                      (click)="viewProfile(row.user)"
+                      aria-label="View profile"
+                      matTooltip="View profile"
+                    >
+                      <!-- Deliberate glyph split: account_box = "open this row's detail" (here), distinct from
                          the member selector's person = identity/"you" marker. Keep the two glyphs apart so
                          "view a member" never reads as the "this is you" affordance. -->
-                    <mat-icon>account_box</mat-icon>
-                  </button>
-                </td>
-              </ng-container>
+                      <mat-icon>account_box</mat-icon>
+                    </button>
+                  </td>
+                </ng-container>
 
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>Name</th>
-                <td mat-cell *matCellDef="let row" [class.cc-inactive]="!row.active">
-                  <div>{{ row.loginName }}</div>
-                  <div class="muted">{{ row.fullName }}</div>
-                </td>
-              </ng-container>
+                <ng-container matColumnDef="name">
+                  <th mat-header-cell *matHeaderCellDef>Name</th>
+                  <td mat-cell *matCellDef="let row" [class.cc-inactive]="!row.active">
+                    <div>{{ row.loginName }}</div>
+                    <div class="muted">{{ row.fullName }}</div>
+                  </td>
+                </ng-container>
 
-              <ng-container matColumnDef="role">
-                <th mat-header-cell *matHeaderCellDef>Role</th>
-                <td mat-cell *matCellDef="let row">
-                  @if (row.role === 'ADMIN') {
-                    <span class="cc-chip">ADMIN</span>
-                  } @else {
-                    <span class="cc-chip cc-chip--neutral">USER</span>
-                  }
-                </td>
-              </ng-container>
+                <ng-container matColumnDef="role">
+                  <th mat-header-cell *matHeaderCellDef>Role</th>
+                  <td mat-cell *matCellDef="let row">
+                    @if (row.role === 'ADMIN') {
+                      <span class="cc-chip">Admin</span>
+                    } @else {
+                      <span class="cc-chip cc-chip--neutral">Member</span>
+                    }
+                  </td>
+                </ng-container>
 
-              <ng-container matColumnDef="count">
-                <th mat-header-cell *matHeaderCellDef class="col-numeric">Cups</th>
-                <td mat-cell *matCellDef="let row" class="col-numeric">{{ row.count }}</td>
-              </ng-container>
+                <ng-container matColumnDef="count">
+                  <th mat-header-cell *matHeaderCellDef class="col-numeric">Cups</th>
+                  <td mat-cell *matCellDef="let row" class="col-numeric">{{ row.count }}</td>
+                </ng-container>
 
-              <ng-container matColumnDef="balance">
-                <th mat-header-cell *matHeaderCellDef class="col-numeric">Balance</th>
-                <td mat-cell *matCellDef="let row" class="col-numeric" [class.warn]="row.balanceCents < 0">
-                  {{ row.balanceCents | euros: true }}
-                </td>
-              </ng-container>
+                <ng-container matColumnDef="balance">
+                  <th mat-header-cell *matHeaderCellDef class="col-numeric">Balance</th>
+                  <td mat-cell *matCellDef="let row" class="col-numeric" [class.warn]="row.balanceCents < 0">
+                    {{ row.balanceCents | euros: true }}
+                  </td>
+                </ng-container>
 
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef class="col-actions">
-                  <span class="cc-visually-hidden">Actions</span>
-                </th>
-                <td mat-cell *matCellDef="let row" class="col-actions">
-                  <mat-slide-toggle
-                    [checked]="row.active"
-                    (change)="toggleActive(row.user)"
-                    aria-label="Active"
-                    matTooltip="Active"
-                  ></mat-slide-toggle>
-                  <button
-                    mat-icon-button
-                    (click)="rotate(row.user)"
-                    aria-label="Rotate link"
-                    matTooltip="Rotate coffee link"
-                  >
-                    <mat-icon>autorenew</mat-icon>
-                  </button>
-                  <button
-                    mat-icon-button
-                    (click)="downloadQr(row.user)"
-                    aria-label="Download QR"
-                    matTooltip="Download QR code"
-                  >
-                    <mat-icon>qr_code</mat-icon>
-                  </button>
-                  <button
-                    mat-icon-button
-                    color="warn"
-                    (click)="remove(row.user)"
-                    aria-label="Delete"
-                    matTooltip="Delete member"
-                  >
-                    <mat-icon>delete</mat-icon>
-                  </button>
-                </td>
-              </ng-container>
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef class="col-actions">
+                    <span class="cc-visually-hidden">Actions</span>
+                  </th>
+                  <td mat-cell *matCellDef="let row" class="col-actions">
+                    <mat-slide-toggle
+                      [checked]="row.active"
+                      (change)="toggleActive(row.user)"
+                      aria-label="Active"
+                      matTooltip="Active"
+                    ></mat-slide-toggle>
+                    <button
+                      mat-icon-button
+                      (click)="rotate(row.user)"
+                      aria-label="Rotate link"
+                      matTooltip="Rotate coffee link"
+                    >
+                      <mat-icon>autorenew</mat-icon>
+                    </button>
+                    <button
+                      mat-icon-button
+                      (click)="downloadQr(row.user)"
+                      aria-label="Download QR"
+                      matTooltip="Download QR code"
+                    >
+                      <mat-icon>qr_code</mat-icon>
+                    </button>
+                    <button
+                      mat-icon-button
+                      color="warn"
+                      (click)="remove(row.user)"
+                      aria-label="Delete"
+                      matTooltip="Delete member"
+                    >
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </td>
+                </ng-container>
 
-              <tr mat-header-row *matHeaderRowDef="columns"></tr>
-              <tr mat-row *matRowDef="let row; columns: columns"></tr>
-            </table>
-          </div>
-          @if (dataSource.data.length === 0) {
+                <tr mat-header-row *matHeaderRowDef="columns"></tr>
+                <tr mat-row *matRowDef="let row; columns: columns"></tr>
+              </table>
+            </div>
+            <mat-paginator [pageSize]="10" [pageSizeOptions]="[10, 25, 50]"></mat-paginator>
+          } @else if (!loading) {
             <p class="muted">No members yet.</p>
           }
-          <mat-paginator [pageSize]="10" [pageSizeOptions]="[10, 25, 50]"></mat-paginator>
         </mat-card>
       }
     </div>
@@ -317,6 +318,13 @@ interface MemberRow {
 
       .col-actions {
         white-space: nowrap;
+      }
+
+      /* The slide-toggle is shorter than the icon buttons, so align every action item to a common vertical
+         center (the cell's vertical-align centers the whole cluster in the row); otherwise they align on the
+         baseline and the toggle sits a few px below the buttons. */
+      .col-actions :is(mat-slide-toggle, button) {
+        vertical-align: middle;
       }
 
       /* Match the admin-expenses row-action cluster: a small, consistent gap between the per-row buttons. */
@@ -521,7 +529,7 @@ export class AdminUsersComponent implements OnInit {
       this.dialog
         .open(ConfirmDialogComponent, {
           data: {
-            title: 'Delete this member?',
+            title: 'Delete this member',
             message: `Delete ${user.loginName}? This cannot be undone.`,
             confirmLabel: 'Delete',
             destructive: true

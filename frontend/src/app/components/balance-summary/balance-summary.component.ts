@@ -55,6 +55,11 @@ import { EurosPipe } from '../../pipes/euros.pipe';
 
       .cc-count-card {
         text-align: center;
+        /* The big number's line-box adds ~11px above the digit, and the hero button's drop-shadow eats ~6px
+           below it, so a symmetric 16px card padding reads as top-heavy (the space below the button looks
+           smaller). Extra bottom padding makes the visible gap below the button match the one above the
+           number. */
+        padding-bottom: 32px;
       }
 
       .cc-count-actions {

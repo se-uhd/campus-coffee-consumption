@@ -16,7 +16,7 @@ import { UserDto } from '../../models';
   selector: 'cc-member-select',
   imports: [FormsModule, MatFormFieldModule, MatSelectModule, MatIconModule],
   template: `
-    <mat-form-field class="full-width">
+    <mat-form-field class="full-width" subscriptSizing="dynamic">
       <mat-label>Member</mat-label>
       <mat-select
         [ngModel]="selectedId()"

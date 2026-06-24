@@ -150,7 +150,7 @@ test.describe('admin flow', () => {
     // delete it: a confirm dialog appears, then the entry is gone
     await recorded.getByRole('button', { name: 'Delete purchase' }).click();
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('Delete this purchase?')).toBeVisible();
+    await expect(dialog.getByText('Delete this purchase')).toBeVisible();
     await dialog.getByRole('button', { name: 'Delete' }).click();
 
     await expect(page.getByText('Purchase deleted.')).toBeVisible();
