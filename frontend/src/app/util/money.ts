@@ -1,4 +1,4 @@
-// Money is displayed in the English number format (a period decimal, a comma thousands separator) on
+// Money is displayed in the English number format (a decimal point, a comma thousands separator) on
 // purpose: the whole UI is in English, so a single, consistent format reads better than mixing English copy
 // with German-formatted figures. The euro input separately accepts a comma OR a point as the decimal
 // separator (see parseEurosToCents), so a German user can still type "4,20"; only the display is normalised.
@@ -14,7 +14,7 @@ const EUROS_SIGNED_FORMAT = new Intl.NumberFormat('en-US', {
 
 /**
  * Formats integer euro cents as a euro string for display, e.g. `-420` ⇒ `-4.20 €`, `0` ⇒ `0.00 €`,
- * `123456` ⇒ `1,234.56 €` (English number format: a period decimal and a comma thousands separator, with
+ * `123456` ⇒ `1,234.56 €` (English number format: a decimal point and a comma thousands separator, with
  * the euro sign after the amount). Balance arithmetic stays in integer cents; the single division here is
  * only the display conversion, which rounds to two decimals, so no rounding error accrues. Shared by the
  * `EurosPipe` (templates) and the few component/dialog code paths that need the same formatting directly.

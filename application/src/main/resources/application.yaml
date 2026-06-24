@@ -24,7 +24,7 @@ springdoc:
   swagger-ui:
     enabled: false
 # Custom properties; documented in their @ConfigurationProperties classes (AppProperties, IdProperties,
-# JwtProperties, FixturesProperties, CorsProperties, BootstrapAdminProperties, CoffeePriceProperties,
+# JwtProperties, FixturesProperties, BootstrapAdminProperties, CoffeePriceProperties,
 # ConsumptionProperties), not here.
 campus-coffee:
   app:
@@ -119,10 +119,12 @@ campus-coffee:
     secret: ${JWT_SECRET} # required, no fallback
   fixtures:
     load-on-startup: false # prod has real members, not fixtures
-  bootstrap-admin: # create one admin on first startup if none exists
+  bootstrap-admin: # create one admin on first startup if none exists; all defaults live here, not in the class
     login-name: ${BOOTSTRAP_ADMIN_LOGIN:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}
     email-address: ${BOOTSTRAP_ADMIN_EMAIL:admin@se.uni-heidelberg.de}
+    first-name: ${BOOTSTRAP_ADMIN_FIRST_NAME:Bootstrap}
+    last-name: ${BOOTSTRAP_ADMIN_LAST_NAME:Admin}
 management:
   # env is not exposed in prod: even with sensitive values masked it reveals the configuration
   # structure and property-source names.
@@ -130,3 +132,24 @@ management:
     web:
       exposure:
         include: health, metrics
+
+---
+# The demo profile is a thin overlay on prod for a public, throwaway demo (activate them together:
+# SPRING_PROFILES_ACTIVE=prod,demo). It keeps every prod hardening (managed Cloud SQL, required https base
+# URL via PublicBaseUrlGuard, real JWT secret, Swagger and the /api/dev endpoints off) and only adds the seed
+# data, so the demo is internet-safe. The fixture + DevDemoDataLoader dataset is cleared and reseeded on
+# every boot, so the demo is deterministic, self-cleaning, and discards any prior deployment's data. Run it
+# at a single Cloud Run instance (--max-instances=1) so two instances never reset the database at once.
+spring:
+  config:
+    activate:
+      on-profile: demo
+campus-coffee:
+  id:
+    # Deterministic ids (like dev), so the seeded ids and capability/QR tokens are stable and reset-on-startup
+    # re-creates them; prod uses random ids only because it never resets, so its seeds cannot collide.
+    entity-seed: ${CAMPUS_COFFEE_ID_ENTITY_SEED:42}
+    event-seed: ${CAMPUS_COFFEE_ID_EVENT_SEED:100}
+  fixtures:
+    load-on-startup: true
+    reset-on-startup: true

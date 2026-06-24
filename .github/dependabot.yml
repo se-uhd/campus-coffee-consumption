@@ -40,6 +40,13 @@ updates:
     groups:
       npm-minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # Keep @types/node on the major that matches the pinned Node runtime (Node 24 LTS, set in mise.toml).
+      # A major @types/node bump tracks a newer Node release that stays "Current" until its October LTS
+      # (e.g. Node 26 is Current until October 2026), so the types must never run ahead of the runtime. Bump
+      # this by hand when the project itself moves to the next Node LTS.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   # Dockerfile base images. Only the build-stage jdxcode/mise image is bumped here; its version is the
   # mise tool version, independent of the bundled JDK. The runtime stage's eclipse-temurin tag is the

@@ -1,4 +1,4 @@
-package de.seuhd.campuscoffee.security
+package de.seuhd.campuscoffee.api.security
 
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.model.Role
@@ -22,7 +22,7 @@ import org.springframework.security.core.userdetails.User as SpringUser
  * minted before deactivation is rejected separately when the request principal is resolved to a domain user.
  */
 @Service
-class CampusUserDetailsService(
+class DomainUserDetailsService(
     private val userService: UserService
 ) : UserDetailsService {
     override fun loadUserByUsername(username: String): UserDetails {
