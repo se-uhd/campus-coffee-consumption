@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { ProfileUpdateRequest, UserDto } from '../models';
 
 /**
- * The authenticated user's own profile against `/api/profile` (the interceptor adds the X-Coffee-Token).
+ * The authenticated user's own profile against `/api/profile` (the interceptor adds the X-Capability-Token).
  * Used by both the member profile page and the admin's own profile page.
  */
 @Injectable({ providedIn: 'root' })
@@ -23,7 +23,7 @@ export class ProfileService {
 
   /**
    * The caller's own QR code as a PNG blob. Fetched via HttpClient (so the interceptor attaches the
-   * X-Coffee-Token header) rather than an `<img src>`, which could not send the header.
+   * X-Capability-Token header) rather than an `<img src>`, which could not send the header.
    */
   qrBlob(): Promise<Blob> {
     return firstValueFrom(this.http.get('/api/profile/qr.png', { responseType: 'blob' }));

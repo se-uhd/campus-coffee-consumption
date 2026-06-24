@@ -1,8 +1,8 @@
 package de.seuhd.campuscoffee.tests.acceptance
 
-import de.seuhd.campuscoffee.api.dtos.MemberSummaryDto
+import de.seuhd.campuscoffee.api.dtos.DepositRequestDto
 import de.seuhd.campuscoffee.api.dtos.PriceUpdateDto
-import de.seuhd.campuscoffee.api.dtos.SettlementRequestDto
+import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
@@ -16,7 +16,7 @@ import org.springframework.test.web.servlet.client.returnResult
 
 /**
  * Step definitions for the money-feature acceptance scenarios: an admin sets the price, a member buys beans
- * and drinks coffee, an admin records a settlement, and the member's balance reflects each in euro cents
+ * and drinks coffee, an admin records a deposit, and the member's balance reflects each in euro cents
  * (negative ⇒ they owe the fund).
  */
 class CucumberAccountingSteps(
@@ -63,14 +63,14 @@ class CucumberAccountingSteps(
             .returnResult<ByteArray>()
     }
 
-    @When("an admin records a {int} cent settlement for the member")
-    fun anAdminRecordsASettlement(amountCents: Int) {
+    @When("an admin records a {int} cent deposit for the member")
+    fun anAdminRecordsADeposit(amountCents: Int) {
         val id = userService.getByLoginName(member).id!!
         client()
             .post()
             .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(SettlementRequestDto(userId = id, amountCents = amountCents, note = null))
+            .body(DepositRequestDto(userId = id, amountCents = amountCents, note = null))
             .withAdmin()
             .exchange()
             .returnResult<ByteArray>()
@@ -85,7 +85,7 @@ class CucumberAccountingSteps(
                 .accept(MediaType.APPLICATION_JSON)
                 .withMember(member)
                 .exchange()
-                .returnResult<MemberSummaryDto>()
+                .returnResult<UserSummaryDto>()
                 .responseBody!!
         assertThat(summary.balanceCents).isEqualTo(balanceCents.toLong())
     }

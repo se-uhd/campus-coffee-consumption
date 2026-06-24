@@ -5,9 +5,9 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 /**
- * Response DTO for a kitty money movement: a settlement (with a member) or a kitty adjustment (without).
+ * Response DTO for a kitty money movement: a deposit (with a member) or a kitty adjustment (without).
  * The member, when present, is flattened to their id and login name. [amountCents] is in euro cents
- * (positive for a settlement; signed for an adjustment).
+ * (positive for a deposit; signed for an adjustment).
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class PaymentDto(

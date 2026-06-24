@@ -23,7 +23,7 @@ import java.util.UUID
 
 /**
  * Unit tests for the dev demo data loader's contract, mocking the services. They assert that the loader
- * creates its full set of extra demo members, layers consumption, bean-purchase, and settlement history on
+ * creates its full set of extra demo members, layers consumption, bean-purchase, and deposit history on
  * top of them (plus one kitty float), deactivates a member marked inactive only after seeding their history,
  * and is idempotent: a second [DevDemoDataLoader.loadDemoData] call skips because the demo members already
  * exist.
@@ -70,7 +70,7 @@ class DevDemoDataLoaderTest {
         whenever(coffeeConsumptionService.createForUser(any())).thenReturn(mock<CoffeeConsumption>())
         whenever(coffeeConsumptionService.applyDelta(any(), eq(1), any())).thenReturn(mock<CoffeeConsumption>())
         whenever(expenseService.recordOwn(any(), any(), any(), any())).thenReturn(mock<Expense>())
-        whenever(paymentService.recordSettlement(any(), any(), any(), any())).thenReturn(mock<Payment>())
+        whenever(paymentService.recordDeposit(any(), any(), any(), any())).thenReturn(mock<Payment>())
         whenever(paymentService.adjustKitty(any(), any(), any())).thenReturn(mock<Payment>())
     }
 
@@ -91,16 +91,16 @@ class DevDemoDataLoaderTest {
     }
 
     @Test
-    fun `loadDemoData seeds consumption, expense, and settlement history plus one kitty float`() {
+    fun `loadDemoData seeds consumption, expense, and deposit history plus one kitty float`() {
         whenever(userService.getAll()).thenReturn(listOf(admin))
         stubCreatePath()
 
         loader.loadDemoData()
 
-        // the demo specs add coffees, own bean purchases, and member settlements, so each seed path runs
+        // the demo specs add coffees, own bean purchases, and member deposits, so each seed path runs
         verify(coffeeConsumptionService, atLeastOnce()).applyDelta(any(), eq(1), any())
         verify(expenseService, atLeastOnce()).recordOwn(any(), any(), any(), any())
-        verify(paymentService, atLeastOnce()).recordSettlement(any(), any(), any(), any())
+        verify(paymentService, atLeastOnce()).recordDeposit(any(), any(), any(), any())
         // exactly one initial kitty float, recorded against the resolved fixture admin
         verify(paymentService, times(1)).adjustKitty(any(), any(), eq(admin))
     }

@@ -16,11 +16,11 @@ import org.testcontainers.utility.DockerImageName
 /**
  * Utilities for the system tests: the PostgreSQL container wiring, the shared RestTestClient, and helpers
  * for the two authentication mechanisms: an admin JWT minted at the token endpoint, and a member
- * capability token sent as the `X-Coffee-Token` header.
+ * capability token sent as the `X-Capability-Token` header.
  */
 object SystemTestUtils {
     /** The header a member authenticates with (their secret capability token). */
-    const val COFFEE_TOKEN_HEADER = "X-Coffee-Token"
+    const val CAPABILITY_TOKEN_HEADER = "X-Capability-Token"
 
     private lateinit var client: RestTestClient
 
@@ -82,7 +82,7 @@ object SystemTestUtils {
     fun RestTestClient.RequestHeadersSpec<*>.withAdmin(): RestTestClient.RequestHeadersSpec<*> =
         header(HttpHeaders.AUTHORIZATION, adminBearer())
 
-    /** The X-Coffee-Token header carrying the given member's capability token. */
+    /** The X-Capability-Token header carrying the given member's capability token. */
     fun RestTestClient.RequestHeadersSpec<*>.withMember(loginName: String): RestTestClient.RequestHeadersSpec<*> =
-        header(COFFEE_TOKEN_HEADER, memberToken(loginName))
+        header(CAPABILITY_TOKEN_HEADER, memberToken(loginName))
 }

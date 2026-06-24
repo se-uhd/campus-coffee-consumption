@@ -22,7 +22,7 @@ import { NotificationService } from '../../services/notification.service';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
 import { EurosPipe } from '../../pipes/euros.pipe';
-import { MemberBalanceDto, Role, UserDto } from '../../models';
+import { UserBalanceDto, Role, UserDto } from '../../models';
 
 /**
  * A members-table row: the full user (carrying the role, active state, and capability link the row actions
@@ -386,7 +386,7 @@ export class AdminUsersComponent implements OnInit {
   }
 
   /** Merges each user with their overview count and balance into the table rows. */
-  private mergeRows(users: UserDto[], overview: MemberBalanceDto[]): MemberRow[] {
+  private mergeRows(users: UserDto[], overview: UserBalanceDto[]): MemberRow[] {
     const balanceById = new Map(overview.map((member) => [member.userId, member]));
     // A row with no id cannot be keyed or acted on, so skip it explicitly rather than collapsing every such
     // user to the '' key, which would collide them onto one another's balance and silently show wrong zeros

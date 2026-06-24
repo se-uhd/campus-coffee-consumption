@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { AdjustmentRequest, KittyDto, PaymentDto, SettlementRequest } from '../models';
+import { AdjustmentRequest, KittyDto, PaymentDto, DepositRequest } from '../models';
 
 /**
  * The admin kitty calls against `/api/kitty` (the interceptor adds the JWT): the balance and history, a
@@ -18,7 +18,7 @@ export class KittyService {
   }
 
   /** Records that a member paid money into the kitty (a positive amount in euro cents). */
-  deposit(request: SettlementRequest): Promise<PaymentDto> {
+  deposit(request: DepositRequest): Promise<PaymentDto> {
     return firstValueFrom(this.http.post<PaymentDto>('/api/kitty/deposit', request));
   }
 

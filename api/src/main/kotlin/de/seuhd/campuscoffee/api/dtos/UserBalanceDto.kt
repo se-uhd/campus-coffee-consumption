@@ -6,7 +6,7 @@ import java.util.UUID
  * Response DTO for one row of the admin balance overview: a member and their current coffee [count] and
  * [balanceCents] (negative ⇒ they owe the fund). Money is in euro cents.
  */
-data class MemberBalanceDto(
+data class UserBalanceDto(
     val userId: UUID,
     val loginName: String,
     val firstName: String,

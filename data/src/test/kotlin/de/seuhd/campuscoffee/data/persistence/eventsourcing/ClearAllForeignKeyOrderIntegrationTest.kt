@@ -75,7 +75,7 @@ class ClearAllForeignKeyOrderIntegrationTest : AbstractEventSourcingDataIntegrat
     fun `clearing all five logged entity types in foreign-key order empties every table and the event log`() {
         // seed every logged entity type so all the read tables and the children's RESTRICT user FKs are
         // populated before the clear: a user, their consumption, the price, an expense they bought, and a
-        // settlement they paid
+        // deposit they paid
         val member = seedMember()
         coffeeConsumptionDataService.upsert(CoffeeConsumption(user = member, count = 2))
         coffeePriceDataService.upsert(CoffeePrice(amountCents = 50))

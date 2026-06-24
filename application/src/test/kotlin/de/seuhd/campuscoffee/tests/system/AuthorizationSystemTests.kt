@@ -6,7 +6,7 @@ import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
-import de.seuhd.campuscoffee.tests.SystemTestUtils.COFFEE_TOKEN_HEADER
+import de.seuhd.campuscoffee.tests.SystemTestUtils.CAPABILITY_TOKEN_HEADER
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.jwtFor
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
@@ -59,7 +59,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
             client()
                 .get()
                 .uri("/api/summary")
-                .header(COFFEE_TOKEN_HEADER, "not-a-real-token")
+                .header(CAPABILITY_TOKEN_HEADER, "not-a-real-token")
                 .exchange()
                 .statusCode()
 
@@ -145,6 +145,38 @@ class AuthorizationSystemTests : AbstractSystemTest() {
                 .statusCode()
 
         assertThat(status).isEqualTo(401)
+    }
+
+    @Test
+    fun `an anonymous request to actuator health returns 200 OK`() {
+        // health is the one actuator endpoint left public (the Docker/Cloud Run healthcheck relies on it),
+        // so it must stay anonymously reachable even as every other actuator path is locked down. Together
+        // with the 401 and 403 cases below this pins the actuator authorization contract: a regression that
+        // reordered the security matchers (the SPA `GET /** -> permitAll` ahead of `/actuator/** -> ADMIN`)
+        // would break one of the three.
+        val status =
+            client()
+                .get()
+                .uri("/actuator/health")
+                .exchange()
+                .statusCode()
+
+        assertThat(status).isEqualTo(200)
+    }
+
+    @Test
+    fun `a member request to a non-health actuator endpoint returns 403 Forbidden`() {
+        // a ROLE_USER member is authenticated but not an admin, so the `/actuator/** -> ADMIN` rule forbids
+        // it (403): actuator is closed to members as well as to anonymous callers.
+        val status =
+            client()
+                .get()
+                .uri("/actuator/env")
+                .withMember(member)
+                .exchange()
+                .statusCode()
+
+        assertThat(status).isEqualTo(403)
     }
 
     @Test

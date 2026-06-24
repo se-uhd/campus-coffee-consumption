@@ -5,25 +5,14 @@
     "description": "REST API for tracking the coffee consumption of SE@UHD group members: members bump their own count via a secret capability link, and admins manage members and adjust counts.",
     "version": "0.3.1"
   },
-  "servers": [
-    {
-      "url": "http://localhost:8080",
-      "description": "Generated server url"
-    }
-  ],
+  "servers": [{ "url": "http://localhost:8081", "description": "Generated server url" }],
   "tags": [
-    {
-      "name": "Admin accounting",
-      "description": "Per-member balances and activity (admin only)."
-    },
+    { "name": "Admin accounting", "description": "Per-member balances and activity (admin only)." },
     {
       "name": "Consumption",
-      "description": "Adding and undoing a member's own coffees, authenticated by their capability token (X-Coffee-Token)."
+      "description": "Adding and undoing a member's own coffees (X-Capability-Token)."
     },
-    {
-      "name": "Authentication",
-      "description": "Exchange credentials for a stateless JWT bearer token."
-    },
+    { "name": "Authentication", "description": "Exchange credentials for a stateless JWT bearer token." },
     {
       "name": "Admin expenses",
       "description": "Recording, correcting, and deleting members' bean purchases (admin only)."
@@ -37,36 +26,22 @@
       "description": "Dev-only endpoints to clear, load, and inspect test data in the database."
     },
     {
-      "name": "Price",
-      "description": "Setting and inspecting the global coffee price (admin only)."
+      "name": "Self-service",
+      "description": "The authenticated member's own landing summary and activity (X-Capability-Token)."
     },
-    {
-      "name": "Expenses",
-      "description": "A member recording their own bean purchases (X-Coffee-Token)."
-    },
+    { "name": "Price", "description": "Setting and inspecting the global coffee price (admin only)." },
+    { "name": "Expenses", "description": "A member recording their own bean purchases (X-Capability-Token)." },
     {
       "name": "User consumption (admin)",
       "description": "Admin view and adjustment of any member's coffee consumption."
     },
-    {
-      "name": "Member",
-      "description": "The authenticated member's own landing summary and activity (X-Coffee-Token)."
-    },
-    {
-      "name": "Users",
-      "description": "Admin operations for managing members and their capability links."
-    },
-    {
-      "name": "Profile",
-      "description": "The authenticated user's own profile and capability link."
-    }
+    { "name": "Users", "description": "Admin operations for managing members and their capability links." },
+    { "name": "Profile", "description": "The authenticated user's own profile and capability link." }
   ],
   "paths": {
     "/api/users/{userId}/expenses/{expenseId}": {
       "put": {
-        "tags": [
-          "Admin expenses"
-        ],
+        "tags": ["Admin expenses"],
         "summary": "Correct a recorded bean purchase.",
         "operationId": "update",
         "parameters": [
@@ -74,98 +49,48 @@
             "name": "userId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           },
           {
             "name": "expenseId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdminExpenseDto"
-              }
-            }
-          },
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminExpenseDto" } } },
           "required": true
         },
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExpenseDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/ExpenseDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       },
       "delete": {
-        "tags": [
-          "Admin expenses"
-        ],
+        "tags": ["Admin expenses"],
         "summary": "Delete a recorded bean purchase.",
         "operationId": "delete",
         "parameters": [
@@ -173,83 +98,43 @@
             "name": "userId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           },
           {
             "name": "expenseId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
-          },
+          "200": { "description": "OK" },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/users/{userId}/consumption": {
       "get": {
-        "tags": [
-          "User consumption (admin)"
-        ],
+        "tags": ["User consumption (admin)"],
         "summary": "Get a member's current coffee total and recent changes.",
         "operationId": "get",
         "parameters": [
@@ -258,100 +143,50 @@
             "in": "path",
             "description": "Unique identifier of the member.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           },
           {
             "name": "limit",
             "in": "query",
             "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "exclusiveMinimum": 0,
-              "maximum": 100
-            }
+            "schema": { "type": "integer", "format": "int32", "exclusiveMinimum": 0, "maximum": 100 }
           },
           {
             "name": "offset",
             "in": "query",
             "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0
-            }
+            "schema": { "type": "integer", "format": "int32", "minimum": 0 }
           }
         ],
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConsumptionDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/ConsumptionDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       },
       "put": {
-        "tags": [
-          "User consumption (admin)"
-        ],
+        "tags": ["User consumption (admin)"],
         "summary": "Override a member's coffee count to an explicit value (admin correction).",
         "operationId": "overrideTotal",
         "parameters": [
@@ -360,89 +195,44 @@
             "in": "path",
             "description": "Unique identifier of the member.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConsumptionOverrideDto"
-              }
-            }
+            "application/json": { "schema": { "$ref": "#/components/schemas/ConsumptionOverrideDto" } }
           },
           "required": true
         },
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConsumptionDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/ConsumptionDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       },
       "post": {
-        "tags": [
-          "User consumption (admin)"
-        ],
+        "tags": ["User consumption (admin)"],
         "summary": "Apply a +1/-1 change to a member's coffee count.",
         "operationId": "change",
         "parameters": [
@@ -451,91 +241,46 @@
             "in": "path",
             "description": "Unique identifier of the member.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "requestBody": {
           "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConsumptionDeltaDto"
-              }
-            }
+            "application/json": { "schema": { "$ref": "#/components/schemas/ConsumptionDeltaDto" } }
           },
           "required": true
         },
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConsumptionDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/ConsumptionDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/users/{id}": {
       "get": {
-        "tags": [
-          "Users"
-        ],
+        "tags": ["Users"],
         "summary": "Get user by ID.",
         "operationId": "getById",
         "parameters": [
@@ -544,49 +289,26 @@
             "in": "path",
             "description": "Unique identifier of the user to retrieve.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "responses": {
           "200": {
             "description": "The user with the provided ID as a JSON object.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserDto"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserDto" } } }
           },
           "404": {
             "description": "No user with the provided ID could be found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated user lacks the role required for this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       },
       "put": {
-        "tags": [
-          "Users"
-        ],
+        "tags": ["Users"],
         "summary": "Update user by ID.",
         "operationId": "update_1",
         "parameters": [
@@ -595,89 +317,42 @@
             "in": "path",
             "description": "Unique identifier of the user to update.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UserDto"
-              }
-            }
-          },
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserDto" } } },
           "required": true
         },
         "responses": {
           "200": {
             "description": "The updated user as a JSON object.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserDto"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserDto" } } }
           },
           "400": {
             "description": "Validation failed (e.g., IDs in path and body do not match, bean validation error).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated user may not update this user (e.g., not the owner, or not an admin).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "No user with the provided ID could be found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "A user with the same unique identifier already exists.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       },
       "delete": {
-        "tags": [
-          "Users"
-        ],
+        "tags": ["Users"],
         "summary": "Delete user by ID.",
         "operationId": "delete_1",
         "parameters": [
@@ -686,668 +361,313 @@
             "in": "path",
             "description": "Unique identifier of the user to delete.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "responses": {
-          "204": {
-            "description": "The user was successfully deleted."
-          },
+          "204": { "description": "The user was successfully deleted." },
           "401": {
             "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated user may not delete this user (e.g., not an admin).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "No user with the provided ID could be found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The user cannot be deleted because other data still references it.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/profile": {
       "get": {
-        "tags": [
-          "Profile"
-        ],
+        "tags": ["Profile"],
         "summary": "Get the authenticated user's own profile, including their coffee link.",
         "operationId": "get_1",
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/UserDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       },
       "put": {
-        "tags": [
-          "Profile"
-        ],
+        "tags": ["Profile"],
         "summary": "Update the authenticated member's own profile (first name, last name, email).",
         "operationId": "update_2",
         "requestBody": {
           "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProfileUpdateDto"
-              }
-            }
+            "application/json": { "schema": { "$ref": "#/components/schemas/ProfileUpdateDto" } }
           },
           "required": true
         },
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/UserDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/price": {
       "get": {
-        "tags": [
-          "Price"
-        ],
+        "tags": ["Price"],
         "summary": "Get the current global coffee price per cup.",
         "operationId": "getCurrent",
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/PriceDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/PriceDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       },
       "put": {
-        "tags": [
-          "Price"
-        ],
+        "tags": ["Price"],
         "summary": "Set the global coffee price per cup.",
         "operationId": "setPrice",
         "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PriceUpdateDto"
-              }
-            }
-          },
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PriceUpdateDto" } } },
           "required": true
         },
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/PriceDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/PriceDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/dev/data": {
       "get": {
-        "tags": [
-          "Dev data"
-        ],
+        "tags": ["Dev data"],
         "summary": "Report the current number of users and coffee consumptions.",
         "operationId": "count",
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/DevSummaryDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/DevSummaryDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       },
       "put": {
-        "tags": [
-          "Dev data"
-        ],
+        "tags": ["Dev data"],
         "summary": "Replace all data with the test fixtures (members and their zeroed consumptions).",
         "operationId": "load",
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/DevSummaryDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/DevSummaryDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       },
       "delete": {
-        "tags": [
-          "Dev data"
-        ],
+        "tags": ["Dev data"],
         "summary": "Clear all data (consumptions and users).",
         "operationId": "clear",
         "responses": {
-          "200": {
-            "description": "OK"
-          },
+          "200": { "description": "OK" },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/users": {
       "get": {
-        "tags": [
-          "Users"
-        ],
+        "tags": ["Users"],
         "summary": "Get all users.",
         "operationId": "getAll",
         "responses": {
           "200": {
             "description": "All users as a JSON array.",
             "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/UserDto"
-                  }
-                }
-              }
+              "application/json": { "schema": { "items": { "$ref": "#/components/schemas/UserDto" } } }
             }
           },
           "403": {
             "description": "The authenticated user lacks the role required for this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       },
       "post": {
-        "tags": [
-          "Users"
-        ],
+        "tags": ["Users"],
         "summary": "Create a new user.",
         "operationId": "create",
         "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UserDto"
-              }
-            }
-          },
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserDto" } } },
           "required": true
         },
         "responses": {
           "201": {
             "description": "The new user as a JSON object.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserDto"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserDto" } } }
           },
           "400": {
             "description": "Validation failed (e.g., bean validation error, or the request body carries an ID; IDs are assigned by the server).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "A user with the same value for a unique field already exists.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated user lacks the role required for this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/users/{userId}/expenses": {
       "get": {
-        "tags": [
-          "Admin expenses"
-        ],
+        "tags": ["Admin expenses"],
         "summary": "List a member's recorded bean purchases.",
         "operationId": "list",
         "parameters": [
@@ -1355,82 +675,40 @@
             "name": "userId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "responses": {
           "200": {
             "description": "OK",
             "content": {
-              "*/*": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ExpenseDto"
-                  }
-                }
-              }
+              "*/*": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ExpenseDto" } } }
             }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       },
       "post": {
-        "tags": [
-          "Admin expenses"
-        ],
+        "tags": ["Admin expenses"],
         "summary": "Record a bean purchase for a member, with a kitty/private split.",
         "operationId": "create_1",
         "parameters": [
@@ -1438,91 +716,44 @@
             "name": "userId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdminExpenseDto"
-              }
-            }
-          },
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminExpenseDto" } } },
           "required": true
         },
         "responses": {
           "201": {
             "description": "Created",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExpenseDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/ExpenseDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/users/{id}/link/rotate": {
       "post": {
-        "tags": [
-          "Users"
-        ],
+        "tags": ["Users"],
         "summary": "Rotate a member's capability link, invalidating the old QR code.",
         "operationId": "rotateLink",
         "parameters": [
@@ -1531,579 +762,278 @@
             "in": "path",
             "description": "Unique identifier of the member.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/UserDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/kitty/deposit": {
       "post": {
-        "tags": [
-          "Kitty"
-        ],
+        "tags": ["Kitty"],
         "summary": "Record a member deposit (money paid into the kitty).",
         "operationId": "deposit",
         "requestBody": {
           "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SettlementRequestDto"
-              }
-            }
+            "application/json": { "schema": { "$ref": "#/components/schemas/DepositRequestDto" } }
           },
           "required": true
         },
         "responses": {
           "201": {
             "description": "Created",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/PaymentDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/PaymentDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/kitty/adjustment": {
       "post": {
-        "tags": [
-          "Kitty"
-        ],
+        "tags": ["Kitty"],
         "summary": "Adjust the kitty (initial float or correction).",
         "operationId": "adjustment",
         "requestBody": {
           "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdjustmentRequestDto"
-              }
-            }
+            "application/json": { "schema": { "$ref": "#/components/schemas/AdjustmentRequestDto" } }
           },
           "required": true
         },
         "responses": {
           "201": {
             "description": "Created",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/PaymentDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/PaymentDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/expenses": {
       "post": {
-        "tags": [
-          "Expenses"
-        ],
+        "tags": ["Expenses"],
         "summary": "Record the authenticated member's own bean purchase.",
         "operationId": "record",
         "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MemberExpenseDto"
-              }
-            }
-          },
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OwnExpenseDto" } } },
           "required": true
         },
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/MemberSummaryDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/UserSummaryDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/consumption": {
       "post": {
-        "tags": [
-          "Consumption"
-        ],
+        "tags": ["Consumption"],
         "summary": "Add one coffee to the authenticated member's count.",
         "operationId": "add",
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/MemberSummaryDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/UserSummaryDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/consumption/cancel": {
       "post": {
-        "tags": [
-          "Consumption"
-        ],
+        "tags": ["Consumption"],
         "summary": "Undo the authenticated member's most recent coffee (within the grace period).",
         "operationId": "cancel",
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/MemberSummaryDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/UserSummaryDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/auth/token": {
       "post": {
-        "tags": [
-          "Authentication"
-        ],
+        "tags": ["Authentication"],
         "summary": "Authenticate with a login name and password and issue a JWT bearer token.",
         "operationId": "token",
         "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TokenRequestDto"
-              }
-            }
-          },
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TokenRequestDto" } } },
           "required": true
         },
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/TokenResponseDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/TokenResponseDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/users/{userId}/activity": {
       "get": {
-        "tags": [
-          "Admin accounting"
-        ],
+        "tags": ["Admin accounting"],
         "summary": "Get a page of a member's activity.",
-        "operationId": "memberActivity",
+        "operationId": "userActivity",
         "parameters": [
           {
             "name": "userId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           },
           {
             "name": "limit",
             "in": "query",
             "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "exclusiveMinimum": 0,
-              "maximum": 100
-            }
+            "schema": { "type": "integer", "format": "int32", "exclusiveMinimum": 0, "maximum": 100 }
           },
           {
             "name": "offset",
             "in": "query",
             "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0
-            }
+            "schema": { "type": "integer", "format": "int32", "minimum": 0 }
           }
         ],
         "responses": {
@@ -2111,73 +1041,36 @@
             "description": "OK",
             "content": {
               "*/*": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/LedgerEntryDto"
-                  }
-                }
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityEntryDto" } }
               }
             }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/users/{id}/qr.png": {
       "get": {
-        "tags": [
-          "Users"
-        ],
+        "tags": ["Users"],
         "summary": "Download a member's capability QR code (high-resolution PNG).",
         "operationId": "qrCode",
         "parameters": [
@@ -2186,82 +1079,40 @@
             "in": "path",
             "description": "Unique identifier of the member.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "image/png": {
-                "schema": {
-                  "type": "string",
-                  "format": "byte"
-                }
-              }
-            }
+            "content": { "image/png": { "schema": { "type": "string", "format": "byte" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/users/{id}/link": {
       "get": {
-        "tags": [
-          "Users"
-        ],
+        "tags": ["Users"],
         "summary": "Get a member's capability link (the URL encoded in their QR code).",
         "operationId": "link",
         "parameters": [
@@ -2270,152 +1121,75 @@
             "in": "path",
             "description": "Unique identifier of the member.",
             "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
+            "schema": { "type": "string", "format": "uuid" }
           }
         ],
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/UserDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/users/qr.zip": {
       "get": {
-        "tags": [
-          "Users"
-        ],
+        "tags": ["Users"],
         "summary": "Download a ZIP archive of every member's capability QR code (one PNG per member).",
         "operationId": "qrCodesZip",
         "responses": {
           "200": {
             "description": "OK",
             "content": {
-              "application/zip": {
-                "schema": {
-                  "$ref": "#/components/schemas/StreamingResponseBody"
-                }
-              }
+              "application/zip": { "schema": { "$ref": "#/components/schemas/StreamingResponseBody" } }
             }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/users/overview": {
       "get": {
-        "tags": [
-          "Admin accounting"
-        ],
+        "tags": ["Admin accounting"],
         "summary": "Get every member's current count and balance.",
         "operationId": "overview",
         "responses": {
@@ -2423,144 +1197,69 @@
             "description": "OK",
             "content": {
               "*/*": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MemberBalanceDto"
-                  }
-                }
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/UserBalanceDto" } }
               }
             }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/users/me": {
       "get": {
-        "tags": [
-          "Users"
-        ],
+        "tags": ["Users"],
         "summary": "Get the authenticated admin's own user.",
         "operationId": "me",
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/UserDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/users/filter": {
       "get": {
-        "tags": [
-          "Users"
-        ],
+        "tags": ["Users"],
         "summary": "Filter user by a selected field.",
         "operationId": "filter",
         "parameters": [
@@ -2569,50 +1268,28 @@
             "in": "query",
             "description": "Login name of the user to retrieve.",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
           "200": {
             "description": "The user matching the filter criteria as a JSON object.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserDto"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserDto" } } }
           },
           "404": {
             "description": "No user matching the filter criteria could be found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated user lacks the role required for this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/summary": {
       "get": {
-        "tags": [
-          "Member"
-        ],
+        "tags": ["Self-service"],
         "summary": "Get the authenticated member's landing summary.",
         "operationId": "summary",
         "parameters": [
@@ -2620,165 +1297,79 @@
             "name": "limit",
             "in": "query",
             "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "exclusiveMinimum": 0,
-              "maximum": 100
-            }
+            "schema": { "type": "integer", "format": "int32", "exclusiveMinimum": 0, "maximum": 100 }
           },
           {
             "name": "offset",
             "in": "query",
             "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0
-            }
+            "schema": { "type": "integer", "format": "int32", "minimum": 0 }
           }
         ],
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/MemberSummaryDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/UserSummaryDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/profile/qr.png": {
       "get": {
-        "tags": [
-          "Profile"
-        ],
+        "tags": ["Profile"],
         "summary": "Download the member's own capability QR code (high-resolution PNG).",
         "operationId": "qrCode_1",
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "image/png": {
-                "schema": {
-                  "type": "string",
-                  "format": "byte"
-                }
-              }
-            }
+            "content": { "image/png": { "schema": { "type": "string", "format": "byte" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/price/history": {
       "get": {
-        "tags": [
-          "Price"
-        ],
+        "tags": ["Price"],
         "summary": "Get the global coffee price history (newest first).",
         "operationId": "history",
         "responses": {
@@ -2786,73 +1377,36 @@
             "description": "OK",
             "content": {
               "*/*": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PriceChangeDto"
-                  }
-                }
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/PriceChangeDto" } }
               }
             }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/kitty/history": {
       "get": {
-        "tags": [
-          "Kitty"
-        ],
+        "tags": ["Kitty"],
         "summary": "Get the kitty balance and a page of its history.",
         "operationId": "history_1",
         "parameters": [
@@ -2860,93 +1414,46 @@
             "name": "limit",
             "in": "query",
             "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "exclusiveMinimum": 0,
-              "maximum": 100
-            }
+            "schema": { "type": "integer", "format": "int32", "exclusiveMinimum": 0, "maximum": 100 }
           },
           {
             "name": "offset",
             "in": "query",
             "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0
-            }
+            "schema": { "type": "integer", "format": "int32", "minimum": 0 }
           }
         ],
         "responses": {
           "200": {
             "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/KittyDto"
-                }
-              }
-            }
+            "content": { "*/*": { "schema": { "$ref": "#/components/schemas/KittyDto" } } }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
     },
     "/api/activity": {
       "get": {
-        "tags": [
-          "Member"
-        ],
+        "tags": ["Self-service"],
         "summary": "Get a page of the authenticated member's activity.",
         "operationId": "activity",
         "parameters": [
@@ -2954,22 +1461,13 @@
             "name": "limit",
             "in": "query",
             "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "exclusiveMinimum": 0,
-              "maximum": 100
-            }
+            "schema": { "type": "integer", "format": "int32", "exclusiveMinimum": 0, "maximum": 100 }
           },
           {
             "name": "offset",
             "in": "query",
             "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0
-            }
+            "schema": { "type": "integer", "format": "int32", "minimum": 0 }
           }
         ],
         "responses": {
@@ -2977,64 +1475,29 @@
             "description": "OK",
             "content": {
               "*/*": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/LedgerEntryDto"
-                  }
-                }
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityEntryDto" } }
               }
             }
           },
           "400": {
             "description": "The request is malformed or violates a validation rule.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "401": {
             "description": "The request is unauthenticated (a missing, unknown, or rotated credential).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "403": {
             "description": "The authenticated caller is not permitted to perform this operation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "404": {
             "description": "A referenced resource does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           },
           "409": {
             "description": "The request conflicts with the current state of the resource.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
           }
         }
       }
@@ -3045,89 +1508,26 @@
       "AdminExpenseDto": {
         "type": "object",
         "properties": {
-          "weightGrams": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 1000000,
-            "minimum": 0
-          },
-          "amountCents": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 10000000,
-            "minimum": 0
-          },
-          "privateAmountCents": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 10000000,
-            "minimum": 0
-          },
-          "kittyAmountCents": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 10000000,
-            "minimum": 0
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 500,
-            "minLength": 0
-          }
+          "weightGrams": { "type": "integer", "format": "int32", "maximum": 1000, "minimum": 0 },
+          "amountCents": { "type": "integer", "format": "int32", "maximum": 100000, "minimum": 0 },
+          "privateAmountCents": { "type": "integer", "format": "int32", "maximum": 100000, "minimum": 0 },
+          "kittyAmountCents": { "type": "integer", "format": "int32", "maximum": 100000, "minimum": 0 },
+          "note": { "type": ["string", "null"], "maxLength": 500, "minLength": 0 }
         },
-        "required": [
-          "amountCents",
-          "kittyAmountCents",
-          "privateAmountCents",
-          "weightGrams"
-        ]
+        "required": ["amountCents", "kittyAmountCents", "privateAmountCents", "weightGrams"]
       },
       "ExpenseDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "buyerUserId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "buyerLoginName": {
-            "type": "string"
-          },
-          "weightGrams": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "amountCents": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "privateAmountCents": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "kittyAmountCents": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "createdAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          }
+          "id": { "type": "string", "format": "uuid" },
+          "buyerUserId": { "type": "string", "format": "uuid" },
+          "buyerLoginName": { "type": "string" },
+          "weightGrams": { "type": "integer", "format": "int32" },
+          "amountCents": { "type": "integer", "format": "int32" },
+          "privateAmountCents": { "type": "integer", "format": "int32" },
+          "kittyAmountCents": { "type": "integer", "format": "int32" },
+          "note": { "type": ["string", "null"] },
+          "createdAt": { "type": ["string", "null"], "format": "date-time" }
         },
         "required": [
           "amountCents",
@@ -3143,369 +1543,123 @@
         "type": "object",
         "description": "The new, non-negative total and an optional note.",
         "properties": {
-          "total": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 1000000,
-            "minimum": 0
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 500,
-            "minLength": 0
-          }
+          "total": { "type": "integer", "format": "int32", "maximum": 1000000, "minimum": 0 },
+          "note": { "type": ["string", "null"], "maxLength": 500, "minLength": 0 }
         },
-        "required": [
-          "total"
-        ]
+        "required": ["total"]
       },
       "ConsumptionChangeDto": {
         "type": "object",
         "properties": {
-          "count": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "delta": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "createdBy": {
-            "type": "string"
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
+          "count": { "type": "integer", "format": "int32" },
+          "delta": { "type": "integer", "format": "int32" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "createdBy": { "type": "string" },
+          "note": { "type": ["string", "null"] }
         },
-        "required": [
-          "count",
-          "createdAt",
-          "createdBy",
-          "delta"
-        ]
+        "required": ["count", "createdAt", "createdBy", "delta"]
       },
       "ConsumptionDto": {
         "type": "object",
         "properties": {
-          "total": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "changes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConsumptionChangeDto"
-            }
-          }
+          "total": { "type": "integer", "format": "int32" },
+          "changes": { "type": "array", "items": { "$ref": "#/components/schemas/ConsumptionChangeDto" } }
         },
-        "required": [
-          "changes",
-          "total"
-        ]
+        "required": ["changes", "total"]
       },
       "UserDto": {
         "type": "object",
         "description": "Data of the member to create, including their role.",
         "properties": {
-          "id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          },
-          "createdAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          },
-          "loginName": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "pattern": "\\w+"
-          },
-          "emailAddress": {
-            "type": "string",
-            "format": "email",
-            "maxLength": 254,
-            "minLength": 0
-          },
-          "firstName": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1
-          },
-          "lastName": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1
-          },
-          "password": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 255,
-            "minLength": 8,
-            "writeOnly": true
-          },
-          "role": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "USER",
-              "ADMIN"
-            ]
-          },
-          "active": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "capabilityUrl": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
+          "id": { "type": ["string", "null"], "format": "uuid" },
+          "createdAt": { "type": ["string", "null"], "format": "date-time" },
+          "updatedAt": { "type": ["string", "null"], "format": "date-time" },
+          "loginName": { "type": "string", "maxLength": 255, "minLength": 1, "pattern": "\\w+" },
+          "emailAddress": { "type": "string", "format": "email", "maxLength": 254, "minLength": 0 },
+          "firstName": { "type": "string", "maxLength": 255, "minLength": 1 },
+          "lastName": { "type": "string", "maxLength": 255, "minLength": 1 },
+          "password": { "type": ["string", "null"], "maxLength": 255, "minLength": 8, "writeOnly": true },
+          "role": { "type": ["string", "null"], "enum": ["USER", "ADMIN"] },
+          "active": { "type": ["boolean", "null"] },
+          "capabilityUrl": { "type": ["string", "null"] }
         },
-        "required": [
-          "emailAddress",
-          "firstName",
-          "lastName",
-          "loginName"
-        ]
+        "required": ["emailAddress", "firstName", "lastName", "loginName"]
       },
       "ProfileUpdateDto": {
         "type": "object",
         "description": "The profile fields to update.",
         "properties": {
-          "firstName": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1
-          },
-          "lastName": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1
-          },
-          "emailAddress": {
-            "type": "string",
-            "format": "email",
-            "maxLength": 254,
-            "minLength": 0
-          }
+          "firstName": { "type": "string", "maxLength": 255, "minLength": 1 },
+          "lastName": { "type": "string", "maxLength": 255, "minLength": 1 },
+          "emailAddress": { "type": "string", "format": "email", "maxLength": 254, "minLength": 0 }
         },
-        "required": [
-          "emailAddress",
-          "firstName",
-          "lastName"
-        ]
+        "required": ["emailAddress", "firstName", "lastName"]
       },
       "PriceUpdateDto": {
         "type": "object",
         "properties": {
-          "amountCents": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 10000000,
-            "minimum": 0
-          }
+          "amountCents": { "type": "integer", "format": "int32", "maximum": 100000, "minimum": 0 }
         },
-        "required": [
-          "amountCents"
-        ]
+        "required": ["amountCents"]
       },
       "PriceDto": {
         "type": "object",
-        "properties": {
-          "amountCents": {
-            "type": "integer",
-            "format": "int32"
-          }
-        },
-        "required": [
-          "amountCents"
-        ]
+        "properties": { "amountCents": { "type": "integer", "format": "int32" } },
+        "required": ["amountCents"]
       },
       "DevSummaryDto": {
         "type": "object",
         "properties": {
-          "users": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "consumptions": {
-            "type": "integer",
-            "format": "int32"
-          }
+          "users": { "type": "integer", "format": "int32" },
+          "consumptions": { "type": "integer", "format": "int32" }
         },
-        "required": [
-          "consumptions",
-          "users"
-        ]
+        "required": ["consumptions", "users"]
       },
       "ConsumptionDeltaDto": {
         "type": "object",
         "description": "The single-step delta to apply (+1 or -1).",
-        "properties": {
-          "delta": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 1,
-            "minimum": -1
-          }
-        },
-        "required": [
-          "delta"
-        ]
+        "properties": { "delta": { "type": "integer", "format": "int32", "maximum": 1, "minimum": -1 } },
+        "required": ["delta"]
       },
-      "SettlementRequestDto": {
+      "DepositRequestDto": {
         "type": "object",
         "properties": {
-          "userId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "amountCents": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 10000000,
-            "minimum": 1
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 500,
-            "minLength": 0
-          }
+          "userId": { "type": "string", "format": "uuid" },
+          "amountCents": { "type": "integer", "format": "int32", "maximum": 100000, "minimum": 1 },
+          "note": { "type": ["string", "null"], "maxLength": 500, "minLength": 0 }
         },
-        "required": [
-          "amountCents",
-          "userId"
-        ]
+        "required": ["amountCents", "userId"]
       },
       "PaymentDto": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "userId": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          },
-          "userLoginName": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "amountCents": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "createdAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          }
+          "id": { "type": "string", "format": "uuid" },
+          "userId": { "type": ["string", "null"], "format": "uuid" },
+          "userLoginName": { "type": ["string", "null"] },
+          "amountCents": { "type": "integer", "format": "int32" },
+          "note": { "type": ["string", "null"] },
+          "createdAt": { "type": ["string", "null"], "format": "date-time" }
         },
-        "required": [
-          "amountCents",
-          "id"
-        ]
+        "required": ["amountCents", "id"]
       },
       "AdjustmentRequestDto": {
         "type": "object",
         "properties": {
-          "amountCents": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 10000000,
-            "minimum": -10000000
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 500,
-            "minLength": 0
-          }
+          "amountCents": { "type": "integer", "format": "int32", "maximum": 100000, "minimum": -100000 },
+          "note": { "type": ["string", "null"], "maxLength": 500, "minLength": 0 }
         },
-        "required": [
-          "amountCents"
-        ]
+        "required": ["amountCents"]
       },
-      "MemberExpenseDto": {
+      "OwnExpenseDto": {
         "type": "object",
         "properties": {
-          "weightGrams": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 1000000,
-            "minimum": 0
-          },
-          "amountCents": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 10000000,
-            "minimum": 1
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 500,
-            "minLength": 0
-          }
+          "weightGrams": { "type": "integer", "format": "int32", "maximum": 1000, "minimum": 0 },
+          "amountCents": { "type": "integer", "format": "int32", "maximum": 100000, "minimum": 1 },
+          "note": { "type": ["string", "null"], "maxLength": 500, "minLength": 0 }
         },
-        "required": [
-          "amountCents",
-          "weightGrams"
-        ]
+        "required": ["amountCents", "weightGrams"]
       },
-      "LedgerEntryDto": {
+      "ActivityEntryDto": {
         "type": "object",
         "properties": {
           "type": {
@@ -3514,244 +1668,88 @@
               "CONSUMPTION",
               "CONSUMPTION_CANCEL",
               "PRIVATE_EXPENSE",
-              "SETTLEMENT",
+              "DEPOSIT",
               "KITTY_EXPENSE",
               "KITTY_ADJUSTMENT"
             ]
           },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "createdBy": {
-            "type": "string"
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "amountCents": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "runningBalanceCents": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "count": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int32"
-          },
-          "delta": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int32"
-          },
-          "weightGrams": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int32"
-          },
-          "privateAmountCents": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64"
-          },
-          "kittyAmountCents": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64"
-          }
+          "id": { "type": "string", "format": "uuid" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "createdBy": { "type": "string" },
+          "note": { "type": ["string", "null"] },
+          "amountCents": { "type": "integer", "format": "int64" },
+          "runningBalanceCents": { "type": "integer", "format": "int64" },
+          "count": { "type": ["integer", "null"], "format": "int32" },
+          "delta": { "type": ["integer", "null"], "format": "int32" },
+          "weightGrams": { "type": ["integer", "null"], "format": "int32" },
+          "privateAmountCents": { "type": ["integer", "null"], "format": "int64" },
+          "kittyAmountCents": { "type": ["integer", "null"], "format": "int64" }
         },
-        "required": [
-          "amountCents",
-          "createdAt",
-          "createdBy",
-          "id",
-          "runningBalanceCents",
-          "type"
-        ]
+        "required": ["amountCents", "createdAt", "createdBy", "id", "runningBalanceCents", "type"]
       },
-      "MemberSummaryDto": {
+      "UserSummaryDto": {
         "type": "object",
         "properties": {
-          "count": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "priceCents": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "balanceCents": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "kittyBalanceCents": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "cancellable": {
-            "type": "boolean"
-          },
-          "ledger": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LedgerEntryDto"
-            }
-          }
+          "count": { "type": "integer", "format": "int32" },
+          "priceCents": { "type": "integer", "format": "int32" },
+          "balanceCents": { "type": "integer", "format": "int64" },
+          "kittyBalanceCents": { "type": "integer", "format": "int64" },
+          "cancellable": { "type": "boolean" },
+          "activity": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityEntryDto" } }
         },
-        "required": [
-          "balanceCents",
-          "cancellable",
-          "count",
-          "kittyBalanceCents",
-          "ledger",
-          "priceCents"
-        ]
+        "required": ["activity", "balanceCents", "cancellable", "count", "kittyBalanceCents", "priceCents"]
       },
       "TokenRequestDto": {
         "type": "object",
         "properties": {
-          "loginName": {
-            "type": "string",
-            "minLength": 1
-          },
-          "password": {
-            "type": "string",
-            "minLength": 1
-          }
+          "loginName": { "type": "string", "minLength": 1 },
+          "password": { "type": "string", "minLength": 1 }
         },
-        "required": [
-          "loginName",
-          "password"
-        ]
+        "required": ["loginName", "password"]
       },
       "TokenResponseDto": {
         "type": "object",
-        "properties": {
-          "token": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "token"
-        ]
+        "properties": { "token": { "type": "string" } },
+        "required": ["token"]
       },
       "StreamingResponseBody": {},
-      "MemberBalanceDto": {
+      "UserBalanceDto": {
         "type": "object",
         "properties": {
-          "userId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "loginName": {
-            "type": "string"
-          },
-          "firstName": {
-            "type": "string"
-          },
-          "lastName": {
-            "type": "string"
-          },
-          "count": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "balanceCents": {
-            "type": "integer",
-            "format": "int64"
-          }
+          "userId": { "type": "string", "format": "uuid" },
+          "loginName": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "count": { "type": "integer", "format": "int32" },
+          "balanceCents": { "type": "integer", "format": "int64" }
         },
-        "required": [
-          "balanceCents",
-          "count",
-          "firstName",
-          "lastName",
-          "loginName",
-          "userId"
-        ]
+        "required": ["balanceCents", "count", "firstName", "lastName", "loginName", "userId"]
       },
       "PriceChangeDto": {
         "type": "object",
         "properties": {
-          "amountCents": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "createdBy": {
-            "type": "string"
-          }
+          "amountCents": { "type": "integer", "format": "int32" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "createdBy": { "type": "string" }
         },
-        "required": [
-          "amountCents",
-          "createdAt",
-          "createdBy"
-        ]
+        "required": ["amountCents", "createdAt", "createdBy"]
       },
       "KittyDto": {
         "type": "object",
         "properties": {
-          "balanceCents": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "entries": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LedgerEntryDto"
-            }
-          }
+          "balanceCents": { "type": "integer", "format": "int64" },
+          "entries": { "type": "array", "items": { "$ref": "#/components/schemas/ActivityEntryDto" } }
         },
-        "required": [
-          "balanceCents",
-          "entries"
-        ]
+        "required": ["balanceCents", "entries"]
       },
       "ErrorResponse": {
         "properties": {
-          "errorCode": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "statusCode": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "statusMessage": {
-            "type": "string"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "path": {
-            "type": "string"
-          }
+          "errorCode": { "type": "string" },
+          "message": { "type": "string" },
+          "statusCode": { "type": "integer", "format": "int32" },
+          "statusMessage": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "path": { "type": "string" }
         }
       }
     }

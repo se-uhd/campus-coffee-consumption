@@ -7,14 +7,15 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ActivityEntryDto } from './activityEntryDto';
 
 
-export interface MemberBalanceDto { 
-    userId: string;
-    loginName: string;
-    firstName: string;
-    lastName: string;
+export interface UserSummaryDto { 
     count: number;
+    priceCents: number;
     balanceCents: number;
+    kittyBalanceCents: number;
+    cancellable: boolean;
+    activity: Array<ActivityEntryDto>;
 }
 

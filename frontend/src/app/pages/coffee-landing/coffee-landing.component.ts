@@ -14,23 +14,23 @@ import { CapabilityTokenService } from '../../services/capability-token.service'
 import { SummaryService } from '../../services/summary.service';
 import { ProfileService } from '../../services/profile.service';
 import { NotificationService } from '../../services/notification.service';
-import { LedgerListComponent } from '../../components/ledger-list/ledger-list.component';
+import { ActivityListComponent } from '../../components/activity-list/activity-list.component';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { BalanceSummaryComponent } from '../../components/balance-summary/balance-summary.component';
 import { CollapsibleCardComponent } from '../../components/collapsible-card/collapsible-card.component';
 import { EuroAmountDirective } from '../../directives/euro-amount.directive';
-import { LedgerEntryDto, MemberExpenseRequest, MemberSummaryDto } from '../../models';
+import { ActivityEntryDto, OwnExpenseRequest, UserSummaryDto } from '../../models';
 import { euroInputError, toCents } from '../../util/money';
-import { appendLedgerPage } from '../../util/ledger';
+import { appendActivityPage } from '../../util/activity';
 
-/** The page size for one ledger page; "Load more" appends another page of this size. */
-const LEDGER_PAGE_SIZE = 10;
+/** The page size for one activity page; "Load more" appends another page of this size. */
+const ACTIVITY_PAGE_SIZE = 10;
 
 /**
  * Member landing reached by scanning the wall QR code (`/login/:token`). Reads the capability token from
  * the route, holds it for the interceptor, and shows the prepaid-card view: the big count and a +1 hero,
  * the price per cup, the member's balance (debt or credit), the read-only kitty balance, an "undo last
- * coffee" action within the grace period, a private bean-purchase form, and the unified ledger. Only the
+ * coffee" action within the grace period, a private bean-purchase form, and the unified activity. Only the
  * displayed count updates optimistically on a +1; all money is always taken from the server's summary.
  */
 @Component({
@@ -46,7 +46,7 @@ const LEDGER_PAGE_SIZE = 10;
     MatTooltipModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
-    LedgerListComponent,
+    ActivityListComponent,
     AppHeaderComponent,
     BalanceSummaryComponent,
     CollapsibleCardComponent,
@@ -182,13 +182,13 @@ const LEDGER_PAGE_SIZE = 10;
 
         <mat-card class="card">
           <h2>Recent activity</h2>
-          <cc-ledger-list
-            [entries]="ledger"
+          <cc-activity-list
+            [entries]="activity"
             [showFilter]="true"
             [canLoadMore]="hasMore"
             [loadingMore]="loadingMore"
             (loadMore)="loadMore()"
-          ></cc-ledger-list>
+          ></cc-activity-list>
         </mat-card>
       }
     </div>
@@ -218,9 +218,9 @@ const LEDGER_PAGE_SIZE = 10;
 export class CoffeeLandingComponent implements OnInit {
   token = '';
   loginName = '';
-  summary: MemberSummaryDto | null = null;
-  /** The unified ledger, paged client-side via "Load more". */
-  ledger: LedgerEntryDto[] = [];
+  summary: UserSummaryDto | null = null;
+  /** The unified activity, paged client-side via "Load more". */
+  activity: ActivityEntryDto[] = [];
   /** The optimistically-displayed count; reconciled to the server count after every action. */
   displayCount: number | null = null;
   busy = false;
@@ -257,12 +257,12 @@ export class CoffeeLandingComponent implements OnInit {
     this.reload();
   }
 
-  /** Loads the authoritative summary (and its first ledger page); surfaces a retryable error on failure. */
+  /** Loads the authoritative summary (and its first activity page); surfaces a retryable error on failure. */
   async reload(): Promise<void> {
     this.loading = true;
     this.loadError = '';
     try {
-      this.applySummary(await this.summaryService.getSummary(LEDGER_PAGE_SIZE, 0));
+      this.applySummary(await this.summaryService.getSummary(ACTIVITY_PAGE_SIZE, 0));
     } catch {
       this.loadError = 'Could not load your coffee count. Your link may be invalid.';
     } finally {
@@ -270,16 +270,16 @@ export class CoffeeLandingComponent implements OnInit {
     }
   }
 
-  /** Appends the next page of the member's ledger. */
+  /** Appends the next page of the member's activity. */
   async loadMore(): Promise<void> {
     this.loadingMore = true;
     try {
-      const next = await this.summaryService.getActivity(LEDGER_PAGE_SIZE, this.ledger.length);
-      const { entries, appended } = appendLedgerPage(this.ledger, next);
-      this.ledger = entries;
+      const next = await this.summaryService.getActivity(ACTIVITY_PAGE_SIZE, this.activity.length);
+      const { entries, appended } = appendActivityPage(this.activity, next);
+      this.activity = entries;
       // base "Load more" on the rows actually gained: a full page that collapsed to fewer new rows (its
       // boundary row was a duplicate) means there is nothing more to fetch
-      this.hasMore = appended === LEDGER_PAGE_SIZE;
+      this.hasMore = appended === ACTIVITY_PAGE_SIZE;
     } catch (error) {
       this.notifications.error(error, 'Could not load more activity.');
     } finally {
@@ -287,12 +287,12 @@ export class CoffeeLandingComponent implements OnInit {
     }
   }
 
-  /** Adopts a server summary as the source of truth (the displayed count and first ledger page reconcile). */
-  private applySummary(summary: MemberSummaryDto): void {
+  /** Adopts a server summary as the source of truth (the displayed count and first activity page reconcile). */
+  private applySummary(summary: UserSummaryDto): void {
     this.summary = summary;
     this.displayCount = summary.count;
-    this.ledger = summary.ledger;
-    this.hasMore = summary.ledger.length === LEDGER_PAGE_SIZE;
+    this.activity = summary.activity;
+    this.hasMore = summary.activity.length === ACTIVITY_PAGE_SIZE;
   }
 
   /** Adds a coffee: bumps the displayed count optimistically, then reconciles to the server summary. */
@@ -320,7 +320,7 @@ export class CoffeeLandingComponent implements OnInit {
    * double-tap) loses the @Version optimistic-lock race on one write; the documented contract is that the SPA
    * retries it, so the dropped tap is re-applied rather than surfaced as an error.
    */
-  private async addCoffeeWithRetry(): Promise<MemberSummaryDto> {
+  private async addCoffeeWithRetry(): Promise<UserSummaryDto> {
     try {
       return await this.summaryService.addCoffee();
     } catch (error) {
@@ -368,7 +368,7 @@ export class CoffeeLandingComponent implements OnInit {
     }
     this.busy = true;
     try {
-      const request: MemberExpenseRequest = {
+      const request: OwnExpenseRequest = {
         weightGrams: this.expenseWeightGrams,
         amountCents,
         note: this.expenseNote || undefined

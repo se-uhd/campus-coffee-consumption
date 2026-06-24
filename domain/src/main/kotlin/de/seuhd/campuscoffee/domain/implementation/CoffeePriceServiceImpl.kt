@@ -8,8 +8,8 @@ import de.seuhd.campuscoffee.domain.model.PriceChange
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
+import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeePriceDataService
-import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class CoffeePriceServiceImpl(
     private val coffeePriceDataService: CoffeePriceDataService,
-    private val ledgerDataService: LedgerDataService
+    private val activityDataService: ActivityDataService
 ) : CoffeePriceService {
     override fun getCurrent(): CoffeePrice =
         coffeePriceDataService.findCurrent()
@@ -68,7 +68,7 @@ class CoffeePriceServiceImpl(
     override fun priceHistory(actingUser: User): List<PriceChange> {
         requireAdmin(actingUser)
         // the data service returns the history oldest-first; the API shows it newest-first
-        return ledgerDataService.priceHistory().reversed()
+        return activityDataService.priceHistory().reversed()
     }
 
     override fun clear() = coffeePriceDataService.clear()

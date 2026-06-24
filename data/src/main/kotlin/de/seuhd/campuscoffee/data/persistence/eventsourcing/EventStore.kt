@@ -51,13 +51,13 @@ class EventStore(
 
     /**
      * Appends a DELETE event carrying the id of the removed domain object, plus any [ownerKeys] that the
-     * member/kitty ledger reads key on (a deleted expense or settlement must still be matched to its owner so
-     * the ledger reverses it; the projection ignores everything but the id). Each value is stored as its
-     * string form to match the way the body flattens references.
+     * member-activity and kitty-history reads key on (a deleted expense or deposit must still be matched to
+     * its owner so the activity feed reverses it; the projection ignores everything but the id). Each value
+     * is stored as its string form to match the way the body flattens references.
      *
      * @param domainType the domain type of the removed object
      * @param id the id of the removed domain object
-     * @param ownerKeys extra body fields (e.g. `buyerUserId`, `userId`) so a member-ledger query still
+     * @param ownerKeys extra body fields (e.g. `buyerUserId`, `userId`) so a member-activity query still
      *   matches the DELETE event; a null value is omitted
      */
     fun appendDelete(

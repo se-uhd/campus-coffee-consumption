@@ -11,7 +11,7 @@ import java.util.UUID
 /**
  * Event sourcing payment data adapter, the only persistence path. A Decorator around the relational
  * [PaymentDataServiceImpl] (both adapters for the same `PaymentDataService` port, so it is `@Primary`),
- * delegating reads and `getAllByUser` and writing each settlement and kitty adjustment event-first.
+ * delegating reads and `getAllByUser` and writing each deposit and kitty adjustment event-first.
  */
 @Service
 @Primary
@@ -30,7 +30,7 @@ class EventSourcedPaymentDataService(
 
     @Transactional
     override fun delete(id: UUID) =
-        // carry the member id (null for a pure kitty adjustment) so the member ledger reverses a settlement
+        // carry the member id (null for a pure kitty adjustment) so the member activity reverses a deposit
         writer.delete(Payment::class, id, delegate::getById) { mapOf("userId" to it.user?.id) }
 
     @Transactional

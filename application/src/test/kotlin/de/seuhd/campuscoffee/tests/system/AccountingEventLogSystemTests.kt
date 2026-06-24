@@ -1,8 +1,8 @@
 package de.seuhd.campuscoffee.tests.system
 
-import de.seuhd.campuscoffee.api.dtos.MemberExpenseDto
+import de.seuhd.campuscoffee.api.dtos.DepositRequestDto
+import de.seuhd.campuscoffee.api.dtos.OwnExpenseDto
 import de.seuhd.campuscoffee.api.dtos.PriceUpdateDto
-import de.seuhd.campuscoffee.api.dtos.SettlementRequestDto
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
@@ -81,7 +81,7 @@ class AccountingEventLogSystemTests : AbstractSystemTest() {
             .post()
             .uri("/api/expenses")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(MemberExpenseDto(weightGrams = 1000, amountCents = 900, note = "beans"))
+            .body(OwnExpenseDto(weightGrams = 1000, amountCents = 900, note = "beans"))
             .withMember(member)
             .exchange()
 
@@ -117,12 +117,12 @@ class AccountingEventLogSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a settlement appends a Payment event with the member and amount and the admin login`() {
+    fun `a deposit appends a Payment event with the member and amount and the admin login`() {
         client()
             .post()
             .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(SettlementRequestDto(userId = seededUser(member).persistedId, amountCents = 1000, note = "paid"))
+            .body(DepositRequestDto(userId = seededUser(member).persistedId, amountCents = 1000, note = "paid"))
             .withAdmin()
             .exchange()
 
@@ -131,7 +131,7 @@ class AccountingEventLogSystemTests : AbstractSystemTest() {
         val event = paymentEvents.first()
         assertThat(event.body["userId"]).isEqualTo(seededUser(member).persistedId.toString())
         assertThat((event.body["amountCents"] as Number).toInt()).isEqualTo(1000)
-        // a settlement's note is carried in the full-state body (the event note column is the admin
+        // a deposit's note is carried in the full-state body (the event note column is the admin
         // override/reset reason, set only by the consumption service); the actor login is the admin
         assertThat(event.body["note"]).isEqualTo("paid")
         assertThat(event.createdBy).isEqualTo("jane_doe")

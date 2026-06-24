@@ -1,16 +1,16 @@
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
+import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.CoffeePrice
 import de.seuhd.campuscoffee.domain.model.Expense
-import de.seuhd.campuscoffee.domain.model.LedgerEntryType
 import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
+import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeePriceDataService
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
-import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -19,15 +19,15 @@ import org.springframework.beans.factory.annotation.Autowired
 import java.util.UUID
 
 /**
- * Integration tests for [LedgerDataServiceImpl]: the member and kitty ledger projections walked straight
+ * Integration tests for [ActivityDataServiceImpl]: the member and kitty history projections walked straight
  * from the event log. Each write is attributed to the "system" actor (no SecurityContext in a data test),
- * so a consumption write is an "owner step" when the ledger is read with ownerLogin = "system". These drive
+ * so a consumption write is an "owner step" when the activity is read with ownerLogin = "system". These drive
  * the INSERT/UPDATE/DELETE branches of the expense and payment walks, the owner-undo and admin-override
  * consumption branches, and the price-at-time valuation.
  */
-class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTest() {
+class ActivityDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTest() {
     @Autowired
-    private lateinit var ledgerDataService: LedgerDataService
+    private lateinit var activityDataService: ActivityDataService
 
     @Autowired
     private lateinit var coffeePriceDataService: CoffeePriceDataService
@@ -74,9 +74,9 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         )
 
     private fun balanceOf(user: User): Long =
-        ledgerDataService.memberLedger(user.persistedId, systemActor).lastOrNull()?.runningBalanceCents ?: 0L
+        activityDataService.userActivity(user.persistedId, systemActor).lastOrNull()?.runningBalanceCents ?: 0L
 
-    private fun kittyBalance(): Long = ledgerDataService.kittyLedger().lastOrNull()?.runningBalanceCents ?: 0L
+    private fun kittyBalance(): Long = activityDataService.kittyHistory().lastOrNull()?.runningBalanceCents ?: 0L
 
     @Test
     fun `each coffee is valued at the price in effect at its append position`() {
@@ -101,8 +101,8 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         coffeeConsumptionDataService.upsert(consumption.copy(count = 0)) // owner undo, credited at 70
 
         assertThat(balanceOf(member)).isEqualTo(0)
-        val types = ledgerDataService.memberLedger(member.persistedId, systemActor).map { it.type }
-        assertThat(types).containsExactly(LedgerEntryType.CONSUMPTION, LedgerEntryType.CONSUMPTION_CANCEL)
+        val types = activityDataService.userActivity(member.persistedId, systemActor).map { it.type }
+        assertThat(types).containsExactly(ActivityEntryType.CONSUMPTION, ActivityEntryType.CONSUMPTION_CANCEL)
     }
 
     @Test
@@ -113,9 +113,9 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         coffeeConsumptionDataService.upsert(consumption.copy(count = 3)) // a +3 jump
 
         // reading with a non-matching owner login treats the system write as an admin override (a lump)
-        val ledger = ledgerDataService.memberLedger(member.persistedId, "someone-else")
-        assertThat(ledger.last().runningBalanceCents).isEqualTo(-150)
-        assertThat(ledger.last().type).isEqualTo(LedgerEntryType.CONSUMPTION)
+        val activity = activityDataService.userActivity(member.persistedId, "someone-else")
+        assertThat(activity.last().runningBalanceCents).isEqualTo(-150)
+        assertThat(activity.last().type).isEqualTo(ActivityEntryType.CONSUMPTION)
     }
 
     @Test
@@ -127,10 +127,10 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         // read as an admin override (non-matching owner): a +4 lump, then lower to 1 (a -3 lump, a credit)
         coffeeConsumptionDataService.upsert(consumption.copy(count = 1))
 
-        val ledger = ledgerDataService.memberLedger(member.persistedId, "an-admin")
+        val activity = activityDataService.userActivity(member.persistedId, "an-admin")
         // 4 cups at 50 = -200, then -3 cups credited back = +150 -> -50
-        assertThat(ledger.last().runningBalanceCents).isEqualTo(-50)
-        assertThat(ledger).hasSize(2)
+        assertThat(activity.last().runningBalanceCents).isEqualTo(-50)
+        assertThat(activity).hasSize(2)
     }
 
     @Test
@@ -141,13 +141,13 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         // two owner +1 steps, so two increments sit on the undo stack
         consumption = coffeeConsumptionDataService.upsert(consumption.copy(count = 1))
         consumption = coffeeConsumptionDataService.upsert(consumption.copy(count = 2))
-        assertThat(ledgerDataService.lastCancellableIncrement(member.persistedId, systemActor)).isNotNull()
+        assertThat(activityDataService.lastCancellableIncrement(member.persistedId, systemActor)).isNotNull()
 
         // a count drop of more than one is never an owner ±1 step, so it is an admin override-down that trims
         // the undo stack: dropping by two removes both outstanding increments, leaving nothing to cancel
         coffeeConsumptionDataService.upsert(consumption.copy(count = 0))
 
-        assertThat(ledgerDataService.lastCancellableIncrement(member.persistedId, systemActor)).isNull()
+        assertThat(activityDataService.lastCancellableIncrement(member.persistedId, systemActor)).isNull()
     }
 
     @Test
@@ -160,7 +160,7 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         coffeeConsumptionDataService.upsert(consumption.copy(count = 2)) // +1 at 200, the newest increment
 
         // the undo targets the most recent owner increment, so it would credit its price (200)
-        val cancellable = ledgerDataService.lastCancellableIncrement(member.persistedId, systemActor)
+        val cancellable = activityDataService.lastCancellableIncrement(member.persistedId, systemActor)
         assertThat(cancellable).isNotNull()
         assertThat(cancellable!!.priceCents).isEqualTo(200)
     }
@@ -206,9 +206,9 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         )
 
         assertThat(balanceOf(member)).isEqualTo(300)
-        // no kitty-funded portion, so the kitty stays at zero and the kitty ledger has no entry
+        // no kitty-funded portion, so the kitty stays at zero and the kitty history has no entry
         assertThat(kittyBalance()).isEqualTo(0)
-        assertThat(ledgerDataService.kittyLedger()).isEmpty()
+        assertThat(activityDataService.kittyHistory()).isEmpty()
     }
 
     @Test
@@ -230,13 +230,13 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
 
         expenseDataService.delete(expense.persistedId)
 
-        // the DELETE event carries the buyer id, so the member ledger matches and reverses it too
+        // the DELETE event carries the buyer id, so the member activity matches and reverses it too
         assertThat(balanceOf(member)).isEqualTo(0)
         assertThat(kittyBalance()).isEqualTo(0)
     }
 
     @Test
-    fun `a split expense carries both portions on the member and the kitty ledger entry`() {
+    fun `a split expense carries both portions on the member and the kitty history entry`() {
         val member = seedMember()
         seedPrice(50)
         expenseDataService.upsert(
@@ -250,14 +250,14 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         )
 
         val memberEntry =
-            ledgerDataService.memberLedger(member.persistedId, systemActor).first {
-                it.type == LedgerEntryType.PRIVATE_EXPENSE
+            activityDataService.userActivity(member.persistedId, systemActor).first {
+                it.type == ActivityEntryType.PRIVATE_EXPENSE
             }
         assertThat(memberEntry.amountCents).isEqualTo(400)
         assertThat(memberEntry.privateAmountCents).isEqualTo(400)
         assertThat(memberEntry.kittyAmountCents).isEqualTo(500)
 
-        val kittyEntry = ledgerDataService.kittyLedger().first { it.type == LedgerEntryType.KITTY_EXPENSE }
+        val kittyEntry = activityDataService.kittyHistory().first { it.type == ActivityEntryType.KITTY_EXPENSE }
         // the kitty entry's own effect is the negative kitty draw, but it carries the same split breakdown
         assertThat(kittyEntry.amountCents).isEqualTo(-500)
         assertThat(kittyEntry.privateAmountCents).isEqualTo(400)
@@ -265,7 +265,7 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
     }
 
     @Test
-    fun `a private-only expense carries no split on the member ledger entry`() {
+    fun `a private-only expense carries no split on the member activity entry`() {
         val member = seedMember()
         seedPrice(50)
         expenseDataService.upsert(
@@ -279,22 +279,22 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         )
 
         val memberEntry =
-            ledgerDataService.memberLedger(member.persistedId, systemActor).first {
-                it.type == LedgerEntryType.PRIVATE_EXPENSE
+            activityDataService.userActivity(member.persistedId, systemActor).first {
+                it.type == ActivityEntryType.PRIVATE_EXPENSE
             }
         assertThat(memberEntry.privateAmountCents).isNull()
         assertThat(memberEntry.kittyAmountCents).isNull()
     }
 
     @Test
-    fun `a settlement credits the member and feeds the kitty`() {
+    fun `a deposit credits the member and feeds the kitty`() {
         val member = seedMember()
         seedPrice(50)
         paymentDataService.upsert(Payment(user = member, amountCents = 1000))
 
         assertThat(balanceOf(member)).isEqualTo(1000)
         assertThat(kittyBalance()).isEqualTo(1000)
-        assertThat(ledgerDataService.kittyLedger().last().type).isEqualTo(LedgerEntryType.SETTLEMENT)
+        assertThat(activityDataService.kittyHistory().last().type).isEqualTo(ActivityEntryType.DEPOSIT)
     }
 
     @Test
@@ -302,7 +302,7 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         seedPrice(50)
         var adjustment = paymentDataService.upsert(Payment(user = null, amountCents = 1000))
         assertThat(kittyBalance()).isEqualTo(1000)
-        assertThat(ledgerDataService.kittyLedger().last().type).isEqualTo(LedgerEntryType.KITTY_ADJUSTMENT)
+        assertThat(activityDataService.kittyHistory().last().type).isEqualTo(ActivityEntryType.KITTY_ADJUSTMENT)
 
         adjustment = paymentDataService.upsert(adjustment.copy(amountCents = 750)) // correct the amount
         assertThat(kittyBalance()).isEqualTo(750)
@@ -320,19 +320,19 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         consumption = coffeeConsumptionDataService.upsert(consumption.copy(count = 1))
 
         assertThat(balanceOf(member)).isEqualTo(-50)
-        // only the single +1 increment shows on the ledger; the no-op upsert adds nothing
-        assertThat(ledgerDataService.memberLedger(member.persistedId, systemActor)).hasSize(1)
+        // only the single +1 increment shows on the activity; the no-op upsert adds nothing
+        assertThat(activityDataService.userActivity(member.persistedId, systemActor)).hasSize(1)
     }
 
     @Test
-    fun `correcting a settlement adjusts the member balance and the kitty to the new amount`() {
+    fun `correcting a deposit adjusts the member balance and the kitty to the new amount`() {
         val member = seedMember()
         seedPrice(50)
-        var settlement = paymentDataService.upsert(Payment(user = member, amountCents = 1000))
+        var deposit = paymentDataService.upsert(Payment(user = member, amountCents = 1000))
         assertThat(balanceOf(member)).isEqualTo(1000)
         assertThat(kittyBalance()).isEqualTo(1000)
 
-        settlement = paymentDataService.upsert(settlement.copy(amountCents = 1200))
+        deposit = paymentDataService.upsert(deposit.copy(amountCents = 1200))
 
         // the member balance and the kitty both reflect the corrected amount (the full state)
         assertThat(balanceOf(member)).isEqualTo(1200)
@@ -340,16 +340,16 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
     }
 
     @Test
-    fun `deleting a settlement reverses the member balance and the kitty contribution`() {
+    fun `deleting a deposit reverses the member balance and the kitty contribution`() {
         val member = seedMember()
         seedPrice(50)
-        val settlement = paymentDataService.upsert(Payment(user = member, amountCents = 1000))
+        val deposit = paymentDataService.upsert(Payment(user = member, amountCents = 1000))
         assertThat(balanceOf(member)).isEqualTo(1000)
         assertThat(kittyBalance()).isEqualTo(1000)
 
-        paymentDataService.delete(settlement.persistedId)
+        paymentDataService.delete(deposit.persistedId)
 
-        // the DELETE event carries the member id, so the member ledger reverses the settlement too
+        // the DELETE event carries the member id, so the member activity reverses the deposit too
         assertThat(balanceOf(member)).isEqualTo(0)
         assertThat(kittyBalance()).isEqualTo(0)
     }
@@ -360,6 +360,6 @@ class LedgerDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationTes
         val current = coffeePriceDataService.findCurrent()!!
         coffeePriceDataService.upsert(current.copy(amountCents = 70))
 
-        assertThat(ledgerDataService.priceHistory().map { it.amountCents }).containsExactly(50, 70)
+        assertThat(activityDataService.priceHistory().map { it.amountCents }).containsExactly(50, 70)
     }
 }
