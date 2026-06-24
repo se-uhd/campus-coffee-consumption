@@ -46,7 +46,7 @@ From `application/src/test/kotlin/de/seuhd/campuscoffee/tests/architecture/Archi
 The domain defines **port interfaces** that adapters implement:
 
 - **API Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/api/`): Generic service interface `CrudService<DOMAIN, ID>` and the concrete service interfaces `UserService`, `CoffeeConsumptionService`, `CoffeePriceService`, `ExpenseService`, `PaymentService`, and `AccountingService` (the read side: a member's summary and unified activity feed, the per-member overview, and the kitty history and balance).
-- **Data Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/data/`): Generic data service interface `CrudDataService<DOMAIN, ID>`, the concrete `UserDataService`, `CoffeeConsumptionDataService` (the latter adds `getByUserId`), `CoffeePriceDataService`, `ExpenseDataService`, and `PaymentDataService`, the event-log-backed `ConsumptionHistoryDataService` and `ActivityDataService` (the unified-activity and kitty walk over the log), the `KittyLock` port (a Postgres advisory lock serializing the kitty-overdraw check, implemented by `PostgresKittyLock`), and the `PasswordHasher` port.
+- **Data Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/data/`): Generic data service interface `CrudDataService<DOMAIN, ID>`, the concrete `UserDataService`, `CoffeeConsumptionDataService` (the latter adds `getByUserId`), `CoffeePriceDataService`, `ExpenseDataService`, and `PaymentDataService`, the event-log-backed `ConsumptionHistoryDataService` and `ActivityDataService` (the unified-activity and kitty walk over the log), the `BalanceDataService` port (reads the maintained `member_balance`/`kitty_balance` projections, implemented by `BalanceProjection`), the `KittyLock` port (a Postgres advisory lock serializing the kitty-overdraw check, implemented by `PostgresKittyLock`), and the `PasswordHasher` port.
 - **Infrastructure ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/`): `IdGenerator`, `CapabilityTokenGenerator`, `QrCodeGenerator`, `StartupTask`, plus the request-scoped event-metadata ports `ActorProvider` and `ChangeNoteContext`.
 
 Service **implementations**:
@@ -75,16 +75,18 @@ Two additions versus CampusCoffee's event machinery:
 
 1. **`created_by` and `note` metadata on the generic event.** `events` and `EventEntity` carry a
    `created_by` (the actor's **login name** as a string: a member via their token, an admin, or `"system"`
-   for startup fixtures/bootstrap) and a nullable `note` (an admin's free-text reason for an absolute count
-   correction). Both are set at the `EventStore.append*` boundary from the
-   request-scoped `ActorProvider` (reads the `SecurityContext`) and `ChangeNoteContext` (a thread-local that
-   the coffee-consumption service sets only around the count correction, the one operation that takes a
-   reason). A deposit, kitty adjustment, or expense note is written into that entity's own event body
-   (by its `Event*Serializer`), not into this metadata `note` column, so a `note` query over `events`
-   returns null for those. Neither metadata field is part of the full-state JSON body,
-   and the generic writer/decorator signatures are untouched. `created_by` is a login string, not a user
-   id, so the audit trail is human-readable, represents the non-user `"system"` actor naturally, and does
-   not foreign key into the mutable users read model.
+   for startup fixtures/bootstrap) and a nullable `note` (the free-text note associated with the event). Both
+   are set at the single `EventStore.append*` boundary from the request-scoped `ActorProvider` (reads the
+   `SecurityContext`) and the note source. The note is unified at that boundary: it is the admin's
+   count-correction reason when present (from `ChangeNoteContext`, the thread-local the coffee-consumption
+   service sets only around the count correction, the one operation that takes a reason with no entity field
+   of its own), otherwise the entity's own note carried in the event body (a deposit, kitty adjustment, or
+   expense note, which is also entity state and is projected to that entity's read-model `note` column). So
+   `events.note` is the one canonical, queryable note for every event, and the activity and kitty feeds read
+   that single column. A DELETE body carries only the id, so it contributes no note. Neither metadata field
+   is part of the full-state JSON body, and the generic writer/decorator signatures are untouched.
+   `created_by` is a login string, not a user id, so the audit trail is human-readable, represents the
+   non-user `"system"` actor naturally, and does not foreign key into the mutable users read model.
 2. **Several logged entities, each modeled exactly like CampusCoffee's `Review`.** `CoffeeConsumption`,
    `CoffeePrice`, `Expense`, and `Payment` are all logged the same way: a domain model, a JPA read-model
    entity, a relational `*DataServiceImpl`, and a `@Primary` event-sourced decorator. Each flattens its user
@@ -164,6 +166,15 @@ admin split never leaks the kitty portion into the member's view). The member ba
 value; the API pages it newest-first. The **kitty history** is the same walk over the global payment and
 expense-kitty streams (admin-only; members see only the kitty balance, in their summary). New owner-key
 expression indexes (`body->>'userId'`, `body->>'buyerUserId'`) keep those scans efficient.
+
+The activity and kitty **lists** are read by walking the log (the per-entry running balances are intrinsic to
+that walk), but the **balance numbers** that used to force a whole-stream replay on hot reads are served from
+two maintained projections instead (`member_balance`, `kitty_balance`; the `BalanceDataService` port,
+implemented by `BalanceProjection` in the event-sourcing package). They are kept consistent by recomputing the
+affected member (and the kitty) from the same walk inside each money write's transaction, so a stored balance
+cannot drift from the authoritative walk, and they roll back with the write. So the per-member overview and
+the kitty-overdraw guard read one indexed row rather than replaying a stream, and the events-to-data rebuild
+recomputes both projections after replaying the log (which it now does in bounded `seq`-ordered batches).
 
 ### Generic Base Classes
 
@@ -433,10 +444,10 @@ access to your working notes or any review document) must understand the change 
 - **ORM**: JPA with Spring Data.
 - **Connection**: Configured in `application/src/main/resources/application.yaml`.
 
-The schema is a six-migration set, one `CREATE` per table: the incremental index/version migrations were
-folded into their table's create before the first production deployment, so each table is defined in one
-place (there is no deployed database whose checksums this would break; from here the migrations are
-append-only, see below).
+The schema is a seven-migration set, broadly one `CREATE` per table (V7 adds the two balance-projection
+tables together as one cohesive read-model unit): the incremental index/version migrations were folded into
+their table's create before the first production deployment, so each table is defined in one place (there is
+no deployed database whose checksums this would break; from here the migrations are append-only, see below).
 - `V1__create_users_table.sql`: `users` (uuid PK, timestamps, `login_name` unique, `email_address` unique,
   `first_name`, `last_name`, a single `role` column (`USER`/`ADMIN`, no `user_roles` table), `active`,
   `password_hash` nullable, `capability_token` unique, and `version` for optimistic locking).
@@ -461,9 +472,18 @@ append-only, see below).
 - `V6__create_payments_table.sql`: `payments` (uuid PK, timestamps, nullable `user_id` FK with the default
   RESTRICT (present is a deposit, null is a pure kitty adjustment), `amount_cents` signed, `note`,
   `version`).
+- `V7__create_balance_projection_tables.sql`: the two maintained balance projections (see the money model
+  below). `member_balance` (`user_id` uuid PK, FK to `users` with `ON DELETE CASCADE`, `balance_cents`
+  bigint) holds each member's running balance; `kitty_balance` (`id integer PK DEFAULT 1` with a
+  `CHECK (id = 1)`, `balance_cents` bigint) holds the single global kitty balance. The two single-row tables
+  use different one-row idioms on purpose: `coffee_prices` is an event-sourced entity with a meaningful UUID
+  id, so it needs the separate `is_singleton` guard column, whereas `kitty_balance` is a plain derived cache
+  with no natural id, so its fixed integer id is itself the guard (the lighter form). These projection tables
+  are unversioned (no optimistic-locking `version`); they are maintained inside each money write's transaction.
 
 Each of `users`, `coffee_consumptions`, `coffee_prices`, `expenses`, and `payments` carries a `version`
-column for optimistic locking; the append-only `events` log is deliberately unversioned.
+column for optimistic locking; the append-only `events` log and the `member_balance`/`kitty_balance`
+projections are deliberately unversioned.
 
 **Keep the migration files lean: plain DDL, no explanatory comments.** A column's or constraint's rationale
 belongs in the entity class's KDoc and the changelog, never in the `.sql`. And never edit an applied
@@ -532,20 +552,23 @@ keep conventional camelCase names.
 
 Two authentication mechanisms, one per audience; there is **no HTTP Basic**:
 
-- **Admins, JWT bearer.** `POST /api/auth/token` exchanges a username and password for a signed JWT (a
-  work-session TTL of ~10 hours, no refresh flow). The credentials are **encrypted in the browser**: the
-  request body is a compact JWE (`RSA-OAEP-256` + `A256GCM`), not plaintext. The backend publishes its RSA
-  public key at the public `GET /api/auth/public-key` (a JWK); the SPA encrypts `{ loginName, password }`
-  with it (the `jose` library), and `LoginPayloadDecryptor` (api layer) decrypts it with the configured
-  private key before authentication. This keeps the raw password out of TLS-terminating proxies and
-  request-body logs (defense in depth on top of TLS); it does not replace TLS, defend against a compromised
-  client or XSS, or make the login zero-knowledge (the server decrypts and still bcrypt-checks). A malformed
-  or undecryptable payload is a 400 (`LoginPayloadException`), distinct from the 401 for wrong-but-readable
-  credentials, so it is not a credential oracle. The SPA sends the issued token as `Authorization: Bearer …`.
-  The resource server maps the token's `roles` claim to a `ROLE_ADMIN` authority. The
+- **Admins, JWT bearer via a session cookie.** `POST /api/auth/token` exchanges a username and password for a
+  signed JWT (a work-session TTL of ~10 hours, no refresh flow). The credentials are **encrypted in the
+  browser**: the request body is a compact JWE (`RSA-OAEP-256` + `A256GCM`), not plaintext, and carries an
+  `iat` so a captured ciphertext cannot be replayed beyond `campus-coffee.login-encryption.max-payload-age`
+  (default 2 minutes). The backend publishes its RSA public key at the public `GET /api/auth/public-key` (a
+  JWK); the SPA encrypts `{ loginName, password, iat }` with it (the `jose` library), and
+  `LoginPayloadDecryptor` (api layer) decrypts it (rejecting a stale payload) before authentication. A
+  malformed, undecryptable, or stale payload is a 400 (`LoginPayloadException`), distinct from the 401 for
+  wrong-but-readable credentials, so it is not a credential oracle. The token endpoint sets the JWT in an
+  **httpOnly, `SameSite=Strict`, Secure (outside dev) cookie**, so the browser stores it where JavaScript
+  cannot read or exfiltrate it (an XSS cannot steal the session) and sends it automatically;
+  `POST /api/auth/logout` clears the cookie. `CookieOrHeaderBearerTokenResolver` reads the bearer token from
+  that cookie (the SPA) or the `Authorization` header (API clients and the system tests, which still use the
+  header). The resource server maps the token's `roles` claim to a `ROLE_ADMIN` authority. The
   `AuthenticationManager` / `DaoAuthenticationProvider` / `CampusUserDetailsService` / password-encoder
-  beans exist only for this login step. See `doc/2026-06-24_login-payload-encryption.md` for the threat
-  model, the choice of asymmetric over a shared symmetric key, and the key management.
+  beans exist only for this login step. See `doc/2026-06-24_login-payload-encryption.md` and
+  `doc/2026-06-24_security-hardening-and-cookie-auth.md` for the threat model and key management.
 - **Members, capability token.** `CapabilityTokenAuthenticationFilter` reads the `X-Capability-Token` header,
   resolves it to a member via `UserService.findByCapabilityToken`, and sets a `ROLE_USER` principal. The
   capability principal is **always** `ROLE_USER`, never `ROLE_ADMIN`, so an admin's own token grants only
@@ -553,8 +576,13 @@ Two authentication mechanisms, one per audience; there is **no HTTP Basic**:
   deactivated member is still authenticated (reads work), but the domain rejects their mutations → 403.
 
 The access rules gate the API by audience (`/api/users/**`, `/api/price/**`, and `/api/kitty/**` → `ROLE_ADMIN`; `/api/consumption/**`, `/api/expenses/**`, `/api/profile/**`,
-`/api/summary`, and `/api/activity` → `ROLE_USER`; `/api/auth/token`, `/api/auth/public-key`, actuator
+`/api/summary`, and `/api/activity` → `ROLE_USER`; `/api/auth/token`, `/api/auth/logout`, `/api/auth/public-key`, actuator
 health, Swagger, dev endpoints, and the SPA routes are public); the finer ownership rules live in the domain services.
+The chain sets a Content-Security-Policy (`default-src 'self'`, `connect-src 'self'`, `frame-ancestors 'none'`,
+inline styles allowed for Angular Material) as the structural XSS mitigation. CSRF token protection stays
+disabled: the only cookie (the admin session) is `SameSite=Strict` so it is never sent cross-site, and the
+member/API flows authenticate with a custom header a cross-site page cannot set, so a token-based scheme
+would only burden those CSRF-immune flows.
 `ActorProvider` returns the
 current principal's login for `created_by`; `CurrentUserProvider` resolves the principal to a domain
 `User`. CORS is not configured: the SPA is same-origin, so the security chain needs no CORS source (add one
@@ -603,7 +631,7 @@ controllers map paths relative to the resource.
 - `PUT  /users/{id}/consumption` `{ total, note? }`: the absolute count correction (`note` is the optional admin reason, ≤ 500 chars).
 - `POST/PUT/DELETE /users/{id}/expenses` `{ amountCents, privateAmountCents, kittyAmountCents, weightGrams, note? }`: record / correct / delete a member's bean purchase with an explicit private/kitty split (must sum to the total) attributed to the member as buyer.
 - `GET /price`: read the current global price (admin-only; members receive it through their landing summary).
-- `PUT /price` `{ amountCents }`: set the global price; `GET /price/history` reads the full price history from the log.
+- `PUT /price` `{ amountCents }`: set the global price; `GET /price/history?limit=50&offset=0` reads a page of the price history from the log (newest first).
 - `POST /kitty/deposit` `{ userId, amountCents, note? }`: a member pays money into the kitty (credits the member, feeds the kitty).
 - `POST /kitty/adjustment` `{ amountCents, note? }`: a pure kitty adjustment (an initial float or a correction).
 - `GET /kitty/history?limit=50&offset=0`: the kitty history (deposits and admin expenses, with the running kitty balance).
@@ -611,7 +639,8 @@ controllers map paths relative to the resource.
 ### Auth and dev
 
 - `GET  /auth/public-key`: the RSA public key (a JWK) the SPA uses to encrypt the login payload (public, no auth).
-- `POST /auth/token`: `{ encryptedPayload }`, a compact JWE of `{ loginName, password }` → JWT (the only admin credential; no Basic). The server decrypts it before authenticating; a malformed/undecryptable payload is a 400.
+- `POST /auth/token`: `{ encryptedPayload }`, a compact JWE of `{ loginName, password, iat }` → JWT, set in an httpOnly `SameSite=Strict` session cookie (the body also returns the token for header-based API clients). The only admin credential; no Basic. The server decrypts and freshness-checks it before authenticating; a malformed, undecryptable, or stale payload is a 400.
+- `POST /auth/logout`: clears the admin session cookie (public; clearing one's own cookie needs no auth).
 - `GET/PUT/DELETE /dev/data` (dev profile only): report counts / seed fixtures / clear.
 
 Notes on semantics:
@@ -654,6 +683,12 @@ Notes on semantics:
     it is configured rather than generated per startup; in prod it is delivered as one line with literal
     `\n` separators (`LoginEncryptionConfig` restores the newlines), parsed via Spring Security's
     `RsaKeyConverters`.
+  - `campus-coffee.login-encryption.max-payload-age` (`LoginEncryptionProperties`, api module): how far the
+    encrypted login payload's `iat` may differ from the server clock before it is rejected as stale (the
+    replay window). A `Duration`, default 2 minutes.
+  - `campus-coffee.auth.cookie.secure` / `name` (`AuthCookieProperties`, api module): whether the admin
+    session cookie is marked `Secure` (default `true`; the dev profile, served over plain http, sets it
+    `false`) and the cookie name. The cookie is always httpOnly and `SameSite=Strict`.
   - `campus-coffee.fixtures.load-on-startup` (`FixturesProperties`, application module): when `true` and
     the database has no users yet, load the fixtures on startup (on in dev, off in prod).
   - `campus-coffee.fixtures.reset-on-startup` (`FixturesProperties`, application module): when `true`, clear

@@ -309,9 +309,9 @@ Only `UserController`'s `@CrudOperation`-annotated methods get rich response doc
 
 #### L26. PUT `/profile` and other gaps in CLAUDE.md's endpoint matrix and migration descriptions
 *(Cluster of documentation accuracy items, all Low.)*
-- **`GET /users/filter` omitted from CLAUDE.md** (`UserController.kt:134`; documented in README) — the endpoint exists but the matrix does not list it.
-- **CLAUDE.md V4 migration description omits the `is_singleton` guard column and its unique constraint** (`CLAUDE.md:415`; `V4__create_coffee_prices_table.sql`) — the DB-level single-row guard is dropped from the column list (it is documented in the design doc).
-- **V3 migration comments are stale** (`V3__create_events_table.sql:15,26`) — `entity_type` lists only `(User, CoffeeConsumption)` of five types, and the `note` comment mentions a non-existent "reset."
+- **`GET /users/filter` omitted from CLAUDE.md** (`UserController.kt:134`; documented in README): the endpoint exists but the matrix does not list it.
+- **CLAUDE.md V4 migration description omits the `is_singleton` guard column and its unique constraint** (`CLAUDE.md:415`; `V4__create_coffee_prices_table.sql`): the DB-level single-row guard is dropped from the column list (it is documented in the design doc).
+- **V3 migration comments are stale** (`V3__create_events_table.sql:15,26`): `entity_type` lists only `(User, CoffeeConsumption)` of five types, and the `note` comment mentions a non-existent "reset."
 
 **Fix:** update each to match the code and the canonical design doc.
 
