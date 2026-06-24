@@ -45,7 +45,7 @@ class CurrentUserProvider(
                 ?: error("No authenticated user is present on the security context.")
         check(authentication.isAuthenticated) { "The current request is not authenticated." }
         val user = userService.getByLoginName(authentication.name)
-        if (user.role == Role.ADMIN && user.active == false) {
+        if (user.role == Role.ADMIN && user.active != true) {
             throw ForbiddenException("This admin account has been deactivated.")
         }
         return user

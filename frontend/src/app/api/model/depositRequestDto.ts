@@ -9,7 +9,7 @@
  */
 
 
-export interface SettlementRequestDto { 
+export interface DepositRequestDto { 
     userId: string;
     amountCents: number;
     note?: string | null;

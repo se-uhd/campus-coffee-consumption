@@ -17,7 +17,7 @@ import java.util.UUID
  * This is a port implemented by the domain layer and consumed by the API layer. Each mutation
  * ([applyDelta], [setTotal]) loads the target member's consumption, applies the new count, and upserts it,
  * which the event-sourced data adapter records as a full-state event. There is deliberately no new
- * ledger machinery: the count advances through the same upsert path a review's approval count did.
+ * activity machinery: the count advances through the same upsert path a review's approval count did.
  *
  * Authorization is by [User.role] and ownership: a member may add a coffee or undo a recent one only on
  * their own count, an admin may act on anyone, and the absolute override ([setTotal], an admin correction)

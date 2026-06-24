@@ -5,7 +5,7 @@ import java.util.UUID
 
 /**
  * Port interface for expense data operations, implemented by the data layer. Extends the generic
- * [CrudDataService] and adds the per-buyer lookup the balance and ledger rely on.
+ * [CrudDataService] and adds the per-buyer lookup the balance and activity rely on.
  */
 interface ExpenseDataService : CrudDataService<Expense, UUID> {
     /**

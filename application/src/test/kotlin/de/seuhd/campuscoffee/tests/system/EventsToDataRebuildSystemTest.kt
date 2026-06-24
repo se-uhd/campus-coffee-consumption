@@ -2,7 +2,7 @@ package de.seuhd.campuscoffee.tests.system
 
 import de.seuhd.campuscoffee.Application
 import de.seuhd.campuscoffee.api.dtos.KittyDto
-import de.seuhd.campuscoffee.api.dtos.MemberSummaryDto
+import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.data.persistence.eventsourcing.EventsToDataRunner
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
@@ -30,8 +30,8 @@ import org.testcontainers.containers.PostgreSQLContainer
 
 /**
  * System test for the event sourcing rebuild: with `events-to-data-on-startup` on so the [EventsToDataRunner]
- * bean exists, seed users, consumptions, a price, an expense, and a settlement; then rebuild the read tables
- * from the log and assert the balance, kitty, and ledger are unchanged: the log is a faithful source of
+ * bean exists, seed users, consumptions, a price, an expense, and a deposit; then rebuild the read tables
+ * from the log and assert the balance, kitty, and activity are unchanged: the log is a faithful source of
  * truth.
  */
 @SpringBootTest(classes = [Application::class], webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -79,14 +79,14 @@ class EventsToDataRebuildSystemTest {
 
     private fun memberId() = userService.getByLoginName(member).id!!
 
-    private fun summary(): MemberSummaryDto =
+    private fun summary(): UserSummaryDto =
         client()
             .get()
             .uri("/api/summary")
             .accept(MediaType.APPLICATION_JSON)
             .withMember(member)
             .exchange()
-            .returnResult<MemberSummaryDto>()
+            .returnResult<UserSummaryDto>()
             .responseBody!!
 
     private fun kittyBalance(): Long =
@@ -101,8 +101,8 @@ class EventsToDataRebuildSystemTest {
             .balanceCents
 
     @Test
-    fun `rebuilding the read model from the log leaves the balance, kitty, and ledger unchanged`() {
-        // a coffee at 50, a member purchase (+900 private), and a settlement (+1000) -> balance 1850
+    fun `rebuilding the read model from the log leaves the balance, kitty, and activity unchanged`() {
+        // a coffee at 50, a member purchase (+900 private), and a deposit (+1000) -> balance 1850
         client()
             .post()
             .uri("/api/consumption")
@@ -132,7 +132,7 @@ class EventsToDataRebuildSystemTest {
         val after = summary()
         assertThat(after.count).isEqualTo(before.count)
         assertThat(after.balanceCents).isEqualTo(before.balanceCents)
-        assertThat(after.ledger.map { it.type }).isEqualTo(before.ledger.map { it.type })
+        assertThat(after.activity.map { it.type }).isEqualTo(before.activity.map { it.type })
         assertThat(kittyBalance()).isEqualTo(kittyBefore)
     }
 

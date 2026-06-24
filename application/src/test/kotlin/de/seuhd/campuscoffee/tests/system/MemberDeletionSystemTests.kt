@@ -1,6 +1,6 @@
 package de.seuhd.campuscoffee.tests.system
 
-import de.seuhd.campuscoffee.api.dtos.SettlementRequestDto
+import de.seuhd.campuscoffee.api.dtos.DepositRequestDto
 import de.seuhd.campuscoffee.api.dtos.UserDto
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
@@ -14,7 +14,7 @@ import java.util.UUID
 
 /**
  * System tests for the member deletion guard: a member with any financial footprint (a non-zero count or a
- * settlement) cannot be hard-deleted (409), preserving the financial history, while a pristine member is
+ * deposit) cannot be hard-deleted (409), preserving the financial history, while a pristine member is
  * deleted (204).
  */
 class MemberDeletionSystemTests : AbstractSystemTest() {
@@ -92,13 +92,13 @@ class MemberDeletionSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `deleting a member who has a settlement returns 409 Conflict`() {
-        val id = createMember("hassettlement")
+    fun `deleting a member who has a deposit returns 409 Conflict`() {
+        val id = createMember("hasdeposit")
         client()
             .post()
             .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(SettlementRequestDto(userId = id, amountCents = 500, note = null))
+            .body(DepositRequestDto(userId = id, amountCents = 500, note = null))
             .withAdmin()
             .exchange()
 

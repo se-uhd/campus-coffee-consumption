@@ -508,7 +508,7 @@ class UserServiceTest {
     }
 
     @Test
-    fun `delete of a member with a settlement throws DeletionConflictException`() {
+    fun `delete of a member with a deposit throws DeletionConflictException`() {
         whenever(coffeeConsumptionDataService.getByUserId(memberId))
             .thenReturn(CoffeeConsumption(user = storedMember, count = 0))
         whenever(expenseDataService.getAllByBuyer(memberId)).thenReturn(emptyList())

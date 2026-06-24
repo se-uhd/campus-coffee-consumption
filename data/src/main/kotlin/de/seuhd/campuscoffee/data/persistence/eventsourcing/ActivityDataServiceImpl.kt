@@ -1,10 +1,10 @@
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
+import de.seuhd.campuscoffee.domain.model.ActivityEntry
+import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.model.CancellableIncrement
-import de.seuhd.campuscoffee.domain.model.LedgerEntry
-import de.seuhd.campuscoffee.domain.model.LedgerEntryType
 import de.seuhd.campuscoffee.domain.model.PriceChange
-import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
+import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 import java.util.UUID
@@ -24,10 +24,10 @@ private fun intBody(
 ): Int? = (event.body?.get(key) as? Number)?.toInt()
 
 /**
- * The (private, kitty) portions of a split bean purchase, for the admin ledger breakdown, or `(null, null)`
+ * The (private, kitty) portions of a split bean purchase, for the admin activity breakdown, or `(null, null)`
  * when there is no split to show: a DELETE (which only reverses a balance) or an expense with no kitty
- * portion (a fully-private purchase). The two are surfaced together so both admin views (the member ledger's
- * PRIVATE_EXPENSE row and the kitty ledger's KITTY_EXPENSE row) render the same `private + kitty` split.
+ * portion (a fully-private purchase). The two are surfaced together so both admin views (the member activity's
+ * PRIVATE_EXPENSE row and the kitty history's KITTY_EXPENSE row) render the same `private + kitty` split.
  */
 private fun splitPortions(event: EventEntity): Pair<Long?, Long?> {
     // Only an INSERT (the original purchase) carries an absolute split worth displaying. An UPDATE row's
@@ -56,7 +56,7 @@ private fun uuidBody(
 private fun seqOf(event: EventEntity): Long = requireNotNull(event.seq) { "A stored event must carry a seq." }
 
 /**
- * The event's own id, used as a ledger entry's stable per-entry key (for client-side paging and dedup). The
+ * The event's own id, used as an activity entry's stable per-entry key (for client-side paging and dedup). The
  * append position [seqOf] orders the walk but stays inside the data layer; the entry exposes this id instead.
  */
 private fun idOf(event: EventEntity): UUID = requireNotNull(event.id) { "A stored event must carry an id." }
@@ -69,10 +69,10 @@ private fun createdAtOf(event: EventEntity): LocalDateTime =
 private fun actorOf(event: EventEntity): String = event.createdBy ?: SYSTEM_ACTOR
 
 /**
- * The signed balance effect of a value-carrying event (an expense's private portion, or a settlement
+ * The signed balance effect of a value-carrying event (an expense's private portion, or a deposit
  * amount): the full value on INSERT, the change from the remembered previous value on UPDATE, and the
  * reversal on DELETE. Updates [last] for the entity so the next UPDATE/DELETE of the same entity sees the
- * right previous value (a DELETE resets it to zero). Shared by the expense and settlement walks, which
+ * right previous value (a DELETE resets it to zero). Shared by the expense and deposit walks, which
  * differ only in the body field and the per-entity memory.
  *
  * @param event the event being walked
@@ -101,7 +101,7 @@ private fun deltaEffect(
  * seeded before any coffee is consumed (see the bootstrap), so the as-of lookup normally resolves. If a
  * hand-edited or misordered log somehow holds a coffee before any price, fall back to the earliest known
  * price (or 0 when the log carries no price at all) rather than throwing, so one malformed member stream
- * cannot 500 a whole admin overview or ledger read.
+ * cannot 500 a whole admin overview or activity read.
  */
 private fun priceAsOf(
     seq: Long,
@@ -112,26 +112,26 @@ private fun priceAsOf(
         ?: 0
 
 /**
- * Reads the unified-ledger and balance projections straight from the append-only event log (there is no
- * ledger table). It walks a member's streams oldest-first, valuing each coffee at [priceAsOf] its append
+ * Reads the unified-activity and balance projections straight from the append-only event log (there is no
+ * activity table). It walks a member's streams oldest-first, valuing each coffee at [priceAsOf] its append
  * position, and tracks a per-member LIFO stack of increment prices so an undo credits exactly the increment
  * it reverses. Money sums use [Long]; per-event effects fit [Int].
  */
 @Suppress("TooManyFunctions")
 @Service
-class LedgerDataServiceImpl(
+class ActivityDataServiceImpl(
     private val eventRepository: EventRepository
-) : LedgerDataService {
-    override fun memberLedger(
+) : ActivityDataService {
+    override fun userActivity(
         userId: UUID,
         ownerLogin: String
-    ): List<LedgerEntry> {
-        val walk = MemberWalk(loadPricePoints(), ownerLogin)
-        eventRepository.findMemberLedger(userId.toString()).forEach { walk.accept(it) }
+    ): List<ActivityEntry> {
+        val walk = UserWalk(loadPricePoints(), ownerLogin)
+        eventRepository.findUserActivity(userId.toString()).forEach { walk.accept(it) }
         return walk.result()
     }
 
-    override fun kittyLedger(): List<LedgerEntry> {
+    override fun kittyHistory(): List<ActivityEntry> {
         val walk = KittyWalk()
         // one SQL-ordered stream (payments + expenses by seq) instead of two type queries re-sorted in memory
         eventRepository.findKittyStream().forEach { walk.accept(it) }
@@ -146,7 +146,7 @@ class LedgerDataServiceImpl(
         val stack = ArrayDeque<CancellableIncrement>()
         var prevCount = 0
         eventRepository
-            .findMemberLedger(userId.toString())
+            .findUserActivity(userId.toString())
             .filter { LoggedEntityType.ofLabel(requireNotNull(it.entityType)) == LoggedEntityType.COFFEE_CONSUMPTION }
             .forEach { event ->
                 val count = intBody(event, "count") ?: 0
@@ -186,16 +186,16 @@ class LedgerDataServiceImpl(
 }
 
 /**
- * Accumulates one member's ledger oldest-first. Each accepted event contributes a signed effect to the
+ * Accumulates one member's activity oldest-first. Each accepted event contributes a signed effect to the
  * running [balance]; a coffee is valued at the price in effect at its append position, an owner undo credits
  * the exact price of the increment it pops off [incrementPrices], and an admin override is a lump at the
  * override-time price. Because the override is valued at the override-time price (not the per-cup prices
  * actually charged), a correction down made after a price change may not net the member's balance exactly to
  * zero; that is the documented intended rule, not a rounding bug. Only the private portion of an expense and
- * the member's own settlements affect the balance.
+ * the member's own deposits affect the balance.
  */
 @Suppress("UndocumentedFunction", "UndocumentedFunctionParameter")
-private class MemberWalk(
+private class UserWalk(
     private val prices: List<PricePoint>,
     private val ownerLogin: String
 ) {
@@ -203,19 +203,19 @@ private class MemberWalk(
     private var prevCount = 0
     private val incrementPrices = ArrayDeque<Int>()
     private val lastExpensePrivate = HashMap<UUID, Int>()
-    private val lastSettlement = HashMap<UUID, Int>()
-    private val entries = mutableListOf<LedgerEntry>()
+    private val lastDeposit = HashMap<UUID, Int>()
+    private val entries = mutableListOf<ActivityEntry>()
 
-    /** The accumulated ledger oldest-first. */
-    fun result(): List<LedgerEntry> = entries
+    /** The accumulated activity oldest-first. */
+    fun result(): List<ActivityEntry> = entries
 
-    /** Applies one of the member's events, appending its ledger entry (if it has any balance effect). */
+    /** Applies one of the member's events, appending its activity entry (if it has any balance effect). */
     fun accept(event: EventEntity) {
         val entry =
             when (LoggedEntityType.ofLabel(requireNotNull(event.entityType))) {
                 LoggedEntityType.COFFEE_CONSUMPTION -> consumption(event)
                 LoggedEntityType.EXPENSE -> expense(event)
-                LoggedEntityType.PAYMENT -> settlement(event)
+                LoggedEntityType.PAYMENT -> deposit(event)
                 // a member's stream never carries these; listed (not `else`) so a new type forces a decision
                 LoggedEntityType.USER, LoggedEntityType.COFFEE_PRICE -> null
             } ?: return
@@ -223,7 +223,7 @@ private class MemberWalk(
         entries += entry.copy(runningBalanceCents = balance)
     }
 
-    private fun consumption(event: EventEntity): LedgerEntry? {
+    private fun consumption(event: EventEntity): ActivityEntry? {
         val count = intBody(event, "count") ?: 0
         val delta = count - prevCount
         prevCount = count
@@ -236,17 +236,17 @@ private class MemberWalk(
             byOwner && delta == 1 -> {
                 val price = priceAsOf(seq, prices)
                 incrementPrices.addLast(price)
-                entry(event, LedgerEntryType.CONSUMPTION, -price.toLong(), count = count, delta = delta)
+                entry(event, ActivityEntryType.CONSUMPTION, -price.toLong(), count = count, delta = delta)
             }
             byOwner && delta == -1 -> {
                 // an owner -1 undoes one of the member's own +1s and normally pops its exact stacked price.
                 // A missing one is reachable (e.g. dev fixtures seed coffees as the "system" actor, so an
                 // owner undo of one finds no own increment on the stack), so credit the price in effect at the
-                // undo's append position rather than failing the whole ledger read. An undo lands within the
+                // undo's append position rather than failing the whole activity read. An undo lands within the
                 // short grace window of its increment, so the as-of price equals the increment price in
                 // practice; this only differs in the contrived case the exact increment is genuinely absent.
                 val price = incrementPrices.removeLastOrNull() ?: priceAsOf(seq, prices)
-                entry(event, LedgerEntryType.CONSUMPTION_CANCEL, price.toLong(), count = count, delta = delta)
+                entry(event, ActivityEntryType.CONSUMPTION_CANCEL, price.toLong(), count = count, delta = delta)
             }
             else -> {
                 // an admin override (any delta): value the whole jump as a lump at the override-time price
@@ -257,25 +257,25 @@ private class MemberWalk(
                 if (delta < 0) {
                     repeat(minOf(-delta, incrementPrices.size)) { incrementPrices.removeLast() }
                 }
-                entry(event, LedgerEntryType.CONSUMPTION, -delta.toLong() * price, count = count, delta = delta)
+                entry(event, ActivityEntryType.CONSUMPTION, -delta.toLong() * price, count = count, delta = delta)
             }
         }
     }
 
-    private fun expense(event: EventEntity): LedgerEntry? {
+    private fun expense(event: EventEntity): ActivityEntry? {
         val effect = deltaEffect(event, "privateAmountCents", lastExpensePrivate)
         // a fully kitty-funded expense (no private portion) does not touch the member's balance
         if (effect == 0) {
             return null
         }
-        // carry both portions of a split purchase so the admin ledger can break it down (the member-serving
+        // carry both portions of a split purchase so the admin activity can break it down (the member-serving
         // read path nulls them before they leave the domain, see AccountingServiceImpl). The two are present
         // together only when there is a real kitty split; a DELETE reverses the balance and exposes none, and
         // a fully-private expense leaves both null.
         val (privatePortion, kittyPortion) = splitPortions(event)
         return entry(
             event,
-            LedgerEntryType.PRIVATE_EXPENSE,
+            ActivityEntryType.PRIVATE_EXPENSE,
             effect.toLong(),
             weightGrams = intBody(event, "weightGrams"),
             privateAmountCents = privatePortion,
@@ -283,21 +283,21 @@ private class MemberWalk(
         )
     }
 
-    private fun settlement(event: EventEntity): LedgerEntry {
-        val effect = deltaEffect(event, "amountCents", lastSettlement)
-        return entry(event, LedgerEntryType.SETTLEMENT, effect.toLong())
+    private fun deposit(event: EventEntity): ActivityEntry {
+        val effect = deltaEffect(event, "amountCents", lastDeposit)
+        return entry(event, ActivityEntryType.DEPOSIT, effect.toLong())
     }
 
     private fun entry(
         event: EventEntity,
-        type: LedgerEntryType,
+        type: ActivityEntryType,
         amountCents: Long,
         count: Int? = null,
         delta: Int? = null,
         weightGrams: Int? = null,
         privateAmountCents: Long? = null,
         kittyAmountCents: Long? = null
-    ) = LedgerEntry(
+    ) = ActivityEntry(
         type = type,
         id = idOf(event),
         createdAt = createdAtOf(event),
@@ -314,7 +314,7 @@ private class MemberWalk(
 }
 
 /**
- * Accumulates the kitty ledger oldest-first: payments (settlements and adjustments) add money, the
+ * Accumulates the kitty history oldest-first: payments (deposits and adjustments) add money, the
  * kitty-funded portion of an expense removes it. Each accepted event contributes a signed effect to the
  * running kitty [balance].
  */
@@ -323,10 +323,10 @@ private class KittyWalk {
     private var balance = 0L
     private val lastPayment = HashMap<UUID, Int>()
     private val lastExpenseKitty = HashMap<UUID, Int>()
-    private val entries = mutableListOf<LedgerEntry>()
+    private val entries = mutableListOf<ActivityEntry>()
 
-    /** The accumulated kitty ledger oldest-first. */
-    fun result(): List<LedgerEntry> = entries
+    /** The accumulated kitty history oldest-first. */
+    fun result(): List<ActivityEntry> = entries
 
     /** Applies one money-stream event, appending its kitty entry (if it moves the kitty). */
     fun accept(event: EventEntity) {
@@ -341,15 +341,15 @@ private class KittyWalk {
         entries += entry.copy(runningBalanceCents = balance)
     }
 
-    private fun payment(event: EventEntity): LedgerEntry {
+    private fun payment(event: EventEntity): ActivityEntry {
         val id = uuidBody(event, "id")
         val type =
             if (event.body?.get("userId") !=
                 null
             ) {
-                LedgerEntryType.SETTLEMENT
+                ActivityEntryType.DEPOSIT
             } else {
-                LedgerEntryType.KITTY_ADJUSTMENT
+                ActivityEntryType.KITTY_ADJUSTMENT
             }
         val effect =
             when (requireNotNull(event.changeType)) {
@@ -367,7 +367,7 @@ private class KittyWalk {
         return entry(event, type, effect.toLong())
     }
 
-    private fun expense(event: EventEntity): LedgerEntry? {
+    private fun expense(event: EventEntity): ActivityEntry? {
         val id = uuidBody(event, "id")
         val effect =
             when (requireNotNull(event.changeType)) {
@@ -387,12 +387,12 @@ private class KittyWalk {
         if (effect == 0) {
             return null
         }
-        // carry both portions so the admin kitty ledger renders the same `private + kitty` split as the member
-        // ledger's expense row; a DELETE only reverses the kitty draw and exposes none.
+        // carry both portions so the admin kitty history renders the same `private + kitty` split as the member
+        // activity's expense row; a DELETE only reverses the kitty draw and exposes none.
         val (privatePortion, kittyPortion) = splitPortions(event)
         return entry(
             event,
-            LedgerEntryType.KITTY_EXPENSE,
+            ActivityEntryType.KITTY_EXPENSE,
             effect.toLong(),
             weightGrams = intBody(event, "weightGrams"),
             privateAmountCents = privatePortion,
@@ -402,12 +402,12 @@ private class KittyWalk {
 
     private fun entry(
         event: EventEntity,
-        type: LedgerEntryType,
+        type: ActivityEntryType,
         amountCents: Long,
         weightGrams: Int? = null,
         privateAmountCents: Long? = null,
         kittyAmountCents: Long? = null
-    ) = LedgerEntry(
+    ) = ActivityEntry(
         type = type,
         id = idOf(event),
         createdAt = createdAtOf(event),

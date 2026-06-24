@@ -31,7 +31,7 @@ interface UserService : CrudService<User, UUID> {
 
     /**
      * Resolves a member by their secret capability token, used by the capability token authentication
-     * filter to turn an `X-Coffee-Token` header into a principal. Returns null (rather than throwing) for
+     * filter to turn an `X-Capability-Token` header into a principal. Returns null (rather than throwing) for
      * an unknown or rotated token, so the filter can answer 401 without surfacing an error.
      *
      * @param capabilityToken the secret capability token to resolve

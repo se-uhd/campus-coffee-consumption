@@ -9,9 +9,12 @@
  */
 
 
-export interface MemberExpenseDto { 
-    weightGrams: number;
-    amountCents: number;
-    note?: string | null;
+export interface UserBalanceDto { 
+    userId: string;
+    loginName: string;
+    firstName: string;
+    lastName: string;
+    count: number;
+    balanceCents: number;
 }
 

@@ -24,7 +24,7 @@ import java.time.LocalDateTime
  *
  * Two metadata columns sit alongside the body rather than inside it: [createdBy] (the actor's login name,
  * a member, an admin, or `"system"`) makes a member's changes retrievable and displayable without parsing
- * the JSON, and [note] holds an admin's optional reason for a count override, a settlement, or a kitty
+ * the JSON, and [note] holds an admin's optional reason for a count override, a deposit, or a kitty
  * adjustment.
  */
 @Entity

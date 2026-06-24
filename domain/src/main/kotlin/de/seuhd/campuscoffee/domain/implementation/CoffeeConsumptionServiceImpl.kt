@@ -11,10 +11,10 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.ChangeNoteContext
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.ConsumptionHistoryDataService
 import de.seuhd.campuscoffee.domain.ports.data.CrudDataService
-import de.seuhd.campuscoffee.domain.ports.data.LedgerDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -37,7 +37,7 @@ import java.util.UUID
 class CoffeeConsumptionServiceImpl(
     private val coffeeConsumptionDataService: CoffeeConsumptionDataService,
     private val consumptionHistoryDataService: ConsumptionHistoryDataService,
-    private val ledgerDataService: LedgerDataService,
+    private val activityDataService: ActivityDataService,
     private val userDataService: UserDataService,
     private val changeNoteContext: ChangeNoteContext,
     // the grace-period default lives once in application.yaml (campus-coffee.consumption.cancel-grace-period,
@@ -113,7 +113,7 @@ class CoffeeConsumptionServiceImpl(
         userId: UUID,
         actingUser: User
     ): CoffeeConsumption {
-        // a cancel must be recorded by the owner, so its event is attributed to the member and the ledger
+        // a cancel must be recorded by the owner, so its event is attributed to the member and the activity
         // credits it at the original increment's price; an admin corrects a count with setTotal instead
         if (actingUser.persistedId != userId) {
             throw ForbiddenException("Only the owner may undo their own coffee; an admin adjusts the count instead.")
@@ -121,12 +121,12 @@ class CoffeeConsumptionServiceImpl(
         if (actingUser.active != true) {
             throw ForbiddenException("A deactivated member is read-only and cannot undo a coffee.")
         }
-        // invariant: the grace/candidate gate here and the ledger credit (which re-walks the member's
+        // invariant: the grace/candidate gate here and the activity credit (which re-walks the member's
         // increments LIFO) derive the same chosen increment from the same stack rules, so they must stay
         // rule-identical. The count <= 0 recheck below plus the @Version-guarded write prevent a double-undo
         // even though this candidate read is not serialized with the write.
         val candidate =
-            ledgerDataService.lastCancellableIncrement(userId, actingUser.loginName)
+            activityDataService.lastCancellableIncrement(userId, actingUser.loginName)
                 ?: throw ConflictException("There is no recent coffee to undo.")
         if (candidate.createdAt.isBefore(graceCutoff())) {
             throw ConflictException(
@@ -158,7 +158,7 @@ class CoffeeConsumptionServiceImpl(
         userId: UUID,
         ownerLogin: String
     ): CancellableIncrement? {
-        val candidate = ledgerDataService.lastCancellableIncrement(userId, ownerLogin) ?: return null
+        val candidate = activityDataService.lastCancellableIncrement(userId, ownerLogin) ?: return null
         return if (candidate.createdAt.isBefore(graceCutoff())) null else candidate
     }
 

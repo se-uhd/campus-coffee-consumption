@@ -61,7 +61,7 @@ class UserController(
     override fun mapper(): DtoMapper<User, UserDto> = userDtoMapper
 
     /**
-     * Returns every member (admin only). Deliberately unpaged, unlike the ledger reads: the admin SPA needs
+     * Returns every member (admin only). Deliberately unpaged, unlike the activity reads: the admin SPA needs
      * the whole member set at once (the member-selector dropdown and the overview table), and a coffee group
      * is small enough that the full list is cheap. Bound it by paging only if the membership grows large.
      */

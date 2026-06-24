@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.api.controller
 
-import de.seuhd.campuscoffee.api.dtos.MemberExpenseDto
-import de.seuhd.campuscoffee.api.dtos.MemberSummaryDto
+import de.seuhd.campuscoffee.api.dtos.OwnExpenseDto
+import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.api.mapper.AccountingDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
 import de.seuhd.campuscoffee.domain.model.persistedId
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping
  * member, never to anyone the request names), and the response is the refreshed member summary. Correcting
  * or deleting a purchase is admin-only (the SPA states this to the member).
  */
-@Tag(name = "Expenses", description = "A member recording their own bean purchases (X-Coffee-Token).")
+@Tag(name = "Expenses", description = "A member recording their own bean purchases (X-Capability-Token).")
 @Controller
 @RequestMapping("/expenses")
 class ExpenseController(
@@ -39,23 +39,23 @@ class ExpenseController(
     @Operation(summary = "Record the authenticated member's own bean purchase.")
     @PostMapping("")
     fun record(
-        @RequestBody @Valid dto: MemberExpenseDto
-    ): ResponseEntity<MemberSummaryDto> {
-        val member = currentUserProvider.currentUser()
+        @RequestBody @Valid dto: OwnExpenseDto
+    ): ResponseEntity<UserSummaryDto> {
+        val user = currentUserProvider.currentUser()
         expenseService.recordOwn(
             weightGrams = requireNotNull(dto.weightGrams),
             amountCents = requireNotNull(dto.amountCents),
             note = dto.note,
-            actingUser = member
+            actingUser = user
         )
         return ResponseEntity.ok(
             accountingDtoMapper.toSummaryDto(
-                accountingService.memberSummary(member.persistedId, DEFAULT_LEDGER_LIMIT, 0, member)
+                accountingService.userSummary(user.persistedId, DEFAULT_ACTIVITY_LIMIT, 0, user)
             )
         )
     }
 
     private companion object {
-        private const val DEFAULT_LEDGER_LIMIT = 10
+        private const val DEFAULT_ACTIVITY_LIMIT = 10
     }
 }

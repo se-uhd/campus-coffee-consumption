@@ -10,11 +10,11 @@ import java.util.UUID
  * Request body for an admin recording that a member paid money into the kitty
  * (`POST /api/kitty/deposit`): the member, the positive amount in euro cents, and an optional note.
  */
-data class SettlementRequestDto(
+data class DepositRequestDto(
     @field:NotNull(message = "User id is required.")
     val userId: UUID?,
     @field:NotNull(message = "Amount is required.")
-    @field:Min(value = 1, message = "A settlement amount must be positive.")
+    @field:Min(value = 1, message = "A deposit amount must be positive.")
     @field:Max(value = MAX_MONEY_CENTS, message = "Amount is implausibly large.")
     val amountCents: Int?,
     @field:Size(max = 500, message = "Note must be at most 500 characters long.")

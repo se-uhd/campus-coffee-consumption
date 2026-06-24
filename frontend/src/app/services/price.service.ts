@@ -5,7 +5,7 @@ import { PriceChangeDto, PriceDto, PriceUpdateRequest } from '../models';
 
 /**
  * The admin coffee-price calls against `/api/price` (the interceptor adds the JWT). Members never call
- * these directly; their current price arrives in the `MemberSummaryDto`.
+ * these directly; their current price arrives in the `UserSummaryDto`.
  */
 @Injectable({ providedIn: 'root' })
 export class PriceService {

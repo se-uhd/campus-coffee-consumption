@@ -51,8 +51,6 @@ class CucumberSpringConfiguration(
     }
 
     private fun clearAll() {
-        // money children reference users (RESTRICT) and consumptions cascade, so clear them before users;
-        // the price is independent
         expenseService.clear()
         paymentService.clear()
         coffeeConsumptionService.clear()

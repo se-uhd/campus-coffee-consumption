@@ -48,7 +48,7 @@ class DomainUserDetailsService(
             .password(storedHash)
             .authorities(authorities)
             // a deactivated user is disabled, so the DaoAuthenticationProvider refuses the login
-            .disabled(user.active == false)
+            .disabled(user.active != true)
             .build()
     }
 }

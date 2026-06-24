@@ -18,22 +18,22 @@ import { PriceService } from '../../services/price.service';
 import { KittyService } from '../../services/kitty.service';
 import { NotificationService } from '../../services/notification.service';
 import { AdminSelectionService } from '../../services/admin-selection.service';
-import { LedgerListComponent } from '../../components/ledger-list/ledger-list.component';
+import { ActivityListComponent } from '../../components/activity-list/activity-list.component';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { BalanceSummaryComponent } from '../../components/balance-summary/balance-summary.component';
 import { MemberSelectComponent } from '../../components/member-select/member-select.component';
-import { ConsumptionDto, LedgerEntryDto, UserDto } from '../../models';
-import { appendLedgerPage } from '../../util/ledger';
+import { ConsumptionDto, ActivityEntryDto, UserDto } from '../../models';
+import { appendActivityPage } from '../../util/activity';
 
-/** The page size for one ledger page; "Load more" appends another page of this size (matching the member landing). */
-const LEDGER_PAGE_SIZE = 10;
+/** The page size for one activity page; "Load more" appends another page of this size (matching the member landing). */
+const ACTIVITY_PAGE_SIZE = 10;
 
 /**
  * Admin landing: the selected member's view, mirroring the member landing. A member selector at the top
  * (the admin's own account by default, marked with a person icon), then the same blocks as the member page: a big
  * coffee count with the admin's single-step +/- controls and an Edit action that opens an absolute count
  * correction folded into the count panel, the selected member's balance / kitty / price summary, and the
- * member's recent activity (the unified ledger, paged with "Load more"). The all-members overview lives on the
+ * member's recent activity (the unified activity, paged with "Load more"). The all-members overview lives on the
  * Members page (`/admin/users`). The header links to the members, price, expenses, kitty, and own-profile
  * pages and signs out. A member is settled by recording a payment on the kitty page, not by zeroing their
  * count.
@@ -51,7 +51,7 @@ const LEDGER_PAGE_SIZE = 10;
     MatTooltipModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
-    LedgerListComponent,
+    ActivityListComponent,
     AppHeaderComponent,
     BalanceSummaryComponent,
     MemberSelectComponent
@@ -211,13 +211,13 @@ const LEDGER_PAGE_SIZE = 10;
 
         <mat-card class="card">
           <h2>Recent activity</h2>
-          <cc-ledger-list
-            [entries]="ledger"
+          <cc-activity-list
+            [entries]="activity"
             [showFilter]="true"
             [canLoadMore]="hasMore"
             [loadingMore]="loadingMore"
             (loadMore)="loadMore()"
-          ></cc-ledger-list>
+          ></cc-activity-list>
         </mat-card>
       }
     </div>
@@ -244,7 +244,7 @@ export class AdminLandingComponent implements OnInit {
   /** The member whose data is currently loaded, used to skip a redundant reload on a repeated `member` param. */
   private loadedId = '';
   consumption: ConsumptionDto | null = null;
-  ledger: LedgerEntryDto[] = [];
+  activity: ActivityEntryDto[] = [];
   balanceCents: number | null = null;
   priceCents: number | null = null;
   kittyBalanceCents: number | null = null;
@@ -317,7 +317,7 @@ export class AdminLandingComponent implements OnInit {
     this.editMode = false;
     // unlike `reload()`, this post-navigation load runs outside a try/catch boundary (the queryParamMap
     // subscription only `void`s it), so a failed load for the navigated-to member would silently keep the
-    // previous member's data on screen; surface it as a retryable error instead (matching member-profile)
+    // previous member's data on screen; surface it as a retryable error instead (matching profile)
     try {
       await this.loadConsumption();
     } catch (error) {
@@ -372,7 +372,7 @@ export class AdminLandingComponent implements OnInit {
   }
 
   /**
-   * Loads the selected member's total, balance, and unified ledger. The member id is captured at the start
+   * Loads the selected member's total, balance, and unified activity. The member id is captured at the start
    * so that a slower earlier load, fired by a rapid member switch, discards its result instead of clobbering
    * the current selection's data.
    */
@@ -389,44 +389,44 @@ export class AdminLandingComponent implements OnInit {
     }
     this.consumption = consumption;
     this.newTotal = consumption.total;
-    await this.loadLedger(requestedId);
+    await this.loadActivity(requestedId);
   }
 
   /**
-   * Loads the first page of the selected member's unified ledger (newest-first; "Load more" appends the
+   * Loads the first page of the selected member's unified activity (newest-first; "Load more" appends the
    * rest) and derives the current balance from its newest row. The member id is passed in (captured by the
    * caller) so a stale earlier load discards its result.
    *
    * @param requestedId the member id captured when the load was started
    */
-  private async loadLedger(requestedId: string = this.selectedId): Promise<void> {
-    const ledger = await this.accountingService.memberActivity(requestedId, LEDGER_PAGE_SIZE, 0);
+  private async loadActivity(requestedId: string = this.selectedId): Promise<void> {
+    const activity = await this.accountingService.memberActivity(requestedId, ACTIVITY_PAGE_SIZE, 0);
     if (requestedId !== this.selectedId) {
       return;
     }
-    this.ledger = ledger;
-    this.hasMore = ledger.length === LEDGER_PAGE_SIZE;
-    this.balanceCents = ledger.length > 0 ? ledger[0].runningBalanceCents : 0;
+    this.activity = activity;
+    this.hasMore = activity.length === ACTIVITY_PAGE_SIZE;
+    this.balanceCents = activity.length > 0 ? activity[0].runningBalanceCents : 0;
   }
 
-  /** Appends the next page of the selected member's unified ledger (incremental "Load more" server paging). */
+  /** Appends the next page of the selected member's unified activity (incremental "Load more" server paging). */
   async loadMore(): Promise<void> {
     const requestedId = this.selectedId;
     this.loadingMore = true;
     try {
       const next = await this.accountingService.memberActivity(
         requestedId,
-        LEDGER_PAGE_SIZE,
-        this.ledger.length
+        ACTIVITY_PAGE_SIZE,
+        this.activity.length
       );
       if (requestedId !== this.selectedId) {
         return;
       }
-      const { entries, appended } = appendLedgerPage(this.ledger, next);
-      this.ledger = entries;
+      const { entries, appended } = appendActivityPage(this.activity, next);
+      this.activity = entries;
       // base "Load more" on the rows actually gained: a full page that collapsed to fewer new rows (its
       // boundary row was a duplicate) means there is nothing more to fetch
-      this.hasMore = appended === LEDGER_PAGE_SIZE;
+      this.hasMore = appended === ACTIVITY_PAGE_SIZE;
     } catch (error) {
       this.notifications.error(error, 'Could not load more activity.');
     } finally {
@@ -445,7 +445,7 @@ export class AdminLandingComponent implements OnInit {
   /**
    * Applies a +1/-1 to the selected member, optimistically then reconciling to the server total. The member
    * id is captured up front and every state write is guarded on it still being the current selection, so a
-   * rapid member switch mid-request never lands one member's count/ledger on another's view.
+   * rapid member switch mid-request never lands one member's count/activity on another's view.
    */
   async change(delta: number): Promise<void> {
     const id = this.selectedId;
@@ -466,7 +466,7 @@ export class AdminLandingComponent implements OnInit {
       // keep the absolute-correction field in step with the count so opening Edit after a +/- does not
       // pre-fill a stale total that, if Set without retyping, would silently revert the change
       this.newTotal = updated.total;
-      await this.loadLedger(id);
+      await this.loadActivity(id);
       await this.refreshFund();
     } catch (error) {
       this.notifications.error(error, delta < 0 ? 'Count is already zero.' : 'Could not record that.');
@@ -500,7 +500,7 @@ export class AdminLandingComponent implements OnInit {
       this.editMode = false;
       this.note = '';
       this.notifications.success('Total updated.');
-      await this.loadLedger(id);
+      await this.loadActivity(id);
       await this.refreshFund();
     } catch (error) {
       this.notifications.error(error, 'Could not set the total.');

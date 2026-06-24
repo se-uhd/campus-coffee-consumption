@@ -2,17 +2,17 @@ package de.seuhd.campuscoffee.tests.system
 
 import de.seuhd.campuscoffee.api.dtos.AdjustmentRequestDto
 import de.seuhd.campuscoffee.api.dtos.AdminExpenseDto
+import de.seuhd.campuscoffee.api.dtos.DepositRequestDto
 import de.seuhd.campuscoffee.api.dtos.ExpenseDto
 import de.seuhd.campuscoffee.api.dtos.KittyDto
-import de.seuhd.campuscoffee.api.dtos.MemberBalanceDto
-import de.seuhd.campuscoffee.api.dtos.MemberExpenseDto
-import de.seuhd.campuscoffee.api.dtos.MemberSummaryDto
+import de.seuhd.campuscoffee.api.dtos.OwnExpenseDto
 import de.seuhd.campuscoffee.api.dtos.PaymentDto
 import de.seuhd.campuscoffee.api.dtos.PriceChangeDto
 import de.seuhd.campuscoffee.api.dtos.PriceDto
 import de.seuhd.campuscoffee.api.dtos.PriceUpdateDto
-import de.seuhd.campuscoffee.api.dtos.SettlementRequestDto
-import de.seuhd.campuscoffee.domain.model.LedgerEntryType
+import de.seuhd.campuscoffee.api.dtos.UserBalanceDto
+import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
+import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
@@ -25,7 +25,7 @@ import org.springframework.test.web.servlet.client.returnResult
 import java.util.UUID
 
 /**
- * System tests for the money feature: the global price, member and admin expenses, settlements and kitty
+ * System tests for the money feature: the global price, member and admin expenses, deposits and kitty
  * adjustments, the per-member balance (a coffee valued at the price in effect when it was consumed), and the
  * communal kitty. Members authenticate by their capability token; admins by JWT.
  */
@@ -50,14 +50,14 @@ class AccountingSystemTests : AbstractSystemTest() {
             .withMember(member)
             .exchange()
 
-    private fun memberSummary(): MemberSummaryDto =
+    private fun userSummary(): UserSummaryDto =
         client()
             .get()
             .uri("/api/summary")
             .accept(MediaType.APPLICATION_JSON)
             .withMember(member)
             .exchange()
-            .returnResult<MemberSummaryDto>()
+            .returnResult<UserSummaryDto>()
             .responseBody!!
 
     private fun kitty(): KittyDto =
@@ -90,7 +90,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         setPrice(70)
         addCoffee()
 
-        val summary = memberSummary()
+        val summary = userSummary()
 
         assertThat(summary.count).isEqualTo(2)
         assertThat(summary.priceCents).isEqualTo(70)
@@ -142,19 +142,19 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .post()
                 .uri("/api/expenses")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(MemberExpenseDto(weightGrams = 1000, amountCents = 900, note = "beans"))
+                .body(OwnExpenseDto(weightGrams = 1000, amountCents = 900, note = "beans"))
                 .withMember(member)
                 .exchange()
-                .returnResult<MemberSummaryDto>()
+                .returnResult<UserSummaryDto>()
                 .responseBody!!
 
         // the purchase is 100% private, so the member's balance is credited by the full 900 cents
         assertThat(summary.balanceCents).isEqualTo(900)
-        val privateEntries = summary.ledger.filter { it.type == LedgerEntryType.PRIVATE_EXPENSE }
+        val privateEntries = summary.activity.filter { it.type == ActivityEntryType.PRIVATE_EXPENSE }
         assertThat(privateEntries).hasSize(1)
         assertThat(privateEntries.first().amountCents).isEqualTo(900)
         // a member's own purchase never touches the kitty
-        assertThat(summary.ledger.none { it.type == LedgerEntryType.KITTY_EXPENSE }).isTrue()
+        assertThat(summary.activity.none { it.type == ActivityEntryType.KITTY_EXPENSE }).isTrue()
     }
 
     @Test
@@ -188,20 +188,20 @@ class AccountingSystemTests : AbstractSystemTest() {
         assertThat(expense.status.value()).isEqualTo(201)
         assertThat(expense.responseBody!!.privateAmountCents).isEqualTo(400)
 
-        // the member's ledger shows only the +400 private portion
-        val summary = memberSummary()
+        // the member's activity shows only the +400 private portion
+        val summary = userSummary()
         assertThat(summary.balanceCents).isEqualTo(400)
-        assertThat(summary.ledger.filter { it.type == LedgerEntryType.PRIVATE_EXPENSE }.map { it.amountCents })
+        assertThat(summary.activity.filter { it.type == ActivityEntryType.PRIVATE_EXPENSE }.map { it.amountCents })
             .containsExactly(400)
 
         // the kitty drops by the 500 kitty-funded portion
         val kittyAfter = kitty()
         assertThat(kittyAfter.balanceCents).isEqualTo(kittyBefore - 500)
-        assertThat(kittyAfter.entries.first { it.type == LedgerEntryType.KITTY_EXPENSE }.amountCents).isEqualTo(-500)
+        assertThat(kittyAfter.entries.first { it.type == ActivityEntryType.KITTY_EXPENSE }.amountCents).isEqualTo(-500)
     }
 
     @Test
-    fun `a settlement credits the member and feeds the kitty`() {
+    fun `a deposit credits the member and feeds the kitty`() {
         val kittyBefore = kitty().balanceCents
 
         val payment =
@@ -209,13 +209,13 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .post()
                 .uri("/api/kitty/deposit")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(SettlementRequestDto(userId = memberId(), amountCents = 1000, note = "paid"))
+                .body(DepositRequestDto(userId = memberId(), amountCents = 1000, note = "paid"))
                 .withAdmin()
                 .exchange()
                 .returnResult<PaymentDto>()
         assertThat(payment.status.value()).isEqualTo(201)
 
-        assertThat(memberSummary().balanceCents).isEqualTo(1000)
+        assertThat(userSummary().balanceCents).isEqualTo(1000)
         assertThat(kitty().balanceCents).isEqualTo(kittyBefore + 1000)
     }
 
@@ -233,7 +233,7 @@ class AccountingSystemTests : AbstractSystemTest() {
 
         assertThat(kitty().balanceCents).isEqualTo(kittyBefore + 750)
         // the member's balance is untouched by a pure kitty adjustment
-        assertThat(memberSummary().balanceCents).isEqualTo(0)
+        assertThat(userSummary().balanceCents).isEqualTo(0)
     }
 
     @Test
@@ -399,7 +399,7 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .post()
                 .uri("/api/expenses")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(MemberExpenseDto(weightGrams = 1000, amountCents = 0, note = "beans"))
+                .body(OwnExpenseDto(weightGrams = 1000, amountCents = 0, note = "beans"))
                 .withMember(member)
                 .exchange()
                 .statusCode()
@@ -433,9 +433,9 @@ class AccountingSystemTests : AbstractSystemTest() {
             .exchange()
 
         // with no private portion, the buyer's balance is untouched and no PRIVATE_EXPENSE row appears
-        val summary = memberSummary()
+        val summary = userSummary()
         assertThat(summary.balanceCents).isEqualTo(0)
-        assertThat(summary.ledger.none { it.type == LedgerEntryType.PRIVATE_EXPENSE }).isTrue()
+        assertThat(summary.activity.none { it.type == ActivityEntryType.PRIVATE_EXPENSE }).isTrue()
     }
 
     @Test
@@ -449,7 +449,7 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .accept(MediaType.APPLICATION_JSON)
                 .withAdmin()
                 .exchange()
-                .returnResult<Array<MemberBalanceDto>>()
+                .returnResult<Array<UserBalanceDto>>()
                 .responseBody!!
 
         val max = overview.first { it.loginName == member }

@@ -1,6 +1,6 @@
 package de.seuhd.campuscoffee.tests.acceptance
 
-import de.seuhd.campuscoffee.api.dtos.MemberSummaryDto
+import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
 import io.cucumber.java.en.Given
@@ -37,7 +37,7 @@ class CucumberConsumptionSteps(
     @Then("the request succeeds and the coffee count is {int}")
     fun theRequestSucceedsAndTheCountIs(count: Int) {
         assertThat(lastResult.status.value()).isEqualTo(200)
-        val dto = objectMapper.readValue(lastResult.responseBody, MemberSummaryDto::class.java)
+        val dto = objectMapper.readValue(lastResult.responseBody, UserSummaryDto::class.java)
         assertThat(dto.count).isEqualTo(count)
     }
 
