@@ -23,9 +23,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   deployed profile (defense in depth; `DevController` is already `@Profile("dev")`).
 - `scripts/check-version-sync.sh` compares the full version token (including any pre-release or build
   suffix), not just `x.y.z`.
-- `scripts/deploy-cloudrun.sh` gains a `MIN_INSTANCES` knob (mirroring `MAX_INSTANCES`); `MIN_INSTANCES=1`
-  keeps one Cloud Run instance always warm, so the demo never cold-starts (and never reseeds on an idle
-  wake).
+- Remove the public demo deployment: the `demo` Spring profile, `compose.demo.yaml`, the throwaway Cloud Run
+  demo, and the demo-only `deploy-cloudrun.sh` instance-count knobs are gone. Production deploys scale to zero
+  (with startup CPU boost to shorten the cold start) and use the shared Cloud SQL database directly, since
+  nothing reseeds it on boot any more. `DevDemoDataLoader` stays for local dev and the e2e suite, now
+  `@Profile("dev")` only.
 - Unify the form and panel vertical rhythm: tighten the gap between form fields (and `.form-row` groups) to
   12px, give every panel heading the same 16px gap to its first element (the profile "Your details", the
   "Members" card, and the collapsible "Record expense" headers were flush against their content), and

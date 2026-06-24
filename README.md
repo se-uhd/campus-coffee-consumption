@@ -107,8 +107,7 @@ repeatable), each with a coffee consumption at zero. The credentials live in
 A member's capability link is `http://localhost:8080/login/<token>`, and members authenticate **only** with
 that link (they have no password). The admin `jane_doe` is different: she logs in with a **password** at
 `POST /api/auth/token` (the JWT login), **not** with the capability token in the table above. The fixture
-admin password is **`aaaMbnPdFYDqkOpS3fVA`** (also in `TestFixtures.kt`). The same fixtures seed the public
-demo deployment, so that admin login works there too. The dev `DevController` (`GET/PUT/DELETE /api/dev/data`) reports the counts, reloads the
+admin password is **`aaaMbnPdFYDqkOpS3fVA`** (also in `TestFixtures.kt`). The dev `DevController` (`GET/PUT/DELETE /api/dev/data`) reports the counts, reloads the
 fixtures (reassigning the same seeded ids), or clears the data.
 
 On top of these fixtures, the `dev` profile runs a dev-only `DevDemoDataLoader` that adds about nine more

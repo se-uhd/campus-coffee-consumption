@@ -243,8 +243,7 @@ The `dev` profile:
   consumption at zero, so the app comes up with the seeded ids and demo-able coffee links ready.
 - Resets the data on every dev start (`campus-coffee.fixtures.reset-on-startup: true`): clears the data and
   reseeds the fixtures (and the demo data below), so each restart returns to the same deterministic state.
-- Layers on **dev demo data** via `DevDemoDataLoader` (`@Profile("dev", "demo")`, so the cloud demo gets the
-  same dataset; a `StartupTask` at
+- Layers on **dev demo data** via `DevDemoDataLoader` (`@Profile("dev")`; a `StartupTask` at
   order 260, after the fixture reset+reseed and the price seed): about nine extra members (a mix of roles and
   active states) and an initial kitty float, and it also enriches **every existing fixture user** (the admin
   `jane_doe` included) with varied consumption, bean-purchase, and deposit history, so the members list
@@ -617,12 +616,7 @@ Notes on semantics:
 ## Configuration
 
 - Main config: `application/src/main/resources/application.yaml`.
-- The dev, prod, and demo profiles activate on `spring.config.activate.on-profile`. The **demo** profile is a
-  thin overlay activated together with prod (`SPRING_PROFILES_ACTIVE=prod,demo`) for a public, throwaway
-  Cloud Run demo: it keeps every prod hardening (managed Cloud SQL, required https base URL, real JWT,
-  Swagger and `/api/dev` off) and only adds the seed data (the fixtures + `DevDemoDataLoader` dataset,
-  deterministic ids, cleared and reseeded on every boot). Deploy it with
-  `MAX_INSTANCES=1 scripts/deploy-cloudrun.sh compose.demo.yaml`.
+- The dev and prod profiles activate on `spring.config.activate.on-profile`.
 - Custom properties (each has a `@ConfigurationProperties` class so the keys resolve in the IDE's
   `application.yaml` editor):
   - `campus-coffee.app.base-url` (`AppProperties`, api module): the public origin used to build the
@@ -652,10 +646,9 @@ The startup tasks run before the embedded web server accepts requests (via a `Sm
 `StartupDataInitializer`, that runs every registered `StartupTask` in `order`): the optional event-log
 rebuild (order 100), then the fixture loader (200), then the price seeder (`CoffeePriceStartupLoader`, 250,
 seeds `campus-coffee.price.initial-cents` when no price exists yet so a price exists before any coffee is
-consumed), then `DevDemoDataLoader` (260, `@Profile("dev", "demo")`, so it runs in local dev and the cloud
-demo), then the bootstrap admin (300). So in dev and demo the fixtures seed an admin and the bootstrap step
-is a no-op; in plain prod the fixtures are off, so the bootstrap step creates the admin (and the demo loader
-does not run).
+consumed), then `DevDemoDataLoader` (260, `@Profile("dev")`, so it runs in local dev only), then the
+bootstrap admin (300). So in dev the fixtures seed an admin and the bootstrap step is a no-op; in prod the
+fixtures are off, so the bootstrap step creates the admin (and `DevDemoDataLoader` does not run).
 
 ## Important Patterns
 
