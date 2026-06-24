@@ -25,7 +25,7 @@ class CoffeeConsumptionEntity : Entity() {
 
     @field:Version
     @field:Column(name = "version")
-    var version: Long? = null
+    var version: Long? = 0
 
     companion object {
         /** Name of the one-per-user unique constraint, declared in the Flyway migration. */

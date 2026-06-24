@@ -11,6 +11,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   "+" button overlapped the balance card); they now keep the same 16px spacing as the rest of the page.
 - Tidy the browser tab titles: capitalized, with SE@UHD in parentheses and no middle-dot separator, e.g.
   "My Coffee (SE@UHD)".
+- Give every entity except the append-only `events` log a `version` column for optimistic locking:
+  `UserEntity` gains a `@Version` field and the `users` table a `version` column (`NOT NULL DEFAULT 0`), so
+  two concurrent admin edits of the same member can no longer silently overwrite each other; the existing
+  version fields default to 0 to match.
+- Consolidate the Flyway migrations to one `CREATE` per table (six migrations) and strip their comments: the
+  incremental index and version migrations are folded into their table's create, and the rationale lives in
+  the entity classes and this changelog rather than in the SQL. A one-time pre-production cleanup (no
+  deployed database had the old migrations applied); from here migrations stay append-only.
+- Gate the dev data endpoints (`/api/dev/**`) open rule on the `dev` profile, so it is never registered in a
+  deployed profile (defense in depth; `DevController` is already `@Profile("dev")`).
+- `scripts/check-version-sync.sh` compares the full version token (including any pre-release or build
+  suffix), not just `x.y.z`.
 
 ## [0.4.0] - 2026-06-23
 

@@ -180,6 +180,22 @@ class AuthorizationSystemTests : AbstractSystemTest() {
     }
 
     @Test
+    fun `an anonymous request to the dev data endpoints returns 401 Unauthorized`() {
+        // outside the dev profile the `/api/dev/**` permitAll rule is not registered (it is gated on the dev
+        // profile), so the request falls through to the authenticated catch-all instead of being anonymously
+        // reachable. The DevController is itself @Profile("dev"), so this is defense in depth; the tests run
+        // under the default profile, where dev is not active.
+        val status =
+            client()
+                .get()
+                .uri("/api/dev/data")
+                .exchange()
+                .statusCode()
+
+        assertThat(status).isEqualTo(401)
+    }
+
+    @Test
     fun `a deactivated admin requesting a token returns 401 Unauthorized`() {
         // a second admin must exist so the seeded admin can be deactivated (the last-active-admin guard)
         val secondAdmin = createSecondAdmin()
