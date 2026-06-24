@@ -78,6 +78,48 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   provides it to every subproject's `build-logic` convention plugin. This silences Gradle's "The Kotlin
   Gradle plugin was loaded multiple times in different subprojects" warning; the build output is unchanged.
 
+### Security
+
+- Move the admin session from a JWT in `localStorage` to an **httpOnly, SameSite=Strict cookie** that
+  JavaScript cannot read or exfiltrate, so an XSS can no longer steal the admin token. The resource server
+  reads the bearer token from the cookie (the SPA) or the `Authorization` header (API and test clients) via a
+  new `CookieOrHeaderBearerTokenResolver`; `POST /api/auth/logout` clears the cookie. The cookie is `Secure`
+  in every profile but dev (`campus-coffee.auth.cookie.secure`). SameSite=Strict is the CSRF defense, so
+  token-based CSRF (which would burden the CSRF-immune header flows) stays off. See
+  `doc/2026-06-24_security-hardening-and-cookie-auth.md`.
+- Send a Content-Security-Policy on every response (`default-src 'self'`, `connect-src 'self'`,
+  `frame-ancestors 'none'`, with inline styles allowed for Angular Material), the structural XSS mitigation.
+- Bound the replay window of the encrypted login payload: it now carries an `iat`, and the decryptor rejects a
+  payload outside `campus-coffee.login-encryption.max-payload-age` (default 2 minutes) as a 400.
+- Reject the committed dev-only fallback JWT secret and RSA login key on a non-dev startup (`WeakDevSecretGuard`),
+  and reject a loopback or bare-hostname prod base URL (`PublicBaseUrlGuard`).
+- Read `GET /api/price` through the live-user check so a deactivated or demoted admin's in-flight token is
+  rejected there too.
+- Stop leaking `deploy.prod.env` into the Docker/Cloud Build context (`.dockerignore` now matches
+  `deploy*.env`), `chmod 600` the deploy env files and harden `scripts/deploy-cloudrun.sh` (`umask 077`), and
+  run the prod app as a least-privilege database role (`scripts/sql/create-app-role.sql`) instead of the
+  Cloud SQL superuser.
+
+### Changed
+
+- Maintain `member_balance` and `kitty_balance` read-model projections (updated in the write transaction by
+  recomputing from the event-log walks), so the per-member overview and the kitty-overdraw guard read one
+  indexed row instead of replaying a stream; the events-to-data rebuild recomputes them and now replays the
+  log in bounded batches.
+- Unify event-note handling at the append boundary: `events.note` now carries every event's note (the
+  count-correction reason or the entity's own body note), so the activity and kitty feeds show deposit,
+  adjustment, and expense notes that were previously dropped.
+
+### Fixed
+
+- Page `GET /api/price/history` and cap `PageQuery.offset`; stop the `GlobalExceptionHandler` from echoing
+  framework exception class names or parser detail in any profile.
+- Reject a zero-total admin expense (matching the member path), normalize a member's email so the unique
+  constraint catches case-variant duplicates, and surface a concurrent first-ever price write as a clean 409
+  instead of a recovery a real transaction cannot perform.
+- Retry a member self-scan 409 a bounded number of times with backoff, and stop an admin profile edit (or
+  active-state toggle) from reverting a concurrent admin's `role`/`active` change with a stale snapshot.
+
 ## [0.4.0] - 2026-06-23
 
 This release renames the API and code vocabulary to the words the UI and endpoints already use. It is a
