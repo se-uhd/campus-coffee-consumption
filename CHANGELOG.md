@@ -20,6 +20,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   detekt-test-utils' kotlin-compiler-embeddable and caffeine) and the JNA restricted-native-access notice from
   the build log. Also `@Suppress("DEPRECATION")` the deliberate `JWEAlgorithm.RSA1_5` use in
   `LoginPayloadDecryptorTest`, which verifies the decryptor rejects an algorithm downgrade.
+- Cap the prod Hikari connection pool at `maximum-pool-size: 5` so a zero-downtime rolling Cloud Run deploy
+  (the old and new revisions overlap, each holding its own pool, across several instances) cannot exhaust the
+  small `db-g1-small` Cloud SQL instance's connection limit.
 
 ### Removed
 
