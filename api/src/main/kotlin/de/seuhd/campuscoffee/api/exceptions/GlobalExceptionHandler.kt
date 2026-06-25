@@ -70,6 +70,11 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
      * the supplied credentials, and a wrong password raises an [AuthenticationException] there (not in the
      * filter chain), so the security entry point does not see it.
      *
+     * The client-facing body is the same for every authentication-failure subtype: a wrong password, an
+     * unknown login, and a deactivated account all return the same fixed `Unauthorized` code and "Invalid
+     * credentials." message, so the response never reveals whether a login name exists or is deactivated (it
+     * is not an account-enumeration oracle). The real cause is logged server-side only.
+     *
      * @param exception the authentication failure
      * @param request   the current web request
      */
@@ -78,10 +83,18 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         exception: AuthenticationException,
         request: WebRequest
     ): ResponseEntity<ErrorResponse> {
-        log.warn { "Authentication failed: ${exception.message}" }
+        log.warn { "Authentication failed (${exception.javaClass.simpleName}): ${exception.message}" }
         return ResponseEntity
             .status(HttpStatus.UNAUTHORIZED)
-            .body(errorBody(exception, HttpStatus.UNAUTHORIZED, request, exception.message))
+            .body(
+                errorBody(
+                    exception,
+                    HttpStatus.UNAUTHORIZED,
+                    request,
+                    "Invalid credentials.",
+                    errorCode = "Unauthorized"
+                )
+            )
     }
 
     /**
@@ -105,9 +118,40 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
     }
 
     /**
-     * Maps a method-parameter constraint violation (a `@Validated` query/path-param bound, such as the paging
-     * `@Max`/`@Min`/`@Positive` limits) to 400. Without this, a `ConstraintViolationException` would fall
-     * through to the generic 500 handler even though an out-of-range parameter is a client error.
+     * Maps a login rate-limit breach to 429 Too Many Requests, with a `Retry-After` header (seconds) telling
+     * the client when to try again. Raised by the login endpoint's attempt limiter, not the filter chain.
+     *
+     * @param exception the rate-limit breach carrying the retry-after duration
+     * @param request   the current web request
+     */
+    @ExceptionHandler(TooManyLoginAttemptsException::class)
+    fun handleTooManyLoginAttempts(
+        exception: TooManyLoginAttemptsException,
+        request: WebRequest
+    ): ResponseEntity<ErrorResponse> {
+        // round up to at least one second so a sub-second refill still yields a sane Retry-After
+        val retryAfterSeconds = exception.retryAfter.toSeconds().coerceAtLeast(1)
+        log.warn { "Login rate limit exceeded; advising Retry-After ${retryAfterSeconds}s." }
+        return ResponseEntity
+            .status(HttpStatus.TOO_MANY_REQUESTS)
+            .header(HttpHeaders.RETRY_AFTER, retryAfterSeconds.toString())
+            .body(
+                errorBody(
+                    exception,
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    request,
+                    "Too many login attempts; try again later.",
+                    errorCode = "TooManyRequests"
+                )
+            )
+    }
+
+    /**
+     * Maps a Jakarta `ConstraintViolationException` to 400, a safety net for any `@Validated` method-param
+     * constraint, so an out-of-range parameter is a client error instead of falling through to the generic
+     * 500 handler. The paging bounds do not arrive here: `PageQuery` is a `@Valid`-bound parameter object, so
+     * an out-of-range `limit`/`offset` surfaces as a `MethodArgumentNotValidException` and is handled by
+     * [handleMethodArgumentNotValid].
      *
      * @param exception the constraint violation raised for an out-of-range request parameter
      * @param request   the current web request

@@ -89,6 +89,10 @@ abstract class AbstractSystemTest {
         @DynamicPropertySource
         fun configureProperties(registry: DynamicPropertyRegistry) {
             configurePostgresContainers(registry, postgresContainer)
+            // the broad suite makes many failed logins on purpose from the same loopback client; the login
+            // rate limiter has its own test (LoginRateLimitSystemTest), so turn it off here so an unrelated
+            // test cannot hit the shared per-client failure budget
+            registry.add("campus-coffee.auth.rate-limit.enabled") { "false" }
         }
     }
 }

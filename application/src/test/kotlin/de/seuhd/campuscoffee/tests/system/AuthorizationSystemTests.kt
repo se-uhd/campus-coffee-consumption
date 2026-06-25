@@ -332,6 +332,29 @@ class AuthorizationSystemTests : AbstractSystemTest() {
     }
 
     @Test
+    fun `an in-flight admin JWT after deactivation returns 403 on a member delete`() {
+        val secondAdmin = createSecondAdmin()
+        val seededAdmin = seededUser("jane_doe")
+        val target = seededUser(member)
+        val (login, password) = TestFixtures.rawCredentialsFor(Role.ADMIN)
+        // issue a JWT while the admin is still active, then deactivate them
+        val inFlight = jwtFor(login, password)
+        userService.update(seededAdmin.copy(active = false), secondAdmin)
+
+        // the delete path now resolves the acting user too, so the deactivated admin is rejected before any
+        // deletion happens (a hard delete is irreversible, so the lockout must cover it)
+        val status =
+            client()
+                .delete()
+                .uri("/api/users/{id}", target.persistedId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $inFlight")
+                .exchange()
+                .statusCode()
+
+        assertThat(status).isEqualTo(403)
+    }
+
+    @Test
     fun `a rotated capability token no longer authenticates`() {
         val admin = seededUser("jane_doe")
         val max = seededUser(member)

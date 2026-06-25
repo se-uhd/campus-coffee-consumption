@@ -28,6 +28,10 @@ dependencies {
     implementation(libs.spring.boot.starter.oauth2.resource.server)
     // Jackson support for the Kotlin DTOs (construction, nullability, defaults); Spring Boot auto-registers it.
     implementation(libs.jackson.module.kotlin)
+    // Login-endpoint brute-force/DoS protection: Bucket4j token buckets held in a Caffeine cache, plus the
+    // Caffeine-backed replay guard for the encrypted login payload.
+    implementation(libs.bucket4j.core)
+    implementation(libs.caffeine)
 
     // MapStruct is compile-only for the Kotlin mappers; kapt runs the processor that generates the impls.
     compileOnly(libs.mapstruct)

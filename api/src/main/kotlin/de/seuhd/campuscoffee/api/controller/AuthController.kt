@@ -4,10 +4,13 @@ import de.seuhd.campuscoffee.api.configuration.AuthCookieProperties
 import de.seuhd.campuscoffee.api.dtos.PublicKeyDto
 import de.seuhd.campuscoffee.api.dtos.TokenRequestDto
 import de.seuhd.campuscoffee.api.dtos.TokenResponseDto
+import de.seuhd.campuscoffee.api.exceptions.LoginPayloadException
+import de.seuhd.campuscoffee.api.security.LoginAttemptLimiter
 import de.seuhd.campuscoffee.api.security.LoginPayloadDecryptor
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.springframework.http.HttpHeaders
 import org.springframework.http.ResponseCookie
@@ -15,6 +18,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
+import org.springframework.security.core.AuthenticationException
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm
 import org.springframework.security.oauth2.jwt.JwsHeader
 import org.springframework.security.oauth2.jwt.JwtClaimsSet
@@ -48,7 +52,8 @@ class AuthController(
     private val jwtEncoder: JwtEncoder,
     private val loginPayloadDecryptor: LoginPayloadDecryptor,
     private val loginPublicKey: PublicKeyDto,
-    private val cookieProperties: AuthCookieProperties
+    private val cookieProperties: AuthCookieProperties,
+    private val loginAttemptLimiter: LoginAttemptLimiter
 ) {
     /**
      * Returns the RSA public key (as a JWK) the client uses to encrypt the login payload. Public material
@@ -64,26 +69,44 @@ class AuthController(
      * Decrypts the credentials, authenticates them with the shared [AuthenticationManager], and returns a
      * signed JWT carrying the subject, the user's role, and a work-session expiry.
      *
+     * Brute-force / DoS protected: a client (keyed on its IP) that exceeds the configured failure budget is
+     * refused with 429 before any decrypt or bcrypt work runs (see [LoginAttemptLimiter]). A malformed
+     * payload and a wrong password both count as a failure; a successful login resets the client's count.
+     *
      * @param request the encrypted credentials (a compact JWE) to authenticate
+     * @param httpRequest the servlet request, used to derive the rate-limit client key (its IP)
      * @return 200 OK with the issued bearer token
      */
     @Operation(summary = "Authenticate with an encrypted login payload and issue a JWT bearer token.")
     @PostMapping("/token")
     fun token(
         @RequestBody
-        @Valid request: TokenRequestDto
+        @Valid request: TokenRequestDto,
+        httpRequest: HttpServletRequest
     ): ResponseEntity<TokenResponseDto> {
         // do not log the supplied login name: it is PII, and the canonical identifier (the user id) is not
         // resolved at the credential boundary (a failed attempt has no user). Logging the bare event is enough.
         log.info { "Token requested." }
+        val clientKey = rateLimitClientKey(httpRequest)
+        // refuse a client that has used up its failure budget before doing any decrypt/bcrypt work (429)
+        loginAttemptLimiter.ensureWithinLimit(clientKey)
         // decrypt the payload (a malformed/undecryptable one raises a LoginPayloadException -> 400), then
         // authenticate; wrong credentials raise an AuthenticationException that the global exception handler
-        // renders as a JSON 401 (the endpoint never returns a token for them)
-        val credentials = loginPayloadDecryptor.decrypt(request.encryptedPayload.orEmpty())
+        // renders as a JSON 401 (the endpoint never returns a token for them). Either failure counts against
+        // the client's rate-limit budget; a success clears it.
         val authentication =
-            authenticationManager.authenticate(
-                UsernamePasswordAuthenticationToken(credentials.loginName, credentials.password)
-            )
+            try {
+                val credentials = loginPayloadDecryptor.decrypt(request.encryptedPayload.orEmpty())
+                authenticationManager
+                    .authenticate(UsernamePasswordAuthenticationToken(credentials.loginName, credentials.password))
+                    .also { loginAttemptLimiter.recordSuccess(clientKey) }
+            } catch (e: LoginPayloadException) {
+                loginAttemptLimiter.recordFailure(clientKey)
+                throw e
+            } catch (e: AuthenticationException) {
+                loginAttemptLimiter.recordFailure(clientKey)
+                throw e
+            }
 
         val now = Instant.now()
         val claims =
@@ -144,6 +167,21 @@ class AuthController(
             .maxAge(maxAge)
             .build()
 
+    /**
+     * The per-client key the login rate limiter counts against: the originating client IP. Behind a proxy
+     * (Cloud Run) the real client is the first hop of `X-Forwarded-For`; otherwise the direct socket address.
+     *
+     * @param httpRequest the servlet request to read the client address from.
+     */
+    private fun rateLimitClientKey(httpRequest: HttpServletRequest): String =
+        httpRequest
+            .getHeader(FORWARDED_FOR_HEADER)
+            ?.substringBefore(',')
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: httpRequest.remoteAddr
+            ?: "unknown"
+
     /** Strips the `ROLE_` prefix from the granted authorities to produce the bare role names. */
     private fun rolesOf(authentication: Authentication): List<String> =
         authentication.authorities
@@ -155,5 +193,6 @@ class AuthController(
         private val log = KotlinLogging.logger {}
         private const val TOKEN_TTL_HOURS = 10L
         private const val ROLE_PREFIX = "ROLE_"
+        private const val FORWARDED_FOR_HEADER = "X-Forwarded-For"
     }
 }
