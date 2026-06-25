@@ -2,110 +2,121 @@
 #
 # One-command deploy of CampusCoffeeConsumption to Google Cloud Run, against managed Cloud SQL.
 #
-# Usage:
-#   DB_PASSWORD=... scripts/deploy-cloudrun.sh [compose-file]   # first deploy (DB_PASSWORD = Cloud SQL password)
-#   scripts/deploy-cloudrun.sh [compose-file]                   # later deploys (reuses deploy.env)
+# Secrets are authored locally in deploy.prod.env (gitignored, the source of truth) and SYNCED into Google
+# Secret Manager by this script; the running service reads them from Secret Manager, bound as environment
+# variables with --set-secrets. So the editable copy stays on the operator's machine while the runtime gets
+# Secret Manager's encryption at rest, access audit, and versioning, and no secret rides in the build context.
+# Non-secret config (the base URL, DB user, and bootstrap-admin identity) also comes from deploy.prod.env and
+# is passed with --set-env-vars.
 #
-# compose-file defaults to compose.prod.yaml (the prod profile, real members, no seed data). The service
-# scales to zero when idle; the startup CPU boost (below) shortens the resulting cold start.
+# This deploys with `gcloud run deploy` rather than `gcloud beta run compose up`: compose up cannot bind a
+# Secret Manager secret as an environment variable (its `secrets:` only uploads a local file), and the prod
+# profile fails fast without the secrets, so a compose-up revision would crash before they could be bound.
+#
+# Usage:
+#   scripts/deploy-cloudrun.sh        # reads deploy.prod.env (copy deploy.env.example to start one)
 #
 # One-time prerequisites:
 #   gcloud auth login
 #   gcloud config set project <your-project-id>
 #   gcloud config set run/region <region>            # e.g. europe-west3
-#   gcloud components install beta
-#   # a Cloud SQL Postgres instance named in application.yaml's prod datasource URL, the Cloud SQL Admin API
-#   # enabled, and the Cloud Run runtime service account granted the Cloud SQL Client role
-#   # the least-privilege app role provisioned once (scripts/sql/create-app-role.sql), so the service runs as
-#   # campus_coffee_app rather than the Cloud SQL master postgres superuser
-#
-# Hardening: deploy.env is the simple path, but the three secrets (JWT_SECRET, LOGIN_PRIVATE_KEY_PEM,
-# DB_PASSWORD) are better held in Secret Manager and bound after the compose deploy with
-#   gcloud run services update "$service" --set-secrets=DB_PASSWORD=db-app-password:latest,JWT_SECRET=jwt-secret:latest,LOGIN_PRIVATE_KEY_PEM=login-key:latest
-# so they never sit in a plaintext file or the build context.
-#
-# `gcloud run compose up` has no flag to set environment variables, so all secrets and the public URL are
-# supplied through the Compose file's `env_file: deploy.env`. This script generates deploy.env on first run
-# (a random JWT secret and a random bootstrap-admin password, printed once) and reuses it afterwards, so
-# JWTs and the admin credential survive a redeploy. deploy.env is gitignored and kept out of the build
-# context. The public base URL is a chicken-and-egg with Cloud Run's assigned URL, so the first run deploys
-# once to learn the URL, writes it back, and redeploys. `--allow-unauthenticated` grants public invocation;
-# app-level authentication still gates every write.
+#   gcloud services enable run.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com sqladmin.googleapis.com
+#   # A Cloud SQL Postgres instance named in application.yaml's prod datasource URL. The prod profile connects
+#   # through the Cloud SQL socket factory (Admin API + IAM), so no --add-cloudsql-instances mount is needed.
+#   # Grant the Cloud Run runtime service account BOTH:
+#   #   roles/cloudsql.client                (connect through the socket factory)
+#   #   roles/secretmanager.secretAccessor   (read the secrets bound below)
 
 set -euo pipefail
-
-# deploy.env carries the JWT secret, the RSA login key, the DB password, and the admin credential, so every
-# file this script creates (deploy.env and the mktemp work file) must be owner-only. umask 077 makes that the
-# default; an explicit chmod below is the belt-and-suspenders.
 umask 077
-
 cd "$(dirname "$0")/.."
 
-# The compose file selects the deployment (compose.prod.yaml by default). The Cloud Run
-# service name is the Compose project `name:`.
-compose="${1:-compose.prod.yaml}"
-[ -f "$compose" ] || { echo "compose file not found: $compose" >&2; exit 1; }
-service="$(sed -n 's/^name: *//p' "$compose" | head -1)"
-[ -n "$service" ] || { echo "could not read 'name:' from $compose" >&2; exit 1; }
+env_file="deploy.prod.env"
+service="campus-coffee-consumption-prod"
+[ -f "$env_file" ] || {
+  echo "$env_file not found. Copy deploy.env.example to $env_file and fill it in." >&2
+  exit 1
+}
 
-# --- deploy.env: created once, reused afterwards ------------------------------------------------------------
-if [[ ! -f deploy.env ]]; then
-  : "${DB_PASSWORD:?Set DB_PASSWORD to your Cloud SQL password for the first deploy, e.g. DB_PASSWORD=... $0}"
-  admin_password="$(openssl rand -hex 16)"
-  # The login-payload RSA key as a single line with literal \n separators (an env_file value cannot span
-  # lines); the app turns the \n back into real newlines.
-  login_private_key_pem="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null \
-    | awk 'BEGIN{ORS="\\n"}{print}' | sed 's/\\n$//')"
-  {
-    printf 'JWT_SECRET=%s\n' "$(openssl rand -hex 32)"
-    printf 'LOGIN_PRIVATE_KEY_PEM=%s\n' "$login_private_key_pem"
-    printf 'DB_USERNAME=%s\n' "${DB_USERNAME:-campus_coffee_app}"
-    printf 'DB_PASSWORD=%s\n' "$DB_PASSWORD"
-    printf 'CAMPUS_COFFEE_APP_BASE_URL=%s\n' "https://pending.invalid"
-    printf 'BOOTSTRAP_ADMIN_LOGIN=%s\n' "admin"
-    printf 'BOOTSTRAP_ADMIN_PASSWORD=%s\n' "$admin_password"
-    printf 'BOOTSTRAP_ADMIN_EMAIL=%s\n' "admin@se.uni-heidelberg.de"
-  } > deploy.env
-  chmod 600 deploy.env
-  echo "Generated deploy.env (gitignored, mode 600)."
-  echo "  First-admin login:    admin"
-  echo "  First-admin password: $admin_password   (printed once; store it now)"
-fi
+# Read a single-line value from deploy.prod.env without sourcing it (the multi-line PEM cannot be sourced).
+val() { grep "^$1=" "$env_file" | head -1 | cut -d= -f2-; }
+# Read the multi-line LOGIN_PRIVATE_KEY_PEM value (from after the '=' on its line through the END marker).
+login_key() {
+  awk '/^LOGIN_PRIVATE_KEY_PEM=/{sub(/^LOGIN_PRIVATE_KEY_PEM=/,"");p=1} p{print} /-----END PRIVATE KEY-----/{exit}' "$env_file"
+}
 
-echo "Deploying ${service} from ${compose} to Cloud Run..."
-gcloud beta run compose up "$compose" --allow-unauthenticated
+db_username="$(val DB_USERNAME)"
+base_url="$(val CAMPUS_COFFEE_APP_BASE_URL)"
+admin_login="$(val BOOTSTRAP_ADMIN_LOGIN)"
+admin_email="$(val BOOTSTRAP_ADMIN_EMAIL)"
+admin_first="$(val BOOTSTRAP_ADMIN_FIRST_NAME)"
+admin_last="$(val BOOTSTRAP_ADMIN_LAST_NAME)"
 
-# --- resolve the real service URL and redeploy if the base URL is still the placeholder --------------------
+# --- sync the four secrets from deploy.prod.env into Secret Manager ----------------------------------------
+# Create the secret if missing; add a new version only when the deploy.prod.env value differs from the current
+# latest, so re-deploys do not churn versions. Values flow through a temp file (umask 077) and are never echoed.
+sync_secret() { # secret-name; value on stdin
+  local name="$1" tmp
+  tmp="$(mktemp)"
+  cat >"$tmp"
+  if ! gcloud secrets describe "$name" >/dev/null 2>&1; then
+    gcloud secrets create "$name" --data-file="$tmp" --replication-policy=automatic >/dev/null
+    echo "  created $name"
+  elif ! gcloud secrets versions access latest --secret="$name" 2>/dev/null | cmp -s - "$tmp"; then
+    gcloud secrets versions add "$name" --data-file="$tmp" >/dev/null
+    echo "  updated $name (new version)"
+  else
+    echo "  $name unchanged"
+  fi
+  rm -f "$tmp"
+}
+
+echo "Syncing secrets from ${env_file} to Secret Manager..."
+printf '%s' "$(val JWT_SECRET)" | sync_secret jwt-secret
+login_key | sync_secret login-key
+printf '%s' "$(val DB_PASSWORD)" | sync_secret db-app-password
+printf '%s' "$(val BOOTSTRAP_ADMIN_PASSWORD)" | sync_secret bootstrap-admin-password
+
+# --- deploy: build from source, bind the secrets and non-secret config ------------------------------------
+secrets="JWT_SECRET=jwt-secret:latest"
+secrets+=",LOGIN_PRIVATE_KEY_PEM=login-key:latest"
+secrets+=",DB_PASSWORD=db-app-password:latest"
+secrets+=",BOOTSTRAP_ADMIN_PASSWORD=bootstrap-admin-password:latest"
+
+env_vars="SPRING_PROFILES_ACTIVE=prod"
+env_vars+=",DB_USERNAME=${db_username}"
+env_vars+=",CAMPUS_COFFEE_APP_BASE_URL=${base_url}"
+env_vars+=",BOOTSTRAP_ADMIN_LOGIN=${admin_login}"
+env_vars+=",BOOTSTRAP_ADMIN_EMAIL=${admin_email}"
+env_vars+=",BOOTSTRAP_ADMIN_FIRST_NAME=${admin_first}"
+env_vars+=",BOOTSTRAP_ADMIN_LAST_NAME=${admin_last}"
+
+echo "Deploying ${service} to Cloud Run (building from source)..."
+gcloud run deploy "$service" \
+  --source . \
+  --allow-unauthenticated \
+  --set-secrets="$secrets" \
+  --set-env-vars="$env_vars" \
+  --memory=1Gi \
+  --cpu=1 \
+  --concurrency=80 \
+  --max-instances="${MAX_INSTANCES:-4}" \
+  --cpu-boost
+
+# --- resolve the real service URL and write it back if it is still the placeholder -------------------------
 url="$(gcloud run services describe "$service" --format='value(status.url)')"
-if grep -q 'CAMPUS_COFFEE_APP_BASE_URL=https://pending.invalid' deploy.env; then
-  echo "Setting CAMPUS_COFFEE_APP_BASE_URL=${url} and redeploying so capability QR links are correct..."
-  # portable in-place edit (no GNU/BSD sed -i divergence): rewrite the one line
+if [ "$base_url" = "https://pending.invalid" ]; then
+  echo "Resolved ${url}; writing it to ${env_file} and updating the service..."
   tmp="$(mktemp)"
   while IFS= read -r line; do
     case "$line" in
       CAMPUS_COFFEE_APP_BASE_URL=*) printf 'CAMPUS_COFFEE_APP_BASE_URL=%s\n' "$url" ;;
       *) printf '%s\n' "$line" ;;
     esac
-  done < deploy.env > "$tmp"
-  mv "$tmp" deploy.env
-  gcloud beta run compose up "$compose" --allow-unauthenticated
+  done <"$env_file" >"$tmp"
+  mv "$tmp" "$env_file"
+  chmod 600 "$env_file"
+  gcloud run services update "$service" --update-env-vars="CAMPUS_COFFEE_APP_BASE_URL=${url}"
 fi
-
-# Set the runtime resource limits and the startup CPU boost in one update. `gcloud beta run compose up` has
-# no flags for these, so they are applied here after the deploy.
-#   --memory/--cpu       the per-instance limits; 1Gi pairs with the JVM's MaxRAMPercentage=75 (Dockerfile).
-#   --concurrency        requests served per instance before a new one starts.
-#   --max-instances      caps fan-out (and the Cloud SQL connection count); override with MAX_INSTANCES.
-#   --cpu-boost          extra CPU during container startup so the JVM and Spring context boot faster,
-#                        shortening the scale-to-zero cold start. Not separately billed.
-# The service still scales to zero when idle (min-instances stays the default 0).
-max_instances="${MAX_INSTANCES:-4}"
-echo "Setting resource limits (memory 1Gi, cpu 1, concurrency 80, max-instances ${max_instances}) and startup CPU boost on ${service}..."
-gcloud run services update "$service" \
-  --memory=1Gi \
-  --cpu=1 \
-  --concurrency=80 \
-  --max-instances="$max_instances" \
-  --cpu-boost
 
 echo "Service URL: ${url}"

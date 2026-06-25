@@ -212,18 +212,33 @@ The prod profile connects to a **Cloud SQL for PostgreSQL 18** instance
 (`se-uhd:europe-west3:campus-coffee-consumption`, project `se-uhd`) via the **Cloud SQL Java connector**,
 which does TLS and IAM auth itself (no authorized-networks or client-cert setup). The non-secret connection
 details are baked into the prod profile; the DB password, `JWT_SECRET`, the login-encryption private key
-(`LOGIN_PRIVATE_KEY_PEM`), and the bootstrap-admin credentials come from the environment / Secret Manager.
+(`LOGIN_PRIVATE_KEY_PEM`), and the bootstrap-admin credentials are supplied as environment variables.
 Fixtures are off in prod; instead, a **bootstrap admin** is created on first startup from
 `campus-coffee.bootstrap-admin.*` when no admin exists.
 
+**Secrets are authored in `deploy.prod.env` and synced into Google Secret Manager.** The gitignored
+`deploy.prod.env` is the local source of truth for the four secrets (`JWT_SECRET`, `LOGIN_PRIVATE_KEY_PEM`,
+`DB_PASSWORD`, `BOOTSTRAP_ADMIN_PASSWORD`) and the non-secret config. `scripts/deploy-cloudrun.sh` reads it,
+syncs each secret into Secret Manager (creating it, or adding a new version when the value changes), and binds
+them onto the service from Secret Manager with `--set-secrets`; the non-secret config
+(`CAMPUS_COFFEE_APP_BASE_URL`, `DB_USERNAME`, the non-secret `BOOTSTRAP_ADMIN_*` identity) is passed with
+`--set-env-vars`. So the editable copy stays on the operator's machine while the runtime reads the secrets from
+Secret Manager (encryption at rest, access audit, versioning), and no secret rides in the build context. The
+cloud deploy uses `gcloud run deploy` rather than `gcloud beta run compose up`, because compose up cannot bind
+a Secret Manager secret as an environment variable. See
+`doc/2026-06-25_secret-manager-for-deployment-secrets.md`.
+
 Deploy notes:
-- Attach the instance with `--add-cloudsql-instances se-uhd:europe-west3:campus-coffee-consumption` and
-  grant the runtime service account the **Cloud SQL Client** role.
-- Inject `DB_PASSWORD`, `JWT_SECRET`, `LOGIN_PRIVATE_KEY_PEM` (a PKCS#8 RSA private key, at least 2048 bits,
-  as one line with literal `\n` separators), and the `BOOTSTRAP_ADMIN_*` values from Secret Manager, and set
-  `CAMPUS_COFFEE_APP_BASE_URL` to the deployed HTTPS origin (used to build the capability URLs). The same
-  login key must be present on every instance, so it is configured, not generated per startup;
-  `scripts/deploy-cloudrun.sh` generates one into `deploy.env` on first run.
+- One-time: enable the APIs (`gcloud services enable run.googleapis.com cloudbuild.googleapis.com
+  secretmanager.googleapis.com artifactregistry.googleapis.com sqladmin.googleapis.com`) and grant the Cloud
+  Run runtime service account both `roles/cloudsql.client` (to connect through the socket factory) and
+  `roles/secretmanager.secretAccessor` (to read the secrets). The socket factory uses the Cloud SQL Admin API
+  and IAM, so no `--add-cloudsql-instances` mount is needed.
+- The Secret Manager secrets are `jwt-secret`, `login-key`, `db-app-password`, and `bootstrap-admin-password`;
+  `LOGIN_PRIVATE_KEY_PEM` is a PKCS#8 RSA private key (at least 2048 bits), a normal multi-line PEM. The same
+  login key must be present on every instance, so it is one Secret Manager secret every instance reads.
+  `CAMPUS_COFFEE_APP_BASE_URL` is the deployed HTTPS origin (used to build the capability URLs);
+  `scripts/deploy-cloudrun.sh` resolves it and writes it back to `deploy.prod.env` on the first deploy.
 - The `com.google.cloud.sql:postgres-socket-factory` runtime dependency (named by the prod datasource URL)
   is already declared in `application/build.gradle.kts`.
 
