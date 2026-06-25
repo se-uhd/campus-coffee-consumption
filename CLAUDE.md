@@ -520,6 +520,15 @@ admin deactivates them instead); `coffee_consumptions` stays `CASCADE` because e
   user administration, authorization).
 - **Architecture Tests**: ArchUnit tests enforcing the hexagonal layer rules.
 - Because event sourcing is the only mode, there is a single backend (no dual relational/event sourcing test split).
+- **The automated tests all run the `dev` profile, so prod-only behaviors are not covered.** The system tests,
+  acceptance tests, and the Playwright e2e all run under `dev`, so anything that activates only in another
+  profile is exercised by no test: the Content-Security-Policy, the `Secure` session cookie, and Angular's
+  production build optimizations (such as critical-CSS inlining). **When you change the CSP, the security
+  config, or the production build, verify against the `prod` profile, not just the dev e2e.** Example: the
+  first production deploy served an unstyled UI because the prod CSP's `script-src 'self'` blocked the inline
+  `onload` handler in Angular's deferred-stylesheet markup; the fix was to disable
+  `optimization.styles.inlineCritical` in `frontend/angular.json` (a plain render-blocking stylesheet, so the
+  CSP stays strict).
 
 ### Test Naming
 
