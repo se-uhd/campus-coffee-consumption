@@ -395,6 +395,10 @@ export class ProfileComponent implements OnInit {
 
   /** Saves the edited name and email, then returns to the read-only view. */
   async save(): Promise<void> {
+    // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
+    if (this.busy) {
+      return;
+    }
     if (!this.profile) {
       return;
     }

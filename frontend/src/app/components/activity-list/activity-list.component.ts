@@ -61,7 +61,9 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
                 <!-- a member's split purchase: show the full purchase total, broken down below -->
                 <span class="amount">+{{ expenseTotal(entry) }}</span>
               } @else {
-                <span class="amount" [class.warn]="entry.amountCents < 0">{{ signed(entry.amountCents) }}</span>
+                <span class="amount" [class.warn]="entry.amountCents < 0">{{
+                  signed(entry.amountCents)
+                }}</span>
               }
             </div>
             <div class="muted">
