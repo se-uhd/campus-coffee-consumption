@@ -21,12 +21,14 @@ import java.time.ZoneOffset
 /**
  * Unit tests for [LoginPayloadDecryptor]: a fresh payload encrypted with the matching public key round-trips
  * to the credentials, every unreadable payload (not a JWE, encrypted with another key, a downgraded
- * algorithm, not a JSON object, or missing a credential field) is surfaced as a [LoginPayloadException], and
- * a payload whose `iat` is missing or outside the freshness window is rejected (replay protection).
+ * algorithm, not a JSON object, or missing a credential field) is surfaced as a [LoginPayloadException], a
+ * payload whose `iat` is missing or outside the freshness window (past or future) is rejected, and the same
+ * ciphertext presented twice is rejected as a replay.
  */
 class LoginPayloadDecryptorTest {
     private lateinit var key: RSAKey
     private lateinit var decryptor: LoginPayloadDecryptor
+    private lateinit var seenFingerprints: MutableSet<String>
 
     private val now = Instant.parse("2026-06-24T12:00:00Z")
     private val clock = Clock.fixed(now, ZoneOffset.UTC)
@@ -34,7 +36,10 @@ class LoginPayloadDecryptorTest {
     @BeforeEach
     fun setUp() {
         key = RSAKeyGenerator(KEY_BITS).keyID("test").generate()
-        decryptor = LoginPayloadDecryptor(key.toRSAPrivateKey(), clock, Duration.ofMinutes(2))
+        seenFingerprints = mutableSetOf()
+        // MutableSet.add returns true on first insert (first use) and false if already present (a replay)
+        decryptor =
+            LoginPayloadDecryptor(key.toRSAPrivateKey(), clock, Duration.ofMinutes(2)) { seenFingerprints.add(it) }
     }
 
     private fun encrypt(
@@ -118,6 +123,26 @@ class LoginPayloadDecryptorTest {
         val stale = credentials(iatMillis = now.minus(Duration.ofMinutes(5)).toEpochMilli())
 
         assertThatThrownBy { decryptor.decrypt(encrypt(stale)) }
+            .isInstanceOf(LoginPayloadException::class.java)
+    }
+
+    @Test
+    fun `decrypt throws LoginPayloadException for a payload dated too far in the future`() {
+        // a forward-skewed iat (beyond the window) is rejected just like a past one, so a pre-minted
+        // ciphertext cannot be held and used later
+        val future = credentials(iatMillis = now.plus(Duration.ofMinutes(5)).toEpochMilli())
+
+        assertThatThrownBy { decryptor.decrypt(encrypt(future)) }
+            .isInstanceOf(LoginPayloadException::class.java)
+    }
+
+    @Test
+    fun `decrypt throws LoginPayloadException when the same ciphertext is presented a second time`() {
+        val ciphertext = encrypt(credentials())
+        // the first use succeeds; replaying the exact captured ciphertext within the window is rejected
+        decryptor.decrypt(ciphertext)
+
+        assertThatThrownBy { decryptor.decrypt(ciphertext) }
             .isInstanceOf(LoginPayloadException::class.java)
     }
 

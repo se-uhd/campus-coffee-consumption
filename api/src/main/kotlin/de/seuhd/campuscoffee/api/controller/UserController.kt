@@ -120,7 +120,13 @@ class UserController(
     override fun delete(
         @Parameter(description = "Unique identifier of the user to delete.", required = true)
         @PathVariable id: UUID
-    ): ResponseEntity<Void> = super.delete(id)
+    ): ResponseEntity<Void> {
+        // resolve the principal so a deactivated admin's in-flight JWT is rejected here too (the resolver
+        // throws ForbiddenException for a deactivated admin), keeping the lockout uniform across endpoints.
+        // Hard-deleting a member is irreversible, so this must not be reachable by a just-revoked admin.
+        currentUserProvider.currentUser()
+        return super.delete(id)
+    }
 
     /** Retrieves the signed-in admin's own user (the admin landing default). */
     @Operation(summary = "Get the authenticated admin's own user.")
