@@ -31,10 +31,10 @@ class AdminAccountingController(
     private val currentUserProvider: CurrentUserProvider
 ) {
     /**
-     * Returns every member's current count and balance (admin only). Deliberately unpaged, like
-     * `GET /users`: the admin overview table shows all members at once, and a coffee group is small. Each
-     * member's balance is a walk over their event stream, so this is O(members); page it if membership
-     * grows large.
+     * Returns every member's current count and balance (admin only). Unpaged, like `GET /users`: the admin
+     * overview table shows all members at once, and a coffee group is small. Each member's balance is read
+     * from the maintained `member_balance` projection in one query, not by replaying their event stream; the
+     * per-member count is still read per member. Page it if membership grows large.
      */
     @Operation(summary = "Get every member's current count and balance.")
     @GetMapping("/overview")

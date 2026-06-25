@@ -14,7 +14,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Restrict the bulk QR downloads to active members: both the new PDF sheet and the existing
   `GET /api/users/qr.zip` now skip deactivated members, whose wall codes are retired.
 - Encrypt the admin login payload in the browser. `POST /api/auth/token` now takes a compact JWE
-  (`RSA-OAEP-256` + `A256GCM`) of `{ loginName, password }` instead of a plaintext body: the backend
+  (`RSA-OAEP-256` + `A256GCM`) of `{ loginName, password, iat }` instead of a plaintext body: the backend
   publishes its RSA public key at the new public `GET /api/auth/public-key` (a JWK), and the SPA encrypts the
   credentials with it (via the `jose` library) before signing in. This keeps the raw password out of
   TLS-terminating proxies and request-body logs (defense in depth on top of TLS). The RSA private key is
@@ -33,10 +33,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `UserEntity` gains a `@Version` field and the `users` table a `version` column (`NOT NULL DEFAULT 0`), so
   two concurrent admin edits of the same member can no longer silently overwrite each other; the existing
   version fields default to 0 to match.
-- Consolidate the Flyway migrations to one `CREATE` per table (six migrations) and strip their comments: the
-  incremental index and version migrations are folded into their table's create, and the rationale lives in
-  the entity classes and this changelog rather than in the SQL. A one-time pre-production cleanup (no
-  deployed database had the old migrations applied); from here migrations stay append-only.
+- Consolidate the Flyway migrations to one `CREATE` per table and strip their comments: the incremental
+  index and version migrations are folded into their table's create, and the rationale lives in the entity
+  classes and this changelog rather than in the SQL. A one-time pre-production cleanup (no deployed database
+  had the old migrations applied); from here migrations stay append-only.
 - Gate the dev data endpoints (`/api/dev/**`) open rule on the `dev` profile, so it is never registered in a
   deployed profile (defense in depth; `DevController` is already `@Profile("dev")`).
 - `scripts/check-version-sync.sh` compares the full version token (including any pre-release or build
@@ -99,6 +99,34 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `deploy*.env`), `chmod 600` the deploy env files and harden `scripts/deploy-cloudrun.sh` (`umask 077`), and
   run the prod app as a least-privilege database role (`scripts/sql/create-app-role.sql`) instead of the
   Cloud SQL superuser.
+- Rate-limit `POST /api/auth/token` to stop online password guessing and a bcrypt CPU-exhaustion flood. A
+  Bucket4j token bucket per client IP (held in a Caffeine cache) allows `campus-coffee.auth.rate-limit.max-failures`
+  failed attempts per `campus-coffee.auth.rate-limit.window` (default 10 per 15 minutes); the next attempt is
+  refused with 429 and a `Retry-After` header before any decrypt or bcrypt work runs. A malformed payload and
+  a wrong password both count as a failure; a successful login clears the count. Behind a proxy the client IP
+  comes from `X-Forwarded-For`. The limiter is on by default and can be turned off with
+  `campus-coffee.auth.rate-limit.enabled=false`.
+- Return the same `401 Unauthorized` body for every login failure (wrong password, unknown login, deactivated
+  account), so the response no longer reveals whether a login name exists or is deactivated; the real cause is
+  logged server-side only.
+- Make a captured login ciphertext single-use within its freshness window. The decryptor fingerprints each
+  compact JWE and rejects a second presentation of the same ciphertext as a replay (400), closing the residual
+  window the `iat` check alone left open. No client change: the existing per-encryption randomness already
+  makes each genuine login a distinct ciphertext.
+- Strengthen the admin password policy to at least 24 characters with a lowercase letter, an uppercase letter,
+  and a digit, on both the admin API (`UserDto`) and the bootstrap-admin path. Members are unaffected (they
+  authenticate with a capability link and have no password). The seeded dev and test admin passwords are
+  updated to match.
+- Close a deactivated-admin lockout gap on `DELETE /api/users/{id}`: the delete now resolves the acting user
+  like the other admin endpoints, so an admin who was deactivated while their JWT is still valid can no longer
+  hard-delete members. A stale or absent principal on any endpoint now reads as a clean 401 (re-authenticate)
+  rather than a 404 or 500.
+- Document the event log's retention of superseded auth secrets in
+  `doc/2026-06-24_security-hardening-and-cookie-auth.md`: the append-only log keeps the full state of each
+  `User` event, including the capability token and bcrypt password hash, so an old token or hash lingers after
+  a rotation or password change. This is no new exposure beyond the access-controlled `users` table (a rotated
+  token no longer authenticates, and a bcrypt hash is a hash), so it is accepted and documented rather than
+  encrypted in the log.
 
 ### Changed
 
@@ -109,6 +137,41 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Unify event-note handling at the append boundary: `events.note` now carries every event's note (the
   count-correction reason or the entity's own body note), so the activity and kitty feeds show deposit,
   adjustment, and expense notes that were previously dropped.
+- Serialize every balance-projection recompute so a concurrent write cannot lost-update an unversioned
+  projection row. The `KittyLock` port becomes `BalanceLock` with `lockKitty()` and a new per-member
+  `lockMember(userId)` (a second Postgres advisory lock keyed on the member id), and `BalanceProjection`
+  acquires the right lock (kitty before member, a fixed order so the paths cannot deadlock) around every
+  recompute. This closes two gaps where a kitty write skipped the lock: `PaymentService.recordDeposit` and
+  `ExpenseService.delete` both move the kitty but took no lock, so a deposit or a delete racing a guarded draw
+  could lose the draw's kitty recompute and let a later expense overdraw the fund. The per-member balance,
+  recomputed by self-scans, purchases, deposits, and admin steps with no shared versioned row, is now
+  serialized the same way.
+- Clear the `member_balance` and `kitty_balance` projections explicitly at the start of the events-to-data
+  rebuild instead of relying on the `member_balance` cascade from the user delete, so the kitty row cannot go
+  stale during the replay.
+- Read the cancel grace period through a typed `ConsumptionProperties` (`campus-coffee.consumption`,
+  default 5 minutes) in the domain instead of a raw `@Value`, so the key resolves in the IDE's
+  `application.yaml` editor like every other custom property.
+- Add the synchronous re-entrancy guard (`if (this.busy) return`) to the admin mutation handlers that lacked
+  it: the +1/-1 count button, the absolute count override, record purchase, create user, set price, and save
+  profile. A fast double-tap fired two same-tick handlers before the disabled state re-rendered, so a
+  non-idempotent count change or a purchase could post twice; the sibling member and kitty handlers already
+  had this guard.
+- Run the remaining frontend quality gates in `gradle check` (so CI catches them): the Vitest unit suite,
+  Knip dead-code detection, and the Prettier format check, alongside the existing eslint/stylelint. Only the
+  eslint/stylelint gate ran before, so a broken unit test, an unused export, or unformatted TypeScript could
+  merge green. The committed OpenAPI spec dump (`src-gen/api-docs.json`) joins the generated DTOs in
+  `.prettierignore`, since springdoc owns its formatting.
+- Build the Docker image in CI (a new `docker-build` job), so a broken Dockerfile fails the build instead of
+  the first production deploy.
+- Pin the runtime base image by digest (`eclipse-temurin:25-jre-alpine@sha256:...`) for a reproducible image,
+  keeping the `25` major in the `FROM` line so the toolchain-version check still reads it.
+- Size the production runtime: set `JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0` so the heap tracks the
+  container limit, and set `--memory`, `--cpu`, `--concurrency`, and `--max-instances` on the Cloud Run
+  deploy instead of relying on the platform defaults.
+- Fix `scripts/run-e2e-coverage.sh`: under `set -e` the e2e exit-code capture was dead code, so a failing
+  e2e aborted the script before the coverage flush and the real status was lost. The e2e now runs so its
+  exit code is captured, the JaCoCo flush always happens, and the script exits with the e2e's real status.
 
 ### Fixed
 
@@ -119,6 +182,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   instead of a recovery a real transaction cannot perform.
 - Retry a member self-scan 409 a bounded number of times with backoff, and stop an admin profile edit (or
   active-state toggle) from reverting a concurrent admin's `role`/`active` change with a stale snapshot.
+- Reject a zero or negative `delta` on the admin single-step count change at the validation layer (it was
+  caught only in the domain before), and require a bean purchase to weigh at least 100 grams (the expense DTOs
+  accepted a zero-weight purchase that still moved money).
+- Log a warning when a coffee is valued at 0 because the price history is empty, instead of valuing it as free
+  with no signal. A price is always seeded before any coffee in normal operation, so this only fires on a
+  hand-edited or misordered log; the as-of lookup still falls back to the earliest known price, never 0, when
+  any price exists.
+- Fix documentation that no longer matched the code: the README's event-log note (`events.note` carries every
+  event's note, not only a count-correction reason) and its claim that the domain has no framework
+  dependencies (it depends on Spring), the `AdminAccountingController.overview` KDoc (member balances are read
+  from the projection, not replayed per member), the `ConsumptionProperties` location and the migration count
+  in `CLAUDE.md`, and the login-payload design note in `doc/` (the payload carries `iat` and the replay guard
+  is implemented, not deferred).
 
 ## [0.4.0] - 2026-06-23
 

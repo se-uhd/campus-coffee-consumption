@@ -101,6 +101,18 @@ captured ciphertext could be replayed against the token endpoint. A stale payloa
   `scripts/sql/create-app-role.sql`, instead of the Cloud SQL `postgres` superuser. `deploy.env.example` and
   the deploy script document sourcing the secrets from Secret Manager.
 
+### Auth secrets in the event log (accepted)
+
+The append-only `events` log stores the full state of each `User` event, including the `capability_token` and
+the bcrypt `password_hash` (the raw password is stripped via `UserSecretsMixin`, but the hash and token are
+kept so a rebuild from the log can still authenticate). So the log retains superseded values: an old
+capability token after a rotation, an old hash after a password change. This is accepted rather than encrypted
+in the log, for three reasons: it is no new exposure beyond the access-controlled `users` read table, which
+holds the same secrets; a rotated capability token no longer authenticates anyone (auth checks the current
+token in `users`), so an old token in the log grants no access; and a bcrypt hash is designed to be stored.
+Field-level encryption of the event body would add key management and a rebuild that decrypts, for little gain
+at this threat model. If the log is ever exported beyond the database trust boundary, revisit this.
+
 ## Money read model: a maintained balance projection
 
 The hottest member reads used to replay event streams on every call: `GET /summary` walked the whole global

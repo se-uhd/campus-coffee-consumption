@@ -87,7 +87,7 @@ class CoffeeConsumptionServiceTest {
                 activityDataService,
                 userDataService,
                 changeNoteContext,
-                gracePeriod
+                ConsumptionProperties(gracePeriod)
             )
     }
 
