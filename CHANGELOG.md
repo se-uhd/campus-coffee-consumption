@@ -7,28 +7,40 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Deploy to Cloud Run with `gcloud run deploy --source . --set-secrets` instead of `gcloud beta run compose
+  up`. Compose up cannot bind a Secret Manager secret as an environment variable, so the cloud deploy moved
+  to `gcloud run deploy` (it still builds the image from the `Dockerfile` via Cloud Build). The secrets and
+  non-secret config are read from `deploy.prod.env` and passed via `--set-secrets` / `--set-env-vars`.
+
+### Removed
+
+- Remove `compose.prod.yaml`: the cloud deploy no longer uses a Compose file. The dev `compose.yaml` stays
+  for local runs.
+
+### Security
+
+- Route the production deployment secrets through Google Secret Manager. `scripts/deploy-cloudrun.sh` syncs
+  `JWT_SECRET`, `LOGIN_PRIVATE_KEY_PEM`, `DB_PASSWORD`, and `BOOTSTRAP_ADMIN_PASSWORD` from the gitignored
+  `deploy.prod.env` (the local source of truth) into Secret Manager and binds them onto the Cloud Run service
+  from there (`--set-secrets`), so the runtime gets encryption at rest, access audit, and versioning, and no
+  secret rides in the git history or the build context. The runtime service account needs
+  `roles/secretmanager.secretAccessor`. See `doc/2026-06-25_secret-manager-for-deployment-secrets.md`.
+
 ## [0.5.0] - 2026-06-25
+
+### Added
 
 - Add an admin "Download all QR codes (PDF sheet)" action that renders every active member's capability QR
   code into one printable A4 PDF grid, each code labelled with the member's login name, next to the existing
   ZIP download (`GET /api/users/qr.pdf`, admin-only). Backed by Apache PDFBox (Apache-2.0) behind a new
   `QrGridPdfGenerator` domain port, so the PDF library stays out of the web and domain layers.
+
+### Changed
+
 - Restrict the bulk QR downloads to active members: both the new PDF sheet and the existing
   `GET /api/users/qr.zip` now skip deactivated members, whose wall codes are retired.
-- Encrypt the admin login payload in the browser. `POST /api/auth/token` now takes a compact JWE
-  (`RSA-OAEP-256` + `A256GCM`) of `{ loginName, password, iat }` instead of a plaintext body: the backend
-  publishes its RSA public key at the new public `GET /api/auth/public-key` (a JWK), and the SPA encrypts the
-  credentials with it (via the `jose` library) before signing in. This keeps the raw password out of
-  TLS-terminating proxies and request-body logs (defense in depth on top of TLS). The RSA private key is
-  configured like the JWT secret, `campus-coffee.login-encryption.private-key-pem` (a PKCS#8 PEM, at least
-  2048 bits), required in prod via `LOGIN_PRIVATE_KEY_PEM` (delivered as one line with `\n` separators) with
-  an insecure dev fallback; the same key must be present on every instance, so it is configured rather than
-  generated per startup. A malformed or undecryptable payload returns 400, distinct from the 401 for
-  wrong-but-readable credentials, so it is not a credential oracle. This is defense in depth, not a new trust
-  boundary: it does not replace TLS, does not protect against a compromised client or XSS, and is not
-  zero-knowledge (the server decrypts and still verifies the password with bcrypt).
-- Fix the member landing page: the count/hero card and the balance card sat flush with no gap (the hero
-  "+" button overlapped the balance card); they now keep the same 16px spacing as the rest of the page.
 - Tidy the browser tab titles: capitalized, with SE@UHD in parentheses and no middle-dot separator, e.g.
   "My Coffee (SE@UHD)".
 - Give every entity except the append-only `events` log a `version` column for optimistic locking:
@@ -39,15 +51,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   index and version migrations are folded into their table's create, and the rationale lives in the entity
   classes and this changelog rather than in the SQL. A one-time pre-production cleanup (no deployed database
   had the old migrations applied); from here migrations stay append-only.
-- Gate the dev data endpoints (`/api/dev/**`) open rule on the `dev` profile, so it is never registered in a
-  deployed profile (defense in depth; `DevController` is already `@Profile("dev")`).
 - `scripts/check-version-sync.sh` compares the full version token (including any pre-release or build
   suffix), not just `x.y.z`.
-- Remove the public demo deployment: the `demo` Spring profile, `compose.demo.yaml`, the throwaway Cloud Run
-  demo, and the demo-only `deploy-cloudrun.sh` instance-count knobs are gone. Production deploys scale to zero
-  (with startup CPU boost to shorten the cold start) and use the shared Cloud SQL database directly, since
-  nothing reseeds it on boot any more. `DevDemoDataLoader` stays for local dev and the e2e suite, now
-  `@Profile("dev")` only.
 - Unify the form and panel vertical rhythm: tighten the gap between form fields (and `.form-row` groups) to
   12px, give every panel heading the same 16px gap to its first element (the profile "Your details", the
   "Members" card, and the collapsible "Record expense" headers were flush against their content), and
@@ -79,9 +84,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   from a new `kotlin-jvm` catalog alias that tracks the existing `kotlin` version), so a single classloader
   provides it to every subproject's `build-logic` convention plugin. This silences Gradle's "The Kotlin
   Gradle plugin was loaded multiple times in different subprojects" warning; the build output is unchanged.
-
-### Changed
-
 - Maintain `member_balance` and `kitty_balance` read-model projections (updated in the write transaction by
   recomputing from the event-log walks), so the per-member overview and the kitty-overdraw guard read one
   indexed row instead of replaying a stream; the events-to-data rebuild recomputes them and now replays the
@@ -125,8 +127,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   e2e aborted the script before the coverage flush and the real status was lost. The e2e now runs so its
   exit code is captured, the JaCoCo flush always happens, and the script exits with the e2e's real status.
 
+### Removed
+
+- Remove the public demo deployment: the `demo` Spring profile, `compose.demo.yaml`, the throwaway Cloud Run
+  demo, and the demo-only `deploy-cloudrun.sh` instance-count knobs are gone. Production deploys scale to zero
+  (with startup CPU boost to shorten the cold start) and use the shared Cloud SQL database directly, since
+  nothing reseeds it on boot any more. `DevDemoDataLoader` stays for local dev and the e2e suite, now
+  `@Profile("dev")` only.
+
 ### Fixed
 
+- Fix the member landing page: the count/hero card and the balance card sat flush with no gap (the hero
+  "+" button overlapped the balance card); they now keep the same 16px spacing as the rest of the page.
 - Page `GET /api/price/history` and cap `PageQuery.offset`; stop the `GlobalExceptionHandler` from echoing
   framework exception class names or parser detail in any profile.
 - Reject a zero-total admin expense (matching the member path), normalize a member's email so the unique
@@ -150,6 +162,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Security
 
+- Encrypt the admin login payload in the browser. `POST /api/auth/token` now takes a compact JWE
+  (`RSA-OAEP-256` + `A256GCM`) of `{ loginName, password, iat }` instead of a plaintext body: the backend
+  publishes its RSA public key at the new public `GET /api/auth/public-key` (a JWK), and the SPA encrypts the
+  credentials with it (via the `jose` library) before signing in. This keeps the raw password out of
+  TLS-terminating proxies and request-body logs (defense in depth on top of TLS). The RSA private key is
+  configured like the JWT secret, `campus-coffee.login-encryption.private-key-pem` (a PKCS#8 PEM, at least
+  2048 bits), required in prod via `LOGIN_PRIVATE_KEY_PEM` (delivered as one line with `\n` separators) with
+  an insecure dev fallback; the same key must be present on every instance, so it is configured rather than
+  generated per startup. A malformed or undecryptable payload returns 400, distinct from the 401 for
+  wrong-but-readable credentials, so it is not a credential oracle. This is defense in depth, not a new trust
+  boundary: it does not replace TLS, does not protect against a compromised client or XSS, and is not
+  zero-knowledge (the server decrypts and still verifies the password with bcrypt).
+- Gate the dev data endpoints (`/api/dev/**`) open rule on the `dev` profile, so it is never registered in a
+  deployed profile (defense in depth; `DevController` is already `@Profile("dev")`).
 - Move the admin session from a JWT in `localStorage` to an **httpOnly, SameSite=Strict cookie** that
   JavaScript cannot read or exfiltrate, so an XSS can no longer steal the admin token. The resource server
   reads the bearer token from the cookie (the SPA) or the `Authorization` header (API and test clients) via a
@@ -203,6 +229,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 This release renames the API and code vocabulary to the words the UI and endpoints already use. It is a
 **breaking API change**: the bundled SPA, the committed OpenAPI spec, and the docs all move in lockstep.
 
+### Added
+
+- Guard tests pin the Actuator authorization contract: `/actuator/health` stays anonymously reachable (200),
+  while every other actuator path is refused to anonymous callers (401) and to members (403). Together they
+  fail loudly if the security matcher order ever regresses (the SPA `GET /** -> permitAll` slipping ahead of
+  the `/actuator/** -> ADMIN` rule), which would otherwise expose actuator endpoints anonymously.
+- **A `demo` Spring profile for a public, throwaway demo on Cloud Run.** Activated together with prod as
+  `prod,demo`, it is a thin overlay: it keeps every prod hardening (managed Cloud SQL, required https base
+  URL, real JWT secret, Swagger and the `/api/dev` endpoints off) and only adds the seed data, loading the
+  full fixture + `DevDemoDataLoader` dataset (~15 members with populated ledgers, balances, and a kitty
+  float) with deterministic ids and clearing+reseeding it on every boot, so the demo is deterministic,
+  self-cleaning, and discards any prior deployment's data. `DevDemoDataLoader` now runs on `dev` and `demo`;
+  `scripts/deploy-cloudrun.sh` takes a compose file (`compose.demo.yaml`) plus a `MAX_INSTANCES=1` cap so the
+  boot-time reset runs on a single instance. The https base-URL fail-fast `ProdConfigGuard` is renamed
+  `PublicBaseUrlGuard` and now guards both internet-facing profiles (`prod` and `demo`).
+
+### Changed
+
 - **Breaking: the kitty "settlement" is now a "deposit".** The request body `SettlementRequestDto` is renamed
   `DepositRequestDto` and `PaymentService.recordSettlement` becomes `recordDeposit`. The persisted entity
   stays `Payment`, and the `POST /api/kitty/deposit` endpoint is unchanged.
@@ -225,10 +269,6 @@ This release renames the API and code vocabulary to the words the UI and endpoin
   Cucumber test config (the ordering is already explained in `EventsToDataRunner`'s KDoc), and the
   deactivation check in `CurrentUserProvider`/`DomainUserDetailsService` is unified on `active != true` to
   match the domain services.
-- Guard tests pin the Actuator authorization contract: `/actuator/health` stays anonymously reachable (200),
-  while every other actuator path is refused to anonymous callers (401) and to members (403). Together they
-  fail loudly if the security matcher order ever regresses (the SPA `GET /** -> permitAll` slipping ahead of
-  the `/actuator/** -> ADMIN` rule), which would otherwise expose actuator endpoints anonymously.
 - Log messages identify an entity consistently by its **id, in single quotes**, never by a login name. A
   login name is PII; the id is the canonical, privacy-preserving key. The `UserServiceImpl.describe` /
   `describeId` overrides that appended the user's login name to the create/update/delete audit log are
@@ -243,15 +283,6 @@ This release renames the API and code vocabulary to the words the UI and endpoin
   2026). It also asserts `@types/node` and the `engines.node` floor track that major. Paired with the
   Dependabot rule that ignores `@types/node` major bumps, this keeps the frontend toolchain on the Node 24
   LTS line; the runtime is bumped by hand only when moving to the next Node LTS.
-- **A `demo` Spring profile for a public, throwaway demo on Cloud Run.** Activated together with prod as
-  `prod,demo`, it is a thin overlay: it keeps every prod hardening (managed Cloud SQL, required https base
-  URL, real JWT secret, Swagger and the `/api/dev` endpoints off) and only adds the seed data, loading the
-  full fixture + `DevDemoDataLoader` dataset (~15 members with populated ledgers, balances, and a kitty
-  float) with deterministic ids and clearing+reseeding it on every boot, so the demo is deterministic,
-  self-cleaning, and discards any prior deployment's data. `DevDemoDataLoader` now runs on `dev` and `demo`;
-  `scripts/deploy-cloudrun.sh` takes a compose file (`compose.demo.yaml`) plus a `MAX_INSTANCES=1` cap so the
-  boot-time reset runs on a single instance. The https base-URL fail-fast `ProdConfigGuard` is renamed
-  `PublicBaseUrlGuard` and now guards both internet-facing profiles (`prod` and `demo`).
 - **Web security moved into the `api` layer, where the inbound HTTP adapter belongs.** The Spring Security
   filter chain, the capability-token filter, the `UserDetailsService`, the JSON auth entry-point/handlers,
   the `ActorProvider` adapter, the JWT config + `JwtProperties`, and the public base-url guard all moved from
@@ -259,11 +290,14 @@ This release renames the API and code vocabulary to the words the UI and endpoin
   / `.api.configuration`). The ArchUnit layer definition is updated to match; `application` now holds only
   the Spring Boot main class and the bootstrap/seeding (the loaders plus the `Fixtures`/`CoffeePrice`/
   `BootstrapAdmin` properties). `SpaForwardingController` is renamed `SinglePageAppController`.
+- `BootstrapAdminProperties` declares only the structure; its default values (the admin email and name) move
+  into `application.yaml`'s prod `campus-coffee.bootstrap-admin` block, so a default has a single source.
+
+### Removed
+
 - The unused CORS configuration (`CorsConfig` + `CorsProperties` + `campus-coffee.cors.allowed-origins`) is
   removed: the SPA is same-origin, so the security chain needs no CORS source (re-add it in `api` if the SPA
   ever moves to a separate origin).
-- `BootstrapAdminProperties` declares only the structure; its default values (the admin email and name) move
-  into `application.yaml`'s prod `campus-coffee.bootstrap-admin` block, so a default has a single source.
 
 ## [0.3.1] - 2026-06-22
 
@@ -381,9 +415,6 @@ rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
   green before release, so several specs had drifted (`Undo last coffee` vs `Undo last cup`, the ambiguous
   `Member` label, a euro `mat-error` that did not yet render, the collapsed kitty-adjustment card). The
   specs now target the shipped UI.
-
-### Fixed (documentation)
-
 - The three ledger endpoints show their real `@RequestParam` defaults (`/ledger` and `/users/{id}/ledger`
   default to `limit=20`, `/kitty/ledger` to `limit=50`; the change-log default stays 5). `CLAUDE.md` now
   lists `GET /users/filter`, documents the `is_singleton` / `uq_coffee_prices_singleton` single-row guard,
