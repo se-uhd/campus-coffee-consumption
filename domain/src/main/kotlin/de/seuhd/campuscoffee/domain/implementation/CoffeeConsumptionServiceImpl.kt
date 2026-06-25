@@ -16,10 +16,8 @@ import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.ConsumptionHistoryDataService
 import de.seuhd.campuscoffee.domain.ports.data.CrudDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.Duration
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.UUID
@@ -40,9 +38,9 @@ class CoffeeConsumptionServiceImpl(
     private val activityDataService: ActivityDataService,
     private val userDataService: UserDataService,
     private val changeNoteContext: ChangeNoteContext,
-    // the grace-period default lives once in application.yaml (campus-coffee.consumption.cancel-grace-period,
-    // defaulting to 5m there); the domain binds the key directly because it cannot depend on the api module
-    @param:Value($$"${campus-coffee.consumption.cancel-grace-period}") private val cancelGracePeriod: Duration
+    // the cancel grace period, bound from campus-coffee.consumption.cancel-grace-period (default 5m); the
+    // typed holder lives in the domain because the rule is enforced here and the domain cannot depend on api
+    private val consumptionProperties: ConsumptionProperties
 ) : CrudServiceImpl<CoffeeConsumption, UUID>(CoffeeConsumption::class.java),
     CoffeeConsumptionService {
     override fun dataService(): CrudDataService<CoffeeConsumption, UUID> = coffeeConsumptionDataService
@@ -163,7 +161,8 @@ class CoffeeConsumptionServiceImpl(
     }
 
     /** The cutoff time before which a coffee can no longer be undone (now minus the grace period). */
-    private fun graceCutoff(): LocalDateTime = LocalDateTime.now(ZoneId.of("UTC")).minus(cancelGracePeriod)
+    private fun graceCutoff(): LocalDateTime =
+        LocalDateTime.now(ZoneId.of("UTC")).minus(consumptionProperties.cancelGracePeriod)
 
     /** Allows a read only when [actingUser] owns the consumption of [userId] or is an admin. */
     private fun requireMayView(

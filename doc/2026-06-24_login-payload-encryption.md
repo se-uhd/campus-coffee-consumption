@@ -24,7 +24,7 @@ credentials with that public key; only the backend can decrypt. No secret lives 
   initial bundle).
 - **Public-key endpoint.** `GET /api/auth/public-key` returns the public key as a JWK
   (`kty, n, e, alg=RSA-OAEP-256, use=enc, kid`), reachable without authentication. The SPA fetches it, then
-  encrypts `{ loginName, password }` and posts `{ encryptedPayload }`.
+  encrypts `{ loginName, password, iat }` and posts `{ encryptedPayload }`.
 - **Algorithm pinning.** The decryptor accepts only the advertised `RSA-OAEP-256` + `A256GCM` pair and
   rejects anything else before any RSA private-key operation runs. A bare Nimbus `RSADecrypter` otherwise
   also accepts `RSA1_5` and `RSA-OAEP` (SHA-1); we do not advertise those, so we do not accept them.
@@ -56,8 +56,10 @@ would fail intermittently under horizontal scaling.
 - **Does not:** replace TLS (still required); defend against a compromised client or XSS (a malicious script
   reads the password from the form before encryption); make the login zero-knowledge (the server decrypts to
   plaintext and still verifies the password with bcrypt, by design, since it must verify it).
-- **Replay:** an attacker who captures the ciphertext past the TLS boundary can replay it to mint a token,
-  the same exposure as capturing the resulting bearer token. Adding a nonce or short timestamp inside the
-  JWE payload, validated server-side, would close that window; it is deferred for this threat model (it adds
-  server-side nonce state and clock-skew handling for marginal benefit), and the inner JSON is the natural
-  extension point for it later with no wire-format change.
+- **Replay:** the payload carries an `iat` (client-set epoch millis), and the decryptor rejects one whose
+  `iat` is further than `campus-coffee.login-encryption.max-payload-age` (default 2 minutes, in either
+  direction for clock skew) from the server clock, so a captured ciphertext cannot be replayed beyond that
+  window. Within the window, the decryptor also fingerprints each ciphertext and rejects a second
+  presentation of the same one, so a captured ciphertext is single-use. The nonce state is in-memory and per
+  instance, so on a multi-instance deployment the per-instance freshness window still bounds a cross-instance
+  replay.

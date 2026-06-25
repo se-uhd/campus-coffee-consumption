@@ -46,7 +46,7 @@ From `application/src/test/kotlin/de/seuhd/campuscoffee/tests/architecture/Archi
 The domain defines **port interfaces** that adapters implement:
 
 - **API Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/api/`): Generic service interface `CrudService<DOMAIN, ID>` and the concrete service interfaces `UserService`, `CoffeeConsumptionService`, `CoffeePriceService`, `ExpenseService`, `PaymentService`, and `AccountingService` (the read side: a member's summary and unified activity feed, the per-member overview, and the kitty history and balance).
-- **Data Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/data/`): Generic data service interface `CrudDataService<DOMAIN, ID>`, the concrete `UserDataService`, `CoffeeConsumptionDataService` (the latter adds `getByUserId`), `CoffeePriceDataService`, `ExpenseDataService`, and `PaymentDataService`, the event-log-backed `ConsumptionHistoryDataService` and `ActivityDataService` (the unified-activity and kitty walk over the log), the `BalanceDataService` port (reads the maintained `member_balance`/`kitty_balance` projections, implemented by `BalanceProjection`), the `KittyLock` port (a Postgres advisory lock serializing the kitty-overdraw check, implemented by `PostgresKittyLock`), and the `PasswordHasher` port.
+- **Data Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/data/`): Generic data service interface `CrudDataService<DOMAIN, ID>`, the concrete `UserDataService`, `CoffeeConsumptionDataService` (the latter adds `getByUserId`), `CoffeePriceDataService`, `ExpenseDataService`, and `PaymentDataService`, the event-log-backed `ConsumptionHistoryDataService` and `ActivityDataService` (the unified-activity and kitty walk over the log), the `BalanceDataService` port (reads the maintained `member_balance`/`kitty_balance` projections, implemented by `BalanceProjection`), the `BalanceLock` port (two Postgres advisory locks, `lockKitty()` serializing the kitty-overdraw check and `lockMember(userId)` serializing a member's balance recompute, implemented by `PostgresBalanceLock`), and the `PasswordHasher` port.
 - **Infrastructure ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/`): `IdGenerator`, `CapabilityTokenGenerator`, `QrCodeGenerator`, `StartupTask`, plus the request-scoped event-metadata ports `ActorProvider` and `ChangeNoteContext`.
 
 Service **implementations**:
@@ -135,10 +135,15 @@ adjustments and drawn down by the kitty portion of admin expenses.
 
 The kitty must never go negative. Any operation that would drive it below zero (the kitty portion of an
 admin expense or a negative kitty adjustment) is refused with a 409 (`ConflictException`). The check and the
-write are serialized by a Postgres advisory lock (the `KittyLock` domain port, implemented by
-`PostgresKittyLock` in the data layer via `pg_advisory_xact_lock`) so two concurrent draws cannot both read
-a sufficient balance and overdraw the fund (a TOCTOU race). `ExpenseService` and `PaymentService` take the
-lock around the read-then-write.
+write are serialized by a Postgres advisory lock (the `BalanceLock` domain port, implemented by
+`PostgresBalanceLock` in the data layer via `pg_advisory_xact_lock`) so two concurrent draws cannot both read
+a sufficient balance and overdraw the fund (a TOCTOU race). The overdraw-checking paths (`ExpenseService.record`/
+`update` and `PaymentService.adjustKitty`) take `lockKitty()` around the read-then-write. The other
+balance-projection writes are serialized at one place, `BalanceProjection.maintain`: it takes `lockKitty()`
+around every kitty recompute and a per-member `lockMember(userId)` around every member recompute, in the fixed
+order kitty-before-member so the paths cannot deadlock. So a write that moves the kitty but has no overdraw
+check (a deposit, an expense delete) still cannot lost-update the kitty, and a member's balance, recomputed by
+self-scans, purchases, deposits, and admin steps with no shared versioned row, cannot lost-update either.
 
 The balance values each cup at the price **in effect when it was consumed** via an "as-of" join over the
 log keyed on the event **append order (`seq`)**, never a wall-clock timestamp (the two per-write
@@ -560,8 +565,15 @@ Two authentication mechanisms, one per audience; there is **no HTTP Basic**:
   JWK); the SPA encrypts `{ loginName, password, iat }` with it (the `jose` library), and
   `LoginPayloadDecryptor` (api layer) decrypts it (rejecting a stale payload) before authentication. A
   malformed, undecryptable, or stale payload is a 400 (`LoginPayloadException`), distinct from the 401 for
-  wrong-but-readable credentials, so it is not a credential oracle. The token endpoint sets the JWT in an
-  **httpOnly, `SameSite=Strict`, Secure (outside dev) cookie**, so the browser stores it where JavaScript
+  wrong-but-readable credentials, so it is not a credential oracle. The decryptor also fingerprints each
+  ciphertext and rejects a second presentation of the same one as a replay, so a captured ciphertext is
+  single-use within its freshness window. Every authentication failure (wrong password, unknown login,
+  deactivated account) returns the **same** 401 body, so it does not reveal whether a login name exists. The
+  endpoint is **rate-limited** per client IP (`LoginAttemptLimiter`, a Bucket4j token bucket): too many failed
+  attempts in the window yield a 429 before any decrypt or bcrypt work, bounding online guessing and a bcrypt
+  CPU flood. An admin password must be at least 24 characters with a lowercase letter, an uppercase letter,
+  and a digit (`UserDto` and the bootstrap path; members have no password). The token endpoint sets the JWT in
+  an **httpOnly, `SameSite=Strict`, Secure (outside dev) cookie**, so the browser stores it where JavaScript
   cannot read or exfiltrate it (an XSS cannot steal the session) and sends it automatically;
   `POST /api/auth/logout` clears the cookie. `CookieOrHeaderBearerTokenResolver` reads the bearer token from
   that cookie (the SPA) or the `Authorization` header (API clients and the system tests, which still use the
@@ -670,8 +682,9 @@ Notes on semantics:
     tables from the log on startup. Off by default.
   - `campus-coffee.price.initial-cents` (`CoffeePriceProperties`, application module): the initial price per
     cup, in euro cents, seeded on first startup when no price exists yet. Default 50.
-  - `campus-coffee.consumption.cancel-grace-period` (`ConsumptionProperties`, api module): how long after
-    adding a coffee a member may still undo it. A `Duration`, default 5 minutes.
+  - `campus-coffee.consumption.cancel-grace-period` (`ConsumptionProperties`, domain module): how long after
+    adding a coffee a member may still undo it. A `Duration`, default 5 minutes. The typed holder lives in the
+    domain because the rule is enforced there and the domain cannot depend on the api module.
   - `campus-coffee.jwt.secret` (`JwtProperties`, api module): HMAC signing secret for the JWTs.
     Required and at least 32 bytes; supplied via `JWT_SECRET` (the dev profile has an insecure fallback,
     the prod profile none).
@@ -689,6 +702,10 @@ Notes on semantics:
   - `campus-coffee.auth.cookie.secure` / `name` (`AuthCookieProperties`, api module): whether the admin
     session cookie is marked `Secure` (default `true`; the dev profile, served over plain http, sets it
     `false`) and the cookie name. The cookie is always httpOnly and `SameSite=Strict`.
+  - `campus-coffee.auth.rate-limit.enabled` / `max-failures` / `window` (`LoginRateLimitProperties`, api
+    module): the login brute-force guard on `POST /api/auth/token`. A client (keyed on its IP) gets
+    `max-failures` failed attempts per `window` (default 10 per 15 minutes) before a 429; on by default, off
+    only where a test drives many failures from one client.
   - `campus-coffee.fixtures.load-on-startup` (`FixturesProperties`, application module): when `true` and
     the database has no users yet, load the fixtures on startup (on in dev, off in prod).
   - `campus-coffee.fixtures.reset-on-startup` (`FixturesProperties`, application module): when `true`, clear
