@@ -91,9 +91,21 @@ if grep -q 'CAMPUS_COFFEE_APP_BASE_URL=https://pending.invalid' deploy.env; then
   gcloud beta run compose up "$compose" --allow-unauthenticated
 fi
 
-# Startup CPU boost: extra CPU during container startup so the JVM and the Spring context boot faster,
-# shortening the scale-to-zero cold start. Not separately billed.
-echo "Enabling startup CPU boost on ${service}..."
-gcloud run services update "$service" --cpu-boost
+# Set the runtime resource limits and the startup CPU boost in one update. `gcloud beta run compose up` has
+# no flags for these, so they are applied here after the deploy.
+#   --memory/--cpu       the per-instance limits; 1Gi pairs with the JVM's MaxRAMPercentage=75 (Dockerfile).
+#   --concurrency        requests served per instance before a new one starts.
+#   --max-instances      caps fan-out (and the Cloud SQL connection count); override with MAX_INSTANCES.
+#   --cpu-boost          extra CPU during container startup so the JVM and Spring context boot faster,
+#                        shortening the scale-to-zero cold start. Not separately billed.
+# The service still scales to zero when idle (min-instances stays the default 0).
+max_instances="${MAX_INSTANCES:-4}"
+echo "Setting resource limits (memory 1Gi, cpu 1, concurrency 80, max-instances ${max_instances}) and startup CPU boost on ${service}..."
+gcloud run services update "$service" \
+  --memory=1Gi \
+  --cpu=1 \
+  --concurrency=80 \
+  --max-instances="$max_instances" \
+  --cpu-boost
 
 echo "Service URL: ${url}"

@@ -3,9 +3,5 @@
   "entry": ["src/main.ts", "src/**/*.spec.ts", "e2e/**/*.spec.ts"],
   "project": ["src/**/*.ts", "e2e/**/*.ts", "!src/app/api/**"],
   "ignoreExportsUsedInFile": true,
-  "ignoreDependencies": [
-    "@angular-eslint/builder",
-    "material-icons",
-    "@openapitools/openapi-generator-cli"
-  ]
+  "ignoreDependencies": ["@angular-eslint/builder", "material-icons", "@openapitools/openapi-generator-cli"]
 }

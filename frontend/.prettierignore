@@ -9,3 +9,5 @@ package-lock.json
 src/theme-colors.scss
 # Generated OpenAPI DTOs (openapi-generator owns their formatting).
 src/app/api
+# The committed OpenAPI spec is a backend dump (springdoc owns its formatting), refreshed when the API changes.
+src-gen/api-docs.json
