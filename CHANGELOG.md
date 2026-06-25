@@ -7,6 +7,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-25
+
 - Add an admin "Download all QR codes (PDF sheet)" action that renders every active member's capability QR
   code into one printable A4 PDF grid, each code labelled with the member's login name, next to the existing
   ZIP download (`GET /api/users/qr.pdf`, admin-only). Backed by Apache PDFBox (Apache-2.0) behind a new
@@ -78,56 +80,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   provides it to every subproject's `build-logic` convention plugin. This silences Gradle's "The Kotlin
   Gradle plugin was loaded multiple times in different subprojects" warning; the build output is unchanged.
 
-### Security
-
-- Move the admin session from a JWT in `localStorage` to an **httpOnly, SameSite=Strict cookie** that
-  JavaScript cannot read or exfiltrate, so an XSS can no longer steal the admin token. The resource server
-  reads the bearer token from the cookie (the SPA) or the `Authorization` header (API and test clients) via a
-  new `CookieOrHeaderBearerTokenResolver`; `POST /api/auth/logout` clears the cookie. The cookie is `Secure`
-  in every profile but dev (`campus-coffee.auth.cookie.secure`). SameSite=Strict is the CSRF defense, so
-  token-based CSRF (which would burden the CSRF-immune header flows) stays off. See
-  `doc/2026-06-24_security-hardening-and-cookie-auth.md`.
-- Send a Content-Security-Policy on every response (`default-src 'self'`, `connect-src 'self'`,
-  `frame-ancestors 'none'`, with inline styles allowed for Angular Material), the structural XSS mitigation.
-- Bound the replay window of the encrypted login payload: it now carries an `iat`, and the decryptor rejects a
-  payload outside `campus-coffee.login-encryption.max-payload-age` (default 2 minutes) as a 400.
-- Reject the committed dev-only fallback JWT secret and RSA login key on a non-dev startup (`WeakDevSecretGuard`),
-  and reject a loopback or bare-hostname prod base URL (`PublicBaseUrlGuard`).
-- Read `GET /api/price` through the live-user check so a deactivated or demoted admin's in-flight token is
-  rejected there too.
-- Stop leaking `deploy.prod.env` into the Docker/Cloud Build context (`.dockerignore` now matches
-  `deploy*.env`), `chmod 600` the deploy env files and harden `scripts/deploy-cloudrun.sh` (`umask 077`), and
-  run the prod app as a least-privilege database role (`scripts/sql/create-app-role.sql`) instead of the
-  Cloud SQL superuser.
-- Rate-limit `POST /api/auth/token` to stop online password guessing and a bcrypt CPU-exhaustion flood. A
-  Bucket4j token bucket per client IP (held in a Caffeine cache) allows `campus-coffee.auth.rate-limit.max-failures`
-  failed attempts per `campus-coffee.auth.rate-limit.window` (default 10 per 15 minutes); the next attempt is
-  refused with 429 and a `Retry-After` header before any decrypt or bcrypt work runs. A malformed payload and
-  a wrong password both count as a failure; a successful login clears the count. Behind a proxy the client IP
-  comes from `X-Forwarded-For`. The limiter is on by default and can be turned off with
-  `campus-coffee.auth.rate-limit.enabled=false`.
-- Return the same `401 Unauthorized` body for every login failure (wrong password, unknown login, deactivated
-  account), so the response no longer reveals whether a login name exists or is deactivated; the real cause is
-  logged server-side only.
-- Make a captured login ciphertext single-use within its freshness window. The decryptor fingerprints each
-  compact JWE and rejects a second presentation of the same ciphertext as a replay (400), closing the residual
-  window the `iat` check alone left open. No client change: the existing per-encryption randomness already
-  makes each genuine login a distinct ciphertext.
-- Strengthen the admin password policy to at least 24 characters with a lowercase letter, an uppercase letter,
-  and a digit, on both the admin API (`UserDto`) and the bootstrap-admin path. Members are unaffected (they
-  authenticate with a capability link and have no password). The seeded dev and test admin passwords are
-  updated to match.
-- Close a deactivated-admin lockout gap on `DELETE /api/users/{id}`: the delete now resolves the acting user
-  like the other admin endpoints, so an admin who was deactivated while their JWT is still valid can no longer
-  hard-delete members. A stale or absent principal on any endpoint now reads as a clean 401 (re-authenticate)
-  rather than a 404 or 500.
-- Document the event log's retention of superseded auth secrets in
-  `doc/2026-06-24_security-hardening-and-cookie-auth.md`: the append-only log keeps the full state of each
-  `User` event, including the capability token and bcrypt password hash, so an old token or hash lingers after
-  a rotation or password change. This is no new exposure beyond the access-controlled `users` table (a rotated
-  token no longer authenticates, and a bcrypt hash is a hash), so it is accepted and documented rather than
-  encrypted in the log.
-
 ### Changed
 
 - Maintain `member_balance` and `kitty_balance` read-model projections (updated in the write transaction by
@@ -195,6 +147,56 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   from the projection, not replayed per member), the `ConsumptionProperties` location and the migration count
   in `CLAUDE.md`, and the login-payload design note in `doc/` (the payload carries `iat` and the replay guard
   is implemented, not deferred).
+
+### Security
+
+- Move the admin session from a JWT in `localStorage` to an **httpOnly, SameSite=Strict cookie** that
+  JavaScript cannot read or exfiltrate, so an XSS can no longer steal the admin token. The resource server
+  reads the bearer token from the cookie (the SPA) or the `Authorization` header (API and test clients) via a
+  new `CookieOrHeaderBearerTokenResolver`; `POST /api/auth/logout` clears the cookie. The cookie is `Secure`
+  in every profile but dev (`campus-coffee.auth.cookie.secure`). SameSite=Strict is the CSRF defense, so
+  token-based CSRF (which would burden the CSRF-immune header flows) stays off. See
+  `doc/2026-06-24_security-hardening-and-cookie-auth.md`.
+- Send a Content-Security-Policy on every response (`default-src 'self'`, `connect-src 'self'`,
+  `frame-ancestors 'none'`, with inline styles allowed for Angular Material), the structural XSS mitigation.
+- Bound the replay window of the encrypted login payload: it now carries an `iat`, and the decryptor rejects a
+  payload outside `campus-coffee.login-encryption.max-payload-age` (default 2 minutes) as a 400.
+- Reject the committed dev-only fallback JWT secret and RSA login key on a non-dev startup (`WeakDevSecretGuard`),
+  and reject a loopback or bare-hostname prod base URL (`PublicBaseUrlGuard`).
+- Read `GET /api/price` through the live-user check so a deactivated or demoted admin's in-flight token is
+  rejected there too.
+- Stop leaking `deploy.prod.env` into the Docker/Cloud Build context (`.dockerignore` now matches
+  `deploy*.env`), `chmod 600` the deploy env files and harden `scripts/deploy-cloudrun.sh` (`umask 077`), and
+  run the prod app as a least-privilege database role (`scripts/sql/create-app-role.sql`) instead of the
+  Cloud SQL superuser.
+- Rate-limit `POST /api/auth/token` to stop online password guessing and a bcrypt CPU-exhaustion flood. A
+  Bucket4j token bucket per client IP (held in a Caffeine cache) allows `campus-coffee.auth.rate-limit.max-failures`
+  failed attempts per `campus-coffee.auth.rate-limit.window` (default 10 per 15 minutes); the next attempt is
+  refused with 429 and a `Retry-After` header before any decrypt or bcrypt work runs. A malformed payload and
+  a wrong password both count as a failure; a successful login clears the count. Behind a proxy the client IP
+  comes from `X-Forwarded-For`. The limiter is on by default and can be turned off with
+  `campus-coffee.auth.rate-limit.enabled=false`.
+- Return the same `401 Unauthorized` body for every login failure (wrong password, unknown login, deactivated
+  account), so the response no longer reveals whether a login name exists or is deactivated; the real cause is
+  logged server-side only.
+- Make a captured login ciphertext single-use within its freshness window. The decryptor fingerprints each
+  compact JWE and rejects a second presentation of the same ciphertext as a replay (400), closing the residual
+  window the `iat` check alone left open. No client change: the existing per-encryption randomness already
+  makes each genuine login a distinct ciphertext.
+- Strengthen the admin password policy to at least 24 characters with a lowercase letter, an uppercase letter,
+  and a digit, on both the admin API (`UserDto`) and the bootstrap-admin path. Members are unaffected (they
+  authenticate with a capability link and have no password). The seeded dev and test admin passwords are
+  updated to match.
+- Close a deactivated-admin lockout gap on `DELETE /api/users/{id}`: the delete now resolves the acting user
+  like the other admin endpoints, so an admin who was deactivated while their JWT is still valid can no longer
+  hard-delete members. A stale or absent principal on any endpoint now reads as a clean 401 (re-authenticate)
+  rather than a 404 or 500.
+- Document the event log's retention of superseded auth secrets in
+  `doc/2026-06-24_security-hardening-and-cookie-auth.md`: the append-only log keeps the full state of each
+  `User` event, including the capability token and bcrypt password hash, so an old token or hash lingers after
+  a rotation or password change. This is no new exposure beyond the access-controlled `users` table (a rotated
+  token no longer authenticates, and a bcrypt hash is a hash), so it is accepted and documented rather than
+  encrypted in the log.
 
 ## [0.4.0] - 2026-06-23
 
@@ -271,41 +273,11 @@ a fuller API contract, frontend correctness and UX, the previously-missing tests
 and prose cleanup. It also aligns the API endpoint names with the frontend vocabulary, a breaking endpoint
 rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
 
-### Security
+### Added
 
-- The insecure JWT-secret fallback is scoped to the dev profile only; a missing `JWT_SECRET` now fails fast
-  in every other profile, and the prod compose runs the prod profile with a real secret (it previously ran
-  the dev profile with the committed default).
-- The runtime container runs as a dedicated non-root user and declares a `/actuator/health` healthcheck.
-
-### Fixed
-
-- **Production deployment.** Prod now uses random id seeds (the deterministic seeds re-issued colliding
-  UUIDs on the first entity created after any restart), requires an `https` base URL (a new `ProdConfigGuard`
-  fails fast on a missing or non-https value, so wall QR codes are never dead links), and targets managed
-  Cloud SQL. `compose.prod.yaml` previously overrode the datasource with an ephemeral `postgres/postgres`
-  sidecar that destroyed the event-log money ledger on every redeploy; the deploy now wires `DB_PASSWORD`,
-  the base URL, and `BOOTSTRAP_ADMIN_*` so a fresh prod instance comes up with an admin.
-- **Login names are immutable after creation.** The ledger walk classifies a member's own scans by the
-  actor login recorded in the append-only log, so a rename previously disabled the member's undo and could
-  misvalue their balance; an update now pins the stored login (mirroring the capability-token pin).
-- A corrected (UPDATE) or deleted expense ledger row shows only its signed delta effect, not an absolute
-  private/kitty split that could not be reconciled with the delta.
-- A missing as-of price falls back to the earliest known price instead of throwing, and the admin overview
-  isolates a per-member failure, so one malformed stream can no longer 500 a whole ledger or overview read.
-- **Frontend.** A `+1` retries once on a concurrent-update 409 (the documented self-scan retry); the admin
-  count-correction field is reseeded from the current count, so Set no longer silently reverts intervening
-  cups; a busy entry-guard stops a fast double-tap double-submitting; a token-less admin 401 redirects to
-  the login form; a negative price/expense/deposit is flagged inline; and a non-integer gram weight is
-  rejected.
-- **Malformed euro amounts now show their validation message.** Every money form validated its euro input
-  only through a component method, which disabled the submit button but left the control valid, so Angular
-  Material kept the field's `<mat-error>` hidden. A new `ccEuroAmount` template-driven validator marks a
-  non-empty, unparseable (or, for a price/expense/deposit, negative) amount invalid so the message shows.
-- **The Playwright end-to-end suite passes against the shipped UI.** The suite added in 0.3.0 was never run
-  green before release, so several specs had drifted (`Undo last coffee` vs `Undo last cup`, the ambiguous
-  `Member` label, a euro `mat-error` that did not yet render, the collapsed kitty-adjustment card). The
-  specs now target the shipped UI.
+- The previously-missing tests: two concurrent self-scans (no lost update, a clean 409), the
+  expense-correction kitty-overdraw guard, the advisory-lock ordering (the lock is taken before the balance
+  read), the money fat-finger caps, and the login-rename invariant.
 
 ### Changed
 
@@ -381,11 +353,34 @@ rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
   Cloud token the project does not set, is marked `continue-on-error` so it never blocks CI (the eslint and
   stylelint `frontendLint` gate still covers the SPA). A commit-message convention was added to `CLAUDE.md`. The `EventSourcedMutator` event-write helper was renamed to `EventSourcedWriter` (the `Mutator` name collided with the project's mutation-testing vocabulary).
 
-### Added
+### Fixed
 
-- The previously-missing tests: two concurrent self-scans (no lost update, a clean 409), the
-  expense-correction kitty-overdraw guard, the advisory-lock ordering (the lock is taken before the balance
-  read), the money fat-finger caps, and the login-rename invariant.
+- **Production deployment.** Prod now uses random id seeds (the deterministic seeds re-issued colliding
+  UUIDs on the first entity created after any restart), requires an `https` base URL (a new `ProdConfigGuard`
+  fails fast on a missing or non-https value, so wall QR codes are never dead links), and targets managed
+  Cloud SQL. `compose.prod.yaml` previously overrode the datasource with an ephemeral `postgres/postgres`
+  sidecar that destroyed the event-log money ledger on every redeploy; the deploy now wires `DB_PASSWORD`,
+  the base URL, and `BOOTSTRAP_ADMIN_*` so a fresh prod instance comes up with an admin.
+- **Login names are immutable after creation.** The ledger walk classifies a member's own scans by the
+  actor login recorded in the append-only log, so a rename previously disabled the member's undo and could
+  misvalue their balance; an update now pins the stored login (mirroring the capability-token pin).
+- A corrected (UPDATE) or deleted expense ledger row shows only its signed delta effect, not an absolute
+  private/kitty split that could not be reconciled with the delta.
+- A missing as-of price falls back to the earliest known price instead of throwing, and the admin overview
+  isolates a per-member failure, so one malformed stream can no longer 500 a whole ledger or overview read.
+- **Frontend.** A `+1` retries once on a concurrent-update 409 (the documented self-scan retry); the admin
+  count-correction field is reseeded from the current count, so Set no longer silently reverts intervening
+  cups; a busy entry-guard stops a fast double-tap double-submitting; a token-less admin 401 redirects to
+  the login form; a negative price/expense/deposit is flagged inline; and a non-integer gram weight is
+  rejected.
+- **Malformed euro amounts now show their validation message.** Every money form validated its euro input
+  only through a component method, which disabled the submit button but left the control valid, so Angular
+  Material kept the field's `<mat-error>` hidden. A new `ccEuroAmount` template-driven validator marks a
+  non-empty, unparseable (or, for a price/expense/deposit, negative) amount invalid so the message shows.
+- **The Playwright end-to-end suite passes against the shipped UI.** The suite added in 0.3.0 was never run
+  green before release, so several specs had drifted (`Undo last coffee` vs `Undo last cup`, the ambiguous
+  `Member` label, a euro `mat-error` that did not yet render, the collapsed kitty-adjustment card). The
+  specs now target the shipped UI.
 
 ### Fixed (documentation)
 
@@ -394,6 +389,13 @@ rename (the bundled SPA, OpenAPI spec, and docs are updated in lockstep).
   lists `GET /users/filter`, documents the `is_singleton` / `uq_coffee_prices_singleton` single-row guard,
   corrects the domain "no external dependencies" claim (it depends on Spring by design), marks the expense
   `weightGrams` required, and the `StartupDataInitializer` KDoc lists the real startup-task order.
+
+### Security
+
+- The insecure JWT-secret fallback is scoped to the dev profile only; a missing `JWT_SECRET` now fails fast
+  in every other profile, and the prod compose runs the prod profile with a real secret (it previously ran
+  the dev profile with the committed default).
+- The runtime container runs as a dedicated non-root user and declares a `/actuator/health` healthcheck.
 
 ## [0.3.0] - 2026-06-22
 
@@ -673,6 +675,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.5.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.5.0
 [0.4.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.4.0
 [0.3.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.3.1
 [0.3.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.3.0
