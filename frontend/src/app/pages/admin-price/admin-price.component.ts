@@ -152,6 +152,10 @@ export class AdminPriceComponent implements OnInit {
 
   /** Sets a new price; the euro input is converted to integer cents before sending. */
   async save(): Promise<void> {
+    // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
+    if (this.busy) {
+      return;
+    }
     const amountCents = toCents(this.newPriceEuros);
     if (amountCents == null || amountCents < 0) {
       this.notifications.error(null, 'Enter a valid, non-negative price (e.g. 0.50).');
