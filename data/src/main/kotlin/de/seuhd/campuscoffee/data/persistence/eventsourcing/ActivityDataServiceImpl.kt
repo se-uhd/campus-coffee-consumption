@@ -5,11 +5,14 @@ import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.model.CancellableIncrement
 import de.seuhd.campuscoffee.domain.model.PriceChange
 import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 import java.util.UUID
 
 private const val SYSTEM_ACTOR = "system"
+
+private val log = KotlinLogging.logger {}
 
 /** A point on the price timeline: the price that took effect at append position [seq]. */
 private data class PricePoint(
@@ -49,9 +52,11 @@ private fun uuidBody(
 /**
  * The event's append position. `seq` is assigned by the identity column at INSERT, not at commit, and price
  * changes and `+1` consumptions are not serialized by a lock, so two concurrent unlocked transactions could
- * in principle acquire `seq` in one order and commit in the other. In practice a price change does not
- * interleave with self-scans, so the as-of valuation is stable; the kitty-overdraw path that must not race is
- * separately serialized by the advisory lock.
+ * in principle acquire `seq` in one order and commit in the other. A coffee consumed in the same instant a
+ * price change commits could then be valued at the old or new price in the maintained member_balance until
+ * the next write for that member recomputes it from the log and corrects it. In practice a price change does
+ * not interleave with self-scans, so this window is not reached; the kitty-overdraw path that must not race
+ * is separately serialized by the advisory lock.
  */
 private fun seqOf(event: EventEntity): Long = requireNotNull(event.seq) { "A stored event must carry a seq." }
 
@@ -100,16 +105,21 @@ private fun deltaEffect(
  * The price in effect at append position [seq]: the latest price event at or before it. A price is always
  * seeded before any coffee is consumed (see the bootstrap), so the as-of lookup normally resolves. If a
  * hand-edited or misordered log somehow holds a coffee before any price, fall back to the earliest known
- * price (or 0 when the log carries no price at all) rather than throwing, so one malformed member stream
- * cannot 500 a whole admin overview or activity read.
+ * price (never 0) rather than throwing, so one malformed member stream cannot 500 a whole admin overview or
+ * activity read. Only an empty price history falls back to 0, and that case is logged at warn level so a
+ * coffee charged nothing is not silent.
  */
 private fun priceAsOf(
     seq: Long,
     prices: List<PricePoint>
-): Int =
-    prices.lastOrNull { it.seq <= seq }?.amountCents
-        ?: prices.firstOrNull()?.amountCents
-        ?: 0
+): Int {
+    val resolved = prices.lastOrNull { it.seq <= seq }?.amountCents ?: prices.firstOrNull()?.amountCents
+    if (resolved == null) {
+        log.warn { "No price exists in the log; valuing a coffee at seq $seq as 0 cents. The price seed is missing." }
+        return 0
+    }
+    return resolved
+}
 
 /**
  * Reads the unified-activity and balance projections straight from the append-only event log (there is no
@@ -160,9 +170,11 @@ class ActivityDataServiceImpl(
                             CancellableIncrement(createdAtOf(event), priceAsOf(seqOf(event), prices))
                         )
                     isOwnerStep && delta == -1 -> stack.removeLastOrNull()
-                    // an admin override that lowers the count removes that many outstanding owner increments,
-                    // so a member cannot undo a cup the admin removed or one the admin added; an override up
-                    // adds non-undoable cups and pushes nothing
+                    // any admin step down removes that many outstanding owner increments, so a member cannot
+                    // undo a cup the admin removed or one the admin added. This includes an admin single-step
+                    // -1: it credits the member, so leaving their pending undo would let the same cup be
+                    // credited twice. The intended effect is that an admin -1 also clears the member's undo.
+                    // An admin step up adds non-undoable cups and pushes nothing.
                     delta < 0 -> repeat(minOf(-delta, stack.size)) { stack.removeLast() }
                 }
             }
