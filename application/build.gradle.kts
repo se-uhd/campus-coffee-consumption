@@ -122,9 +122,66 @@ val frontendLint by tasks.registering(NpmTask::class) {
     doLast { marker.get().asFile.writeText("ok") }
 }
 
-// Run the frontend lint as part of `check` (and therefore `build`), like ktlint/detekt on the backend.
+// `npm test` runs the Angular unit tests on Vitest (the package.json `test` script is `ng test --no-watch`).
+// Wired into `check` below so a failing unit test fails `gradle build`/`gradle check`. Cached on the sources
+// and the tool configs; produces no artifact, so an up-to-date marker file stands in for an output.
+val frontendTest by tasks.registering(NpmTask::class) {
+    description = "Runs the Angular unit tests on Vitest (npm test)."
+    dependsOn(frontendInstall, generateFrontendDtos)
+    args.set(listOf("test"))
+    inputs.dir(rootProject.file("frontend/src"))
+    inputs.files(
+        rootProject.file("frontend/angular.json"),
+        rootProject.file("frontend/tsconfig.json"),
+        rootProject.file("frontend/tsconfig.spec.json")
+    )
+    val marker = layout.buildDirectory.file("frontend-test.marker")
+    outputs.file(marker)
+    doLast { marker.get().asFile.writeText("ok") }
+}
+
+// `npm run knip` detects dead code and unused dependencies in the SPA. Wired into `check` below so a new
+// unused export or dependency fails the build. Cached on the sources and the tool configs; produces no
+// artifact, so an up-to-date marker file stands in for an output.
+val frontendKnip by tasks.registering(NpmTask::class) {
+    description = "Runs Knip dead-code and unused-dependency detection on the SPA (npm run knip)."
+    dependsOn(frontendInstall, generateFrontendDtos)
+    args.set(listOf("run", "knip"))
+    inputs.dir(rootProject.file("frontend/src"))
+    inputs.files(
+        rootProject.file("frontend/package.json"),
+        rootProject.file("frontend/knip.json"),
+        rootProject.file("frontend/angular.json"),
+        rootProject.file("frontend/tsconfig.json"),
+        rootProject.file("frontend/tsconfig.app.json")
+    )
+    val marker = layout.buildDirectory.file("frontend-knip.marker")
+    outputs.file(marker)
+    doLast { marker.get().asFile.writeText("ok") }
+}
+
+// `npm run format:check` verifies the SPA sources are Prettier-formatted. Wired into `check` below so an
+// unformatted file fails the build. Cached on the sources and the tool config; produces no artifact, so an
+// up-to-date marker file stands in for an output.
+val frontendFormatCheck by tasks.registering(NpmTask::class) {
+    description = "Checks the SPA sources are Prettier-formatted (npm run format:check)."
+    dependsOn(frontendInstall, generateFrontendDtos)
+    args.set(listOf("run", "format:check"))
+    inputs.dir(rootProject.file("frontend/src"))
+    inputs.files(
+        rootProject.file("frontend/package.json"),
+        rootProject.file("frontend/.prettierrc.json"),
+        rootProject.file("frontend/.prettierignore")
+    )
+    val marker = layout.buildDirectory.file("frontend-format-check.marker")
+    outputs.file(marker)
+    doLast { marker.get().asFile.writeText("ok") }
+}
+
+// Run the frontend lint, unit tests, dead-code check, and format check as part of `check` (and therefore
+// `build`), like ktlint/detekt on the backend.
 tasks.named("check") {
-    dependsOn(frontendLint)
+    dependsOn(frontendLint, frontendTest, frontendKnip, frontendFormatCheck)
 }
 
 // Name the boot jar application.jar (version-independent) so the Dockerfile references a stable

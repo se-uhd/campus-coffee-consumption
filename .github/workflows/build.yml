@@ -116,3 +116,18 @@ jobs:
             frontend/coverage-e2e/
             frontend/playwright-report/
           if-no-files-found: warn
+
+  # Build the Docker image so a broken Dockerfile fails CI. Independent of the build and e2e jobs: it builds
+  # the image from the multi-stage Dockerfile (which runs the Gradle bootJar inside the build stage) and does
+  # not consume their outputs. The tag is throwaway; the image is not pushed.
+  docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build the Docker image
+        run: docker build -t campus-coffee-consumption:ci .
