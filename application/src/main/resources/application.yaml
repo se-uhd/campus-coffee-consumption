@@ -119,6 +119,12 @@ spring:
     # scripts/sql/create-app-role.sql. Override with DB_USERNAME if the role is named differently.
     username: ${DB_USERNAME:campus_coffee_app}
     password: ${DB_PASSWORD} # supplied from Secret Manager (see scripts/deploy-cloudrun.sh and deploy.env.example)
+    hikari:
+      # Cap the pool well under db-g1-small's modest max_connections. A zero-downtime rolling deploy runs the
+      # old and new Cloud Run revisions together briefly, each holding its own pool, and the service can scale
+      # to several instances (--max-instances), so a small per-instance cap keeps the combined connection count
+      # within the instance limit. This low-traffic app needs far fewer than 5 connections per instance anyway.
+      maximum-pool-size: 5
   lifecycle:
     # Drain in-flight requests on a Cloud Run SIGTERM before the context closes.
     timeout-per-shutdown-phase: 20s
