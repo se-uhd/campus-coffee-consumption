@@ -70,7 +70,15 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
-    jvmArgs("-XX:+EnableDynamicAgentLoading", "-Xshare:off")
+    jvmArgs(
+        "-XX:+EnableDynamicAgentLoading",
+        "-Xshare:off",
+        // JDK 25: silence the deprecated sun.misc.Unsafe (JEP 498) and restricted-native-access warnings the
+        // forked test JVM would otherwise print (e.g. via Testcontainers/JNA). A forked test JVM does not
+        // inherit the daemon flags from gradle.properties, so they are repeated here.
+        "--sun-misc-unsafe-memory-access=allow",
+        "--enable-native-access=ALL-UNNAMED",
+    )
     jvmArgumentProviders.add(CommandLineArgumentProvider {
         listOf("-javaagent:${mockitoAgent.singleFile.absolutePath}")
     })
