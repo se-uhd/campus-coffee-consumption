@@ -13,6 +13,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   up`. Compose up cannot bind a Secret Manager secret as an environment variable, so the cloud deploy moved
   to `gcloud run deploy` (it still builds the image from the `Dockerfile` via Cloud Build). The secrets and
   non-secret config are read from `deploy.prod.env` and passed via `--set-secrets` / `--set-env-vars`.
+- Silence the JDK 25 build/test log warnings: pass `--sun-misc-unsafe-memory-access=allow` and
+  `--enable-native-access=ALL-UNNAMED` to the forked test JVMs (the `java-conventions` and
+  `detekt-rules-conventions` plugins) and add the native-access flag to the Gradle daemon (`gradle.properties`),
+  since those JVMs do not inherit the daemon flags. This drops the `sun.misc.Unsafe` notices (from
+  detekt-test-utils' kotlin-compiler-embeddable and caffeine) and the JNA restricted-native-access notice from
+  the build log. Also `@Suppress("DEPRECATION")` the deliberate `JWEAlgorithm.RSA1_5` use in
+  `LoginPayloadDecryptorTest`, which verifies the decryptor rejects an algorithm downgrade.
 
 ### Removed
 

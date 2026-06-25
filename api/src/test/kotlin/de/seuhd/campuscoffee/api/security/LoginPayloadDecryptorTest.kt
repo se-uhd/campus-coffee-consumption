@@ -82,6 +82,7 @@ class LoginPayloadDecryptorTest {
     }
 
     @Test
+    @Suppress("DEPRECATION") // RSA1_5 is used on purpose to verify the decryptor rejects an algorithm downgrade
     fun `decrypt throws LoginPayloadException for a JWE that uses a non-advertised algorithm`() {
         // a downgrade to RSA1_5 (which Nimbus's decrypter would otherwise accept) must be rejected
         val header = JWEHeader.Builder(JWEAlgorithm.RSA1_5, EncryptionMethod.A256GCM).keyID(key.keyID).build()
