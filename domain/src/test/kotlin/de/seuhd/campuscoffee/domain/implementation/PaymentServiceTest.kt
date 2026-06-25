@@ -7,7 +7,7 @@ import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
-import de.seuhd.campuscoffee.domain.ports.data.KittyLock
+import de.seuhd.campuscoffee.domain.ports.data.BalanceLock
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.assertj.core.api.Assertions.assertThat
@@ -30,8 +30,8 @@ class PaymentServiceTest {
     private val paymentDataService: PaymentDataService = mock()
     private val userDataService: UserDataService = mock()
     private val balanceDataService: BalanceDataService = mock()
-    private val kittyLock: KittyLock = mock()
-    private val service = PaymentServiceImpl(paymentDataService, userDataService, balanceDataService, kittyLock)
+    private val balanceLock: BalanceLock = mock()
+    private val service = PaymentServiceImpl(paymentDataService, userDataService, balanceDataService, balanceLock)
 
     private val memberId: UUID = UUID(0L, 1L)
 
@@ -119,8 +119,8 @@ class PaymentServiceTest {
 
         // the overdraw guard is only sound if the lock is taken before the balance is read; a refactor that
         // reordered or dropped the lock would keep every other test green but reintroduce the TOCTOU race
-        val ordered = inOrder(kittyLock, balanceDataService)
-        ordered.verify(kittyLock).lockForUpdate()
+        val ordered = inOrder(balanceLock, balanceDataService)
+        ordered.verify(balanceLock).lockKitty()
         ordered.verify(balanceDataService).kittyBalanceCents()
     }
 }

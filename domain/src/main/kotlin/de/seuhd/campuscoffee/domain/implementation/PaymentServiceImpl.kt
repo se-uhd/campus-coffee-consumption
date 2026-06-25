@@ -8,7 +8,7 @@ import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
-import de.seuhd.campuscoffee.domain.ports.data.KittyLock
+import de.seuhd.campuscoffee.domain.ports.data.BalanceLock
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.springframework.stereotype.Service
@@ -26,7 +26,7 @@ class PaymentServiceImpl(
     private val paymentDataService: PaymentDataService,
     private val userDataService: UserDataService,
     private val balanceDataService: BalanceDataService,
-    private val kittyLock: KittyLock
+    private val balanceLock: BalanceLock
 ) : PaymentService {
     @Transactional
     override fun recordDeposit(
@@ -39,6 +39,9 @@ class PaymentServiceImpl(
         if (amountCents <= 0) {
             throw ValidationException("A deposit amount must be positive.")
         }
+        // no explicit kitty lock here: a deposit is always positive and cannot overdraw, so it has no
+        // overdraw check to serialize. Its kitty recompute is still serialized against concurrent kitty
+        // writers by the lock the projection takes around every recompute (see BalanceProjection.maintain).
         val user = userDataService.getById(userId)
         return paymentDataService.upsert(Payment(user = user, amountCents = amountCents, note = note))
     }
@@ -55,7 +58,7 @@ class PaymentServiceImpl(
         }
         // serialize against other kitty writes so two concurrent ops cannot both read the same balance,
         // both pass the check, and both commit; the kitty is an aggregate across rows that @Version cannot guard
-        kittyLock.lockForUpdate()
+        balanceLock.lockKitty()
         if (kittyBalanceCents() + amountCents < 0) {
             throw ConflictException("This adjustment would make the kitty balance negative.")
         }
