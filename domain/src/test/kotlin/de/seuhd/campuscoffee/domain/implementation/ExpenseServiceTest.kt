@@ -7,8 +7,8 @@ import de.seuhd.campuscoffee.domain.model.Expense
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
+import de.seuhd.campuscoffee.domain.ports.data.BalanceLock
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
-import de.seuhd.campuscoffee.domain.ports.data.KittyLock
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -30,8 +30,8 @@ class ExpenseServiceTest {
     private val expenseDataService: ExpenseDataService = mock()
     private val userDataService: UserDataService = mock()
     private val balanceDataService: BalanceDataService = mock()
-    private val kittyLock: KittyLock = mock()
-    private val service = ExpenseServiceImpl(expenseDataService, userDataService, balanceDataService, kittyLock)
+    private val balanceLock: BalanceLock = mock()
+    private val service = ExpenseServiceImpl(expenseDataService, userDataService, balanceDataService, balanceLock)
 
     private val memberId: UUID = UUID(0L, 1L)
     private val buyerId: UUID = UUID(0L, 2L)
@@ -295,8 +295,8 @@ class ExpenseServiceTest {
         )
 
         // the overdraw guard is only sound if the lock is taken before the balance is read
-        val ordered = inOrder(kittyLock, balanceDataService)
-        ordered.verify(kittyLock).lockForUpdate()
+        val ordered = inOrder(balanceLock, balanceDataService)
+        ordered.verify(balanceLock).lockKitty()
         ordered.verify(balanceDataService).kittyBalanceCents()
     }
 
@@ -327,8 +327,8 @@ class ExpenseServiceTest {
             actingUser = admin
         )
 
-        val ordered = inOrder(kittyLock, balanceDataService)
-        ordered.verify(kittyLock).lockForUpdate()
+        val ordered = inOrder(balanceLock, balanceDataService)
+        ordered.verify(balanceLock).lockKitty()
         ordered.verify(balanceDataService).kittyBalanceCents()
     }
 

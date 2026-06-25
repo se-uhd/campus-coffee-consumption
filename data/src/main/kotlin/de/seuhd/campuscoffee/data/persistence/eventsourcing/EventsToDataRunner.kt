@@ -71,10 +71,13 @@ class EventsToDataRunner(
     }
 
     /**
-     * Empties the read tables in foreign key order: the children that reference users (consumptions,
-     * expenses, payments) before users; the price is independent and is cleared too.
+     * Empties the read tables in foreign key order: the balance projections first, then the children that
+     * reference users (consumptions, expenses, payments) before users; the price is independent and is
+     * cleared too. Clearing the balance projections here, rather than relying on the `member_balance` cascade
+     * from the user delete, keeps the kitty_balance row from going stale during the replay.
      */
     private fun clearReadTables() {
+        balanceProjection.clear()
         coffeeConsumptionRepository.deleteAllInBatch()
         expenseRepository.deleteAllInBatch()
         paymentRepository.deleteAllInBatch()

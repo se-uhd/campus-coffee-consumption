@@ -9,8 +9,8 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
+import de.seuhd.campuscoffee.domain.ports.data.BalanceLock
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
-import de.seuhd.campuscoffee.domain.ports.data.KittyLock
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -28,7 +28,7 @@ class ExpenseServiceImpl(
     private val expenseDataService: ExpenseDataService,
     private val userDataService: UserDataService,
     private val balanceDataService: BalanceDataService,
-    private val kittyLock: KittyLock
+    private val balanceLock: BalanceLock
 ) : ExpenseService {
     @Transactional
     override fun recordOwn(
@@ -67,7 +67,7 @@ class ExpenseServiceImpl(
     ): Expense {
         requireAdmin(actingUser)
         validateAmounts(weightGrams, amountCents, privateAmountCents, kittyAmountCents)
-        kittyLock.lockForUpdate()
+        balanceLock.lockKitty()
         if (kittyBalanceCents() - kittyAmountCents < 0) {
             throw ConflictException("This expense's kitty portion would make the kitty balance negative.")
         }
@@ -105,7 +105,7 @@ class ExpenseServiceImpl(
             throw ValidationException("An expense's buyer cannot be changed; delete it and record a new one.")
         }
         // correcting changes the kitty draw by (new − old); reject if that would overdraw the kitty
-        kittyLock.lockForUpdate()
+        balanceLock.lockKitty()
         if (kittyBalanceCents() + existing.kittyAmountCents - kittyAmountCents < 0) {
             throw ConflictException("This correction would make the kitty balance negative.")
         }
@@ -134,6 +134,9 @@ class ExpenseServiceImpl(
         actingUser: User
     ) {
         requireAdmin(actingUser)
+        // no explicit kitty lock here: a delete only shrinks the kitty draw (it cannot overdraw), so it has
+        // no overdraw check to serialize. Its kitty recompute is still serialized against concurrent kitty
+        // writers by the lock the projection takes around every recompute (see BalanceProjection.maintain).
         expenseDataService.delete(expenseId)
     }
 
