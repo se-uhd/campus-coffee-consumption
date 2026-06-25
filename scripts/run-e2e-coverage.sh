@@ -111,8 +111,11 @@ curl -fsS "$HEALTH_URL" >/dev/null 2>&1 || { log "ERROR: app never became health
 
 # --- 5. Run the e2e with browser coverage on ----------------------------------------------------------
 log "Running the Playwright e2e (PW_COVERAGE=1)…"
-( cd frontend && PW_COVERAGE=1 CI=1 run_node npm run e2e )
-E2E_STATUS=$?
+# Capture the e2e exit code without tripping `set -e`: a failing e2e must still fall through to the cleanup
+# below (stop the app so the agent flushes the exec) and exit with the real e2e status. `|| E2E_STATUS=$?`
+# keeps the failure from aborting the script while recording the code; a success leaves E2E_STATUS at 0.
+E2E_STATUS=0
+( cd frontend && PW_COVERAGE=1 CI=1 run_node npm run e2e ) || E2E_STATUS=$?
 
 # --- 6. Stop the app (trap) so the agent flushes the exec ---------------------------------------------
 cleanup
