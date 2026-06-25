@@ -19,6 +19,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Remove `compose.prod.yaml`: the cloud deploy no longer uses a Compose file. The dev `compose.yaml` stays
   for local runs.
 
+### Fixed
+
+- Fix the production UI rendering unstyled under the Content-Security-Policy. Angular's production build inlined
+  critical CSS and loaded the full stylesheet asynchronously through an inline `onload="this.media='all'"`
+  handler, which the strict `script-src 'self'` policy blocks, so the stylesheet stayed `media="print"` and the
+  Angular Material theme and page layout never applied on screen (the dev e2e missed it: the CSP and the
+  critical-CSS optimization are prod-only). Disable critical-CSS inlining (`optimization.styles.inlineCritical:
+  false` in `frontend/angular.json`), so the build emits a plain render-blocking stylesheet link with no inline
+  JS, keeping the CSP strict.
+
 ### Security
 
 - Route the production deployment secrets through Google Secret Manager. `scripts/deploy-cloudrun.sh` syncs
