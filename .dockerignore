@@ -10,8 +10,9 @@ build
 *.iml
 doc
 *.log
-# Match .gitignore's deploy*.env wildcard: every deploy env file (deploy.env, deploy.prod.env, ...) holds
-# real secrets and must never enter the build context that `gcloud run compose up` uploads to Cloud Build.
+# Match .gitignore's deploy*.env wildcard: keep every deploy env file (deploy.env, deploy.prod.env, ...) out
+# of the build context that `gcloud run deploy --source` uploads to Cloud Build. Secrets now live in Secret
+# Manager, but these files must never enter the image regardless.
 deploy*.env
 .env
 # Host-generated frontend dirs (the Gradle build runs npm itself, so none of these are inputs). node_modules
