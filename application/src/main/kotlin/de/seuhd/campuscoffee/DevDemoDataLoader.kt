@@ -273,8 +273,9 @@ class DevDemoDataLoader(
         // the seeded fixture admin, resolved to satisfy the admin-only deposit and kitty operations
         private const val ADMIN_LOGIN = "jane_doe"
 
-        // a demo password for the extra admin members (dev only; an admin requires a password)
-        private const val DEMO_ADMIN_PASSWORD = "demoAdminPassword42"
+        // a demo password for the extra admin members (dev only; an admin requires a password). Meets the
+        // admin password policy: >= 24 chars, with lower/upper/digit.
+        private const val DEMO_ADMIN_PASSWORD = "demoAdminPasswordSecure42"
 
         // an initial kitty float (euro cents) so the kitty history is non-empty on a fresh dev start
         private const val KITTY_FLOAT_CENTS = 5_000

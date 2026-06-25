@@ -38,8 +38,9 @@ class BootstrapAdminLoaderTest {
 
     private fun fullProperties() =
         BootstrapAdminProperties(
+            // meets the admin password policy: >= 24 chars, with lower/upper/digit
             loginName = "admin",
-            password = "a-password",
+            password = "BootstrapAdminPass123456",
             emailAddress = "admin@se.de",
             firstName = "Boot",
             lastName = "Strap"
@@ -72,6 +73,15 @@ class BootstrapAdminLoaderTest {
     fun `createBootstrapAdmin rejects a too-short password`() {
         assertThatIllegalArgumentException().isThrownBy {
             loader(fullProperties().copy(password = "short")).createBootstrapAdmin()
+        }
+        verify(userService, never()).upsert(any())
+    }
+
+    @Test
+    fun `createBootstrapAdmin rejects a long password missing a character class`() {
+        // long enough but all lowercase and digits, so it fails the lower/upper/digit complexity rule
+        assertThatIllegalArgumentException().isThrownBy {
+            loader(fullProperties().copy(password = "alllowercaseletters123456")).createBootstrapAdmin()
         }
         verify(userService, never()).upsert(any())
     }

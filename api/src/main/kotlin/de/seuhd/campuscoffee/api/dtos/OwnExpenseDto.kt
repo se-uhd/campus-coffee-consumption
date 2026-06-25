@@ -12,7 +12,7 @@ import jakarta.validation.constraints.Size
  */
 data class OwnExpenseDto(
     @field:NotNull(message = "Weight is required.")
-    @field:Min(value = 0, message = "Weight must not be negative.")
+    @field:Min(value = MIN_WEIGHT_GRAMS, message = "Weight must be at least 100 grams.")
     @field:Max(value = MAX_WEIGHT_GRAMS, message = "Weight is implausibly large.")
     val weightGrams: Int?,
     @field:NotNull(message = "Amount is required.")
