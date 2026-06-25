@@ -687,15 +687,16 @@ Notes on semantics:
     domain because the rule is enforced there and the domain cannot depend on the api module.
   - `campus-coffee.jwt.secret` (`JwtProperties`, api module): HMAC signing secret for the JWTs.
     Required and at least 32 bytes; supplied via `JWT_SECRET` (the dev profile has an insecure fallback,
-    the prod profile none).
+    the prod profile none; in prod a Google Secret Manager secret bound onto the service as this env var).
   - `campus-coffee.login-encryption.private-key-pem` (`LoginEncryptionProperties`, api module): the RSA
     private key (PKCS#8 PEM, at least 2048 bits) that decrypts the login payload; its public half is
     published as a JWK at `GET /api/auth/public-key`. Required, supplied via `LOGIN_PRIVATE_KEY_PEM` (the dev
-    profile has an insecure committed fallback, the prod profile none). It must be the **same key on every
-    instance** (a client may fetch the public key from one instance and post the ciphertext to another), so
-    it is configured rather than generated per startup; in prod it is delivered as one line with literal
-    `\n` separators (`LoginEncryptionConfig` restores the newlines), parsed via Spring Security's
-    `RsaKeyConverters`.
+    profile has an insecure committed fallback, the prod profile none; in prod a Google Secret Manager secret
+    bound onto the service as this env var). It must be the **same key on every instance** (a client may
+    fetch the public key from one instance and post the ciphertext to another), so it is one configured key
+    every instance reads rather than generated per startup. `LoginEncryptionConfig` turns any literal `\n`
+    back into newlines, so the value parses whether it is a real multi-line PEM (the Secret Manager form) or
+    a single line with `\n` separators, via Spring Security's `RsaKeyConverters`.
   - `campus-coffee.login-encryption.max-payload-age` (`LoginEncryptionProperties`, api module): how far the
     encrypted login payload's `iat` may differ from the server clock before it is rejected as stale (the
     replay window). A `Duration`, default 2 minutes.
@@ -713,7 +714,9 @@ Notes on semantics:
     to the deterministic seeded state.
   - `campus-coffee.bootstrap-admin.*` (`BootstrapAdminProperties`, application module): when set and no
     admin exists yet, create one admin on startup (used in prod, where fixtures are off). The class declares
-    only the structure; the values and defaults live in `application.yaml`'s prod block.
+    only the structure; the values and defaults live in `application.yaml`'s prod block. In prod the password
+    is a Google Secret Manager secret (`BOOTSTRAP_ADMIN_PASSWORD`); the rest of the identity (login, email,
+    name) is non-secret deploy config.
 
 The startup tasks run before the embedded web server accepts requests (via a `SmartInitializingSingleton`,
 `StartupDataInitializer`, that runs every registered `StartupTask` in `order`): the optional event-log
