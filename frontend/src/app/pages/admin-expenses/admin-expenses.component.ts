@@ -391,6 +391,10 @@ export class AdminExpensesComponent implements OnInit {
 
   /** Creates or corrects a purchase; all euro inputs are converted to integer cents before sending. */
   async save(): Promise<void> {
+    // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
+    if (this.busy) {
+      return;
+    }
     this.error = '';
     const request = this.buildRequest();
     if (!request) {

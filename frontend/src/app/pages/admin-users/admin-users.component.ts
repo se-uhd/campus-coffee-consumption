@@ -455,6 +455,10 @@ export class AdminUsersComponent implements OnInit {
 
   /** Creates a member and shows their assigned capability link. */
   async create(): Promise<void> {
+    // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
+    if (this.busy) {
+      return;
+    }
     this.busy = true;
     this.createdLink = '';
     try {
