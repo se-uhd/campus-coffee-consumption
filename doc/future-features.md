@@ -47,14 +47,3 @@ offer a member discount; each would extend `CoffeePrice` (or add a price dimensi
 
 Simple charts from the event log: cups per day/week, spend over time, the kitty balance trend, top
 contributors. The append-only log already holds everything needed; this is purely a read-side addition.
-
-## Replay-resistant login payload
-
-The admin login payload is encrypted in the browser (a compact JWE under the backend's published RSA public
-key) so the raw password never travels as plaintext; see `doc/2026-06-24_login-payload-encryption.md`. That
-encryption is not replay-resistant on its own: an attacker who captures a ciphertext past the TLS boundary
-could replay it to mint a token, the same exposure as capturing the resulting bearer token. A future
-hardening could add a short-lived nonce or timestamp inside the JWE payload, validated server-side (reject a
-stale or already-seen value), to close that window. It was deferred because it adds server-side nonce state
-and clock-skew handling for marginal benefit at the current threat model (an internal tool, already behind
-TLS); the inner JSON is the natural extension point, so it can be added later with no wire-format change.
