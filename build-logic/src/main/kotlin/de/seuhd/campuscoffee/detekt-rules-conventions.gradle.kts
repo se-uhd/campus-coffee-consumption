@@ -53,4 +53,7 @@ tasks.named<Detekt>("detekt") {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // JDK 25: the forked test JVM loads detekt-test-utils (kotlin-compiler-embeddable, caffeine), which call
+    // the deprecated sun.misc.Unsafe; it does not inherit the daemon's flags, so set them here too.
+    jvmArgs("--sun-misc-unsafe-memory-access=allow", "--enable-native-access=ALL-UNNAMED")
 }
