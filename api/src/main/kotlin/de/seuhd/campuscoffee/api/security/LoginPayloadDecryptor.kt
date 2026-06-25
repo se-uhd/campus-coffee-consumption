@@ -7,11 +7,13 @@ import com.nimbusds.jose.JWEHeader
 import com.nimbusds.jose.JWEObject
 import com.nimbusds.jose.crypto.RSADecrypter
 import de.seuhd.campuscoffee.api.exceptions.LoginPayloadException
+import java.security.MessageDigest
 import java.security.interfaces.RSAPrivateKey
 import java.text.ParseException
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.util.HexFormat
 
 /**
  * The credentials carried inside the encrypted login payload. This is an internal type (never a wire DTO):
@@ -27,6 +29,20 @@ data class LoginCredentials(
 )
 
 /**
+ * Records login-payload fingerprints so a captured ciphertext cannot be replayed within its freshness
+ * window. The `iat` check already bounds the window; this makes a ciphertext single-use inside it.
+ */
+fun interface LoginReplayGuard {
+    /**
+     * Records [fingerprint] as seen and reports whether this was its first use.
+     *
+     * @param fingerprint a stable fingerprint of the encrypted payload (so the exact ciphertext is one-use).
+     * @return true if the fingerprint had not been seen before (accept), false if it is a replay (reject).
+     */
+    fun isFirstUse(fingerprint: String): Boolean
+}
+
+/**
  * Decrypts the compact JWE that a client sends to the token endpoint, recovering the login credentials.
  * The frontend encrypts `{ loginName, password, iat }` with the published RSA public key (`alg=RSA-OAEP-256`,
  * `enc=A256GCM`); only the configured private key here can decrypt it. Any failure to parse, decrypt, or
@@ -39,17 +55,23 @@ data class LoginCredentials(
  * payload is a [LoginPayloadException] (400), the same as any other unreadable payload, so it is not a
  * credential oracle.
  *
+ * A captured ciphertext is also made single-use within its freshness window by [replayGuard]: the exact
+ * compact JWE is fingerprinted, and a second presentation of the same ciphertext is rejected as a replay
+ * (a 400, like any other unusable payload), closing the residual replay window the `iat` check alone leaves.
+ *
  * @param privateKey the RSA private key matching the published public key.
  * @param clock the clock the payload freshness is checked against.
  * @param maxPayloadAge the maximum allowed difference between the payload's `iat` and the server clock.
+ * @param replayGuard records seen ciphertexts so an identical one cannot be replayed within the window.
  */
 class LoginPayloadDecryptor(
     private val privateKey: RSAPrivateKey,
     private val clock: Clock,
-    private val maxPayloadAge: Duration
+    private val maxPayloadAge: Duration,
+    private val replayGuard: LoginReplayGuard
 ) {
     /**
-     * Decrypts and parses the compact JWE into the login credentials, rejecting a stale payload.
+     * Decrypts and parses the compact JWE into the login credentials, rejecting a stale or replayed payload.
      *
      * @param compactJwe the compact-serialized JWE sent by the client.
      * @return the decrypted login credentials.
@@ -61,6 +83,11 @@ class LoginPayloadDecryptor(
             jwe.decrypt(RSADecrypter(privateKey))
             val json = jwe.payload.toJSONObject() ?: throw notJsonObject()
             requireFresh(json["iat"])
+            // only a valid, fresh ciphertext is recorded, so invalid payloads cannot fill the guard; a
+            // second presentation of this exact ciphertext within the window is a replay
+            if (!replayGuard.isFirstUse(fingerprintOf(compactJwe))) {
+                throw LoginPayloadException(IllegalArgumentException("login payload was already used (replay)"))
+            }
             LoginCredentials(
                 loginName = json["loginName"] as? String ?: missingField("loginName"),
                 password = json["password"] as? String ?: missingField("password")
@@ -70,6 +97,10 @@ class LoginPayloadDecryptor(
         } catch (e: JOSEException) {
             throw LoginPayloadException(e)
         }
+
+    /** The SHA-256 hex fingerprint of the compact JWE, the single-use key recorded by the replay guard. */
+    private fun fingerprintOf(compactJwe: String): String =
+        HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(compactJwe.toByteArray()))
 
     /**
      * Rejects a payload whose `iat` is missing, unreadable, or further than [maxPayloadAge] from the server

@@ -38,6 +38,9 @@ ktlint-plugin = "12.1.2"
 ktlint-tool = "1.5.0"
 # detekt static analysis: the 2.0 alpha is pinned to match the Kotlin version, and gated via `check`.
 detekt = "2.0.0-alpha.5"
+# Bucket4j: in-memory token-bucket rate limiter for the login endpoint; not in the Boot BOM. The
+# `_jdk17` variant is the current JDK 17+ baseline build.
+bucket4j = "8.19.0"
 
 [libraries]
 # BOM-managed (version omitted on purpose)
@@ -56,6 +59,9 @@ spring-tx = { module = "org.springframework:spring-tx" }
 # Spring Security crypto: the BCrypt/delegating password encoder. A small, dependency-free artifact used
 # by the data layer's PasswordHasher adapter; version managed by the Boot BOM.
 spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
+# Caffeine in-memory cache: backs the login rate limiter's per-client buckets and the login-payload
+# replay-guard cache (both eviction by TTL). Version managed by the Boot BOM.
+caffeine = { module = "com.github.ben-manes.caffeine:caffeine" }
 postgresql = { module = "org.postgresql:postgresql" }
 flyway-core = { module = "org.flywaydb:flyway-core" }
 flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
@@ -85,6 +91,8 @@ zxing-javase = { module = "com.google.zxing:javase", version.ref = "zxing" }
 pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 # Cloud SQL connector: TLS + IAM auth for the prod Cloud SQL datasource (the socketFactory in the URL).
 cloud-sql-postgres = { module = "com.google.cloud.sql:postgres-socket-factory", version.ref = "cloud-sql" }
+# Bucket4j token-bucket rate limiter (login brute-force/DoS protection); JDK 17+ baseline build.
+bucket4j-core = { module = "com.bucket4j:bucket4j_jdk17-core", version.ref = "bucket4j" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
 
 # Plugin artifacts build-logic depends on so the convention plugins can apply them by id

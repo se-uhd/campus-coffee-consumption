@@ -66,6 +66,9 @@ class CucumberSpringConfiguration(
         @DynamicPropertySource
         fun configureProperties(registry: DynamicPropertyRegistry) {
             configurePostgresContainers(registry, postgresContainer)
+            // disable the login rate limiter for the acceptance suite (it is covered by its own system test),
+            // so repeated scenario logins from the loopback client cannot trip the shared failure budget
+            registry.add("campus-coffee.auth.rate-limit.enabled") { "false" }
         }
     }
 }

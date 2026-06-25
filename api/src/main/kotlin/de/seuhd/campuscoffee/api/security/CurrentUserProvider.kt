@@ -1,9 +1,11 @@
 package de.seuhd.campuscoffee.api.security
 
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
+import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 
@@ -34,20 +36,35 @@ class CurrentUserProvider(
      * The domain [User] for the authenticated principal of the current request.
      *
      * @return the acting user
-     * @throws IllegalStateException if there is no authenticated user (the security filter chain should
-     *   already have rejected such a request with 401 before it reaches a controller)
+     * @throws org.springframework.security.authentication.AuthenticationCredentialsNotFoundException if no
+     *   authenticated user is present (the filter chain should already have rejected such a request) or the
+     *   principal no longer resolves to a user (a JWT minted for an admin who was then hard-deleted); both
+     *   surface as a clean 401 so the client re-authenticates, rather than a 500 or a 404.
      * @throws ForbiddenException if the resolved user is a deactivated admin (an in-flight JWT minted before
      *   the admin was deactivated); a deactivated member is allowed through here and limited to reads.
      */
     fun currentUser(): User {
-        val authentication =
-            SecurityContextHolder.getContext().authentication
-                ?: error("No authenticated user is present on the security context.")
-        check(authentication.isAuthenticated) { "The current request is not authenticated." }
-        val user = userService.getByLoginName(authentication.name)
+        val user = resolveAuthenticatedUser()
         if (user.role == Role.ADMIN && user.active != true) {
             throw ForbiddenException("This admin account has been deactivated.")
         }
         return user
+    }
+
+    /**
+     * Resolves the authenticated principal to its domain [User], treating a missing authentication or a
+     * principal that no longer maps to a user as a 401-mapped [AuthenticationCredentialsNotFoundException].
+     */
+    private fun resolveAuthenticatedUser(): User {
+        val authentication =
+            SecurityContextHolder.getContext().authentication?.takeIf { it.isAuthenticated }
+                ?: throw AuthenticationCredentialsNotFoundException("No authenticated user is present.")
+        return try {
+            userService.getByLoginName(authentication.name)
+        } catch (e: NotFoundException) {
+            // a valid-but-stale credential (the admin was hard-deleted after the token was minted):
+            // treat it as unauthenticated (401) so the client re-logs in, not a 404 on an admin endpoint
+            throw AuthenticationCredentialsNotFoundException("The authenticated principal no longer exists.", e)
+        }
     }
 }
