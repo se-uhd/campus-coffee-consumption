@@ -164,9 +164,7 @@ const ACTIVITY_PAGE_SIZE = 10;
           </button>
           <div extra>
             @if (editMode) {
-              <p class="muted cc-edit-hint">
-                Set the member's total coffee count.
-              </p>
+              <p class="muted cc-edit-hint">Set the member's total coffee count.</p>
               <form #correctionForm="ngForm" class="form-row cc-edit-total">
                 <mat-form-field>
                   <mat-label>New total</mat-label>
@@ -448,6 +446,10 @@ export class AdminLandingComponent implements OnInit {
    * rapid member switch mid-request never lands one member's count/activity on another's view.
    */
   async change(delta: number): Promise<void> {
+    // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
+    if (this.busy) {
+      return;
+    }
     const id = this.selectedId;
     this.busy = true;
     this.error = '';
@@ -484,6 +486,10 @@ export class AdminLandingComponent implements OnInit {
    * member's correction to another's view.
    */
   async override(): Promise<void> {
+    // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
+    if (this.busy) {
+      return;
+    }
     const id = this.selectedId;
     this.error = '';
     if (this.newTotalError() != null) {
