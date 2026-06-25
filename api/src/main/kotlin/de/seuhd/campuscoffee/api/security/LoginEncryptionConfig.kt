@@ -1,5 +1,7 @@
 package de.seuhd.campuscoffee.api.security
 
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.RSAKey
@@ -12,6 +14,7 @@ import java.security.KeyFactory
 import java.security.interfaces.RSAPrivateCrtKey
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.RSAPublicKeySpec
+import java.time.Clock
 
 /**
  * Login-encryption crypto beans built from the configured RSA private key (see [LoginEncryptionProperties]).
@@ -29,10 +32,27 @@ class LoginEncryptionConfig(
     private val publicJwk: RSAKey = buildPublicJwk(privateKey, properties.keyId)
     private val maxPayloadAge = properties.maxPayloadAge
 
-    /** The decryptor that recovers the login credentials from the client's compact JWE, rejecting stale ones. */
+    /**
+     * The decryptor that recovers the login credentials from the client's compact JWE, rejecting a stale or
+     * replayed payload. The replay guard is a Caffeine cache of seen-ciphertext fingerprints, evicted after
+     * twice the freshness window so it covers the whole window in which a captured ciphertext is still valid
+     * without growing unbounded.
+     */
     @Bean
-    fun loginPayloadDecryptor(): LoginPayloadDecryptor =
-        LoginPayloadDecryptor(privateKey, java.time.Clock.systemUTC(), maxPayloadAge)
+    fun loginPayloadDecryptor(): LoginPayloadDecryptor {
+        val seenPayloads: Cache<String, Boolean> =
+            Caffeine
+                .newBuilder()
+                .expireAfterWrite(maxPayloadAge.multipliedBy(2))
+                .maximumSize(REPLAY_CACHE_MAX_ENTRIES)
+                .build()
+        // putIfAbsent returns null only when the fingerprint was absent, i.e. this is its first use
+        val replayGuard =
+            LoginReplayGuard { fingerprint ->
+                seenPayloads.asMap().putIfAbsent(fingerprint, true) == null
+            }
+        return LoginPayloadDecryptor(privateKey, Clock.systemUTC(), maxPayloadAge, replayGuard)
+    }
 
     /** The public key published at `GET /api/auth/public-key`, shaped as a JWK for the browser to import. */
     @Bean
@@ -48,6 +68,10 @@ class LoginEncryptionConfig(
 
     private companion object {
         private const val MIN_KEY_BITS = 2048
+
+        // an upper bound on remembered login-ciphertext fingerprints, so the replay guard cannot grow without
+        // bound and use up memory; entries also expire after twice the freshness window
+        private const val REPLAY_CACHE_MAX_ENTRIES = 100_000L
 
         /**
          * Parses the PKCS#8 PEM into an RSA private key with CRT parameters, using Spring Security's PEM
