@@ -50,7 +50,7 @@ Angular 22 single-page frontend, derived from the CampusCoffee teaching project.
 A multi-module Gradle project (Kotlin DSL) following a hexagonal (ports-and-adapters) architecture, with
 layer boundaries enforced by ArchUnit:
 
-- **domain**: domain models, port interfaces, and business logic (no framework dependencies beyond validation).
+- **domain**: domain models, port interfaces, and business logic (depends on Bean Validation and Spring, but not on the api, data, or application layers).
 - **api**: REST controllers, DTOs, MapStruct DTO mappers, the QR/capability URL helpers.
 - **data**: JPA entities, repositories, the event sourcing machinery (event store, read model projector,
   decorators), and the ZXing QR and capability token adapters.
@@ -112,7 +112,7 @@ repeatable), each with a coffee consumption at zero. The credentials live in
 A member's capability link is `http://localhost:8080/login/<token>`, and members authenticate **only** with
 that link (they have no password). The admin `jane_doe` is different: she logs in with a **password** at
 `POST /api/auth/token` (the JWT login), **not** with the capability token in the table above. The fixture
-admin password is **`aaaMbnPdFYDqkOpS3fVA`** (also in `TestFixtures.kt`). The dev `DevController` (`GET/PUT/DELETE /api/dev/data`) reports the counts, reloads the
+admin password is **`aaaMbnPdFYDqkOpS3fVA2xyz`** (also in `TestFixtures.kt`). The dev `DevController` (`GET/PUT/DELETE /api/dev/data`) reports the counts, reloads the
 fixtures (reassigning the same seeded ids), or clears the data.
 
 On top of these fixtures, the `dev` profile runs a dev-only `DevDemoDataLoader` that adds about nine more
@@ -171,8 +171,8 @@ records a correction; both stay in the append-only log.
 
 Every change (to a count, the price, an expense, or a payment) is one row in the append-only `events`
 table. The `created_by` column records the actor's login (a member, an admin, or `"system"` for the
-fixtures), and `note` records an admin's reason for an absolute count correction (a deposit, kitty
-adjustment, or expense note lives in that entity's own event body, not this column):
+fixtures), and `note` records the note for that change: an admin's reason for an absolute count correction,
+or a deposit, kitty-adjustment, or expense note:
 
 ```sql
 SELECT change_type, entity_type, created_by, note FROM events ORDER BY seq;
