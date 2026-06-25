@@ -1,5 +1,7 @@
 package de.seuhd.campuscoffee
 
+import de.seuhd.campuscoffee.api.dtos.MIN_PASSWORD_LENGTH
+import de.seuhd.campuscoffee.api.dtos.PASSWORD_COMPLEXITY_PATTERN
 import de.seuhd.campuscoffee.configuration.BootstrapAdminProperties
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
@@ -50,7 +52,7 @@ class BootstrapAdminLoader(
                         lastName = lastName.required("last-name"),
                         role = Role.ADMIN,
                         active = true,
-                        password = password.required("password", MIN_PASSWORD_LENGTH)
+                        password = password.requiredPassword()
                     )
                 )
             coffeeConsumptionService.createForUser(created)
@@ -76,10 +78,24 @@ class BootstrapAdminLoader(
         return this
     }
 
+    /**
+     * Validates the bootstrap-admin password against the same policy the API enforces on the admin DTO
+     * (at least [MIN_PASSWORD_LENGTH] characters, with a lowercase letter, an uppercase letter, and a digit),
+     * since the bootstrap path bypasses the DTO. Fails startup with a message naming the offending key.
+     */
+    private fun String?.requiredPassword(): String {
+        val value = required("password", MIN_PASSWORD_LENGTH)
+        require(PASSWORD_COMPLEXITY_REGEX.matches(value)) {
+            "campus-coffee.bootstrap-admin.password must contain at least one lowercase letter, one uppercase " +
+                "letter, and one digit."
+        }
+        return value
+    }
+
     private companion object {
         private const val ORDER = 300
         private const val MIN_LOGIN_NAME_LENGTH = 3
-        private const val MIN_PASSWORD_LENGTH = 8
+        private val PASSWORD_COMPLEXITY_REGEX = Regex(PASSWORD_COMPLEXITY_PATTERN)
         private val log = KotlinLogging.logger {}
     }
 }

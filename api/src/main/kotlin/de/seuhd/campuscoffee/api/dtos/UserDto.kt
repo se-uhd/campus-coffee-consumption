@@ -14,10 +14,11 @@ import java.util.UUID
  * is then rejected by bean validation; the controller validates the DTO before it is mapped to a
  * [de.seuhd.campuscoffee.domain.model.User].
  *
- * [password] is write-only and applies only to an admin: it is required (at least 8 characters) when
- * creating or promoting an admin, and a member (USER) never has one; a member authenticates solely with
- * their capability link, so any password sent for a member is ignored. No response serializes it (and the
- * stored hash is never exposed at all). [role] and [active] appear in responses and may be set by an
+ * [password] is write-only and applies only to an admin: it is required when creating or promoting an admin
+ * (at least 24 characters, with a lowercase letter, an uppercase letter, and a digit), and a member (USER)
+ * never has one; a member authenticates solely with their capability link, so any password sent for a member
+ * is ignored. No response serializes it (and the stored hash is never exposed at all). [role] and [active]
+ * appear in responses and may be set by an
  * admin; a non-admin self-update that sends them is ignored by the domain. [capabilityUrl] is read-only:
  * the assembled "your coffee link" the controller fills in from the member's secret token (the raw token
  * is never a field of its own).
@@ -43,7 +44,15 @@ data class UserDto(
     val lastName: String?,
     // optional in the DTO (only an admin needs one); the domain requires it for an admin and ignores it
     // for a member
-    @field:Size(min = 8, max = 255, message = "Password must be between 8 and 255 characters long.")
+    @field:Size(
+        min = MIN_PASSWORD_LENGTH,
+        max = MAX_PASSWORD_LENGTH,
+        message = "Password must be between 24 and 255 characters long."
+    )
+    @field:Pattern(
+        regexp = PASSWORD_COMPLEXITY_PATTERN,
+        message = "Password must contain at least one lowercase letter, one uppercase letter, and one digit."
+    )
     @field:JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     val password: String? = null,
     val role: Role? = null,

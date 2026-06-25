@@ -42,8 +42,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 "emailAddress" to "new.member@se.de",
                 "firstName" to "New",
                 "lastName" to "Member",
-                "role" to "USER",
-                "password" to "a-strong-password"
+                "role" to "USER"
             )
 
         val result =
@@ -68,8 +67,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 "emailAddress" to "to.delete@se.de",
                 "firstName" to "To",
                 "lastName" to "Delete",
-                "role" to "USER",
-                "password" to "a-strong-password"
+                "role" to "USER"
             )
         val created =
             client()

@@ -42,7 +42,8 @@ object TestFixtures {
                 role = Role.ADMIN,
                 active = true,
                 capabilityToken = "Rh7tK2pXmQ9vL4nB8cD1eF6gH3jZ0sW5yAuToN2kEac",
-                password = "aaaMbnPdFYDqkOpS3fVA"
+                // meets the admin password policy: >= 24 chars, with lower/upper/digit
+                password = "aaaMbnPdFYDqkOpS3fVA2xyz"
             ),
             User(
                 id = fixtureId(2),

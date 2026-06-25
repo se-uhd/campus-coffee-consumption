@@ -8,7 +8,7 @@ import { CompactEncrypt, importJWK } from 'jose';
  */
 
 /** The fixture admin's credentials (admin JWT login). */
-export const ADMIN = { loginName: 'jane_doe', password: 'aaaMbnPdFYDqkOpS3fVA' } as const;
+export const ADMIN = { loginName: 'jane_doe', password: 'aaaMbnPdFYDqkOpS3fVA2xyz' } as const;
 
 /** Fixture member capability tokens (the secret in the `/login/:token` URL), keyed by login name. */
 export const MEMBER_TOKENS = {
