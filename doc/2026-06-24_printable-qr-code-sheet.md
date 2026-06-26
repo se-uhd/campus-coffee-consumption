@@ -33,7 +33,7 @@ dependency, so it gets the same treatment:
 - The data layer owns the implementation: `PdfBoxQrGridGenerator`, backed by Apache PDFBox. It receives
   already-rendered images and only arranges them, so it carries no QR-encoding and no business logic.
 - The api-layer `CapabilityQrResponder` orchestrates. It renders each member's QR once through the existing
-  `QrCodeGenerator` and hands the PDF adapter the labelled images. The ZIP response already worked this way;
+  `QrCodeGenerator` and hands the PDF adapter the labeled images. The ZIP response already worked this way;
   the PDF response shares its member selection.
 
 Why the PDFBox code is infrastructure and not domain logic: hexagonal architecture forbids the domain from

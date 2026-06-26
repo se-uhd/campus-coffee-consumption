@@ -17,7 +17,7 @@ import java.util.zip.ZipOutputStream
 /**
  * Renders members' capability QR codes as HTTP responses: a single high-resolution PNG for one member, a ZIP
  * archive of every active member's PNG (each named `<loginName>.png`), or a printable PDF grid of every
- * active member's code labelled with their login name. Each QR encodes the member's capability URL. Shared
+ * active member's code labeled with their login name. Each QR encodes the member's capability URL. Shared
  * by the member's own profile endpoint and the admin's per-member and bulk endpoints.
  */
 @Component
@@ -71,7 +71,7 @@ class CapabilityQrResponder(
 
     /**
      * Builds a printable PDF grid of the capability QR codes of all active [users] that have a token, each
-     * code labelled with the member's login name, downloaded as `coffee-qr-codes.pdf`. The eligible-member
+     * code labeled with the member's login name, downloaded as `coffee-qr-codes.pdf`. The eligible-member
      * selection and the [MAX_MEMBERS] cap are shared with the ZIP (see [activeBundled]). The codes are
      * rendered at [GRID_QR_PX], smaller than the standalone PNG but ample for a printed grid cell, which
      * keeps the document size reasonable across the whole membership.

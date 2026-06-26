@@ -197,9 +197,9 @@ class UserController(
         return capabilityQrResponder.zipResponse(userService.getAll())
     }
 
-    /** Downloads a printable PDF grid of every active member's capability QR code, labelled by login name. */
+    /** Downloads a printable PDF grid of every active member's capability QR code, labeled by login name. */
     @Operation(
-        summary = "Download a printable PDF grid of every active member's QR code, labelled by login name."
+        summary = "Download a printable PDF grid of every active member's QR code, labeled by login name."
     )
     @GetMapping("/qr.pdf", produces = [MediaType.APPLICATION_PDF_VALUE])
     fun qrCodesPdf(): ResponseEntity<ByteArray> {

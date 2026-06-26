@@ -45,7 +45,7 @@ interface MemberRow {
  * profile" jump that opens the admin profile page for the member (carrying their id as the `member` query
  * param); the trailing actions column carries the active/deactivate toggle, a rotate-link action, a QR
  * download, and a delete. Two bulk actions sit in the Members card header (right-aligned with the "Members"
- * heading): a ZIP of every active member's QR code, and a printable PDF grid of the same codes labelled by
+ * heading): a ZIP of every active member's QR code, and a printable PDF grid of the same codes labeled by
  * login name.
  */
 @Component({
@@ -546,7 +546,7 @@ export class AdminUsersComponent implements OnInit {
     }
   }
 
-  /** Downloads a printable PDF grid of every active member's QR code (each labelled by login name). */
+  /** Downloads a printable PDF grid of every active member's QR code (each labeled by login name). */
   async downloadAllQrPdf(): Promise<void> {
     this.downloadingAllPdf = true;
     try {
