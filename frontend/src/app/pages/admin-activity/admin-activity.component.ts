@@ -15,8 +15,9 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
 import { EurosPipe } from '../../pipes/euros.pipe';
 import { UtcDatePipe } from '../../pipes/utc-date.pipe';
 import { GlobalActivityEntryDto, ActivityEntryType } from '../../models';
-import { activityIcon, activityLabel, displayActor } from '../../util/activity-type';
-import { appendActivityPage } from '../../util/activity';
+import { activityIcon, activityLabel } from '../../util/activity-type';
+import { ActorPipe } from '../../pipes/actor.pipe';
+import { loadActivityPage } from '../../util/activity';
 import { triggerDownload } from '../../util/download';
 import { formatEuros } from '../../util/money';
 import { TruncationTooltipDirective } from '../../directives/truncation-tooltip.directive';
@@ -50,6 +51,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
     MatProgressSpinnerModule,
     EurosPipe,
     UtcDatePipe,
+    ActorPipe,
     AppHeaderComponent,
     TruncationTooltipDirective
   ],
@@ -154,8 +156,8 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
 
                   <ng-container matColumnDef="actor">
                     <th mat-header-cell *matHeaderCellDef>By</th>
-                    <td mat-cell *matCellDef="let row" [ccTruncationTooltip]="actorLabel(row.actorLogin)">
-                      {{ actorLabel(row.actorLogin) }}
+                    <td mat-cell *matCellDef="let row" [ccTruncationTooltip]="row.actorLogin | actor">
+                      {{ row.actorLogin | actor }}
                     </td>
                   </ng-container>
 
@@ -254,23 +256,30 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
         padding-right: 8px;
       }
 
+      /* Column widths are percentages that sum to 100%. Under table-layout: fixed they are honoured exactly
+         (no surplus to redistribute), so the table fills its card responsively while the proportions hold at
+         any width down to the min-width scroll. */
       .mat-column-when {
-        width: 78px;
+        width: 11.5%;
       }
 
       .mat-column-type {
-        width: 128px;
+        width: 22%;
       }
 
-      /* Member (the subject) and By (the actor) are deliberately the same width. */
-      .mat-column-subject,
+      .mat-column-subject {
+        width: 20.5%;
+      }
+
+      /* By (the actor) shows only a login, never a full name, so it is narrower than Subject; the longest
+         usernames truncate and are revealed on hover by the ccTruncationTooltip directive. */
       .mat-column-actor {
-        width: 138px;
+        width: 16%;
       }
 
       .mat-column-member,
       .mat-column-kitty {
-        width: 96px;
+        width: 15%;
       }
 
       .cc-type {
@@ -330,9 +339,6 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
 export class AdminActivityComponent implements OnInit {
   readonly columns = ['when', 'type', 'subject', 'actor', 'member', 'kitty'];
 
-  /** Renders an actor login for display: the automated `system` actor reads as `SYSTEM`. */
-  readonly actorLabel = displayActor;
-
   /** The loaded rows (newest first), accumulated by "Load more". */
   readonly entries = signal<GlobalActivityEntryDto[]>([]);
 
@@ -366,9 +372,11 @@ export class AdminActivityComponent implements OnInit {
     this.loading = true;
     this.loadError = '';
     try {
-      const page = await this.accounting.allActivity(ACTIVITY_PAGE_SIZE, 0);
-      this.entries.set(page);
-      this.hasMore = page.length === ACTIVITY_PAGE_SIZE;
+      const { entries, hasMore } = await loadActivityPage([], ACTIVITY_PAGE_SIZE, (limit, offset) =>
+        this.accounting.allActivity(limit, offset)
+      );
+      this.entries.set(entries);
+      this.hasMore = hasMore;
     } catch {
       this.loadError = 'Could not load the activity.';
     } finally {
@@ -380,12 +388,13 @@ export class AdminActivityComponent implements OnInit {
   async loadMore(): Promise<void> {
     this.loadingMore = true;
     try {
-      const next = await this.accounting.allActivity(ACTIVITY_PAGE_SIZE, this.entries().length);
-      const { entries, appended } = appendActivityPage(this.entries(), next);
+      const { entries, hasMore } = await loadActivityPage(
+        this.entries(),
+        ACTIVITY_PAGE_SIZE,
+        (limit, offset) => this.accounting.allActivity(limit, offset)
+      );
       this.entries.set(entries);
-      // base "Load more" on the rows actually gained: a full page that collapsed to fewer new rows (its
-      // boundary row was a duplicate of the last-seen entry) means there is nothing more to fetch
-      this.hasMore = appended === ACTIVITY_PAGE_SIZE;
+      this.hasMore = hasMore;
     } catch (error) {
       this.notifications.error(error, 'Could not load more activity.');
     } finally {
@@ -416,15 +425,15 @@ export class AdminActivityComponent implements OnInit {
   }
 
   /**
-   * A compact secondary detail for a row, or null when there is none: the cup total (with a signed delta for a
-   * correction) for a consumption, the bean weight for an expense, and the new price for a price change.
+   * A compact secondary detail for a row, or null when there is none: the cup total (with the signed delta in
+   * parentheses) for a consumption, the bean weight for an expense, and the new price for a price change.
    *
    * @param row the activity row
    */
   detail(row: GlobalActivityEntryDto): string | null {
     if (row.count != null) {
       const delta = row.delta;
-      const suffix = delta != null && delta !== 1 ? ` (${delta > 0 ? '+' : ''}${delta})` : '';
+      const suffix = delta != null ? ` (${delta > 0 ? '+' : ''}${delta})` : '';
       return `${row.count} cups${suffix}`;
     }
     if (row.weightGrams != null) {

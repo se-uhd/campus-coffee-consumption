@@ -23,7 +23,7 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
 import { BalanceSummaryComponent } from '../../components/balance-summary/balance-summary.component';
 import { MemberSelectComponent } from '../../components/member-select/member-select.component';
 import { ConsumptionDto, ActivityEntryDto, UserDto } from '../../models';
-import { appendActivityPage } from '../../util/activity';
+import { loadActivityPage } from '../../util/activity';
 
 /** The page size for one activity page; "Load more" appends another page of this size (matching the member landing). */
 const ACTIVITY_PAGE_SIZE = 10;
@@ -407,13 +407,15 @@ export class AdminLandingComponent implements OnInit {
    * @param requestedId the member id captured when the load was started
    */
   private async loadActivity(requestedId: string = this.selectedId): Promise<void> {
-    const activity = await this.accountingService.memberActivity(requestedId, ACTIVITY_PAGE_SIZE, 0);
+    const { entries, hasMore } = await loadActivityPage([], ACTIVITY_PAGE_SIZE, (limit, offset) =>
+      this.accountingService.memberActivity(requestedId, limit, offset)
+    );
     if (requestedId !== this.selectedId) {
       return;
     }
-    this.activity = activity;
-    this.hasMore = activity.length === ACTIVITY_PAGE_SIZE;
-    this.balanceCents = activity.length > 0 ? activity[0].runningBalanceCents : 0;
+    this.activity = entries;
+    this.hasMore = hasMore;
+    this.balanceCents = entries.length > 0 ? entries[0].runningBalanceCents : 0;
   }
 
   /** Appends the next page of the selected member's unified activity (incremental "Load more" server paging). */
@@ -421,19 +423,16 @@ export class AdminLandingComponent implements OnInit {
     const requestedId = this.selectedId;
     this.loadingMore = true;
     try {
-      const next = await this.accountingService.memberActivity(
-        requestedId,
+      const { entries, hasMore } = await loadActivityPage(
+        this.activity,
         ACTIVITY_PAGE_SIZE,
-        this.activity.length
+        (limit, offset) => this.accountingService.memberActivity(requestedId, limit, offset)
       );
       if (requestedId !== this.selectedId) {
         return;
       }
-      const { entries, appended } = appendActivityPage(this.activity, next);
       this.activity = entries;
-      // base "Load more" on the rows actually gained: a full page that collapsed to fewer new rows (its
-      // boundary row was a duplicate) means there is nothing more to fetch
-      this.hasMore = appended === ACTIVITY_PAGE_SIZE;
+      this.hasMore = hasMore;
     } catch (error) {
       this.notifications.error(error, 'Could not load more activity.');
     } finally {

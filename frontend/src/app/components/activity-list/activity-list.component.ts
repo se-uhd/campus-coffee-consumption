@@ -10,6 +10,7 @@ import { UtcDatePipe } from '../../pipes/utc-date.pipe';
 import { ActivityEntryDto, ActivityEntryType } from '../../models';
 import { formatEuros } from '../../util/money';
 import { activityIcon, activityLabel } from '../../util/activity-type';
+import { ActorPipe } from '../../pipes/actor.pipe';
 
 /** The client-side filter buckets for the activity list. */
 type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
@@ -33,7 +34,8 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
     MatButtonToggleModule,
     MatProgressSpinnerModule,
     EurosPipe,
-    UtcDatePipe
+    UtcDatePipe,
+    ActorPipe
   ],
   template: `
     @if (showFilter()) {
@@ -68,7 +70,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
               }
             </div>
             <div class="muted">
-              {{ entry.createdAt | utcDate | date: 'short' }} · {{ entry.createdBy }}
+              {{ entry.createdAt | utcDate | date: 'short' }} · {{ entry.createdBy | actor }}
               @if (entry.note) {
                 · {{ entry.note }}
               }
@@ -225,12 +227,12 @@ export class ActivityListComponent {
   }
 
   /**
-   * A signed cup-delta for a correction or cancellation row, e.g. `-1 cup` or `+4 cups`; null for a normal
-   * single coffee (`delta === 1`) or a non-count entry, so the footer only annotates a change worth showing.
+   * The signed cup-delta for a consumption row, e.g. `+1 cup`, `-1 cup`, or `+4 cups`; null only for a
+   * non-count entry (an expense, deposit, or price change), which has no delta to annotate.
    */
   deltaLabel(entry: ActivityEntryDto): string | null {
     const delta = entry.delta;
-    if (delta == null || delta === 1) {
+    if (delta == null) {
       return null;
     }
     const unit = Math.abs(delta) === 1 ? 'cup' : 'cups';

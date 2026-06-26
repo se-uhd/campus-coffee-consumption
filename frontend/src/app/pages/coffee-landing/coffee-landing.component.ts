@@ -21,7 +21,7 @@ import { CollapsibleCardComponent } from '../../components/collapsible-card/coll
 import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import { ActivityEntryDto, OwnExpenseRequest, UserSummaryDto } from '../../models';
 import { euroInputError, toCents } from '../../util/money';
-import { appendActivityPage } from '../../util/activity';
+import { loadActivityPage } from '../../util/activity';
 
 /** The page size for one activity page; "Load more" appends another page of this size. */
 const ACTIVITY_PAGE_SIZE = 10;
@@ -264,7 +264,7 @@ export class CoffeeLandingComponent implements OnInit {
     this.loading = true;
     this.loadError = '';
     try {
-      this.applySummary(await this.summaryService.getSummary(ACTIVITY_PAGE_SIZE, 0));
+      this.applySummary(await this.summaryService.getSummary(ACTIVITY_PAGE_SIZE + 1, 0), true);
     } catch {
       this.loadError = 'Could not load your coffee count. Your link may be invalid.';
     } finally {
@@ -276,12 +276,13 @@ export class CoffeeLandingComponent implements OnInit {
   async loadMore(): Promise<void> {
     this.loadingMore = true;
     try {
-      const next = await this.summaryService.getActivity(ACTIVITY_PAGE_SIZE, this.activity.length);
-      const { entries, appended } = appendActivityPage(this.activity, next);
+      const { entries, hasMore } = await loadActivityPage(
+        this.activity,
+        ACTIVITY_PAGE_SIZE,
+        (limit, offset) => this.summaryService.getActivity(limit, offset)
+      );
       this.activity = entries;
-      // base "Load more" on the rows actually gained: a full page that collapsed to fewer new rows (its
-      // boundary row was a duplicate) means there is nothing more to fetch
-      this.hasMore = appended === ACTIVITY_PAGE_SIZE;
+      this.hasMore = hasMore;
     } catch (error) {
       this.notifications.error(error, 'Could not load more activity.');
     } finally {
@@ -289,12 +290,24 @@ export class CoffeeLandingComponent implements OnInit {
     }
   }
 
-  /** Adopts a server summary as the source of truth (the displayed count and first activity page reconcile). */
-  private applySummary(summary: UserSummaryDto): void {
+  /**
+   * Adopts a server summary as the source of truth (the displayed count and first activity page reconcile).
+   *
+   * @param summary the server summary to adopt
+   * @param peeked true when the summary was fetched with a one-row peek (`ACTIVITY_PAGE_SIZE + 1` activity
+   *   rows) so "Load more" reflects whether more remains; false for a mutation response, which bundles the
+   *   default-size first page and so falls back to the "page came back full" heuristic
+   */
+  private applySummary(summary: UserSummaryDto, peeked = false): void {
     this.summary = summary;
     this.displayCount = summary.count;
-    this.activity = summary.activity;
-    this.hasMore = summary.activity.length === ACTIVITY_PAGE_SIZE;
+    if (peeked) {
+      this.activity = summary.activity.slice(0, ACTIVITY_PAGE_SIZE);
+      this.hasMore = summary.activity.length > ACTIVITY_PAGE_SIZE;
+    } else {
+      this.activity = summary.activity;
+      this.hasMore = summary.activity.length === ACTIVITY_PAGE_SIZE;
+    }
   }
 
   /** Adds a coffee: bumps the displayed count optimistically, then reconciles to the server summary. */
