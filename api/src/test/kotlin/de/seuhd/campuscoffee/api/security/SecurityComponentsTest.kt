@@ -50,7 +50,7 @@ class SecurityComponentsTest {
 
     @Test
     fun `the actor provider returns system when there is no authentication`() {
-        assertThat(SecurityContextActorProvider().currentActor()).isEqualTo("system")
+        assertThat(SecurityContextActorProvider().currentActor()).isEqualTo("SYSTEM")
     }
 
     @Test
@@ -58,7 +58,7 @@ class SecurityComponentsTest {
         SecurityContextHolder.getContext().authentication =
             AnonymousAuthenticationToken("key", "anonymousUser", listOf(SimpleGrantedAuthority("ROLE_ANONYMOUS")))
 
-        assertThat(SecurityContextActorProvider().currentActor()).isEqualTo("system")
+        assertThat(SecurityContextActorProvider().currentActor()).isEqualTo("SYSTEM")
     }
 
     @Test

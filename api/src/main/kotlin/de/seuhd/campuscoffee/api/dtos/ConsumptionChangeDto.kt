@@ -7,7 +7,7 @@ import java.time.LocalDateTime
  * Response DTO for one entry in a member's consumption change log, built from the event-log rows rather
  * than a dedicated table. [count] is the running total recorded by that change, [delta] the difference
  * from the previous change (e.g. `+1` or `-1`), [createdAt] when it was recorded, [createdBy] the login
- * name of whoever made the change (the member, an admin, or `"system"` for the seeded data), and [note]
+ * name of whoever made the change (the member, an admin, or `"SYSTEM"` for the seeded data), and [note]
  * an optional admin annotation (the reason for an override), omitted when absent.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)

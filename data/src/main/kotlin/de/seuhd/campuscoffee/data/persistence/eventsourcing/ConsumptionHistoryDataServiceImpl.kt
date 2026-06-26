@@ -53,6 +53,6 @@ class ConsumptionHistoryDataServiceImpl(
         // be equal today, which is exactly the coincidence to not depend on).
         private val ENTITY_TYPE = LoggedEntityType.COFFEE_CONSUMPTION.label
         private const val MAX_LIMIT = 100
-        private const val SYSTEM_ACTOR = "system"
+        private const val SYSTEM_ACTOR = "SYSTEM"
     }
 }

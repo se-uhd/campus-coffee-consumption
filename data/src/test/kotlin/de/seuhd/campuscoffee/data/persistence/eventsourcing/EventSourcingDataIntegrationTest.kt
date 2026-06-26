@@ -46,7 +46,7 @@ class EventSourcingDataIntegrationTest : AbstractEventSourcingDataIntegrationTes
         assertThat(events).singleElement().satisfies({
             assertThat(it.entityType).isEqualTo("User")
             assertThat(it.changeType).isEqualTo(ChangeType.INSERT)
-            assertThat(it.createdBy).isEqualTo("system")
+            assertThat(it.createdBy).isEqualTo("SYSTEM")
         })
     }
 
@@ -87,7 +87,7 @@ class EventSourcingDataIntegrationTest : AbstractEventSourcingDataIntegrationTes
 
         assertThat(changes.map { it.count }).containsExactly(2, 1, 0)
         assertThat(changes.map { it.delta }).containsExactly(1, 1, 0)
-        assertThat(changes).allSatisfy { assertThat(it.createdBy).isEqualTo("system") }
+        assertThat(changes).allSatisfy { assertThat(it.createdBy).isEqualTo("SYSTEM") }
     }
 
     @Test
