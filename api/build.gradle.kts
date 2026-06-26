@@ -32,6 +32,8 @@ dependencies {
     // Caffeine-backed replay guard for the encrypted login payload.
     implementation(libs.bucket4j.core)
     implementation(libs.caffeine)
+    // Apache Commons CSV: writes the admin global-activity CSV export with correct RFC 4180 quoting/escaping.
+    implementation(libs.commons.csv)
 
     // MapStruct is compile-only for the Kotlin mappers; kapt runs the processor that generates the impls.
     compileOnly(libs.mapstruct)

@@ -63,6 +63,15 @@ const ACTIVITY_PAGE_SIZE = 10;
       </a>
       <a
         mat-icon-button
+        routerLink="/admin/activity"
+        queryParamsHandling="preserve"
+        aria-label="Activity"
+        matTooltip="Activity"
+      >
+        <mat-icon>receipt_long</mat-icon>
+      </a>
+      <a
+        mat-icon-button
         routerLink="/admin/price"
         queryParamsHandling="preserve"
         aria-label="Price"

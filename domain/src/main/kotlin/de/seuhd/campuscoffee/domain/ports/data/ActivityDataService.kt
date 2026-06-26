@@ -2,6 +2,7 @@ package de.seuhd.campuscoffee.domain.ports.data
 
 import de.seuhd.campuscoffee.domain.model.ActivityEntry
 import de.seuhd.campuscoffee.domain.model.CancellableIncrement
+import de.seuhd.campuscoffee.domain.model.GlobalActivityEntry
 import de.seuhd.campuscoffee.domain.model.PriceChange
 import java.util.UUID
 
@@ -54,4 +55,17 @@ interface ActivityDataService {
      * @return the price changes oldest-first
      */
     fun priceHistory(): List<PriceChange>
+
+    /**
+     * Returns the whole-installation activity oldest-first: every coffee, expense, deposit, kitty adjustment,
+     * and price change across all members, one [GlobalActivityEntry] per event, each carrying the subject
+     * member's running balance and the kitty's running balance (whichever the event moved). The single shared
+     * walk that backs [userActivity] and [kittyHistory] is replayed over the full log here, so the per-member
+     * and kitty running balances match those feeds exactly. Each subject's login is resolved from the log's
+     * own `User` events (so a hard-deleted member still classifies and labels correctly); `subjectName` is left
+     * null for the domain to enrich.
+     *
+     * @return the global activity oldest-first
+     */
+    fun globalActivity(): List<GlobalActivityEntry>
 }

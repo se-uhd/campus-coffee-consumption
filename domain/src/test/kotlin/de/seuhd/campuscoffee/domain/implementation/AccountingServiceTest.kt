@@ -26,9 +26,10 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 /**
- * Unit tests for AccountingServiceImpl, mocking the data ports and the price/consumption services. Covers
- * the read-side composition (summary, member activity, kitty balance and history, overview) and the authorization
- * rules: a member reads only their own balance and may not read the kitty history or the overview.
+ * Unit tests for AccountingServiceImpl, mocking the data ports and the price/consumption services. Covers the
+ * read-side money numbers (the landing summary, the kitty balance, the all-member overview) and the
+ * authorization rules: a member reads only their own summary and may not read the overview. The chronological
+ * feeds moved to [ActivityServiceImpl] (see [ActivityServiceTest]).
  */
 class AccountingServiceTest {
     private val activityDataService: ActivityDataService = mock()
@@ -135,29 +136,10 @@ class AccountingServiceTest {
     }
 
     @Test
-    fun `userActivity returns the newest-first page for an admin`() {
-        whenever(userDataService.getById(memberId)).thenReturn(member)
-        whenever(activityDataService.userActivity(memberId, "max"))
-            .thenReturn(
-                listOf(entry(ActivityEntryType.CONSUMPTION, -50, -50), entry(ActivityEntryType.DEPOSIT, 100, 50))
-            )
-
-        val page = service.userActivity(memberId, 10, 0, admin)
-
-        // newest first: the deposit, then the consumption
-        assertThat(page.map { it.type }).containsExactly(ActivityEntryType.DEPOSIT, ActivityEntryType.CONSUMPTION)
-    }
-
-    @Test
     fun `kittyBalanceCents returns the maintained kitty projection`() {
         whenever(balanceDataService.kittyBalanceCents()).thenReturn(300)
 
         assertThat(service.kittyBalanceCents()).isEqualTo(300)
-    }
-
-    @Test
-    fun `kittyHistory by a non-admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.kittyHistory(10, 0, member) }
     }
 
     @Test
@@ -189,61 +171,5 @@ class AccountingServiceTest {
         ).thenReturn(CoffeeConsumption(user = member, count = 0))
 
         assertThat(service.allBalances(admin).first().balanceCents).isEqualTo(0)
-    }
-
-    @Test
-    fun `a member's activity reflects only the private portion of a split expense and never the kitty portion`() {
-        // the member activity the data service projects for a split bean purchase carries only the buyer's
-        // private credit (PRIVATE_EXPENSE); the kitty-funded portion lives in the kitty history and must never
-        // appear in the member view. A 900-cent purchase split 400 private / 500 kitty: the member sees +400.
-        val privateOnly = entry(ActivityEntryType.PRIVATE_EXPENSE, 400, 400)
-        whenever(userDataService.getById(memberId)).thenReturn(member)
-        whenever(activityDataService.userActivity(memberId, "max")).thenReturn(listOf(privateOnly))
-
-        val page = service.userActivity(memberId, 10, 0, admin)
-
-        // only the private credit surfaces, valued at the private portion (400, never the 900 total or the
-        // 500 kitty portion), and no kitty entry leaks into the member view
-        assertThat(page).singleElement()
-        assertThat(page.first().type).isEqualTo(ActivityEntryType.PRIVATE_EXPENSE)
-        assertThat(page.first().amountCents).isEqualTo(400)
-        assertThat(page.first().runningBalanceCents).isEqualTo(400)
-        assertThat(page.map { it.type })
-            .doesNotContain(ActivityEntryType.KITTY_EXPENSE, ActivityEntryType.KITTY_ADJUSTMENT)
-    }
-
-    @Test
-    fun `userActivity clamps a negative offset to zero and a limit above the cap to the maximum`() {
-        // a 120-entry activity: more than the 100 cap, so the page size is clamped, and a negative offset is
-        // treated as zero (the page starts at the newest entry). The newest-first ordering is preserved.
-        val full = (1..120).map { entry(ActivityEntryType.CONSUMPTION, -50, -50L * it) }
-        whenever(userDataService.getById(memberId)).thenReturn(member)
-        whenever(activityDataService.userActivity(memberId, "max")).thenReturn(full)
-
-        val page = service.userActivity(memberId, limit = 1_000, offset = -10, actingUser = admin)
-
-        // the limit is capped at MAX_LIMIT (100); a negative offset clamps to 0, so the page starts newest
-        assertThat(page).hasSize(100)
-        // newest-first: the last (highest running balance) activity entry leads the page
-        assertThat(page.first().runningBalanceCents).isEqualTo(-6_000L)
-    }
-
-    @Test
-    fun `userActivity returns an empty page for an offset beyond the end of the activity`() {
-        val full = listOf(entry(ActivityEntryType.CONSUMPTION, -50, -50))
-        whenever(userDataService.getById(memberId)).thenReturn(member)
-        whenever(activityDataService.userActivity(memberId, "max")).thenReturn(full)
-
-        // an offset past the single entry yields an empty page rather than an error
-        assertThat(service.userActivity(memberId, limit = 10, offset = 5, actingUser = admin)).isEmpty()
-    }
-
-    @Test
-    fun `kittyHistory clamps a limit above the cap to the maximum for an admin`() {
-        val full = (1..150).map { entry(ActivityEntryType.KITTY_ADJUSTMENT, 100, 100L * it) }
-        whenever(activityDataService.kittyHistory()).thenReturn(full)
-
-        // the kitty history paginates through the same clamp: a limit above MAX_LIMIT (100) is capped
-        assertThat(service.kittyHistory(limit = 500, offset = 0, actingUser = admin)).hasSize(100)
     }
 }

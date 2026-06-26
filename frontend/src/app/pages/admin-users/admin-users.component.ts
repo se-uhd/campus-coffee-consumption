@@ -22,6 +22,7 @@ import { NotificationService } from '../../services/notification.service';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
 import { EurosPipe } from '../../pipes/euros.pipe';
+import { triggerDownload } from '../../util/download';
 import { UserBalanceDto, Role, UserDto } from '../../models';
 
 /**
@@ -527,7 +528,7 @@ export class AdminUsersComponent implements OnInit {
   /** Downloads a member's QR code as a PNG named `<loginName>.png`. */
   async downloadQr(user: UserDto): Promise<void> {
     try {
-      this.triggerDownload(await this.userService.qrBlob(user.id!), `${user.loginName}.png`);
+      triggerDownload(await this.userService.qrBlob(user.id!), `${user.loginName}.png`);
     } catch (error) {
       this.notifications.error(error, 'Could not download the QR code.');
     }
@@ -537,7 +538,7 @@ export class AdminUsersComponent implements OnInit {
   async downloadAllQr(): Promise<void> {
     this.downloadingAll = true;
     try {
-      this.triggerDownload(await this.userService.qrZipBlob(), 'coffee-qr-codes.zip');
+      triggerDownload(await this.userService.qrZipBlob(), 'coffee-qr-codes.zip');
     } catch (error) {
       this.notifications.error(error, 'Could not download the QR codes.');
     } finally {
@@ -549,24 +550,12 @@ export class AdminUsersComponent implements OnInit {
   async downloadAllQrPdf(): Promise<void> {
     this.downloadingAllPdf = true;
     try {
-      this.triggerDownload(await this.userService.qrPdfBlob(), 'coffee-qr-codes.pdf');
+      triggerDownload(await this.userService.qrPdfBlob(), 'coffee-qr-codes.pdf');
     } catch (error) {
       this.notifications.error(error, 'Could not download the QR PDF.');
     } finally {
       this.downloadingAllPdf = false;
     }
-  }
-
-  /** Triggers a browser download of [blob] under [filename] via a temporary object URL. */
-  private triggerDownload(blob: Blob, filename: string): void {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    // revoke on a later tick so it does not race the click-driven download (revoking synchronously can
-    // invalidate the URL before the browser has started fetching the blob)
-    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   /** Deletes a member, gated behind a confirmation. */
