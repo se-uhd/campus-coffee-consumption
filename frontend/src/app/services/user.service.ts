@@ -59,7 +59,7 @@ export class UserService {
     return firstValueFrom(this.http.get('/api/users/qr.zip', { responseType: 'blob' }));
   }
 
-  /** A printable PDF grid of every active member's QR code as a blob (each labelled by login name). */
+  /** A printable PDF grid of every active member's QR code as a blob (each labeled by login name). */
   qrPdfBlob(): Promise<Blob> {
     return firstValueFrom(this.http.get('/api/users/qr.pdf', { responseType: 'blob' }));
   }

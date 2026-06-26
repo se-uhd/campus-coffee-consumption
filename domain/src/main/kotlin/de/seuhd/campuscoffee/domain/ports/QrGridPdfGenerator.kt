@@ -13,7 +13,7 @@ fun interface QrGridPdfGenerator {
      * print-ready PDF. The entries are placed in order, flowing across the columns and onto further pages as
      * needed. An empty list yields a valid, effectively blank PDF rather than throwing.
      *
-     * @param entries the labelled QR images to place, in the order they should appear
+     * @param entries the labeled QR images to place, in the order they should appear
      * @return the PDF document bytes
      */
     fun gridPdf(entries: List<LabeledQrCode>): ByteArray
