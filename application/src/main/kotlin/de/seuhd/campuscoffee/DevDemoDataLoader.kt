@@ -41,7 +41,7 @@ import org.springframework.stereotype.Component
  * so a restart without a reset does not duplicate them.
  *
  * Actor attribution mirrors the fixtures: this runs outside any web request, so the `ActorProvider` finds no
- * principal and every seeded event is recorded with `created_by = "system"` (the admin/member passed as the
+ * principal and every seeded event is recorded with `created_by = "SYSTEM"` (the admin/member passed as the
  * acting user only satisfies the domain authorization checks).
  */
 @Component

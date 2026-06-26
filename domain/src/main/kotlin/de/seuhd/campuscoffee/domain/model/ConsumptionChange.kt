@@ -11,7 +11,7 @@ import java.time.LocalDateTime
  * [count] is the running total recorded by that change, [delta] the difference from the previous change
  * (`+1` or `-1` for a self-scan, the whole count for the initial insert, or the signed jump for an admin
  * override), [createdAt] when the change was recorded, [createdBy] the login name of whoever made it (the
- * member, an admin, or `"system"` for the seeded data and bootstrap), and [note] an optional admin
+ * member, an admin, or `"SYSTEM"` for the seeded data and bootstrap), and [note] an optional admin
  * annotation documenting an override (e.g. the reason for correcting a miscount).
  */
 data class ConsumptionChange(

@@ -20,8 +20,8 @@ import java.util.UUID
 
 /**
  * Integration tests for [ActivityDataServiceImpl]: the member and kitty history projections walked straight
- * from the event log. Each write is attributed to the "system" actor (no SecurityContext in a data test),
- * so a consumption write is an "owner step" when the activity is read with ownerLogin = "system". These drive
+ * from the event log. Each write is attributed to the "SYSTEM" actor (no SecurityContext in a data test),
+ * so a consumption write is an "owner step" when the activity is read with ownerLogin = "SYSTEM". These drive
  * the INSERT/UPDATE/DELETE branches of the expense and payment walks, the owner-undo and admin-override
  * consumption branches, and the price-at-time valuation.
  */
@@ -38,7 +38,7 @@ class ActivityDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationT
     @Autowired
     private lateinit var paymentDataService: PaymentDataService
 
-    private val systemActor = "system"
+    private val systemActor = "SYSTEM"
 
     // The base clearDatabase (run before each test) deletes consumptions and users, but the expense and
     // payment FKs to users are RESTRICT, so clear those (and the independent price) after each test to leave

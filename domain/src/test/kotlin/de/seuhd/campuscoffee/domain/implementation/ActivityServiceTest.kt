@@ -70,7 +70,7 @@ class ActivityServiceTest {
             type = ActivityEntryType.CONSUMPTION,
             id = UUID.randomUUID(),
             createdAt = LocalDateTime.now(),
-            actorLogin = "system",
+            actorLogin = "SYSTEM",
             subjectUserId = subjectUserId,
             subjectLogin = subjectUserId?.let { "max" },
             subjectName = null,
