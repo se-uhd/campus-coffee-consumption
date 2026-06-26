@@ -5,6 +5,7 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.StartupTask
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
@@ -48,6 +49,7 @@ import org.springframework.stereotype.Component
 class DevDemoDataLoader(
     private val userService: UserService,
     private val coffeeConsumptionService: CoffeeConsumptionService,
+    private val coffeePriceService: CoffeePriceService,
     private val expenseService: ExpenseService,
     private val paymentService: PaymentService
 ) : StartupTask {
@@ -130,6 +132,9 @@ class DevDemoDataLoader(
         // Placed after the kitty float and all deposits above, so the kitty portion these draw (only the
         // kitty-only and the split contribute) is covered and the kitty stays >= 0.
         seedPrimaryDemoMemberAdminExpenses(admin)
+        // a price change and an admin count correction so the admin global activity feed shows a PRICE_CHANGE
+        // row and an admin-override consumption row (every activity type appears on a fresh dev start)
+        seedPriceChangeAndCorrection(admin)
         // an extra active member with no history at all, to demo the empty activity/change-log state
         createMember(EMPTY_DEMO_MEMBER)
         log.info {
@@ -265,10 +270,38 @@ class DevDemoDataLoader(
         }
     }
 
+    /**
+     * Raises the global price once and applies an admin absolute count correction to the primary demo member,
+     * so the admin global activity feed has a `PRICE_CHANGE` row and an admin-override consumption row (the two
+     * activity kinds the per-member and kitty seeds never produce). Both are recorded by the system actor
+     * (this runs outside a web request), so they sit on top of the existing seeded history.
+     *
+     * @param admin the resolved fixture admin, acting for the admin-only price change and count correction
+     */
+    private fun seedPriceChangeAndCorrection(admin: User) {
+        coffeePriceService.setPrice(DEMO_NEW_PRICE_CENTS, admin)
+        val member = userService.getByLoginName(PRIMARY_DEMO_LOGIN)
+        coffeeConsumptionService.setTotal(
+            member.persistedId,
+            PRIMARY_DEMO_COFFEES + DEMO_CORRECTION_DELTA,
+            "demo admin count correction",
+            admin
+        )
+        log.info {
+            "Seeded a price change (to ${DEMO_NEW_PRICE_CENTS}c) and an admin count correction " +
+                "(+$DEMO_CORRECTION_DELTA on $PRIMARY_DEMO_LOGIN) for the global activity feed."
+        }
+    }
+
     private companion object {
         // runs after the fixture reset+seed (200) and the price seed (250), so a price is in effect before
         // any demo coffee is added and the demo members layer on top of the seeded fixtures
         private const val ORDER = 260
+
+        // a one-off price change and an admin count correction, so the admin global activity feed exercises
+        // the PRICE_CHANGE row and the admin-override consumption row on a fresh dev start
+        private const val DEMO_NEW_PRICE_CENTS = 60
+        private const val DEMO_CORRECTION_DELTA = 2
 
         // the seeded fixture admin, resolved to satisfy the admin-only deposit and kitty operations
         private const val ADMIN_LOGIN = "jane_doe"

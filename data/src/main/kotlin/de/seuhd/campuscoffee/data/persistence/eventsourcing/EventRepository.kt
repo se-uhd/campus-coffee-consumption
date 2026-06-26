@@ -93,6 +93,21 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
     fun findKittyStream(): List<EventEntity>
 
     /**
+     * Returns the whole-installation activity stream in append order: every consumption, expense, payment, and
+     * price change (everything except the mutable user records), ordered by `seq` so the single global walk
+     * reads one ordered stream. This is the all-members, all-types superset of [findUserActivity] and
+     * [findKittyStream]; the price events are included so the global feed can show price-change rows (the walk
+     * still values coffees from the price timeline, never from these inline rows).
+     */
+    @Query(
+        value =
+            "SELECT * FROM events WHERE " +
+                "entity_type IN ('CoffeeConsumption', 'Expense', 'Payment', 'CoffeePrice') ORDER BY seq ASC",
+        nativeQuery = true
+    )
+    fun findActivityStream(): List<EventEntity>
+
+    /**
      * Whether the log already holds at least one event for the given domain type, so the import can skip it.
      *
      * @param entityType the entity type label (the [LoggedEntityType] label stored in `entity_type`)

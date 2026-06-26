@@ -5,6 +5,7 @@ import de.seuhd.campuscoffee.api.dtos.UserBalanceDto
 import de.seuhd.campuscoffee.api.mapper.AccountingDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
 import de.seuhd.campuscoffee.domain.ports.api.AccountingService
+import de.seuhd.campuscoffee.domain.ports.api.ActivityService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -27,6 +28,7 @@ import java.util.UUID
 @RequestMapping("/users")
 class AdminAccountingController(
     private val accountingService: AccountingService,
+    private val activityService: ActivityService,
     private val accountingDtoMapper: AccountingDtoMapper,
     private val currentUserProvider: CurrentUserProvider
 ) {
@@ -60,7 +62,7 @@ class AdminAccountingController(
             // the admin-by-id activity exposes the kitty-funded portion of a split expense (the member-serving
             // /api/activity does not, see AccountingService.userActivity)
             accountingDtoMapper.toEntryDtos(
-                accountingService.userActivity(
+                activityService.memberActivity(
                     userId,
                     page.limitOr(DEFAULT_LIMIT),
                     page.offset,

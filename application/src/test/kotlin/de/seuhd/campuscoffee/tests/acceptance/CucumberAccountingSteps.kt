@@ -1,8 +1,10 @@
 package de.seuhd.campuscoffee.tests.acceptance
 
 import de.seuhd.campuscoffee.api.dtos.DepositRequestDto
+import de.seuhd.campuscoffee.api.dtos.GlobalActivityEntryDto
 import de.seuhd.campuscoffee.api.dtos.PriceUpdateDto
 import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
+import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
@@ -88,5 +90,35 @@ class CucumberAccountingSteps(
                 .returnResult<UserSummaryDto>()
                 .responseBody!!
         assertThat(summary.balanceCents).isEqualTo(balanceCents.toLong())
+    }
+
+    @Then("the global activity feed shows a {word} entry for the member")
+    fun theGlobalFeedShowsAnEntryForTheMember(type: String) {
+        val entries =
+            client()
+                .get()
+                .uri("/api/users/activity")
+                .accept(MediaType.APPLICATION_JSON)
+                .withAdmin()
+                .exchange()
+                .returnResult<Array<GlobalActivityEntryDto>>()
+                .responseBody!!
+        assertThat(entries)
+            .anyMatch { it.type == ActivityEntryType.valueOf(type) && it.subjectLogin == member }
+    }
+
+    @Then("the activity CSV downloads with a UTF-8 BOM listing the member")
+    fun theActivityCsvDownloads() {
+        val result =
+            client()
+                .get()
+                .uri("/api/users/activity.csv")
+                .withAdmin()
+                .exchange()
+                .returnResult<ByteArray>()
+        assertThat(result.status.value()).isEqualTo(200)
+        val bytes = result.responseBody!!
+        assertThat(bytes.copyOfRange(0, 3)).isEqualTo(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
+        assertThat(bytes.decodeToString()).contains(member)
     }
 }

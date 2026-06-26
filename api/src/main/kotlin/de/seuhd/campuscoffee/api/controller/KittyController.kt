@@ -8,6 +8,7 @@ import de.seuhd.campuscoffee.api.mapper.AccountingDtoMapper
 import de.seuhd.campuscoffee.api.mapper.PaymentDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
 import de.seuhd.campuscoffee.domain.ports.api.AccountingService
+import de.seuhd.campuscoffee.domain.ports.api.ActivityService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -35,6 +36,7 @@ import org.springframework.web.bind.annotation.ResponseStatus
 @RequestMapping("/kitty")
 class KittyController(
     private val accountingService: AccountingService,
+    private val activityService: ActivityService,
     private val accountingDtoMapper: AccountingDtoMapper,
     private val paymentService: PaymentService,
     private val paymentDtoMapper: PaymentDtoMapper,
@@ -51,7 +53,7 @@ class KittyController(
         @Valid @ParameterObject page: PageQuery
     ): ResponseEntity<KittyDto> {
         val admin = currentUserProvider.currentUser()
-        val entries = accountingService.kittyHistory(page.limitOr(HISTORY_LIMIT), page.offset, admin)
+        val entries = activityService.kittyHistory(page.limitOr(HISTORY_LIMIT), page.offset, admin)
         return ResponseEntity.ok(accountingDtoMapper.toKittyDto(accountingService.kittyBalanceCents(), entries))
     }
 

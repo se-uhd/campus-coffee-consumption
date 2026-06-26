@@ -61,6 +61,13 @@ export const routes: Routes = [
       import('./pages/admin-kitty/admin-kitty.component').then((m) => m.AdminKittyComponent)
   },
   {
+    path: 'admin/activity',
+    title: 'Activity (SE@UHD)',
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./pages/admin-activity/admin-activity.component').then((m) => m.AdminActivityComponent)
+  },
+  {
     path: 'admin/profile',
     title: 'Profile (SE@UHD)',
     canActivate: [adminGuard],

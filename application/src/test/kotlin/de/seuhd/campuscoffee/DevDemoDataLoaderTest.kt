@@ -6,6 +6,7 @@ import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
@@ -31,11 +32,18 @@ import java.util.UUID
 class DevDemoDataLoaderTest {
     private val userService = mock<UserService>()
     private val coffeeConsumptionService = mock<CoffeeConsumptionService>()
+    private val coffeePriceService = mock<CoffeePriceService>()
     private val expenseService = mock<ExpenseService>()
     private val paymentService = mock<PaymentService>()
 
     private val loader =
-        DevDemoDataLoader(userService, coffeeConsumptionService, expenseService, paymentService)
+        DevDemoDataLoader(
+            userService,
+            coffeeConsumptionService,
+            coffeePriceService,
+            expenseService,
+            paymentService
+        )
 
     private val admin =
         User(

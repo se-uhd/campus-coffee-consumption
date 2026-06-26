@@ -1,8 +1,11 @@
+@file:Suppress("TooManyFunctions")
+
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
 import de.seuhd.campuscoffee.domain.model.ActivityEntry
 import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.model.CancellableIncrement
+import de.seuhd.campuscoffee.domain.model.GlobalActivityEntry
 import de.seuhd.campuscoffee.domain.model.PriceChange
 import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -49,6 +52,12 @@ private fun uuidBody(
     key: String
 ): UUID = UUID.fromString(requireNotNull(event.body?.get(key)) { "An event body must carry $key." }.toString())
 
+/** Reads an optional UUID field from an event body; null if absent (e.g. a kitty adjustment has no userId). */
+private fun optionalUuidBody(
+    event: EventEntity,
+    key: String
+): UUID? = event.body?.get(key)?.let { UUID.fromString(it.toString()) }
+
 /**
  * The event's append position. `seq` is assigned by the identity column at INSERT, not at commit, and price
  * changes and `+1` consumptions are not serialized by a lock, so two concurrent unlocked transactions could
@@ -81,7 +90,7 @@ private fun actorOf(event: EventEntity): String = event.createdBy ?: SYSTEM_ACTO
  * differ only in the body field and the per-entity memory.
  *
  * @param event the event being walked
- * @param key the body field holding the value (`privateAmountCents` or `amountCents`)
+ * @param key the body field holding the value (`privateAmountCents`, `kittyAmountCents`, or `amountCents`)
  * @param last the per-entity memory of the last value, keyed on the body id
  */
 private fun deltaEffect(
@@ -121,11 +130,315 @@ private fun priceAsOf(
     return resolved
 }
 
+/** Which money event a [WalkedRecord] came from, so each view can pick its public [ActivityEntryType]. */
+private enum class WalkedKind {
+    /** A coffee `+1` or an admin count override (any non-undo count change). */
+    CONSUMPTION,
+
+    /** A member's own undo of a recent coffee within the grace period. */
+    CONSUMPTION_CANCEL,
+
+    /** A bean purchase; the member feed reads its private portion, the kitty feed its kitty portion. */
+    EXPENSE,
+
+    /** A member paid money in (credits the member and feeds the kitty). */
+    DEPOSIT,
+
+    /** A pure admin kitty adjustment (no member). */
+    KITTY_ADJUSTMENT,
+
+    /** The global price was changed (no balance effect; a display row only). */
+    PRICE_CHANGE
+}
+
+/**
+ * One event interpreted by [ActivityWalk]: the subject member it concerns and its signed effect on that
+ * member's balance and/or the kitty, with both running balances after, plus the metadata each view needs. A
+ * field is null where the event does not touch it (no member effect, no kitty effect, no count, and so on).
+ * Each view maps a record to its public shape and assigns the [ActivityEntryType] from [kind].
+ */
+private data class WalkedRecord(
+    val event: EventEntity,
+    val kind: WalkedKind,
+    val subjectUserId: UUID?,
+    val memberEffect: Long?,
+    val memberBalance: Long?,
+    val kittyEffect: Long?,
+    val kittyBalance: Long?,
+    val count: Int? = null,
+    val delta: Int? = null,
+    val weightGrams: Int? = null,
+    val privatePortion: Long? = null,
+    val kittyPortion: Long? = null,
+    val priceAmountCents: Int? = null
+)
+
+/**
+ * The single shared walk over a `seq`-ordered event stream that backs all three activity views. It maintains
+ * per-subject balances and increment-price LIFO stacks and the one kitty balance, valuing each coffee at the
+ * price in effect at its append position ([priceAsOf] over the precomputed [prices] timeline, never the inline
+ * price events). [accept] folds one event and returns its interpreted [WalkedRecord], or null when the event
+ * changes nothing (a zero-delta consumption). It is fed a bounded per-member stream for the member feed, the
+ * kitty stream for the kitty history, and the whole log for the global feed; keying every accumulator per
+ * subject makes those views agree event-for-event with the previous per-member and kitty walks even when
+ * members interleave.
+ *
+ * @param prices the price timeline, ascending by append position
+ * @param subjectLogin the login of a subject id, to tell a member's own coffee (credited at the original price
+ *   on undo) from an admin override; null for an unknown or hard-deleted subject (treated as never-owner) or
+ *   where ownership is irrelevant (the kitty walk, which carries no consumptions)
+ */
+@Suppress("UndocumentedFunction", "UndocumentedFunctionParameter")
+private class ActivityWalk(
+    private val prices: List<PricePoint>,
+    private val subjectLogin: (UUID) -> String?
+) {
+    private val memberBalances = HashMap<UUID, Long>()
+    private var kittyBalance = 0L
+    private val prevCount = HashMap<UUID, Int>()
+    private val incrementPrices = HashMap<UUID, ArrayDeque<Int>>()
+    private val lastExpensePrivate = HashMap<UUID, Int>()
+    private val lastExpenseKitty = HashMap<UUID, Int>()
+    private val lastPayment = HashMap<UUID, Int>()
+
+    /** Folds one event into the accumulators and returns its record, or null if nothing changed. */
+    fun accept(event: EventEntity): WalkedRecord? =
+        when (LoggedEntityType.ofLabel(requireNotNull(event.entityType))) {
+            LoggedEntityType.COFFEE_CONSUMPTION -> consumption(event)
+            LoggedEntityType.EXPENSE -> expense(event)
+            LoggedEntityType.PAYMENT -> payment(event)
+            LoggedEntityType.COFFEE_PRICE -> priceChange(event)
+            // a User event never reaches an activity stream; listed (not `else`) so a new type forces a decision
+            LoggedEntityType.USER -> null
+        }
+
+    private fun consumption(event: EventEntity): WalkedRecord? {
+        val subject = uuidBody(event, "userId")
+        val count = intBody(event, "count") ?: 0
+        val delta = count - (prevCount[subject] ?: 0)
+        prevCount[subject] = count
+        if (delta == 0) {
+            return null
+        }
+        val seq = seqOf(event)
+        val stack = incrementPrices.getOrPut(subject) { ArrayDeque() }
+        val byOwner = actorOf(event) == subjectLogin(subject)
+        val (kind, effect) =
+            when {
+                byOwner && delta == 1 -> {
+                    val price = priceAsOf(seq, prices)
+                    stack.addLast(price)
+                    WalkedKind.CONSUMPTION to -price.toLong()
+                }
+                byOwner && delta == -1 -> {
+                    // an owner undo normally pops its exact stacked price; a missing one (e.g. fixtures seeded
+                    // a coffee as the system actor, so an owner undo finds no own increment) falls back to the
+                    // as-of price, which equals the increment price within the short grace window in practice
+                    val price = stack.removeLastOrNull() ?: priceAsOf(seq, prices)
+                    WalkedKind.CONSUMPTION_CANCEL to price.toLong()
+                }
+                else -> {
+                    // an admin override (any delta): value the whole jump as a lump at the override-time price;
+                    // a lowering override also drops that many outstanding owner increments so a later undo
+                    // cannot credit a stale price and a member cannot undo an admin-added cup
+                    val price = priceAsOf(seq, prices)
+                    if (delta < 0) {
+                        repeat(minOf(-delta, stack.size)) { stack.removeLast() }
+                    }
+                    WalkedKind.CONSUMPTION to -delta.toLong() * price
+                }
+            }
+        val balance = (memberBalances[subject] ?: 0L) + effect
+        memberBalances[subject] = balance
+        return WalkedRecord(
+            event = event,
+            kind = kind,
+            subjectUserId = subject,
+            memberEffect = effect,
+            memberBalance = balance,
+            kittyEffect = null,
+            kittyBalance = null,
+            count = count,
+            delta = delta
+        )
+    }
+
+    private fun expense(event: EventEntity): WalkedRecord {
+        val subject = uuidBody(event, "buyerUserId")
+        // compute both portions every time so each per-entity memory stays current even when one portion is 0
+        val privateEffect = deltaEffect(event, "privateAmountCents", lastExpensePrivate)
+        val kittyEffect = -deltaEffect(event, "kittyAmountCents", lastExpenseKitty)
+        val memberBalanceAfter =
+            if (privateEffect != 0) {
+                (memberBalances[subject] ?: 0L).plus(privateEffect).also { memberBalances[subject] = it }
+            } else {
+                null
+            }
+        val kittyBalanceAfter =
+            if (kittyEffect != 0) {
+                kittyBalance += kittyEffect
+                kittyBalance
+            } else {
+                null
+            }
+        val (privatePortion, kittyPortion) = splitPortions(event)
+        return WalkedRecord(
+            event = event,
+            kind = WalkedKind.EXPENSE,
+            subjectUserId = subject,
+            memberEffect = if (privateEffect != 0) privateEffect.toLong() else null,
+            memberBalance = memberBalanceAfter,
+            kittyEffect = if (kittyEffect != 0) kittyEffect.toLong() else null,
+            kittyBalance = kittyBalanceAfter,
+            weightGrams = intBody(event, "weightGrams"),
+            privatePortion = privatePortion,
+            kittyPortion = kittyPortion
+        )
+    }
+
+    private fun payment(event: EventEntity): WalkedRecord {
+        val amountDelta = deltaEffect(event, "amountCents", lastPayment).toLong()
+        val subject = optionalUuidBody(event, "userId")
+        return if (subject != null) {
+            // a deposit credits the member and feeds the kitty by the same amount
+            val memberBalanceAfter =
+                (memberBalances[subject] ?: 0L).plus(amountDelta).also {
+                    memberBalances[subject] =
+                        it
+                }
+            kittyBalance += amountDelta
+            WalkedRecord(
+                event = event,
+                kind = WalkedKind.DEPOSIT,
+                subjectUserId = subject,
+                memberEffect = amountDelta,
+                memberBalance = memberBalanceAfter,
+                kittyEffect = amountDelta,
+                kittyBalance = kittyBalance
+            )
+        } else {
+            kittyBalance += amountDelta
+            WalkedRecord(
+                event = event,
+                kind = WalkedKind.KITTY_ADJUSTMENT,
+                subjectUserId = null,
+                memberEffect = null,
+                memberBalance = null,
+                kittyEffect = amountDelta,
+                kittyBalance = kittyBalance
+            )
+        }
+    }
+
+    private fun priceChange(event: EventEntity): WalkedRecord =
+        WalkedRecord(
+            event = event,
+            kind = WalkedKind.PRICE_CHANGE,
+            subjectUserId = null,
+            memberEffect = null,
+            memberBalance = null,
+            kittyEffect = null,
+            kittyBalance = null,
+            priceAmountCents = intBody(event, "amountCents")
+        )
+}
+
+/**
+ * Maps a walked record to a member-feed entry (the member's running balance). Only reached for records with a
+ * member effect on a member's own stream, so the kitty-only kinds never occur.
+ */
+private fun WalkedRecord.toMemberEntry(): ActivityEntry =
+    ActivityEntry(
+        type =
+            when (kind) {
+                WalkedKind.CONSUMPTION -> ActivityEntryType.CONSUMPTION
+                WalkedKind.CONSUMPTION_CANCEL -> ActivityEntryType.CONSUMPTION_CANCEL
+                WalkedKind.EXPENSE -> ActivityEntryType.PRIVATE_EXPENSE
+                WalkedKind.DEPOSIT -> ActivityEntryType.DEPOSIT
+                WalkedKind.KITTY_ADJUSTMENT, WalkedKind.PRICE_CHANGE ->
+                    error("A member activity feed never carries a $kind record.")
+            },
+        id = idOf(event),
+        createdAt = createdAtOf(event),
+        createdBy = actorOf(event),
+        note = event.note,
+        amountCents = requireNotNull(memberEffect),
+        runningBalanceCents = requireNotNull(memberBalance),
+        count = count,
+        delta = delta,
+        weightGrams = weightGrams,
+        privateAmountCents = privatePortion,
+        kittyAmountCents = kittyPortion
+    )
+
+/**
+ * Maps a walked record to a kitty-history entry (the kitty running balance). Only reached for records with a
+ * kitty effect on the kitty stream, so the consumption and price kinds never occur.
+ */
+private fun WalkedRecord.toKittyEntry(): ActivityEntry =
+    ActivityEntry(
+        type =
+            when (kind) {
+                WalkedKind.DEPOSIT -> ActivityEntryType.DEPOSIT
+                WalkedKind.KITTY_ADJUSTMENT -> ActivityEntryType.KITTY_ADJUSTMENT
+                WalkedKind.EXPENSE -> ActivityEntryType.KITTY_EXPENSE
+                WalkedKind.CONSUMPTION, WalkedKind.CONSUMPTION_CANCEL, WalkedKind.PRICE_CHANGE ->
+                    error("A kitty history never carries a $kind record.")
+            },
+        id = idOf(event),
+        createdAt = createdAtOf(event),
+        createdBy = actorOf(event),
+        note = event.note,
+        amountCents = requireNotNull(kittyEffect),
+        runningBalanceCents = requireNotNull(kittyBalance),
+        weightGrams = weightGrams,
+        privateAmountCents = privatePortion,
+        kittyAmountCents = kittyPortion
+    )
+
+/**
+ * Maps a walked record to a global-feed entry carrying both balances. An expense is one row of type
+ * `PRIVATE_EXPENSE` showing whichever of the member and kitty effects it moved. The subject login is stamped
+ * from [subjectLoginById]; the display name is left for the domain to resolve.
+ *
+ * @param subjectLoginById the login of each known member by id (a subject absent from it is hard-deleted)
+ */
+private fun WalkedRecord.toGlobalEntry(subjectLoginById: Map<UUID, String>): GlobalActivityEntry =
+    GlobalActivityEntry(
+        type =
+            when (kind) {
+                WalkedKind.CONSUMPTION -> ActivityEntryType.CONSUMPTION
+                WalkedKind.CONSUMPTION_CANCEL -> ActivityEntryType.CONSUMPTION_CANCEL
+                WalkedKind.EXPENSE -> ActivityEntryType.PRIVATE_EXPENSE
+                WalkedKind.DEPOSIT -> ActivityEntryType.DEPOSIT
+                WalkedKind.KITTY_ADJUSTMENT -> ActivityEntryType.KITTY_ADJUSTMENT
+                WalkedKind.PRICE_CHANGE -> ActivityEntryType.PRICE_CHANGE
+            },
+        id = idOf(event),
+        createdAt = createdAtOf(event),
+        actorLogin = actorOf(event),
+        subjectUserId = subjectUserId,
+        subjectLogin = subjectUserId?.let { subjectLoginById[it] },
+        subjectName = null,
+        note = event.note,
+        memberEffectCents = memberEffect,
+        memberBalanceCents = memberBalance,
+        kittyEffectCents = kittyEffect,
+        kittyBalanceCents = kittyBalance,
+        count = count,
+        delta = delta,
+        weightGrams = weightGrams,
+        privateAmountCents = privatePortion,
+        kittyAmountCents = kittyPortion,
+        priceAmountCents = priceAmountCents
+    )
+
 /**
  * Reads the unified-activity and balance projections straight from the append-only event log (there is no
- * activity table). It walks a member's streams oldest-first, valuing each coffee at [priceAsOf] its append
- * position, and tracks a per-member LIFO stack of increment prices so an undo credits exactly the increment
- * it reverses. Money sums use [Long]; per-event effects fit [Int].
+ * activity table). A single shared [ActivityWalk] backs all three feeds: it walks a member's bounded stream
+ * for the member feed, the kitty money stream for the kitty history, and the whole log for the admin global
+ * feed, valuing each coffee at [priceAsOf] its append position. Money sums use [Long]; per-event effects fit
+ * [Int] before widening.
  */
 @Suppress("TooManyFunctions")
 @Service
@@ -136,16 +449,40 @@ class ActivityDataServiceImpl(
         userId: UUID,
         ownerLogin: String
     ): List<ActivityEntry> {
-        val walk = UserWalk(loadPricePoints(), ownerLogin)
-        eventRepository.findUserActivity(userId.toString()).forEach { walk.accept(it) }
-        return walk.result()
+        val walk = ActivityWalk(loadPricePoints()) { if (it == userId) ownerLogin else null }
+        return eventRepository
+            .findUserActivity(userId.toString())
+            .mapNotNull { walk.accept(it) }
+            .filter { it.subjectUserId == userId && it.memberEffect != null }
+            .map { it.toMemberEntry() }
     }
 
     override fun kittyHistory(): List<ActivityEntry> {
-        val walk = KittyWalk()
-        // one SQL-ordered stream (payments + expenses by seq) instead of two type queries re-sorted in memory
-        eventRepository.findKittyStream().forEach { walk.accept(it) }
-        return walk.result()
+        // ownership is irrelevant here: the kitty stream carries no consumptions, so byOwner is never tested
+        val walk = ActivityWalk(loadPricePoints()) { null }
+        return eventRepository
+            .findKittyStream()
+            .mapNotNull { walk.accept(it) }
+            .filter { it.kittyEffect != null }
+            .map { it.toKittyEntry() }
+    }
+
+    override fun globalActivity(): List<GlobalActivityEntry> {
+        // Resolve every subject's login from the log's own User events (the complete historical set, so a
+        // hard-deleted member still resolves), not the current users read model. login_name is immutable, so a
+        // recorded login equals the one a member's own coffee was attributed to (created_by); this keeps the
+        // owner test classifying a deleted member's self-scans as CONSUMPTION/CONSUMPTION_CANCEL rather than
+        // misreading them as admin overrides, and lets the row carry the member's (immutable) login.
+        val subjectLoginById = loadSubjectLogins()
+        val walk = ActivityWalk(loadPricePoints()) { subjectLoginById[it] }
+        return eventRepository
+            .findActivityStream()
+            .mapNotNull { walk.accept(it) }
+            // drop a no-op edit that moved nothing (e.g. an expense whose note or weight changed but neither
+            // money portion did): it would be a meaningless row with both effect columns blank. A price change
+            // legitimately moves no balance, so it is kept.
+            .filter { it.memberEffect != null || it.kittyEffect != null || it.kind == WalkedKind.PRICE_CHANGE }
+            .map { it.toGlobalEntry(subjectLoginById) }
     }
 
     override fun lastCancellableIncrement(
@@ -195,240 +532,18 @@ class ActivityDataServiceImpl(
         eventRepository
             .findByEntityTypeOrderBySeqAsc(LoggedEntityType.COFFEE_PRICE.label)
             .map { PricePoint(seqOf(it), intBody(it, "amountCents") ?: 0) }
-}
 
-/**
- * Accumulates one member's activity oldest-first. Each accepted event contributes a signed effect to the
- * running [balance]; a coffee is valued at the price in effect at its append position, an owner undo credits
- * the exact price of the increment it pops off [incrementPrices], and an admin override is a lump at the
- * override-time price. Because the override is valued at the override-time price (not the per-cup prices
- * actually charged), a correction down made after a price change may not net the member's balance exactly to
- * zero; that is the documented intended rule, not a rounding bug. Only the private portion of an expense and
- * the member's own deposits affect the balance.
- */
-@Suppress("UndocumentedFunction", "UndocumentedFunctionParameter")
-private class UserWalk(
-    private val prices: List<PricePoint>,
-    private val ownerLogin: String
-) {
-    private var balance = 0L
-    private var prevCount = 0
-    private val incrementPrices = ArrayDeque<Int>()
-    private val lastExpensePrivate = HashMap<UUID, Int>()
-    private val lastDeposit = HashMap<UUID, Int>()
-    private val entries = mutableListOf<ActivityEntry>()
-
-    /** The accumulated activity oldest-first. */
-    fun result(): List<ActivityEntry> = entries
-
-    /** Applies one of the member's events, appending its activity entry (if it has any balance effect). */
-    fun accept(event: EventEntity) {
-        val entry =
-            when (LoggedEntityType.ofLabel(requireNotNull(event.entityType))) {
-                LoggedEntityType.COFFEE_CONSUMPTION -> consumption(event)
-                LoggedEntityType.EXPENSE -> expense(event)
-                LoggedEntityType.PAYMENT -> deposit(event)
-                // a member's stream never carries these; listed (not `else`) so a new type forces a decision
-                LoggedEntityType.USER, LoggedEntityType.COFFEE_PRICE -> null
-            } ?: return
-        balance += entry.amountCents
-        entries += entry.copy(runningBalanceCents = balance)
-    }
-
-    private fun consumption(event: EventEntity): ActivityEntry? {
-        val count = intBody(event, "count") ?: 0
-        val delta = count - prevCount
-        prevCount = count
-        if (delta == 0) {
-            return null
-        }
-        val seq = seqOf(event)
-        val byOwner = actorOf(event) == ownerLogin
-        return when {
-            byOwner && delta == 1 -> {
-                val price = priceAsOf(seq, prices)
-                incrementPrices.addLast(price)
-                entry(event, ActivityEntryType.CONSUMPTION, -price.toLong(), count = count, delta = delta)
-            }
-            byOwner && delta == -1 -> {
-                // an owner -1 undoes one of the member's own +1s and normally pops its exact stacked price.
-                // A missing one is reachable (e.g. dev fixtures seed coffees as the "system" actor, so an
-                // owner undo of one finds no own increment on the stack), so credit the price in effect at the
-                // undo's append position rather than failing the whole activity read. An undo lands within the
-                // short grace window of its increment, so the as-of price equals the increment price in
-                // practice; this only differs in the contrived case the exact increment is genuinely absent.
-                val price = incrementPrices.removeLastOrNull() ?: priceAsOf(seq, prices)
-                entry(event, ActivityEntryType.CONSUMPTION_CANCEL, price.toLong(), count = count, delta = delta)
-            }
-            else -> {
-                // an admin override (any delta): value the whole jump as a lump at the override-time price
-                // (Long, so a large override cannot overflow). An override that lowers the count also removes
-                // that many outstanding owner increments from the undo stack, so a later undo cannot credit a
-                // stale price and a member cannot undo an admin-added cup.
-                val price = priceAsOf(seq, prices)
-                if (delta < 0) {
-                    repeat(minOf(-delta, incrementPrices.size)) { incrementPrices.removeLast() }
-                }
-                entry(event, ActivityEntryType.CONSUMPTION, -delta.toLong() * price, count = count, delta = delta)
-            }
-        }
-    }
-
-    private fun expense(event: EventEntity): ActivityEntry? {
-        val effect = deltaEffect(event, "privateAmountCents", lastExpensePrivate)
-        // a fully kitty-funded expense (no private portion) does not touch the member's balance
-        if (effect == 0) {
-            return null
-        }
-        // carry both portions of a split purchase so the admin activity can break it down (the member-serving
-        // read path nulls them before they leave the domain, see AccountingServiceImpl). The two are present
-        // together only when there is a real kitty split; a DELETE reverses the balance and exposes none, and
-        // a fully-private expense leaves both null.
-        val (privatePortion, kittyPortion) = splitPortions(event)
-        return entry(
-            event,
-            ActivityEntryType.PRIVATE_EXPENSE,
-            effect.toLong(),
-            weightGrams = intBody(event, "weightGrams"),
-            privateAmountCents = privatePortion,
-            kittyAmountCents = kittyPortion
-        )
-    }
-
-    private fun deposit(event: EventEntity): ActivityEntry {
-        val effect = deltaEffect(event, "amountCents", lastDeposit)
-        return entry(event, ActivityEntryType.DEPOSIT, effect.toLong())
-    }
-
-    private fun entry(
-        event: EventEntity,
-        type: ActivityEntryType,
-        amountCents: Long,
-        count: Int? = null,
-        delta: Int? = null,
-        weightGrams: Int? = null,
-        privateAmountCents: Long? = null,
-        kittyAmountCents: Long? = null
-    ) = ActivityEntry(
-        type = type,
-        id = idOf(event),
-        createdAt = createdAtOf(event),
-        createdBy = actorOf(event),
-        note = event.note,
-        amountCents = amountCents,
-        runningBalanceCents = 0,
-        count = count,
-        delta = delta,
-        weightGrams = weightGrams,
-        privateAmountCents = privateAmountCents,
-        kittyAmountCents = kittyAmountCents
-    )
-}
-
-/**
- * Accumulates the kitty history oldest-first: payments (deposits and adjustments) add money, the
- * kitty-funded portion of an expense removes it. Each accepted event contributes a signed effect to the
- * running kitty [balance].
- */
-@Suppress("UndocumentedFunction", "UndocumentedFunctionParameter")
-private class KittyWalk {
-    private var balance = 0L
-    private val lastPayment = HashMap<UUID, Int>()
-    private val lastExpenseKitty = HashMap<UUID, Int>()
-    private val entries = mutableListOf<ActivityEntry>()
-
-    /** The accumulated kitty history oldest-first. */
-    fun result(): List<ActivityEntry> = entries
-
-    /** Applies one money-stream event, appending its kitty entry (if it moves the kitty). */
-    fun accept(event: EventEntity) {
-        val entry =
-            when (LoggedEntityType.ofLabel(requireNotNull(event.entityType))) {
-                LoggedEntityType.PAYMENT -> payment(event)
-                LoggedEntityType.EXPENSE -> expense(event)
-                // the kitty stream never carries these; listed (not `else`) so a new type forces a decision
-                LoggedEntityType.USER, LoggedEntityType.COFFEE_CONSUMPTION, LoggedEntityType.COFFEE_PRICE -> null
-            } ?: return
-        balance += entry.amountCents
-        entries += entry.copy(runningBalanceCents = balance)
-    }
-
-    private fun payment(event: EventEntity): ActivityEntry {
-        val id = uuidBody(event, "id")
-        val type =
-            if (event.body?.get("userId") !=
-                null
-            ) {
-                ActivityEntryType.DEPOSIT
-            } else {
-                ActivityEntryType.KITTY_ADJUSTMENT
-            }
-        val effect =
-            when (requireNotNull(event.changeType)) {
-                ChangeType.INSERT -> intBody(event, "amountCents") ?: 0
-                ChangeType.UPDATE -> (intBody(event, "amountCents") ?: 0) - (lastPayment[id] ?: 0)
-                ChangeType.DELETE -> -(lastPayment[id] ?: 0)
-            }
-        if (event.changeType ==
-            ChangeType.DELETE
-        ) {
-            lastPayment[id] = 0
-        } else {
-            lastPayment[id] = intBody(event, "amountCents") ?: 0
-        }
-        return entry(event, type, effect.toLong())
-    }
-
-    private fun expense(event: EventEntity): ActivityEntry? {
-        val id = uuidBody(event, "id")
-        val effect =
-            when (requireNotNull(event.changeType)) {
-                ChangeType.INSERT -> -(intBody(event, "kittyAmountCents") ?: 0)
-                ChangeType.UPDATE -> -((intBody(event, "kittyAmountCents") ?: 0) - (lastExpenseKitty[id] ?: 0))
-                ChangeType.DELETE -> lastExpenseKitty[id] ?: 0
-            }
-        if (event.changeType ==
-            ChangeType.DELETE
-        ) {
-            lastExpenseKitty[id] = 0
-        } else {
-            lastExpenseKitty[id] =
-                intBody(event, "kittyAmountCents") ?: 0
-        }
-        // a private-only expense (no kitty portion) does not move the kitty
-        if (effect == 0) {
-            return null
-        }
-        // carry both portions so the admin kitty history renders the same `private + kitty` split as the member
-        // activity's expense row; a DELETE only reverses the kitty draw and exposes none.
-        val (privatePortion, kittyPortion) = splitPortions(event)
-        return entry(
-            event,
-            ActivityEntryType.KITTY_EXPENSE,
-            effect.toLong(),
-            weightGrams = intBody(event, "weightGrams"),
-            privateAmountCents = privatePortion,
-            kittyAmountCents = kittyPortion
-        )
-    }
-
-    private fun entry(
-        event: EventEntity,
-        type: ActivityEntryType,
-        amountCents: Long,
-        weightGrams: Int? = null,
-        privateAmountCents: Long? = null,
-        kittyAmountCents: Long? = null
-    ) = ActivityEntry(
-        type = type,
-        id = idOf(event),
-        createdAt = createdAtOf(event),
-        createdBy = actorOf(event),
-        note = event.note,
-        amountCents = amountCents,
-        runningBalanceCents = 0,
-        weightGrams = weightGrams,
-        privateAmountCents = privateAmountCents,
-        kittyAmountCents = kittyAmountCents
-    )
+    /**
+     * The login of every member that ever existed, by id, read from the log's `User` events so a hard-deleted
+     * member still resolves. A `User` event body carries the immutable `loginName`; a DELETE body carries only
+     * the id, so it is skipped (`loginName` absent) and the map keeps the login from the create. Used by the
+     * global walk for the owner test and to stamp each row's subject login.
+     */
+    private fun loadSubjectLogins(): Map<UUID, String> =
+        eventRepository
+            .findByEntityTypeOrderBySeqAsc(LoggedEntityType.USER.label)
+            .mapNotNull { event ->
+                val login = event.body?.get("loginName")?.toString() ?: return@mapNotNull null
+                uuidBody(event, "id") to login
+            }.toMap()
 }
