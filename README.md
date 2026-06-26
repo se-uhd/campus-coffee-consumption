@@ -144,7 +144,7 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `DELETE /users/{id}`: refused (409) if the member has financial history; deactivate instead.
 - `GET /users/{id}/link`, `POST /users/{id}/link/rotate`, `GET /users/{id}/qr.png`.
 - `GET /users/qr.zip`: a streamed ZIP of every active member's QR code (one `<loginName>.png` per member).
-- `GET /users/qr.pdf`: a printable PDF grid of every active member's QR code, each labelled by login name.
+- `GET /users/qr.pdf`: a printable PDF grid of every active member's QR code, each labeled by login name.
 - `GET  /users/{id}/consumption?limit=5&offset=0`, `GET /users/{id}/activity?limit=20&offset=0`.
 - `GET /users/activity?limit=20&offset=0`: the whole-installation global activity feed (every member's coffees, purchases, and deposits, the kitty adjustments, and price changes), newest first, each row carrying the subject member, the actor, and the member and kitty running balances. Renders in the admin **Activity** page (`/admin/activity`).
 - `GET /users/activity.csv`: the same global feed as a streamed CSV download of the full dataset, with a UTF-8 BOM, ISO-8601 UTC timestamps, and raw integer euro cents.

@@ -5,6 +5,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-06-26
+
+### Fixed
+
+- Use American spelling ("labeled", not the British "labelled") consistently across the code comments, the
+  README, the changelog, the design docs, and the OpenAPI operation summary, matching the project's
+  American-English convention.
+
 ## [0.6.0] - 2026-06-26
 
 ### Added
@@ -86,7 +94,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - Add an admin "Download all QR codes (PDF sheet)" action that renders every active member's capability QR
-  code into one printable A4 PDF grid, each code labelled with the member's login name, next to the existing
+  code into one printable A4 PDF grid, each code labeled with the member's login name, next to the existing
   ZIP download (`GET /api/users/qr.pdf`, admin-only). Backed by Apache PDFBox (Apache-2.0) behind a new
   `QrGridPdfGenerator` domain port, so the PDF library stays out of the web and domain layers.
 
@@ -759,6 +767,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.6.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.6.1
 [0.6.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.6.0
 [0.5.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.5.1
 [0.5.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.5.0
