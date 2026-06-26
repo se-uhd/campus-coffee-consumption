@@ -16,6 +16,7 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
 import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import { PriceChangeDto } from '../../models';
 import { euroInputError, toCents } from '../../util/money';
+import { ActorPipe } from '../../pipes/actor.pipe';
 
 /**
  * Admin price page: shows the current price (the newest history entry) and the full price history, and lets
@@ -35,6 +36,7 @@ import { euroInputError, toCents } from '../../util/money';
     MatProgressSpinnerModule,
     EurosPipe,
     UtcDatePipe,
+    ActorPipe,
     AppHeaderComponent,
     EuroAmountDirective
   ],
@@ -99,7 +101,7 @@ import { euroInputError, toCents } from '../../util/money';
               <mat-list-item lines="2">
                 <span matListItemTitle>{{ entry.amountCents | euros }}</span>
                 <span matListItemLine class="muted">
-                  {{ entry.createdAt | utcDate | date: 'short' }} · {{ entry.createdBy }}
+                  {{ entry.createdAt | utcDate | date: 'short' }} · {{ entry.createdBy | actor }}
                 </span>
               </mat-list-item>
             } @empty {

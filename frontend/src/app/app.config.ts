@@ -14,9 +14,15 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
     provideAnimationsAsync(),
-    // Reserve a form field's subscript row only when it actually has an error to show, so a field with no
-    // visible error leaves no empty row below it. This keeps the inter-field rhythm and the gap from the
-    // last field to the submit button tight and uniform; a field grows by one line when an error appears.
-    { provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: { subscriptSizing: 'dynamic' } }
+    // Outline appearance app-wide: a bordered field with a transparent fill, so inputs read cleanly on the
+    // white cards. (The default "fill" appearance picks up the red-tinted primary-container, which made the
+    // fields look like unfinished red placeholders.) `subscriptSizing: 'dynamic'` reserves a field's subscript
+    // row only when it actually has an error to show, so a field with no visible error leaves no empty row
+    // below it, keeping the inter-field rhythm and the gap to the submit button tight; a field grows by one
+    // line when an error appears.
+    {
+      provide: MAT_FORM_FIELD_DEFAULT_OPTIONS,
+      useValue: { appearance: 'outline', subscriptSizing: 'dynamic' }
+    }
   ]
 };

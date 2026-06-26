@@ -21,12 +21,10 @@ $cc-theme: mat.define-theme(
       theme-type: light,
       primary: brand.$primary-palette,
       tertiary: brand.$tertiary-palette,
-      use-system-variables: true,
-      system-variables-prefix: sys
+      use-system-variables: true
     ),
     typography: (
-      use-system-variables: true,
-      system-variables-prefix: sys
+      use-system-variables: true
     ),
     density: (
       scale: 0
@@ -75,6 +73,13 @@ $cc-theme: mat.define-theme(
     --mat-sys-on-surface-variant: var(--cc-ink-muted);
     --mat-sys-outline-variant: var(--cc-hairline);
 
+    // The generated neutral palette is red-tinted, so the un-pinned greys (the form-field border, the
+    // snackbar) come out mauve. Pin those to the Sand-derived warm-grey family (the CD's "Warm Gray"). The
+    // selected button-toggle keeps the light-red tonal (its generated secondary-container) by preference.
+    --mat-sys-outline: #ada596;
+    --mat-sys-inverse-surface: #2b2926;
+    --mat-sys-inverse-on-surface: var(--cc-sand);
+
     // System-ui everywhere (the brand/plain families and the shorthand font tokens Material reads).
     --mat-sys-brand-font-family:
       system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -82,6 +87,14 @@ $cc-theme: mat.define-theme(
       system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
 }
+
+// Material draws no visible keyboard-focus indicator by default; add a strong one in the house red so every
+// control shows focus (WCAG 2.4.7).
+@include mat.strong-focus-indicators(
+  (
+    border-color: var(--cc-brand)
+  )
+);
 
 // ---------------------------------------------------------------------------
 // Base elements
@@ -312,8 +325,9 @@ mat-card.card h2:last-child {
   color: var(--cc-brand);
 }
 
-// A small inline chip. The brand-tinted variant marks an ADMIN role with the M3 primary-container tokens;
-// the neutral variant (`.cc-chip--neutral`) marks a plain USER role on the sand surface.
+// A small inline role badge in the members table. The brand variant marks an ADMIN role in the light-red
+// tonal (the same soft accent as the selected tabs and the add-coffee button); the neutral variant
+// (`.cc-chip--neutral`) marks a plain USER role on the sand surface.
 .cc-chip {
   display: inline-block;
   padding: 2px 8px;
@@ -330,9 +344,23 @@ mat-card.card h2:last-child {
   color: var(--cc-ink-muted);
 }
 
-// Give the primary FAB a clear pressed/hover emphasis in the darker brand tone.
+// The add-coffee FAB keeps the M3 light-red tonal fill at rest (a soft, friendly accent for the most-tapped
+// member action), deepening to the darker brand tone on hover/press.
 .mat-mdc-fab.mat-primary:hover {
   --mat-fab-container-color: var(--cc-brand-dark);
+}
+
+// In an open select/autocomplete panel the selected option takes the same light-red tonal fill as the
+// selected filter tabs, on the white panel. Drop the strong-focus-indicator box on options too: each option
+// already shows keyboard focus via its own active highlight, so the box only added a heavy red rectangle.
+.mat-mdc-select-panel .mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled),
+.mat-mdc-autocomplete-panel .mat-mdc-option.mdc-list-item--selected:not(.mdc-list-item--disabled) {
+  background-color: var(--mat-sys-primary-container);
+}
+
+.mat-mdc-select-panel .mat-focus-indicator::before,
+.mat-mdc-autocomplete-panel .mat-focus-indicator::before {
+  display: none;
 }
 
 // A neutral FAB for a non-destructive secondary control (the admin −1 step). It is NOT `color="warn"`: the
