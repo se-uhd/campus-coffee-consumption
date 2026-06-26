@@ -5,6 +5,42 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Aligned the Material theme with the official Universität Heidelberg corporate design. Every primary control
+  now resolves to the exact house red (Pantone 1805 C, #C61826) instead of the tonal palette's rounded
+  #bd0e21; cards are white on the Sand background; and the neutral greys (form-field borders, dividers, the
+  snackbar) are warm greys rather than the red-tinted ones the generated palette produced. The fix was a
+  corrected Material system-variable prefix plus a thin set of brand-token overrides. The soft light red is
+  kept as the selected-state accent: the activity-filter tabs, the add-coffee button, the selected dropdown
+  option, and the Admin role badge.
+- Renamed the automated event actor from "system" to "SYSTEM" everywhere it is recorded and shown (the actor
+  providers, the event log, and every activity view), so the non-member actor stands out from member and
+  admin logins. The frontend reads it through one shared pipe, and any legacy lowercase "system" row still
+  displays as "SYSTEM". The value is only a label, so the rename is behavior-preserving.
+- The admin Activity and Members tables size their columns by percentage under a fixed table layout, so the
+  proportions hold at any width and the columns no longer re-measure (and shift) when "Load more" appends
+  rows. The activity "By" column, which shows only a login, is narrower than the member-name column.
+- Every consumption row shows its cup delta in parentheses, including a normal single coffee (+1), matching
+  how a cancel (-1) and an admin correction (for example +45) were already annotated.
+
+### Fixed
+
+- "Load more" no longer shows a button with nothing left to load. The activity feeds peek one row past the
+  page, so the button reflects whether more rows actually remain instead of guessing from a full page (which
+  left a dead button whenever the total was an exact multiple of the page size).
+- Keyboard focus is visible again on every control (a house-red focus ring), restoring the WCAG 2.4.7
+  indicator the Material theme was drawing none of.
+- A negative member balance renders in red again rather than near-black.
+
+### Added
+
+- An end-to-end test that pins the resolved Material theme tokens to the house colors, so a future theme edit
+  that breaks the brand (the off-brand red, the pink surfaces) fails the build instead of shipping.
+- Unit tests for the activity pagination helper covering the one-row peek and the boundary de-duplication.
+
 ## [0.6.1] - 2026-06-26
 
 ### Fixed

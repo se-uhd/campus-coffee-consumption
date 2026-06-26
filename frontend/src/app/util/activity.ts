@@ -40,3 +40,25 @@ export function appendActivityPage<T extends { id: string }>(
   const fresh = next.filter((entry) => !seen.has(entry.id));
   return { entries: [...existing, ...fresh], appended: fresh.length };
 }
+
+/**
+ * Loads an activity page with a one-row peek, so "Load more" reflects whether anything actually remains. It
+ * requests `pageSize + 1` rows, appends up to `pageSize` new ones (de-duplicated by id via
+ * {@link appendActivityPage}), and reads `hasMore` from the presence of that extra peeked row. This replaces
+ * the unreliable "the page came back full" guess, which leaves a dud "Load more" whenever the total is an
+ * exact multiple of the page size (clicking it then fetches nothing).
+ *
+ * @param existing the entries already loaded (empty for the first page), newest first
+ * @param pageSize the display page size
+ * @param fetchPage fetches a page given a limit and an offset, newest first as the API returns
+ * @returns the merged entries (grown by at most `pageSize`) and whether a further page remains
+ */
+export async function loadActivityPage<T extends { id: string }>(
+  existing: T[],
+  pageSize: number,
+  fetchPage: (limit: number, offset: number) => Promise<T[]>
+): Promise<{ entries: T[]; hasMore: boolean }> {
+  const fetched = await fetchPage(pageSize + 1, existing.length);
+  const { entries } = appendActivityPage(existing, fetched.slice(0, pageSize));
+  return { entries, hasMore: fetched.length > pageSize };
+}

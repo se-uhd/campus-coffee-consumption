@@ -17,7 +17,7 @@ import { CollapsibleCardComponent } from '../../components/collapsible-card/coll
 import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import { KittyDto, ActivityEntryDto, UserDto } from '../../models';
 import { euroInputError, toCents } from '../../util/money';
-import { appendActivityPage } from '../../util/activity';
+import { loadActivityPage } from '../../util/activity';
 
 /** The page size for one kitty-history page; "Load more" appends another page of this size. */
 const PAGE_SIZE = 20;
@@ -222,10 +222,10 @@ export class AdminKittyComponent implements OnInit {
     this.loadError = '';
     try {
       this.users = await this.userService.list();
-      const kitty = await this.kittyService.history(PAGE_SIZE, 0);
+      const kitty = await this.kittyService.history(PAGE_SIZE + 1, 0);
       this.kitty = kitty;
-      this.entries = kitty.entries;
-      this.hasMore = kitty.entries.length === PAGE_SIZE;
+      this.entries = kitty.entries.slice(0, PAGE_SIZE);
+      this.hasMore = kitty.entries.length > PAGE_SIZE;
     } catch {
       this.loadError = 'Could not load the kitty.';
     } finally {
@@ -237,12 +237,11 @@ export class AdminKittyComponent implements OnInit {
   async loadMore(): Promise<void> {
     this.loadingMore = true;
     try {
-      const next = await this.kittyService.history(PAGE_SIZE, this.entries.length);
-      const { entries, appended } = appendActivityPage(this.entries, next.entries);
+      const { entries, hasMore } = await loadActivityPage(this.entries, PAGE_SIZE, (limit, offset) =>
+        this.kittyService.history(limit, offset).then((page) => page.entries)
+      );
       this.entries = entries;
-      // base "Load more" on the rows actually gained: a full page that collapsed to fewer new rows (its
-      // boundary row was a duplicate) means there is nothing more to fetch
-      this.hasMore = appended === PAGE_SIZE;
+      this.hasMore = hasMore;
     } catch (error) {
       this.notifications.error(error, 'Could not load more history.');
     } finally {

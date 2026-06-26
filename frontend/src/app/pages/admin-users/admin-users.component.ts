@@ -332,8 +332,43 @@ interface MemberRow {
         margin: 16px 0 0;
       }
 
+      /* Fixed layout with percentage columns (summing to 100%), matching the activity table: the widths are
+         honoured exactly, the table fills its card and scrolls below the min-width, and the columns no longer
+         re-measure (and shift) when "Load more" appends rows. */
+      table.mat-mdc-table {
+        min-width: 600px;
+        table-layout: fixed;
+      }
+
+      .mat-column-view {
+        width: 8%;
+      }
+
+      .mat-column-name {
+        width: 21%;
+      }
+
+      .mat-column-role {
+        width: 15%;
+      }
+
+      .mat-column-count {
+        width: 10%;
+      }
+
+      .mat-column-balance {
+        width: 14%;
+      }
+
+      .mat-column-actions {
+        width: 32%;
+      }
+
+      /* The actions column holds fixed-size controls (a toggle and icon buttons), not text, so it must never
+         ellipsize them the way the data table truncates a text cell. */
       .col-actions {
         white-space: nowrap;
+        overflow: visible;
       }
 
       /* The slide-toggle is shorter than the icon buttons, so align every action item to a common vertical
@@ -348,9 +383,9 @@ interface MemberRow {
         margin-left: 4px;
       }
 
-      /* The leading "View profile" column hugs its single icon button so the name column starts right after. */
+      /* The leading "View profile" column holds a single icon button; keep its content tight against the name
+         column (its width is set by .mat-column-view above). */
       .col-view {
-        width: 1%;
         white-space: nowrap;
         padding-right: 0;
       }
