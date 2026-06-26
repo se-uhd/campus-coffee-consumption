@@ -40,7 +40,7 @@ class ConsumptionHistoryDataServiceImplTest {
         val id = UUID.randomUUID()
         // newest first: counts 2, 1, 0; the helper fetches limit+1 so the page can see the predecessor
         whenever(eventRepository.findHistory(any(), eq(id.toString()), any(), any()))
-            .thenReturn(listOf(event(2, "max"), event(1, "max"), event(0, "system")))
+            .thenReturn(listOf(event(2, "max"), event(1, "max"), event(0, "SYSTEM")))
 
         val changes = service.changes(id, 2, 0)
 
@@ -71,7 +71,7 @@ class ConsumptionHistoryDataServiceImplTest {
         assertThat(changes).singleElement().satisfies({
             assertThat(it.count).isEqualTo(0)
             assertThat(it.delta).isEqualTo(0)
-            assertThat(it.createdBy).isEqualTo("system")
+            assertThat(it.createdBy).isEqualTo("SYSTEM")
             assertThat(it.note).isEqualTo("a note")
         })
     }

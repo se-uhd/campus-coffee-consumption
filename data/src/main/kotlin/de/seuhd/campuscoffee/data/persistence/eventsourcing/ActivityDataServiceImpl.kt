@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service
 import java.time.LocalDateTime
 import java.util.UUID
 
-private const val SYSTEM_ACTOR = "system"
+private const val SYSTEM_ACTOR = "SYSTEM"
 
 private val log = KotlinLogging.logger {}
 
