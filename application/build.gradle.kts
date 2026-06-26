@@ -1,6 +1,7 @@
 import com.github.gradle.node.npm.task.NpmTask
 import info.solidsoft.gradle.pitest.PitestPluginExtension
 import org.springframework.boot.gradle.tasks.bundling.BootJar
+import org.springframework.boot.gradle.tasks.run.BootRun
 
 plugins {
     id("de.seuhd.campuscoffee.java-conventions")
@@ -201,6 +202,27 @@ tasks.named<BootJar>("bootJar") {
     from(rootProject.file("frontend/dist/frontend/browser")) {
         into("BOOT-INF/classes/static")
     }
+}
+
+// `bootRun` serves static resources straight off the classpath; unlike `bootJar` it does NOT bundle the
+// SPA, so a plain `gradle :application:bootRun` would serve only the API and 404 every SPA route (e.g. the
+// root returns the JSON "No endpoint found for '/index.html'"). Build the SPA and place it on bootRun's
+// classpath under `static/`, so the dev run serves the full app on :8080 exactly like the jar.
+//
+// Wired to `bootRun` ONLY, never to processResources/classes, so a bare `gradle test` (which triggers
+// processResources) still skips the npm build and stays fast. It honors `-PskipFrontendBuild` the same way
+// bootJar does. For live frontend reload, prefer the Angular dev server (`cd frontend && npm start`).
+val stageFrontendForBootRun by tasks.registering(Copy::class) {
+    description = "Stages the built Angular SPA under static/ on bootRun's classpath so the dev run serves it."
+    if (!skipFrontendBuild) {
+        dependsOn(frontendBuild)
+    }
+    from(rootProject.file("frontend/dist/frontend/browser"))
+    into(layout.buildDirectory.dir("bootRunStatic/static"))
+}
+tasks.named<BootRun>("bootRun") {
+    dependsOn(stageFrontendForBootRun)
+    classpath(layout.buildDirectory.dir("bootRunStatic"))
 }
 
 springBoot {

@@ -252,6 +252,14 @@ docker run -d --name db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres 
 gradle :application:bootRun --args='--spring.profiles.active=dev'
 ```
 
+`bootRun` serves the **full app on `http://localhost:8080`**, the SPA included: the `stageFrontendForBootRun`
+task (in `application/build.gradle.kts`) builds the Angular SPA and stages it under `static/` on bootRun's
+classpath, so the root URL serves `index.html` and not the API's 404, exactly like the packaged jar. The
+first run after a frontend change pays the Angular production build (cached afterward, so a backend-only
+restart is fast and a bare `gradle test` never triggers the npm build). For **live frontend reload**, prefer
+the Angular dev server (`cd frontend && npm start`), which serves on its own port and proxies `/api` to the
+backend on `:8080`.
+
 The `dev` profile:
 - Enables Swagger UI at `http://localhost:8080/api/swagger-ui.html` and API docs at `http://localhost:8080/api/api-docs`.
 - Loads the fixture dataset on startup (`campus-coffee.fixtures.load-on-startup: true`, when the database
@@ -271,6 +279,40 @@ The `dev` profile:
 - Registers the dev-only `DevController` (in the `api` layer) under `/api/dev`:
   `GET /api/dev/data` reports the counts, `PUT /api/dev/data` replaces the data with the fixtures
   (clear + seed; idempotent, reassigning the same seeded ids), and `DELETE /api/dev/data` clears it.
+
+### Run frontend and backend separately (live frontend reload)
+
+`bootRun` above serves one self-contained app on `:8080` (API + the bundled SPA), which is the simplest way
+to run the whole thing, but it rebuilds the SPA whenever the frontend sources change and has no hot reload.
+For **active frontend development**, run the two halves separately: the Spring Boot backend on `:8080` and
+the **Angular dev server** (`ng serve`) on `:4200` with hot module reload. The dev server proxies every
+`/api` request to the backend (`frontend/src/proxy.conf.json` → `target: http://localhost:8080`), so the SPA
+and the API still look same-origin to the browser and no CORS config is needed.
+
+1. Start PostgreSQL (see above) if it is not already running.
+2. Start the **backend** on `:8080`. You do not need the bundled SPA in this mode, so skip the (now
+   redundant) frontend build for a faster, lighter start:
+
+   ```shell
+   mise exec -- gradle :application:bootRun --args='--spring.profiles.active=dev' -PskipFrontendBuild
+   ```
+
+   (`-PskipFrontendBuild` makes `stageFrontendForBootRun` stage only whatever is already in
+   `frontend/dist`, so the backend comes up serving the API; the SPA you actually use is the dev server's.
+   Drop the flag if you also want the bundled SPA on `:8080` as a fallback.)
+3. In a second terminal, start the **Angular dev server** (proxying `/api` to `:8080`):
+
+   ```shell
+   cd frontend && mise exec -- npm start
+   ```
+
+4. Open the SPA at **`http://localhost:4200`** (not `:8080`). Edits to `frontend/src/**` hot-reload in the
+   browser; the backend keeps running untouched. This is the loop to use for any UI work.
+
+This is the same two-process split used in production-style deployments where the static SPA is served by a
+separate web server/CDN and the backend is a standalone API: point the SPA's `/api` calls at the backend
+origin (here via the dev-server proxy; in production via the deployment's reverse proxy or an absolute API
+base URL) instead of relying on the single-jar bundling.
 
 ### Rebuild the read model from the event log (optional)
 
@@ -364,10 +406,13 @@ gradle :domain:test --tests "CoffeeConsumptionServiceTest.decrementing a count a
 ### Frontend
 
 The Angular 22 SPA (TypeScript 6, Angular Material 22, on Node 24 via mise) lives in `frontend/` and is
-built by Gradle (a Node-Gradle task runs `npm ci` + `npm run build` and copies `frontend/dist/**/browser/`
-into `application/src/main/resources/static/`, wired before `:application:processResources`/`bootJar`), so
-`gradle build` produces one self-contained jar. For frontend development run the Angular dev server, which
-proxies `/api` to the backend on `:8080`:
+built by Gradle (a Node-Gradle task runs `npm ci` + `npm run build`; `frontend/dist/frontend/browser/` is
+then bundled into the jar's `static/` resources by `bootJar` and staged onto the classpath by
+`stageFrontendForBootRun` for `bootRun`), so both `gradle build` (one self-contained jar) and
+`gradle :application:bootRun` serve the full app, SPA included, on `:8080`. The frontend build is wired into
+`bootJar`/`bootRun` only, never into `processResources`/`classes`, so a bare `gradle test` does not trigger
+the npm build. For **live frontend reload** run the Angular dev server instead, which proxies `/api` to the
+backend on `:8080`:
 
 ```shell
 cd frontend && npm start
