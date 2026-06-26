@@ -1,11 +1,13 @@
 package de.seuhd.campuscoffee.api.mapper
 
 import de.seuhd.campuscoffee.api.dtos.ActivityEntryDto
+import de.seuhd.campuscoffee.api.dtos.GlobalActivityEntryDto
 import de.seuhd.campuscoffee.api.dtos.KittyDto
 import de.seuhd.campuscoffee.api.dtos.PriceChangeDto
 import de.seuhd.campuscoffee.api.dtos.UserBalanceDto
 import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.domain.model.ActivityEntry
+import de.seuhd.campuscoffee.domain.model.GlobalActivityEntry
 import de.seuhd.campuscoffee.domain.model.PriceChange
 import de.seuhd.campuscoffee.domain.model.UserBalance
 import de.seuhd.campuscoffee.domain.model.UserSummary
@@ -33,6 +35,20 @@ interface AccountingDtoMapper {
      * @param entries the activity entries to map
      */
     fun toEntryDtos(entries: List<ActivityEntry>): List<ActivityEntryDto>
+
+    /**
+     * Maps a single global activity entry (the admin all-members feed) to its response DTO.
+     *
+     * @param entry the global activity entry to map
+     */
+    fun toGlobalEntryDto(entry: GlobalActivityEntry): GlobalActivityEntryDto
+
+    /**
+     * Maps a page of global activity entries to their response DTOs.
+     *
+     * @param entries the global activity entries to map
+     */
+    fun toGlobalEntryDtos(entries: List<GlobalActivityEntry>): List<GlobalActivityEntryDto>
 
     /**
      * Maps a member summary to its response DTO.

@@ -9,21 +9,27 @@
  */
 
 
-export interface ActivityEntryDto { 
-    type: ActivityEntryDto.TypeEnum;
+export interface GlobalActivityEntryDto { 
+    type: GlobalActivityEntryDto.TypeEnum;
     id: string;
     createdAt: string;
-    createdBy: string;
+    actorLogin: string;
+    subjectUserId?: string | null;
+    subjectLogin?: string | null;
+    subjectName?: string | null;
     note?: string | null;
-    amountCents: number;
-    runningBalanceCents: number;
+    memberEffectCents?: number | null;
+    memberBalanceCents?: number | null;
+    kittyEffectCents?: number | null;
+    kittyBalanceCents?: number | null;
     count?: number | null;
     delta?: number | null;
     weightGrams?: number | null;
     privateAmountCents?: number | null;
     kittyAmountCents?: number | null;
+    priceAmountCents?: number | null;
 }
-export namespace ActivityEntryDto {
+export namespace GlobalActivityEntryDto {
     export const TypeEnum = {
         Consumption: 'CONSUMPTION',
         ConsumptionCancel: 'CONSUMPTION_CANCEL',

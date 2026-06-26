@@ -45,8 +45,8 @@ From `application/src/test/kotlin/de/seuhd/campuscoffee/tests/architecture/Archi
 
 The domain defines **port interfaces** that adapters implement:
 
-- **API Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/api/`): Generic service interface `CrudService<DOMAIN, ID>` and the concrete service interfaces `UserService`, `CoffeeConsumptionService`, `CoffeePriceService`, `ExpenseService`, `PaymentService`, and `AccountingService` (the read side: a member's summary and unified activity feed, the per-member overview, and the kitty history and balance).
-- **Data Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/data/`): Generic data service interface `CrudDataService<DOMAIN, ID>`, the concrete `UserDataService`, `CoffeeConsumptionDataService` (the latter adds `getByUserId`), `CoffeePriceDataService`, `ExpenseDataService`, and `PaymentDataService`, the event-log-backed `ConsumptionHistoryDataService` and `ActivityDataService` (the unified-activity and kitty walk over the log), the `BalanceDataService` port (reads the maintained `member_balance`/`kitty_balance` projections, implemented by `BalanceProjection`), the `BalanceLock` port (two Postgres advisory locks, `lockKitty()` serializing the kitty-overdraw check and `lockMember(userId)` serializing a member's balance recompute, implemented by `PostgresBalanceLock`), and the `PasswordHasher` port.
+- **API Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/api/`): Generic service interface `CrudService<DOMAIN, ID>` and the concrete service interfaces `UserService`, `CoffeeConsumptionService`, `CoffeePriceService`, `ExpenseService`, `PaymentService`, `AccountingService` (the read-side money **numbers**: a member's summary, the kitty balance, and the per-member overview), and `ActivityService` (the read-side chronological **feeds**: a member's unified activity, the kitty history, and the admin global activity across everyone plus its CSV export). The two mirror the data-layer split (`ActivityDataService` for feeds beside `BalanceDataService` for the scalar balances).
+- **Data Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/data/`): Generic data service interface `CrudDataService<DOMAIN, ID>`, the concrete `UserDataService`, `CoffeeConsumptionDataService` (the latter adds `getByUserId`), `CoffeePriceDataService`, `ExpenseDataService`, and `PaymentDataService`, the event-log-backed `ConsumptionHistoryDataService` and `ActivityDataService` (one shared `ActivityWalk` over the log with three views: a member's unified activity, the kitty history, and `globalActivity` across everyone), the `BalanceDataService` port (reads the maintained `member_balance`/`kitty_balance` projections, implemented by `BalanceProjection`), the `BalanceLock` port (two Postgres advisory locks, `lockKitty()` serializing the kitty-overdraw check and `lockMember(userId)` serializing a member's balance recompute, implemented by `PostgresBalanceLock`), and the `PasswordHasher` port.
 - **Infrastructure ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/`): `IdGenerator`, `CapabilityTokenGenerator`, `QrCodeGenerator`, `StartupTask`, plus the request-scoped event-metadata ports `ActorProvider` and `ChangeNoteContext`.
 
 Service **implementations**:
@@ -415,6 +415,29 @@ Dependencies and tools are kept current automatically:
   dependencies and plugins (resolved from the `libs.versions.toml` catalog).
 - A weekly **`mise-outdated`** workflow opens or updates an issue when the mise-managed tools fall behind.
 
+## Development Workflow
+
+Substantial changes follow a **plan → review → implement → review → deploy** loop, with an adversarial review
+as a first-class step at both ends (not an afterthought):
+
+1. **Plan.** Explore the code, then write a concrete plan (the files to touch, the approach, the reuse,
+   verification). Resolve genuinely open decisions with the requester before finalizing.
+2. **Review the plan.** Run an adversarial review of the plan against the actual code (an independent pass that
+   hunts for wrong assumptions, missed edge cases, and regressions, and verifies each finding in the source).
+   Fold the confirmed findings into the plan before writing any code.
+3. **Implement.** Build it in coherent steps, keeping `gradle build` (and the frontend lint/build) green as you
+   go. Reuse existing patterns and helpers rather than adding parallel ones.
+4. **Review the implementation.** Run an adversarial review of the actual diff for real correctness, security,
+   and behavior-regression bugs the green build does not catch (untested edge cases, injection, silent wrong
+   output, data divergence). Verify each finding against the code and apply the confirmed fixes, then re-run
+   the build green.
+5. **Deploy.** Only after the second review: cut the release (version bump, changelog, tag) and deploy (see
+   **Versioning and Releases** and the deploy notes in `README.md`).
+
+A green build is necessary but not sufficient: The second review exists precisely to find what the tests do
+not. Scale the review depth to the change (a small fix needs a light pass; a feature or refactor warrants a
+thorough, multi-perspective one).
+
 ## Versioning and Releases
 
 The project follows [Semantic Versioning](https://semver.org/) and keeps a [Keep a Changelog](https://keepachangelog.com/)-style `CHANGELOG.md`.
@@ -639,11 +662,20 @@ controllers map paths relative to the resource.
 - `GET /users/me`: the signed-in admin's own user (the admin landing default).
 - `GET /users/filter?login_name=…`: filter users by query params (e.g. by login name).
 - `GET /users/overview`: a per-member overview (counts and balances); it now renders in the member-management page (`/admin/users`).
+- `GET /users/activity?limit=20&offset=0`: the whole-installation **global activity feed** (every member's coffees, purchases, and deposits, the kitty adjustments, and price changes), newest first; each row carries the subject member, the actor (`created_by`), and the member and kitty running balances the event moved (the all-members analogue of `/users/{id}/activity`). Renders in the admin **Activity** page (`/admin/activity`).
+- `GET /users/activity.csv`: the same global feed as a streamed CSV download (`activity.csv`), the full dataset unpaged, with a UTF-8 BOM, ISO-8601 UTC timestamps, and raw integer euro cents; free-text cells (member names, notes) are guarded against spreadsheet formula injection. Powers the Activity page's Download CSV button.
+
+The global feed (paged and CSV) is read by replaying the whole event log per request (the running balances are
+intrinsic to the walk, the same trade-off the per-member/kitty feeds make, see the activity-feed section), so
+its cost is `O(log size)` per request rather than `O(page)`. This is fine at SE@UHD's single-group scale. The
+subject login is resolved from the log's own `User` events so a hard-deleted member's rows stay classified and
+labeled, and the unpaged CSV export fails with a clear 409 above a generous row cap rather than silently
+truncating its running balances or exhausting heap.
 - `GET /users/{id}/link`, `POST /users/{id}/link/rotate`, `GET /users/{id}/qr.png` (downloads as
   `<loginName>.png`, transparent background).
 - `GET /users/qr.zip`: a streamed ZIP of every active member's QR code as `<loginName>.png` (capped at 1000
   members).
-- `GET /users/qr.pdf`: a printable PDF grid of every active member's QR code, each labelled by login name
+- `GET /users/qr.pdf`: a printable PDF grid of every active member's QR code, each labeled by login name
   (the same active-member selection and 1000-member cap as the ZIP). Both power the admin bulk QR-download
   buttons on the members page.
 - `GET  /users/{id}/consumption?limit=5&offset=0`: a member's total plus a page of the change log.

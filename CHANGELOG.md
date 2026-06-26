@@ -5,7 +5,38 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] - 2026-06-26
+
+### Added
+
+- An admin **Activity** page (`/admin/activity`) that lists every activity across all members, the kitty, and
+  the price in one paginated table: coffees, cancels, admin count corrections, private and kitty expenses,
+  deposits, kitty adjustments, and price changes. Each row shows the member it concerns (the subject) and who
+  performed it (the actor); the two differ on an admin correction. Each row has separate member-balance and
+  kitty-balance columns, a client-side type filter, and "Load more" paging. Backed by a new admin-only
+  `GET /api/users/activity`.
+- A **Download CSV** button on the Activity page (and `GET /api/users/activity.csv`) that exports the entire
+  feed (the whole dataset, not just the loaded rows) as a UTF-8 CSV with a byte-order mark, so a spreadsheet
+  renders member names with umlauts correctly. Money stays as raw integer euro cents and timestamps are
+  ISO-8601 UTC. Built with Apache Commons CSV, with free-text cells (member-controlled names and notes)
+  guarded against spreadsheet formula injection.
+- A new `PRICE_CHANGE` activity type for the global feed. The dev demo data now seeds a price change and an
+  admin count correction, so every activity type appears on a fresh dev start.
+- A branded favicon: a coffee cup in the SE@UHD brand red (the same cup the activity feed shows), replacing
+  the default icon. It ships as an SVG with PNG and ICO fallbacks, plus apple-touch and PWA (maskable) icons.
+
+### Changed
+
+- Unify the event-log activity walk: the per-member, kitty, and new global feeds now share one
+  `ActivityWalk` over the log (replacing the duplicated per-member and kitty walks), and the chronological
+  feed reads move from `AccountingService` to a dedicated `ActivityService` (mirroring the data layer's
+  `ActivityDataService`). Behavior of the existing member and kitty feeds is unchanged.
+
+### Fixed
+
+- Stop the `ConsumptionDeltaDto.deltaIsSingleStep` validation getter (an `@AssertTrue` helper) from leaking
+  into the request-body JSON and the OpenAPI schema (and so the generated frontend DTO): mark it
+  `@JsonIgnore` and `@Schema(hidden = true)`. It is a validation-only derived flag, never a request field.
 
 ## [0.5.1] - 2026-06-25
 
@@ -728,6 +759,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.6.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.6.0
 [0.5.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.5.1
 [0.5.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.5.0
 [0.4.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.4.0

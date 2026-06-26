@@ -9,6 +9,7 @@ import { EurosPipe } from '../../pipes/euros.pipe';
 import { UtcDatePipe } from '../../pipes/utc-date.pipe';
 import { ActivityEntryDto, ActivityEntryType } from '../../models';
 import { formatEuros } from '../../util/money';
+import { activityIcon, activityLabel } from '../../util/activity-type';
 
 /** The client-side filter buckets for the activity list. */
 type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
@@ -213,42 +214,14 @@ export class ActivityListComponent {
     return entries.filter((entry) => this.bucketOf(entry.type) === filter);
   });
 
-  /** The Material icon name for a activity entry type. */
+  /** The Material icon name for an activity entry type (shared with the admin global activity table). */
   iconFor(type: ActivityEntryType): string {
-    switch (type) {
-      case 'CONSUMPTION':
-        return 'coffee';
-      case 'CONSUMPTION_CANCEL':
-        return 'undo';
-      case 'PRIVATE_EXPENSE':
-      case 'KITTY_EXPENSE':
-        return 'shopping_cart';
-      case 'DEPOSIT':
-      case 'KITTY_ADJUSTMENT':
-        return 'payments';
-      default:
-        return 'receipt_long';
-    }
+    return activityIcon(type);
   }
 
-  /** A human-readable label for a activity entry type. */
+  /** A human-readable label for an activity entry type (shared with the admin global activity table). */
   labelFor(type: ActivityEntryType): string {
-    switch (type) {
-      case 'CONSUMPTION':
-        return 'Coffee cup';
-      case 'CONSUMPTION_CANCEL':
-        return 'Coffee cancelled';
-      case 'PRIVATE_EXPENSE':
-        return 'Expense';
-      case 'KITTY_EXPENSE':
-        return 'Kitty expense';
-      case 'DEPOSIT':
-        return 'Deposit';
-      case 'KITTY_ADJUSTMENT':
-        return 'Kitty adjustment';
-      default:
-        return 'Entry';
-    }
+    return activityLabel(type);
   }
 
   /**

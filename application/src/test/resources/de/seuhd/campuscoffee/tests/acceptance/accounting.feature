@@ -21,3 +21,11 @@ Feature: Coffee money and balances
     When the member drinks a coffee
     And an admin records a 1000 cent deposit for the member
     Then the member's balance is 950 cents
+
+  Scenario: The admin global activity feed and CSV cover the whole installation
+    Given the coffee member "maxmustermann"
+    And an admin sets the price to 50 cents
+    When the member drinks a coffee
+    And an admin records a 1000 cent deposit for the member
+    Then the global activity feed shows a DEPOSIT entry for the member
+    And the activity CSV downloads with a UTF-8 BOM listing the member

@@ -4,8 +4,8 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 /**
- * The kind of an [ActivityEntry]. The first four appear in a member's unified activity; the last three appear in
- * the admin-only kitty history.
+ * The kind of an [ActivityEntry]. The first four appear in a member's unified activity; the kitty-funded ones
+ * appear in the admin-only kitty history; [PRICE_CHANGE] appears only in the admin global activity feed.
  */
 enum class ActivityEntryType {
     /** A coffee was consumed (a member `+1`, or an admin count override). */
@@ -24,7 +24,10 @@ enum class ActivityEntryType {
     KITTY_EXPENSE,
 
     /** An admin adjustment of the kitty (an initial float or a correction). */
-    KITTY_ADJUSTMENT
+    KITTY_ADJUSTMENT,
+
+    /** The global price per cup was changed (admin global feed only; it moves no single balance). */
+    PRICE_CHANGE
 }
 
 /**

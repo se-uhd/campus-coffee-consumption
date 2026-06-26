@@ -146,6 +146,8 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `GET /users/qr.zip`: a streamed ZIP of every active member's QR code (one `<loginName>.png` per member).
 - `GET /users/qr.pdf`: a printable PDF grid of every active member's QR code, each labelled by login name.
 - `GET  /users/{id}/consumption?limit=5&offset=0`, `GET /users/{id}/activity?limit=20&offset=0`.
+- `GET /users/activity?limit=20&offset=0`: the whole-installation global activity feed (every member's coffees, purchases, and deposits, the kitty adjustments, and price changes), newest first, each row carrying the subject member, the actor, and the member and kitty running balances. Renders in the admin **Activity** page (`/admin/activity`).
+- `GET /users/activity.csv`: the same global feed as a streamed CSV download of the full dataset, with a UTF-8 BOM, ISO-8601 UTC timestamps, and raw integer euro cents.
 - `POST /users/{id}/consumption` `{ "delta": 1 | -1 }`.
 - `PUT  /users/{id}/consumption` `{ "total": N, "note": "…" }`: absolute count correction (`note` optional).
 - `GET/POST/PUT/DELETE /users/{id}/expenses`: list, record, correct, or delete a member's purchases with a private/kitty split (the buyer cannot be changed on a correction).

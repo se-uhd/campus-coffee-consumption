@@ -21,6 +21,7 @@ export type { TokenRequestDto } from './api/model/tokenRequestDto';
 export type { TokenResponseDto } from './api/model/tokenResponseDto';
 export type { PublicKeyDto } from './api/model/publicKeyDto';
 export type { ActivityEntryDto } from './api/model/activityEntryDto';
+export type { GlobalActivityEntryDto } from './api/model/globalActivityEntryDto';
 export type { UserSummaryDto } from './api/model/userSummaryDto';
 export type { PriceDto } from './api/model/priceDto';
 export type { PriceChangeDto } from './api/model/priceChangeDto';
@@ -48,7 +49,8 @@ import { ActivityEntryDto } from './api/model/activityEntryDto';
 export type Role = UserDto.RoleEnum;
 
 /**
- * The kind of an activity-feed row. The first four appear in a member's activity feed; the last three
- * (plus `DEPOSIT`) appear in the admin-only kitty history. All money is signed integer euro cents.
+ * The kind of an activity-feed row. The first four appear in a member's activity feed; the kitty-funded ones
+ * (plus `DEPOSIT`) appear in the admin-only kitty history; `PRICE_CHANGE` appears only in the admin global
+ * activity feed. All money is signed integer euro cents.
  */
 export type ActivityEntryType = ActivityEntryDto.TypeEnum;

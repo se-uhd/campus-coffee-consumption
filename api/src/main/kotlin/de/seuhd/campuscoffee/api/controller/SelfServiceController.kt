@@ -6,6 +6,7 @@ import de.seuhd.campuscoffee.api.mapper.AccountingDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.AccountingService
+import de.seuhd.campuscoffee.domain.ports.api.ActivityService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.GetMapping
 @Controller
 class SelfServiceController(
     private val accountingService: AccountingService,
+    private val activityService: ActivityService,
     private val accountingDtoMapper: AccountingDtoMapper,
     private val currentUserProvider: CurrentUserProvider
 ) {
@@ -63,7 +65,7 @@ class SelfServiceController(
         val user = currentUserProvider.currentUser()
         return ResponseEntity.ok(
             accountingDtoMapper.toEntryDtos(
-                accountingService.userActivity(user.persistedId, page.limitOr(ACTIVITY_LIMIT), page.offset, user)
+                activityService.memberActivity(user.persistedId, page.limitOr(ACTIVITY_LIMIT), page.offset, user)
             )
         )
     }
