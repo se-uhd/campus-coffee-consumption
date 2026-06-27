@@ -33,11 +33,11 @@ class PaymentServiceTest {
     private val balanceLock: BalanceLockService = mock()
     private val service = PaymentServiceImpl(paymentDataService, userDataService, balanceDataService, balanceLock)
 
-    private val memberId: UUID = UUID(0L, 1L)
+    private val userId: UUID = UUID(0L, 1L)
 
-    private val member =
+    private val user =
         User(
-            id = memberId,
+            id = userId,
             loginName = "max",
             emailAddress = "max@se.de",
             firstName = "Max",
@@ -57,30 +57,30 @@ class PaymentServiceTest {
         )
 
     @Test
-    fun `recordDeposit by an admin stores a positive deposit carrying the member`() {
-        whenever(userDataService.getById(memberId)).thenReturn(member)
+    fun `recordDeposit by an admin stores a positive deposit carrying the user`() {
+        whenever(userDataService.getById(userId)).thenReturn(user)
         whenever(paymentDataService.upsert(any())).thenAnswer { it.arguments[0] as Payment }
 
-        val payment = service.recordDeposit(memberId, 1000, "cash", admin)
+        val payment = service.recordDeposit(userId, 1000, "cash", admin)
 
         assertThat(payment.amountCents).isEqualTo(1000)
-        assertThat(payment.user).isEqualTo(member)
+        assertThat(payment.user).isEqualTo(user)
     }
 
     @Test
     fun `recordDeposit by a non-admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.recordDeposit(memberId, 1000, null, member) }
+        assertThrows<ForbiddenException> { service.recordDeposit(userId, 1000, null, user) }
         verify(paymentDataService, never()).upsert(any())
     }
 
     @Test
     fun `recordDeposit of a non-positive amount throws ValidationException`() {
-        assertThrows<ValidationException> { service.recordDeposit(memberId, 0, null, admin) }
+        assertThrows<ValidationException> { service.recordDeposit(userId, 0, null, admin) }
         verify(paymentDataService, never()).upsert(any())
     }
 
     @Test
-    fun `adjustKitty by an admin stores a signed adjustment carrying no member`() {
+    fun `adjustKitty by an admin stores a signed adjustment carrying no user`() {
         whenever(balanceDataService.kittyBalanceCents()).thenReturn(1000L)
         whenever(paymentDataService.upsert(any())).thenAnswer { it.arguments[0] as Payment }
 
@@ -100,7 +100,7 @@ class PaymentServiceTest {
 
     @Test
     fun `adjustKitty by a non-admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.adjustKitty(500, null, member) }
+        assertThrows<ForbiddenException> { service.adjustKitty(500, null, user) }
         verify(paymentDataService, never()).upsert(any())
     }
 

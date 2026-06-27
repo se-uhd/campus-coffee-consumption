@@ -6,7 +6,7 @@ import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
@@ -17,7 +17,7 @@ import org.springframework.http.MediaType
  * rule that rejects a zero. Each malformed request is refused with a clean 400 before it reaches the domain.
  */
 class InputValidationSystemTests : AbstractSystemTest() {
-    private val member = "maxmustermann"
+    private val user = "maxmustermann"
 
     private fun postOwnExpense(expense: OwnExpenseDto): Int =
         client()
@@ -25,7 +25,7 @@ class InputValidationSystemTests : AbstractSystemTest() {
             .uri("/api/expenses")
             .contentType(MediaType.APPLICATION_JSON)
             .body(expense)
-            .withMember(member)
+            .withUser(user)
             .exchange()
             .statusCode()
 
@@ -55,7 +55,7 @@ class InputValidationSystemTests : AbstractSystemTest() {
 
     @Test
     fun `an admin single-step count change of zero returns 400 Bad Request`() {
-        val targetId = seededUser(member).persistedId
+        val targetId = seededUser(user).persistedId
         val status =
             client()
                 .post()

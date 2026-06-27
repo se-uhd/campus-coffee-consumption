@@ -3,7 +3,7 @@ package de.seuhd.campuscoffee.domain.ports.system
 /**
  * Supplies the login name of the actor responsible for the current change, recorded as `created_by` on
  * each event. A port in the hexagonal architecture: declared by the domain and implemented in the
- * application layer, which reads the authenticated principal from Spring Security's `SecurityContext`
+ * api layer, which reads the authenticated principal from Spring Security's `SecurityContext`
  * (the user via their capability token, or the admin). When there is no request principal (startup
  * fixtures, the bootstrap admin, an events-to-data rebuild), the adapter returns `"SYSTEM"`.
  *

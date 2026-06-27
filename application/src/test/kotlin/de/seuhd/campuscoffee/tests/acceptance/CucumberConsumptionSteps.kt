@@ -2,7 +2,7 @@ package de.seuhd.campuscoffee.tests.acceptance
 
 import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
@@ -20,19 +20,19 @@ import tools.jackson.databind.ObjectMapper
 class CucumberConsumptionSteps(
     private val objectMapper: ObjectMapper
 ) {
-    private lateinit var member: String
+    private lateinit var user: String
     private lateinit var lastResult: EntityExchangeResult<ByteArray>
 
-    @Given("the member {string}")
-    fun theMember(loginName: String) {
-        member = loginName
+    @Given("the user {string}")
+    fun theUser(loginName: String) {
+        user = loginName
     }
 
-    @When("the member adds a coffee")
-    fun theMemberAddsACoffee() = post("/api/consumption")
+    @When("the user adds a coffee")
+    fun theUserAddsACoffee() = post("/api/consumption")
 
-    @When("the member undoes a coffee")
-    fun theMemberUndoesACoffee() = post("/api/consumption/cancel")
+    @When("the user undoes a coffee")
+    fun theUserUndoesACoffee() = post("/api/consumption/cancel")
 
     @Then("the request succeeds and the coffee count is {int}")
     fun theRequestSucceedsAndTheCountIs(count: Int) {
@@ -51,7 +51,7 @@ class CucumberConsumptionSteps(
             client()
                 .post()
                 .uri(uri)
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .returnResult<ByteArray>()
     }

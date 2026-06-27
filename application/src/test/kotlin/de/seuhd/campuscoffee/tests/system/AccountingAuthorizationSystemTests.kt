@@ -4,7 +4,7 @@ import de.seuhd.campuscoffee.api.dtos.PriceUpdateDto
 import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
@@ -16,17 +16,17 @@ import org.springframework.test.web.servlet.client.returnResult
  * routes.
  */
 class AccountingAuthorizationSystemTests : AbstractSystemTest() {
-    private val member = "maxmustermann"
+    private val user = "maxmustermann"
 
     @Test
-    fun `a member cannot set the price and is forbidden`() {
+    fun `a user cannot set the price and is forbidden`() {
         val status =
             client()
                 .put()
                 .uri("/api/price")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(PriceUpdateDto(70))
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .statusCode()
 
@@ -34,13 +34,13 @@ class AccountingAuthorizationSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a member cannot read the kitty history and is forbidden`() {
+    fun `a user cannot read the kitty history and is forbidden`() {
         val status =
             client()
                 .get()
                 .uri("/api/kitty/history")
                 .accept(MediaType.APPLICATION_JSON)
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .statusCode()
 
@@ -48,13 +48,13 @@ class AccountingAuthorizationSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a member can read their own summary including the kitty balance`() {
+    fun `a user can read their own summary including the kitty balance`() {
         val result =
             client()
                 .get()
                 .uri("/api/summary")
                 .accept(MediaType.APPLICATION_JSON)
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .returnResult<UserSummaryDto>()
 

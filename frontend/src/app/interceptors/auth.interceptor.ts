@@ -9,13 +9,7 @@ import { CapabilityTokenService } from '../services/capability-token.service';
 const ADMIN_PREFIXES = ['/api/users', '/api/price', '/api/kitty'];
 
 /** User endpoint prefixes, authenticated by the capability token (`X-Capability-Token`). */
-const MEMBER_PREFIXES = [
-  '/api/summary',
-  '/api/activity',
-  '/api/consumption',
-  '/api/expenses',
-  '/api/profile'
-];
+const USER_PREFIXES = ['/api/summary', '/api/activity', '/api/consumption', '/api/expenses', '/api/profile'];
 
 /**
  * Guards the admin 401 redirect so a burst of concurrent 401s (e.g. the parallel reloads a landing page
@@ -68,7 +62,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => error);
       })
     );
-  } else if (MEMBER_PREFIXES.some((prefix) => req.url.startsWith(prefix))) {
+  } else if (USER_PREFIXES.some((prefix) => req.url.startsWith(prefix))) {
     const token = capability.token;
     if (token) {
       return next(req.clone({ setHeaders: { 'X-Capability-Token': token } })).pipe(

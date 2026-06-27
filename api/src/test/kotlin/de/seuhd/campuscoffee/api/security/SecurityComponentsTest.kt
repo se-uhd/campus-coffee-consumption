@@ -35,7 +35,7 @@ class SecurityComponentsTest {
     @AfterEach
     fun clearContext() = SecurityContextHolder.clearContext()
 
-    private fun member() =
+    private fun user() =
         User(
             id = UUID.randomUUID(),
             loginName = "max",
@@ -71,7 +71,7 @@ class SecurityComponentsTest {
 
     @Test
     fun `the capability filter authenticates a known token as a ROLE_USER principal`() {
-        whenever(userService.findByCapabilityToken("the-token")).thenReturn(member())
+        whenever(userService.findByCapabilityToken("the-token")).thenReturn(user())
         val request = MockHttpServletRequest().apply { addHeader("X-Capability-Token", "the-token") }
         val chain = mock<FilterChain>()
 
@@ -109,7 +109,7 @@ class SecurityComponentsTest {
 
     @Test
     fun `the user details service defaults a null role to ROLE_USER`() {
-        whenever(userService.getByLoginName("norole")).thenReturn(member().copy(role = null))
+        whenever(userService.getByLoginName("norole")).thenReturn(user().copy(role = null))
 
         val details = DomainUserDetailsService(userService).loadUserByUsername("norole")
 
@@ -118,7 +118,7 @@ class SecurityComponentsTest {
 
     @Test
     fun `the user details service rejects a user without a stored password hash`() {
-        whenever(userService.getByLoginName("nohash")).thenReturn(member().copy(passwordHash = null))
+        whenever(userService.getByLoginName("nohash")).thenReturn(user().copy(passwordHash = null))
 
         assertThatThrownBy { DomainUserDetailsService(userService).loadUserByUsername("nohash") }
             .isInstanceOf(UsernameNotFoundException::class.java)

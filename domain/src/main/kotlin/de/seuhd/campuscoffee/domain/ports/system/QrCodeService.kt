@@ -1,5 +1,7 @@
 package de.seuhd.campuscoffee.domain.ports.system
 
+import de.seuhd.campuscoffee.domain.model.LabeledQrCode
+
 /**
  * Renders users' capability URLs as QR codes: a single high-resolution PNG (printed on the wall or embedded
  * in a document) and a printable PDF grid of many labeled codes (an admin's one-sheet print of everyone's

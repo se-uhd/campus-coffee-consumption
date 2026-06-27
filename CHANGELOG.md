@@ -16,7 +16,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   "view this user" deep link uses the `?user=` query parameter, and the public activity feed and its CSV
   export expose `userEffectCents` / `userBalanceCents` (were `member*Cents`). The `/admin/users` route and
   the `/api/users` endpoints are unchanged. A new migration renames the `member_balance` projection table
-  to `user_balance`. The rename is behavior-preserving.
+  to `user_balance` (a migration-replay test seeds rows in the pre-rename schema and asserts they survive the
+  migration, doubling as a reusable harness for future data migrations). The rename is behavior-preserving.
 - The whole SPA now runs under `OnPush` change detection with signal-based view state, and the admin users
   page preloads its data through a route resolver and a small cached store, so it paints already populated
   instead of empty-then-filled and repaints instantly on a revisit. A thin top progress bar shows while a
@@ -27,10 +28,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `BCryptPasswordHasher`→`PasswordHasherServiceImpl`, `SeededUuidGenerator`→`IdGeneratorServiceImpl`,
   `BalanceProjection`→`BalanceDataServiceImpl`); the two QR ports collapsed into one `QrCodeService`;
   utility-function files are `*Util` (`ReadSupport`→`ReadUtil`); and every file holds a single top-level type
-  (`ActivityDataServiceImpl`, `ActivityEntry`, and `LoginPayloadDecryptor` were split accordingly). Packages
-  were reorganized to match: `domain/ports/system/` for the SPI ports, `data/adapters/` for the technology
-  adapters, `data/persistence/` for the advisory-lock adapter, and `api/app` + `api/support`. The frontend
-  `UsersStore` became `AdminUserService`. All conventions are now documented in CLAUDE.md.
+  (`ActivityDataServiceImpl`, `ActivityEntry`, and `LoginPayloadDecryptor` were split accordingly).
+  Production code now depends on ports, never on `*Impl` types, enforced by a new ArchUnit rule (the
+  `EventSourced*` decorators are the one documented exception, and a new `BalanceProjectionMaintainer` data
+  interface lets the event writer and the read-model rebuild depend on an abstraction rather than the
+  projection class). The `data` layer was reorganized into one package per concern, dissolving the old
+  `data/persistence/eventsourcing/` package: `domain/ports/system/` for the SPI ports; `data/system/` for the
+  technology adapters; `data/persistence/` root for the cross-cutting persistence mechanisms (the
+  advisory-lock `BalanceLockServiceImpl`, `ConstraintMapping`, and the event-body jsonb serialization
+  `EventJsonMapper` with the `EventSourcingHibernateConfiguration` that pins it onto Hibernate);
+  `data/persistence/events/` for the event-log write support (`EventStore`→`EventAppender`,
+  `ReadModelProjector`, `EventSourcedWriter`, `EventsToDataRunner`); `data/persistence/projection/` for the
+  read-model projection (`BalanceDataServiceImpl` plus the event-log reducer, renamed
+  `ActivityWalk`→`EventReducer` with its `EventProjection`/`EventProjectionType`); `data/persistence/entities/`
+  for the `ChangeType`/`LoggedEntityType` discriminators beside `EventEntity`; and `data/implementations/`
+  for the read-side `ActivityDataServiceImpl`/`ConsumptionHistoryDataServiceImpl` and the `EventSourced*`
+  decorators. The internal event-log layer is named `Event*` and the public feed `Activity*`; `api/web`
+  became `api/app`, with a new `api/support` for the controller-delegate helpers. The frontend `UsersStore`
+  became `AdminUserService`. All conventions are documented in CLAUDE.md.
 - Aligned the Material theme with the official Universität Heidelberg corporate design. Every primary control
   now resolves to the exact house red (Pantone 1805 C, #C61826) instead of the tonal palette's rounded
   #bd0e21; cards are white on the Sand background; and the neutral greys (form-field borders, dividers, the
@@ -50,6 +65,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The admin create-user form now enforces the same password policy as the backend (at least 24 characters
+  with a lowercase letter, an uppercase letter, and a digit) instead of only 8 characters, so a too-short or
+  too-simple admin password is caught in the form rather than failing server-side with a misleading
+  "duplicate login or email?" message.
 - The slide-toggles in the admin users table no longer visibly flash from off into their real state when
   paging or reloading. Rows now track by user id so they are reused instead of destroyed and recreated, and
   the toggle's enter transition is suppressed on that table, so a checked toggle paints checked with no

@@ -23,10 +23,10 @@ dependencies {
     implementation(libs.jackson3.module.kotlin)
     // BCrypt/delegating password encoder for the PasswordHasher adapter (small, dependency-free).
     implementation(libs.spring.security.crypto)
-    // ZXing generates the member capability URL QR codes (core builds the matrix, javase writes the PNG).
+    // ZXing generates the user capability URL QR codes (core builds the matrix, javase writes the PNG).
     implementation(libs.zxing.core)
     implementation(libs.zxing.javase)
-    // Apache PDFBox lays those QR codes out as a printable PDF grid (the all-member QR sheet).
+    // Apache PDFBox lays those QR codes out as a printable PDF grid (the all-user QR sheet).
     implementation(libs.pdfbox)
 
     // MapStruct is compile-only for the Kotlin mappers; kapt runs the processor that generates the impls.

@@ -184,7 +184,7 @@ object SystemTestUtils {
         TestFixtures.rawCredentialsFor(Role.ADMIN).let { (login, password) -> "Bearer ${jwtFor(login, password)}" }
 
     /** The capability token of the seeded user fixture with the given login name. */
-    fun memberToken(loginName: String): String = TestFixtures.rawCapabilityTokenFor(loginName)
+    fun userToken(loginName: String): String = TestFixtures.rawCapabilityTokenFor(loginName)
 
     /** The status code of a response, without asserting it. */
     fun RestTestClient.ResponseSpec.statusCode(): Int = returnResult<ByteArray>().status.value()
@@ -194,6 +194,6 @@ object SystemTestUtils {
         header(HttpHeaders.AUTHORIZATION, adminBearer())
 
     /** The X-Capability-Token header carrying the given user's capability token. */
-    fun RestTestClient.RequestHeadersSpec<*>.withMember(loginName: String): RestTestClient.RequestHeadersSpec<*> =
-        header(CAPABILITY_TOKEN_HEADER, memberToken(loginName))
+    fun RestTestClient.RequestHeadersSpec<*>.withUser(loginName: String): RestTestClient.RequestHeadersSpec<*> =
+        header(CAPABILITY_TOKEN_HEADER, userToken(loginName))
 }

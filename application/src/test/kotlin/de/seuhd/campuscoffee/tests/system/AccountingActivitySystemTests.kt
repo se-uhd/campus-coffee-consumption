@@ -13,7 +13,7 @@ import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -28,9 +28,9 @@ import java.util.UUID
  * UPDATE/DELETE and admin-override branches of the user-activity and kitty-history walks.
  */
 class AccountingActivitySystemTests : AbstractSystemTest() {
-    private val member = "maxmustermann"
+    private val user = "maxmustermann"
 
-    private fun memberId(): UUID = seededUser(member).persistedId
+    private fun userId(): UUID = seededUser(user).persistedId
 
     private fun adminExpense(
         amountCents: Int,
@@ -38,7 +38,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
         kittyAmountCents: Int
     ) = client()
         .post()
-        .uri("/api/users/{id}/expenses", memberId())
+        .uri("/api/users/{id}/expenses", userId())
         .contentType(MediaType.APPLICATION_JSON)
         .body(
             AdminExpenseDto(
@@ -68,7 +68,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
             .get()
             .uri("/api/summary")
             .accept(MediaType.APPLICATION_JSON)
-            .withMember(member)
+            .withUser(user)
             .exchange()
             .returnResult<UserSummaryDto>()
             .responseBody!!
@@ -86,7 +86,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
     private fun adminUserActivity(): List<ActivityEntryDto> =
         client()
             .get()
-            .uri("/api/users/{id}/activity", memberId())
+            .uri("/api/users/{id}/activity", userId())
             .accept(MediaType.APPLICATION_JSON)
             .withAdmin()
             .exchange()
@@ -99,7 +99,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
             .get()
             .uri("/api/activity")
             .accept(MediaType.APPLICATION_JSON)
-            .withMember(member)
+            .withUser(user)
             .exchange()
             .returnResult<Array<ActivityEntryDto>>()
             .responseBody!!
@@ -113,7 +113,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
         val status =
             client()
                 .get()
-                .uri("/api/users/{id}/activity?$query", memberId())
+                .uri("/api/users/{id}/activity?$query", userId())
                 .accept(MediaType.APPLICATION_JSON)
                 .withAdmin()
                 .exchange()
@@ -122,7 +122,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a deposit with no member returns 400 Bad Request`() {
+    fun `a deposit with no user returns 400 Bad Request`() {
         val status =
             client()
                 .post()
@@ -143,7 +143,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
                 .post()
                 .uri("/api/kitty/deposit")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(DepositRequestDto(userId = memberId(), amountCents = amountCents, note = null))
+                .body(DepositRequestDto(userId = userId(), amountCents = amountCents, note = null))
                 .withAdmin()
                 .exchange()
                 .statusCode()
@@ -165,7 +165,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `correcting an expense re-credits the member by the new private portion`() {
+    fun `correcting an expense re-credits the user by the new private portion`() {
         // fund the kitty with a 1000 float so the kitty-funded portions (500, then 300) stay non-negative
         fundKitty(1000)
 
@@ -179,7 +179,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
         // correct it to a larger private portion: 1000 = 700 private + 300 kitty
         client()
             .put()
-            .uri("/api/users/{userId}/expenses/{expenseId}", memberId(), expenseId)
+            .uri("/api/users/{userId}/expenses/{expenseId}", userId(), expenseId)
             .contentType(MediaType.APPLICATION_JSON)
             .body(
                 AdminExpenseDto(
@@ -215,7 +215,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
         val deleteStatus =
             client()
                 .delete()
-                .uri("/api/users/{userId}/expenses/{expenseId}", memberId(), expenseId)
+                .uri("/api/users/{userId}/expenses/{expenseId}", userId(), expenseId)
                 .withAdmin()
                 .exchange()
                 .statusCode()
@@ -228,12 +228,12 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a deposit appears on the member activity as a DEPOSIT entry`() {
+    fun `a deposit appears on the user activity as a DEPOSIT entry`() {
         client()
             .post()
             .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(DepositRequestDto(userId = memberId(), amountCents = 1000, note = "paid"))
+            .body(DepositRequestDto(userId = userId(), amountCents = 1000, note = "paid"))
             .withAdmin()
             .exchange()
 
@@ -264,11 +264,11 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `an admin count override is valued as a lump on the member activity`() {
+    fun `an admin count override is valued as a lump on the user activity`() {
         // the price is the seeded 50; an admin sets the count to 3 in one step -> a -150 lump
         client()
             .put()
-            .uri("/api/users/{id}/consumption", memberId())
+            .uri("/api/users/{id}/consumption", userId())
             .contentType(MediaType.APPLICATION_JSON)
             .body(ConsumptionOverrideDto(3, "manual"))
             .withAdmin()
@@ -281,7 +281,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a member buys then an admin attributes a split purchase building the full activity`() {
+    fun `a user buys then an admin attributes a split purchase building the full activity`() {
         // fund the kitty so the admin split purchase's kitty-funded portion (500) stays non-negative;
         // a pure kitty adjustment has no user, so the user balance assertion below is unaffected
         fundKitty(1000)
@@ -292,19 +292,19 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
             .uri("/api/expenses")
             .contentType(MediaType.APPLICATION_JSON)
             .body(mapOf("weightGrams" to 500, "amountCents" to 300))
-            .withMember(member)
+            .withUser(user)
             .exchange()
         adminExpense(amountCents = 900, privateAmountCents = 400, kittyAmountCents = 500)
         client()
             .post()
             .uri("/api/consumption")
-            .withMember(member)
+            .withUser(user)
             .exchange()
         client()
             .post()
             .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(DepositRequestDto(userId = memberId(), amountCents = 1000, note = null))
+            .body(DepositRequestDto(userId = userId(), amountCents = 1000, note = null))
             .withAdmin()
             .exchange()
 
@@ -319,7 +319,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `an admin sees the kitty split on a member's expense but the member's own activity does not`() {
+    fun `an admin sees the kitty split on a user's expense but the user's own activity does not`() {
         // fund the kitty so the split purchase's kitty-funded portion (500) stays non-negative
         fundKitty(1000)
         // an admin records a split bean purchase on the user: 900 = 400 private + 500 kitty

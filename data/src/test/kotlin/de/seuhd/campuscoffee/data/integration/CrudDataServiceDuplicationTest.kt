@@ -28,7 +28,7 @@ class CrudDataServiceDuplicationTest : AbstractDataIntegrationTest() {
     @Autowired
     private lateinit var coffeeConsumptionDataService: CoffeeConsumptionDataServiceImpl
 
-    private fun member(
+    private fun user(
         login: String,
         email: String = "$login@se.de",
         token: String = "token-$login"
@@ -46,31 +46,31 @@ class CrudDataServiceDuplicationTest : AbstractDataIntegrationTest() {
 
     @Test
     fun `upsert throws DuplicationException for a duplicate login name`() {
-        userDataService.upsert(member("alice", token = "t-alice"))
+        userDataService.upsert(user("alice", token = "t-alice"))
 
-        assertThatThrownBy { userDataService.upsert(member("alice", email = "other@se.de", token = "t-other")) }
+        assertThatThrownBy { userDataService.upsert(user("alice", email = "other@se.de", token = "t-other")) }
             .isInstanceOf(DuplicationException::class.java)
     }
 
     @Test
     fun `upsert throws DuplicationException for a duplicate email address`() {
-        userDataService.upsert(member("bob", email = "shared@se.de", token = "t-bob"))
+        userDataService.upsert(user("bob", email = "shared@se.de", token = "t-bob"))
 
-        assertThatThrownBy { userDataService.upsert(member("bob2", email = "shared@se.de", token = "t-bob2")) }
+        assertThatThrownBy { userDataService.upsert(user("bob2", email = "shared@se.de", token = "t-bob2")) }
             .isInstanceOf(DuplicationException::class.java)
     }
 
     @Test
     fun `upsert throws DuplicationException for a duplicate capability token`() {
-        userDataService.upsert(member("carol", token = "shared-token"))
+        userDataService.upsert(user("carol", token = "shared-token"))
 
-        assertThatThrownBy { userDataService.upsert(member("carol2", token = "shared-token")) }
+        assertThatThrownBy { userDataService.upsert(user("carol2", token = "shared-token")) }
             .isInstanceOf(DuplicationException::class.java)
     }
 
     @Test
     fun `deleting a user cascades their consumption and removes both`() {
-        val user = userDataService.upsert(member("dave"))
+        val user = userDataService.upsert(user("dave"))
         coffeeConsumptionDataService.upsert(CoffeeConsumption(user = user, count = 0))
 
         // succeeds: the coffee_consumptions.user_id FK is ON DELETE CASCADE, so the consumption row goes too
@@ -84,7 +84,7 @@ class CrudDataServiceDuplicationTest : AbstractDataIntegrationTest() {
 
     @Test
     fun `upsert updates an existing user and refreshes the updated timestamp`() {
-        val created = userDataService.upsert(member("frank"))
+        val created = userDataService.upsert(user("frank"))
 
         val updated = userDataService.upsert(created.copy(firstName = "Franklin"))
 
@@ -94,7 +94,7 @@ class CrudDataServiceDuplicationTest : AbstractDataIntegrationTest() {
 
     @Test
     fun `getByLoginName returns the matching user and throws NotFoundException when none matches`() {
-        userDataService.upsert(member("grace"))
+        userDataService.upsert(user("grace"))
 
         assertThat(userDataService.getByLoginName("grace").loginName).isEqualTo("grace")
         assertThatThrownBy { userDataService.getByLoginName("nobody") }
