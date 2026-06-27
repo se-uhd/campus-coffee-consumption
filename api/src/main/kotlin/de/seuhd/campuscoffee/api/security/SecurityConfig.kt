@@ -26,16 +26,16 @@ import org.springframework.security.web.access.AccessDeniedHandler
  *   username+password login), mapped by the resource server to a `ROLE_ADMIN` principal. The browser SPA
  *   carries the token in an httpOnly, `SameSite=Strict` session cookie; API clients and the tests carry it in
  *   the `Authorization` header. [CookieOrHeaderBearerTokenResolver] reads it from either.
- * - **Members** authenticate with their secret **capability token** (the `X-Capability-Token` header), resolved
+ * - **Users** authenticate with their secret **capability token** (the `X-Capability-Token` header), resolved
  *   by [CapabilityTokenAuthenticationFilter] to a `ROLE_USER` principal; even an admin's own token grants
  *   only self-service.
  *
  * The filter chain is stateless (no server-side session). CSRF token protection is disabled because the only
  * cookie (the admin session) is `SameSite=Strict` (never sent cross-site, so it cannot be ridden by a forged
- * request) and the member and API flows authenticate with a custom header a cross-site page cannot set. A
+ * request) and the user and API flows authenticate with a custom header a cross-site page cannot set. A
  * Content-Security-Policy and the other security headers are set on the chain. The access rules gate the API
- * surface by audience; the finer ownership rules (a member acting only on their own count; a user editing
- * only their own account; the deactivated-member read-only rule) depend on the targeted resource, so they
+ * surface by audience; the finer ownership rules (a user acting only on their own count; a user editing
+ * only their own account; the deactivated-user read-only rule) depend on the targeted resource, so they
  * live in the domain services. Non-`/api` GET routes serve the bundled Angular SPA (its `index.html` and
  * assets, plus deep links), so they are public; the SPA makes the authenticated API calls.
  */
@@ -48,7 +48,7 @@ class SecurityConfig {
      * @param authenticationEntryPoint renders a missing or invalid credential as a 401 JSON response
      * @param accessDeniedHandler renders an authorization denial as a 403 JSON response
      * @param jwtAuthenticationConverter maps a validated Bearer token to a principal with ROLE_* authorities
-     * @param capabilityTokenAuthenticationFilter authenticates a member by their X-Capability-Token header
+     * @param capabilityTokenAuthenticationFilter authenticates a user by their X-Capability-Token header
      * @param environment the active environment, used to open the dev data endpoints only under `dev`
      * @param authCookieProperties the admin session-cookie settings (the cookie name the bearer resolver reads)
      */
@@ -83,20 +83,20 @@ class SecurityConfig {
                 authorize("/actuator/health", permitAll)
                 authorize("/actuator/health/**", permitAll)
                 authorize("/actuator/**", hasRole("ADMIN"))
-                // Member self-service: the capability token principal (ROLE_USER). The domain enforces that
-                // a member acts only on their own data and that a deactivated member is read-only. A member
+                // User self-service: the capability token principal (ROLE_USER). The domain enforces that
+                // a user acts only on their own data and that a deactivated user is read-only. A user
                 // sees the price and the kitty balance through their own /summary, never the admin reads.
                 authorize("/api/consumption/**", hasRole("USER"))
                 authorize("/api/profile/**", hasRole("USER"))
                 authorize("/api/summary/**", hasRole("USER"))
                 authorize("/api/activity/**", hasRole("USER"))
                 authorize("/api/expenses/**", hasRole("USER"))
-                // Admin-only money management (JWT, ROLE_ADMIN): the price and the kitty (its history, member
+                // Admin-only money management (JWT, ROLE_ADMIN): the price and the kitty (its history, user
                 // deposits, and adjustments all live under /api/kitty).
                 authorize("/api/price", hasRole("ADMIN"))
                 authorize("/api/price/**", hasRole("ADMIN"))
                 authorize("/api/kitty/**", hasRole("ADMIN"))
-                // Member management and the per-member admin views are admin-only (JWT, ROLE_ADMIN).
+                // User management and the per-user admin views are admin-only (JWT, ROLE_ADMIN).
                 authorize("/api/users/**", hasRole("ADMIN"))
                 // No anonymous access to any other API endpoint.
                 authorize("/api/**", authenticated)
@@ -106,7 +106,7 @@ class SecurityConfig {
                 authorize(anyRequest, authenticated)
             }
             // CSRF token protection is unnecessary here: the admin JWT cookie is SameSite=Strict (so the
-            // browser never sends it on a cross-site request, which is the CSRF vector), and the member and
+            // browser never sends it on a cross-site request, which is the CSRF vector), and the user and
             // API flows authenticate with a custom header (X-Capability-Token / Authorization), which a
             // cross-site page cannot set. A token-based CSRF scheme would instead force a token onto those
             // header-authenticated, CSRF-immune endpoints (and the system tests) for no added protection.
@@ -140,7 +140,7 @@ class SecurityConfig {
                 this.accessDeniedHandler = accessDeniedHandler
             }
         }
-        // run the capability token filter before the bearer-token filter so a member request is
+        // run the capability token filter before the bearer-token filter so a user request is
         // authenticated as ROLE_USER before the resource server looks for a (missing) bearer token
         http.addFilterBefore(capabilityTokenAuthenticationFilter, BearerTokenAuthenticationFilter::class.java)
         return http.build()

@@ -1,4 +1,12 @@
-import { Component, DestroyRef, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  inject,
+  OnInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  signal
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -16,11 +24,11 @@ import { CapabilityTokenService } from '../../services/capability-token.service'
 import { NotificationService } from '../../services/notification.service';
 import { AdminSelectionService } from '../../services/admin-selection.service';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
-import { MemberSelectComponent } from '../../components/member-select/member-select.component';
+import { UserSelectComponent } from '../../components/user-select/user-select.component';
 import { UserDto } from '../../models';
 
 /**
- * The authenticated user's own profile, shared by a member (reached via `/login/:token/profile`, served
+ * The authenticated user's own profile, shared by a user (reached via `/login/:token/profile`, served
  * through `/api/profile`) and an admin (reached via `/admin/profile`, served through `/api/users/me`). Edits the
  * name and email, shows the capability link ("your coffee link") with the sharing-risk note, and offers the
  * QR download. The QR is fetched as a blob so the auth header is attached, then shown via an object URL,
@@ -39,7 +47,7 @@ import { UserDto } from '../../models';
     MatProgressBarModule,
     MatProgressSpinnerModule,
     AppHeaderComponent,
-    MemberSelectComponent
+    UserSelectComponent
   ],
   template: `
     <cc-app-header
@@ -49,32 +57,32 @@ import { UserDto } from '../../models';
       icon="person"
     ></cc-app-header>
 
-    @if (loading) {
+    @if (loading()) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
     <div class="page">
-      @if (adminMode && !loadError) {
+      @if (adminMode && !loadError()) {
         <mat-card class="card">
-          <cc-member-select
-            [users]="users"
-            [selectedId]="selectedId"
+          <cc-user-select
+            [users]="users()"
+            [selectedId]="selectedId()"
             [ownUserId]="selection.ownUserId"
             (selectionChange)="onMemberChange($event)"
-          ></cc-member-select>
+          ></cc-user-select>
         </mat-card>
       }
-      @if (loadError) {
+      @if (loadError()) {
         <mat-card class="card">
-          <p class="warn">{{ loadError }}</p>
+          <p class="warn">{{ loadError() }}</p>
           <button mat-stroked-button (click)="load()">Retry</button>
         </mat-card>
       } @else if (profile) {
         <mat-card class="card">
           <div class="row">
-            <h2>{{ ownProfile ? 'Your details' : 'Member details' }}</h2>
+            <h2>{{ ownProfile ? 'Your details' : 'User details' }}</h2>
             <span class="spacer"></span>
-            @if (!editing) {
+            @if (!editing()) {
               <button
                 mat-icon-button
                 (click)="startEdit()"
@@ -86,7 +94,7 @@ import { UserDto } from '../../models';
             }
           </div>
 
-          @if (!editing) {
+          @if (!editing()) {
             <dl class="cc-details">
               <dt class="muted">First name</dt>
               <dd>{{ profile.firstName }}</dd>
@@ -139,14 +147,14 @@ import { UserDto } from '../../models';
                 }
               </mat-form-field>
               <div class="row">
-                <button mat-flat-button color="primary" (click)="save()" [disabled]="form.invalid || busy">
-                  @if (busy) {
+                <button mat-flat-button color="primary" (click)="save()" [disabled]="form.invalid || busy()">
+                  @if (busy()) {
                     <mat-spinner diameter="20"></mat-spinner>
                   } @else {
                     Save
                   }
                 </button>
-                <button mat-stroked-button (click)="cancelEdit()" [disabled]="busy">Cancel</button>
+                <button mat-stroked-button (click)="cancelEdit()" [disabled]="busy()">Cancel</button>
               </div>
             </form>
           }
@@ -161,18 +169,18 @@ import { UserDto } from '../../models';
             </p>
           } @else {
             <p class="warn">
-              Anyone with this link can act as this member: record coffees and expenses, undo recent coffees,
+              Anyone with this link can act as this user: record coffees and expenses, undo recent coffees,
               edit their profile, and see their balance. Do not share it or post it publicly.
             </p>
           }
           <p class="muted break-word">{{ profile.capabilityUrl }}</p>
-          @if (qrObjectUrl) {
+          @if (qrObjectUrl()) {
             @defer (on viewport) {
               <div class="cc-qr">
-                <img [src]="qrObjectUrl" alt="Coffee QR code" class="cc-qr-img" />
+                <img [src]="qrObjectUrl()" alt="Coffee QR code" class="cc-qr-img" />
                 <a
                   mat-stroked-button
-                  [href]="qrObjectUrl"
+                  [href]="qrObjectUrl()"
                   [attr.download]="profile.loginName + '.png'"
                   aria-label="Download QR code"
                   matTooltip="Download your coffee QR code"
@@ -189,7 +197,7 @@ import { UserDto } from '../../models';
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
       .cc-qr {
@@ -231,21 +239,21 @@ import { UserDto } from '../../models';
 })
 export class ProfileComponent implements OnInit {
   profile: UserDto | null = null;
-  qrObjectUrl: string | null = null;
+  readonly qrObjectUrl = signal<string | null>(null);
   backLink: unknown[] = ['/admin'];
-  busy = false;
-  loading = false;
-  loadError = '';
+  readonly busy = signal(false);
+  readonly loading = signal(false);
+  readonly loadError = signal('');
   /** Whether the details section is in edit mode; read-only by default. */
-  editing = false;
-  /** True for the admin route (`/admin/profile`); false for the member route (`/login/:token/profile`). */
+  readonly editing = signal(false);
+  /** True for the admin route (`/admin/profile`); false for the user route (`/login/:token/profile`). */
   adminMode = false;
-  /** The members an admin may switch between (admin mode only); empty in member mode. */
-  users: UserDto[] = [];
-  /** The id of the member the admin is currently viewing (admin mode only). */
-  selectedId = '';
+  /** The users an admin may switch between (admin mode only); empty in user mode. */
+  readonly users = signal<UserDto[]>([]);
+  /** The id of the user the admin is currently viewing (admin mode only). */
+  readonly selectedId = signal('');
 
-  /** The member whose profile is currently loaded, used to skip a redundant reload on a repeated param. */
+  /** The user whose profile is currently loaded, used to skip a redundant reload on a repeated param. */
   private loadedId = '';
 
   /** The values shown when edit mode was entered, so Cancel can revert the fields. */
@@ -260,15 +268,16 @@ export class ProfileComponent implements OnInit {
     private readonly userService: UserService,
     private readonly capability: CapabilityTokenService,
     private readonly notifications: NotificationService,
-    readonly selection: AdminSelectionService
+    readonly selection: AdminSelectionService,
+    private readonly cdr: ChangeDetectorRef
   ) {
     // Revoke the QR object URL when the component is destroyed to avoid leaking it (replaces ngOnDestroy).
     this.destroyRef.onDestroy(() => this.revokeQr());
   }
 
   /**
-   * Whether the admin is viewing their own account (so the page reads "Your …"). Always true in member mode;
-   * in admin mode it tracks the shared member selection against the admin's own account.
+   * Whether the admin is viewing their own account (so the page reads "Your …"). Always true in user mode;
+   * in admin mode it tracks the shared user selection against the admin's own account.
    */
   get ownProfile(): boolean {
     return !this.adminMode || this.selection.isOwnAccountSelected();
@@ -278,7 +287,7 @@ export class ProfileComponent implements OnInit {
     const token = this.route.snapshot.paramMap.get('token');
     this.adminMode = token === null;
     this.backLink = this.adminMode ? ['/admin'] : ['/login', token];
-    // Register the member's capability token so the interceptor authenticates the member API calls. The
+    // Register the user's capability token so the interceptor authenticates the user API calls. The
     // landing page sets this when navigating in-app, but a direct deep link or a page refresh on this route
     // lands here first with an empty token holder, so set it from the route as well.
     if (token) {
@@ -286,94 +295,96 @@ export class ProfileComponent implements OnInit {
     }
     if (this.adminMode) {
       await this.initAdminSelection();
-      // The URL is the source of truth for the selected member: follow the `member` query param (so the
+      // The URL is the source of truth for the selected user: follow the `user` query param (so the
       // browser Back/Forward buttons, which change it, re-select and reload the profile). Skip the initial
-      // emission's reload while the member list is still loading (`load` below handles the first paint).
+      // emission's reload while the user list is still loading (`load` below handles the first paint).
       this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-        if (this.loading || this.loadError) {
+        if (this.loading() || this.loadError()) {
           return;
         }
-        void this.applySelectionFromUrl(params.get('member'));
+        void this.applySelectionFromUrl(params.get('user'));
       });
     }
     await this.load();
   }
 
   /**
-   * Loads the member list and resolves the shared admin selection: records the admin's own id (from
-   * `/api/users/me`) as the shared default, then takes the selection from the URL's `member` param (the
+   * Loads the user list and resolves the shared admin selection: records the admin's own id (from
+   * `/api/users/me`) as the shared default, then takes the selection from the URL's `user` param (the
    * source of truth, the admin's own account when it is absent), so a deep link or a refresh on
-   * `/admin/profile?member=<id>` lands on that member.
+   * `/admin/profile?user=<id>` lands on that user.
    */
   private async initAdminSelection(): Promise<void> {
     try {
-      this.users = await this.userService.list();
+      this.users.set(await this.userService.list());
       const me = await this.userService.me();
       this.selection.setOwnUserId(me.id ?? '');
-      this.selectedId = this.selection.selectFromParam(this.route.snapshot.queryParamMap.get('member'));
+      this.selectedId.set(this.selection.selectFromParam(this.route.snapshot.queryParamMap.get('user')));
     } catch {
-      // a failed member-list load leaves the selector empty; `load()` still surfaces a retryable error
+      // a failed user-list load leaves the selector empty; `load()` still surfaces a retryable error
     }
   }
 
   /**
-   * Pushes the newly-selected member onto the URL as the `member` query param (a history entry, so Back
+   * Pushes the newly-selected user onto the URL as the `user` query param (a history entry, so Back
    * undoes the switch). The `queryParamMap` subscription then mirrors it into the shared selection and
    * reloads the profile; the URL stays the source of truth.
    *
-   * @param memberId the member id picked in the selector
+   * @param memberId the user id picked in the selector
    */
   async onMemberChange(memberId: string): Promise<void> {
-    this.selectedId = memberId;
+    this.selectedId.set(memberId);
     await this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { member: memberId },
+      queryParams: { user: memberId },
       queryParamsHandling: 'merge'
     });
   }
 
   /**
-   * Selects the member named by the URL's `member` param (or the admin's own account when it is absent) and
-   * reloads the profile, unless that member's profile is already loaded, so a redundant re-emission of the
-   * same param does not reload. `loadedId` (the member actually loaded) is the guard, not the bound
+   * Selects the user named by the URL's `user` param (or the admin's own account when it is absent) and
+   * reloads the profile, unless that user's profile is already loaded, so a redundant re-emission of the
+   * same param does not reload. `loadedId` (the user actually loaded) is the guard, not the bound
    * `selectedId` (which the dropdown already advanced before navigating).
    *
-   * @param memberId the value of the `member` query param, or null when it is absent
+   * @param memberId the value of the `user` query param, or null when it is absent
    */
   private async applySelectionFromUrl(memberId: string | null): Promise<void> {
     const effective = this.selection.selectFromParam(memberId);
     if (effective === this.loadedId) {
-      this.selectedId = effective;
+      this.selectedId.set(effective);
       return;
     }
-    this.selectedId = effective;
+    this.selectedId.set(effective);
     await this.load();
   }
 
   /**
-   * Loads the profile and the QR. In member mode this is the member's own `/api/profile`. In admin mode it
-   * is the selected member by id (the admin's own account or any other member), so the shared selection
-   * drives which member's details and QR are shown.
+   * Loads the profile and the QR. In user mode this is the user's own `/api/profile`. In admin mode it
+   * is the selected user by id (the admin's own account or any other user), so the shared selection
+   * drives which user's details and QR are shown.
    */
   async load(): Promise<void> {
-    this.loading = true;
-    this.loadError = '';
-    this.loadedId = this.selectedId;
+    this.loading.set(true);
+    this.loadError.set('');
+    this.loadedId = this.selectedId();
     try {
       this.profile = this.adminMode
-        ? await this.userService.get(this.selectedId)
+        ? await this.userService.get(this.selectedId())
         : await this.profileService.get();
+      // the profile is an ngModel target reassigned after an await, so mark this OnPush view for check
+      this.cdr.markForCheck();
       // a fresh load leaves edit mode, so the read-only view shows the just-loaded values
-      this.editing = false;
+      this.editing.set(false);
       const blob = this.adminMode
         ? await this.userService.qrBlob(this.profile.id!)
         : await this.profileService.qrBlob();
       this.revokeQr();
-      this.qrObjectUrl = URL.createObjectURL(blob);
+      this.qrObjectUrl.set(URL.createObjectURL(blob));
     } catch {
-      this.loadError = 'Could not load the profile. The link may be invalid.';
+      this.loadError.set('Could not load the profile. The link may be invalid.');
     } finally {
-      this.loading = false;
+      this.loading.set(false);
     }
   }
 
@@ -382,7 +393,7 @@ export class ProfileComponent implements OnInit {
     if (this.profile) {
       this.loadedProfile = { ...this.profile };
     }
-    this.editing = true;
+    this.editing.set(true);
   }
 
   /** Reverts the edited fields to the loaded values and leaves edit mode without saving. */
@@ -390,19 +401,19 @@ export class ProfileComponent implements OnInit {
     if (this.profile && this.loadedProfile) {
       this.profile = { ...this.profile, ...this.loadedProfile };
     }
-    this.editing = false;
+    this.editing.set(false);
   }
 
   /** Saves the edited name and email, then returns to the read-only view. */
   async save(): Promise<void> {
     // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
-    if (this.busy) {
+    if (this.busy()) {
       return;
     }
     if (!this.profile) {
       return;
     }
-    this.busy = true;
+    this.busy.set(true);
     try {
       const updated = this.adminMode
         ? // send only the editable profile fields, with role/active nulled so the backend keeps the stored
@@ -424,20 +435,23 @@ export class ProfileComponent implements OnInit {
       // the admin PUT response may omit `capabilityUrl` (it is assembled, not a stored field), which would
       // blank the "Coffee link"; keep the one already loaded when the response does not carry it
       this.profile = { ...updated, capabilityUrl: updated.capabilityUrl ?? this.profile.capabilityUrl };
-      this.editing = false;
+      // the profile is an ngModel target reassigned after an await, so mark this OnPush view for check
+      this.cdr.markForCheck();
+      this.editing.set(false);
       this.notifications.success('Profile saved.');
     } catch (error) {
       this.notifications.error(error, 'Could not save your profile.');
     } finally {
-      this.busy = false;
+      this.busy.set(false);
     }
   }
 
   /** Revokes the current QR object URL, if any, to avoid leaking it. */
   private revokeQr(): void {
-    if (this.qrObjectUrl) {
-      URL.revokeObjectURL(this.qrObjectUrl);
-      this.qrObjectUrl = null;
+    const url = this.qrObjectUrl();
+    if (url) {
+      URL.revokeObjectURL(url);
+      this.qrObjectUrl.set(null);
     }
   }
 }

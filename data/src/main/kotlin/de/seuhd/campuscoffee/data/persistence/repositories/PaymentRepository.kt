@@ -9,11 +9,11 @@ import java.util.UUID
  */
 interface PaymentRepository : JpaRepository<PaymentEntity, UUID> {
     /**
-     * Returns all payments whose user is the member with the given id, that member's deposits (Spring
+     * Returns all payments whose user is the one with the given id, that user's deposits (Spring
      * Data derives the query from the nested `user.id` path). Pure kitty adjustments have no user and are
      * not returned.
      *
-     * @param userId the id of the member
+     * @param userId the id of the user
      */
     fun findByUserId(userId: UUID): List<PaymentEntity>
 }

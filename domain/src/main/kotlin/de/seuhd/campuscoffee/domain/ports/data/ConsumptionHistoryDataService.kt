@@ -4,7 +4,7 @@ import de.seuhd.campuscoffee.domain.model.ConsumptionChange
 import java.util.UUID
 
 /**
- * Port for reading a member's consumption history straight from the append-only event log (rather than a
+ * Port for reading a user's consumption history straight from the append-only event log (rather than a
  * dedicated table). Implemented by the event sourcing adapter, which queries the `events` rows for the
  * consumption, computes each change's delta against the previous event, and carries the `created_by` /
  * `created_at` / `note` metadata. Kept separate from [CoffeeConsumptionDataService] because it is

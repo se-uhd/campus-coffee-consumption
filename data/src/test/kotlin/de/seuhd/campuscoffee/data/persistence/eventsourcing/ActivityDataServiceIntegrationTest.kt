@@ -19,7 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import java.util.UUID
 
 /**
- * Integration tests for [ActivityDataServiceImpl]: the member and kitty history projections walked straight
+ * Integration tests for [ActivityDataServiceImpl]: the user and kitty history projections walked straight
  * from the event log. Each write is attributed to the "SYSTEM" actor (no SecurityContext in a data test),
  * so a consumption write is an "owner step" when the activity is read with ownerLogin = "SYSTEM". These drive
  * the INSERT/UPDATE/DELETE branches of the expense and payment walks, the owner-undo and admin-override
@@ -87,7 +87,7 @@ class ActivityDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationT
         seedPrice(70)
         coffeeConsumptionDataService.upsert(consumption.copy(count = 2))
 
-        // a coffee at 50 then a coffee at 70 -> the member owes 120
+        // a coffee at 50 then a coffee at 70 -> the user owes 120
         assertThat(balanceOf(member)).isEqualTo(-120)
     }
 
@@ -230,7 +230,7 @@ class ActivityDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationT
 
         expenseDataService.delete(expense.persistedId)
 
-        // the DELETE event carries the buyer id, so the member activity matches and reverses it too
+        // the DELETE event carries the buyer id, so the user activity matches and reverses it too
         assertThat(balanceOf(member)).isEqualTo(0)
         assertThat(kittyBalance()).isEqualTo(0)
     }
@@ -334,7 +334,7 @@ class ActivityDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationT
 
         deposit = paymentDataService.upsert(deposit.copy(amountCents = 1200))
 
-        // the member balance and the kitty both reflect the corrected amount (the full state)
+        // the user balance and the kitty both reflect the corrected amount (the full state)
         assertThat(balanceOf(member)).isEqualTo(1200)
         assertThat(kittyBalance()).isEqualTo(1200)
     }
@@ -349,7 +349,7 @@ class ActivityDataServiceIntegrationTest : AbstractEventSourcingDataIntegrationT
 
         paymentDataService.delete(deposit.persistedId)
 
-        // the DELETE event carries the member id, so the member activity reverses the deposit too
+        // the DELETE event carries the user id, so the user activity reverses the deposit too
         assertThat(balanceOf(member)).isEqualTo(0)
         assertThat(kittyBalance()).isEqualTo(0)
     }

@@ -21,7 +21,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 /**
  * Single Spring and Cucumber configuration shared by all acceptance step definitions. Cucumber allows
  * only one [CucumberContextConfiguration], so the step classes hold step definitions only and rely on the
- * context, container, and cleanup hooks defined here. Each scenario starts from the seeded fixture members
+ * context, container, and cleanup hooks defined here. Each scenario starts from the seeded fixture users
  * (with their deterministic capability tokens) and their zeroed consumptions.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)

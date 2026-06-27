@@ -61,7 +61,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
             <div class="cc-activity-title">
               <span>{{ labelFor(entry.type) }}</span>
               @if (showsExpenseTotal(entry)) {
-                <!-- a member's split purchase: show the full purchase total, broken down below -->
+                <!-- a user's split purchase: show the full purchase total, broken down below -->
                 <span class="amount">+{{ expenseTotal(entry) }}</span>
               } @else {
                 <span class="amount" [class.warn]="entry.amountCents < 0">{{
@@ -110,7 +110,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
       </div>
     }
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
       .cc-activity-filter {
@@ -248,8 +248,8 @@ export class ActivityListComponent {
   /**
    * Whether the entry is an admin split bean purchase that carries a kitty portion; only then is the
    * condensed split shown (an unsplit, 100%-private expense shows none). Both expense rows can carry it: a
-   * `PRIVATE_EXPENSE` on a member's activity and a `KITTY_EXPENSE` on the kitty history. The portions are
-   * present only on the admin views (the member-serving read strips them), so a member's own activity never
+   * `PRIVATE_EXPENSE` on a user's activity and a `KITTY_EXPENSE` on the kitty history. The portions are
+   * present only on the admin views (the user-serving read strips them), so a user's own activity never
    * shows a split.
    */
   hasKittySplit(entry: ActivityEntryDto): boolean {
@@ -258,7 +258,7 @@ export class ActivityListComponent {
   }
 
   /**
-   * Whether the title shows the full purchase total instead of the entry's own signed effect. Only a member
+   * Whether the title shows the full purchase total instead of the entry's own signed effect. Only a user
    * activity's split `PRIVATE_EXPENSE` does: its balance effect is just the private portion, so the title shows
    * the full purchase (private + kitty) and the footer breaks it down. A `KITTY_EXPENSE` keeps its own signed
    * kitty draw in the title and only adds the footer split.

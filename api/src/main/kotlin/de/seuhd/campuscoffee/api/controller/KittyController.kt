@@ -26,9 +26,9 @@ import org.springframework.web.bind.annotation.ResponseStatus
 
 /**
  * Admin controller for the communal kitty (JWT, admin only): its balance and history, and the two money
- * movements made from the kitty page, a member **deposit** (a member paid money in, which credits them and
+ * movements made from the kitty page, a user **deposit** (a user paid money in, which credits them and
  * feeds the kitty) and a kitty **adjustment** (an initial float or a correction, which may be negative).
- * Members see only the kitty balance, which arrives in their landing summary, never the history (which
+ * Users see only the kitty balance, which arrives in their landing summary, never the history (which
  * would reveal who deposited and contributed).
  */
 @Tag(name = "Kitty", description = "The communal kitty: balance, history, deposits, and adjustments (admin only).")
@@ -58,11 +58,11 @@ class KittyController(
     }
 
     /**
-     * Records that a member paid money into the kitty (a deposit, which credits the member and feeds the kitty).
+     * Records that a user paid money into the kitty (a deposit, which credits the user and feeds the kitty).
      *
-     * @param dto the deposit (member, positive amount, optional note)
+     * @param dto the deposit (user, positive amount, optional note)
      */
-    @Operation(summary = "Record a member deposit (money paid into the kitty).")
+    @Operation(summary = "Record a user deposit (money paid into the kitty).")
     @ResponseStatus(HttpStatus.CREATED)
     @ResponseBody
     @PostMapping("/deposit")
@@ -81,7 +81,7 @@ class KittyController(
     }
 
     /**
-     * Adjusts the kitty without a member (an initial float, or a correction; may be negative).
+     * Adjusts the kitty without a user (an initial float, or a correction; may be negative).
      *
      * @param dto the adjustment (signed amount, optional note)
      */

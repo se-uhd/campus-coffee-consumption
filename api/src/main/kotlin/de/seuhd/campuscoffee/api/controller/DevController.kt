@@ -1,12 +1,12 @@
 package de.seuhd.campuscoffee.api.controller
 
 import de.seuhd.campuscoffee.api.dtos.DevSummaryDto
-import de.seuhd.campuscoffee.domain.ports.IdGenerator
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -31,7 +31,7 @@ class DevController(
     private val coffeePriceService: CoffeePriceService,
     private val expenseService: ExpenseService,
     private val paymentService: PaymentService,
-    private val idGenerator: IdGenerator
+    private val idGenerator: IdGeneratorService
 ) {
     /** Reports the current number of users and coffee consumptions. */
     @Operation(summary = "Report the current number of users and coffee consumptions.")
@@ -40,7 +40,7 @@ class DevController(
         ResponseEntity.ok(DevSummaryDto(userService.getAll().size, coffeeConsumptionService.getAll().size))
 
     /** Clears the data and reloads the test fixtures, reusing the seeded ids, and reports the new counts. */
-    @Operation(summary = "Replace all data with the test fixtures (members and their zeroed consumptions).")
+    @Operation(summary = "Replace all data with the test fixtures (users and their zeroed consumptions).")
     @PutMapping("/data")
     fun load(): ResponseEntity<DevSummaryDto> {
         // restart the id sequence so a reload assigns the fixtures the same ids

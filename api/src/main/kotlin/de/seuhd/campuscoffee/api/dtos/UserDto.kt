@@ -15,12 +15,12 @@ import java.util.UUID
  * [de.seuhd.campuscoffee.domain.model.User].
  *
  * [password] is write-only and applies only to an admin: it is required when creating or promoting an admin
- * (at least 24 characters, with a lowercase letter, an uppercase letter, and a digit), and a member (USER)
- * never has one; a member authenticates solely with their capability link, so any password sent for a member
+ * (at least 24 characters, with a lowercase letter, an uppercase letter, and a digit), and a user (USER)
+ * never has one; a user authenticates solely with their capability link, so any password sent for a user
  * is ignored. No response serializes it (and the stored hash is never exposed at all). [role] and [active]
  * appear in responses and may be set by an
  * admin; a non-admin self-update that sends them is ignored by the domain. [capabilityUrl] is read-only:
- * the assembled "your coffee link" the controller fills in from the member's secret token (the raw token
+ * the assembled "your coffee link" the controller fills in from the user's secret token (the raw token
  * is never a field of its own).
  */
 data class UserDto(
@@ -43,7 +43,7 @@ data class UserDto(
     @field:Size(min = 1, max = 255, message = "Last name must be between 1 and 255 characters long.")
     val lastName: String?,
     // optional in the DTO (only an admin needs one); the domain requires it for an admin and ignores it
-    // for a member
+    // for a user
     @field:Size(
         min = MIN_PASSWORD_LENGTH,
         max = MAX_PASSWORD_LENGTH,

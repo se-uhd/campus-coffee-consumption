@@ -9,7 +9,7 @@ import jakarta.validation.constraints.NotNull
 
 /**
  * Request body for the admin single-step coffee count change (`POST /api/users/{userId}/consumption`): a
- * [delta] of exactly `+1` or `-1`. The member endpoint (`POST /api/consumption`) takes no body and always
+ * [delta] of exactly `+1` or `-1`. The user endpoint (`POST /api/consumption`) takes no body and always
  * adds one, so this DTO is admin-only. Any other adjustment goes through the admin absolute override
  * (`PUT`). The `@Min`/`@Max` bound the range and [deltaIsSingleStep] rejects the in-range `0`, so a `0` or
  * out-of-range value yields a 400 at the validation layer (the domain enforces the same rule as a backstop).

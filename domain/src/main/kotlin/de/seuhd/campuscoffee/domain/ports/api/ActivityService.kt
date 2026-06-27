@@ -8,30 +8,30 @@ import de.seuhd.campuscoffee.domain.model.User
 import java.util.UUID
 
 /**
- * Service interface for the read-side **activity feeds**: a member's unified activity, the communal kitty
+ * Service interface for the read-side **activity feeds**: a user's unified activity, the communal kitty
  * history, and the admin-only global activity across everyone. A port implemented by the domain and consumed
  * by the API. It is the feed counterpart of [AccountingService] (which owns the balance, summary, and overview
  * numbers); both read the same event-log walk, here surfaced as chronological lists with running balances.
  */
 interface ActivityService {
     /**
-     * Returns a page of a member's unified activity, newest first. Readable by the member or an admin.
+     * Returns a page of a user's unified activity, newest first. Readable by the user or an admin.
      *
      * [includeKittyPortion] gates the kitty-funded portion of a split bean purchase
      * ([ActivityEntry.kittyAmountCents]): the admin-by-id read passes `true` (the admin sees the split), the
-     * member-serving read passes `false` (the kitty split is stripped, so it never reaches a member, even for
+     * user-serving read passes `false` (the kitty split is stripped, so it never reaches a user, even for
      * an admin-recorded split purchase on them). It never changes the balance math, which uses only the
      * private portion.
      *
-     * @param userId the member whose activity to read
+     * @param userId the user whose activity to read
      * @param limit the maximum number of entries to return
      * @param offset the number of newest entries to skip
      * @param actingUser the authenticated user attempting the read
      * @param includeKittyPortion whether to expose the kitty portion of a split expense (admin view only)
-     * @throws ForbiddenException if [actingUser] is neither that member nor an admin
-     * @throws NotFoundException if no member exists for [userId]
+     * @throws ForbiddenException if [actingUser] is neither that user nor an admin
+     * @throws NotFoundException if no user exists for [userId]
      */
-    fun memberActivity(
+    fun userActivity(
         userId: UUID,
         limit: Int,
         offset: Int,
@@ -56,8 +56,8 @@ interface ActivityService {
 
     /**
      * Returns a page of the whole-installation activity feed, newest first: every coffee, expense, deposit,
-     * kitty adjustment, and price change across all members, each row carrying the subject member, the actor,
-     * and the member and kitty running balances the event moved. Admin-only.
+     * kitty adjustment, and price change across all users, each row carrying the subject user, the actor,
+     * and the user and kitty running balances the event moved. Admin-only.
      *
      * @param limit the maximum number of entries to return
      * @param offset the number of newest entries to skip

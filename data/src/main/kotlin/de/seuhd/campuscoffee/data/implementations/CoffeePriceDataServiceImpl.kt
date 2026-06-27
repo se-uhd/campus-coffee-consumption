@@ -5,8 +5,8 @@ import de.seuhd.campuscoffee.data.mapper.CoffeePriceEntityMapper
 import de.seuhd.campuscoffee.data.persistence.entities.CoffeePriceEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeePriceRepository
 import de.seuhd.campuscoffee.domain.model.CoffeePrice
-import de.seuhd.campuscoffee.domain.ports.IdGenerator
 import de.seuhd.campuscoffee.domain.ports.data.CoffeePriceDataService
+import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -20,7 +20,7 @@ import java.util.UUID
 class CoffeePriceDataServiceImpl(
     repository: CoffeePriceRepository,
     entityMapper: CoffeePriceEntityMapper,
-    idGenerator: IdGenerator
+    idGenerator: IdGeneratorService
 ) : CrudDataServiceImpl<CoffeePrice, CoffeePriceEntity, CoffeePriceRepository, UUID>(
         repository,
         entityMapper,

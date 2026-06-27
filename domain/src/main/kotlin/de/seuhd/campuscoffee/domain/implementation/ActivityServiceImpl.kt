@@ -13,9 +13,9 @@ import java.util.UUID
 
 /**
  * Domain implementation of [ActivityService]. Surfaces the event-log walk (via [ActivityDataService]) as the
- * three chronological feeds: a member's unified activity, the kitty history, and the admin global activity.
- * The member and kitty feeds page the same walk that backs the summary; the global feed additionally resolves
- * each row's subject member to a login (in the data layer) and a display name (here). It does not own any
+ * three chronological feeds: a user's unified activity, the kitty history, and the admin global activity.
+ * The user and kitty feeds page the same walk that backs the summary; the global feed additionally resolves
+ * each row's subject user to a login (in the data layer) and a display name (here). It does not own any
  * balance number; those stay on [de.seuhd.campuscoffee.domain.ports.api.AccountingService].
  */
 @Service
@@ -23,7 +23,7 @@ class ActivityServiceImpl(
     private val activityDataService: ActivityDataService,
     private val userDataService: UserDataService
 ) : ActivityService {
-    override fun memberActivity(
+    override fun userActivity(
         userId: UUID,
         limit: Int,
         offset: Int,
@@ -32,8 +32,8 @@ class ActivityServiceImpl(
     ): List<ActivityEntry> {
         val user = requireMayViewUser(userId, actingUser, userDataService)
         val page = pageNewestFirst(activityDataService.userActivity(userId, user.loginName), limit, offset)
-        // the admin-by-id read keeps the kitty split; the member-serving read strips it so the kitty-funded
-        // portion of a split purchase never reaches a member (the balance math is unaffected either way)
+        // the admin-by-id read keeps the kitty split; the user-serving read strips it so the kitty-funded
+        // portion of a split purchase never reaches a user (the balance math is unaffected either way)
         return if (includeKittyPortion) page else page.map { it.withoutKittyPortion() }
     }
 
@@ -73,20 +73,20 @@ class ActivityServiceImpl(
     /**
      * Reads the whole global activity feed once (via the data port, which resolves each subject's login from
      * the log) and enriches each row's subject with a display name, leaving the result oldest-first, the order
-     * the walk produces, which the callers then page or reverse. A row whose subject is not a current member (a
-     * hard-deleted member whose events outlive their user row) is labeled [DELETED_MEMBER_NAME]; a row with no
+     * the walk produces, which the callers then page or reverse. A row whose subject is not a current user (a
+     * hard-deleted user whose events outlive their user row) is labeled [DELETED_USER_NAME]; a row with no
      * subject (a kitty adjustment, a price change) is left as-is.
      */
     private fun resolvedGlobalActivity(): List<GlobalActivityEntry> {
         val nameById = userDataService.getAll().associate { it.persistedId to "${it.firstName} ${it.lastName}" }
         return activityDataService.globalActivity().map { entry ->
             val subjectId = entry.subjectUserId ?: return@map entry
-            entry.copy(subjectName = nameById[subjectId] ?: DELETED_MEMBER_NAME)
+            entry.copy(subjectName = nameById[subjectId] ?: DELETED_USER_NAME)
         }
     }
 
     private companion object {
-        private const val DELETED_MEMBER_NAME = "(deleted member)"
+        private const val DELETED_USER_NAME = "(deleted user)"
 
         // a generous safety cap on the single-file CSV export so a pathologically large log fails loudly
         // rather than silently truncating or exhausting heap; far above any realistic SE@UHD log size

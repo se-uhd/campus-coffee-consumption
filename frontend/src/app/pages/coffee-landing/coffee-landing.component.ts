@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -33,9 +33,9 @@ const MAX_ADD_RETRIES = 4;
 const ADD_RETRY_BASE_DELAY_MS = 40;
 
 /**
- * Member landing reached by scanning the wall QR code (`/login/:token`). Reads the capability token from
+ * User landing reached by scanning the wall QR code (`/login/:token`). Reads the capability token from
  * the route, holds it for the interceptor, and shows the prepaid-card view: the big count and a +1 hero,
- * the price per cup, the member's balance (debt or credit), the read-only kitty balance, an "undo last
+ * the price per cup, the user's balance (debt or credit), the read-only kitty balance, an "undo last
  * coffee" action within the grace period, a private bean-purchase form, and the unified activity. Only the
  * displayed count updates optimistically on a +1; all money is always taken from the server's summary.
  */
@@ -70,41 +70,41 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
       </a>
     </cc-app-header>
 
-    @if (loading) {
+    @if (loading()) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
     <div class="page">
-      @if (loadError) {
+      @if (loadError()) {
         <mat-card class="card">
-          <p class="warn">{{ loadError }}</p>
+          <p class="warn">{{ loadError() }}</p>
           <button mat-stroked-button (click)="reload()">Retry</button>
         </mat-card>
       } @else {
-        @if (loginName) {
+        @if (loginName()) {
           <p class="muted cc-signed-in">
-            Signed in as <strong class="cc-login-name">{{ loginName }}</strong>
+            Signed in as <strong class="cc-login-name">{{ loginName() }}</strong>
           </p>
         }
 
-        @let s = summary;
+        @let s = summary();
         <cc-balance-summary
-          [count]="displayCount"
+          [count]="displayCount()"
           [priceCents]="s?.priceCents ?? null"
           [balanceCents]="s?.balanceCents ?? null"
           [kittyBalanceCents]="s?.kittyBalanceCents ?? null"
           [showBalance]="s != null"
-          [loading]="loading && s == null"
+          [loading]="loading() && s == null"
         >
           <button
             mat-fab
             color="primary"
             (click)="addCoffee()"
-            [disabled]="busy"
+            [disabled]="busy()"
             aria-label="Add a coffee"
             matTooltip="Add a coffee"
           >
-            @if (busy) {
+            @if (busy()) {
               <mat-spinner diameter="20"></mat-spinner>
             } @else {
               <mat-icon>add</mat-icon>
@@ -112,7 +112,7 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
           </button>
           @if (s?.cancellable) {
             <div extra class="cc-undo">
-              <button mat-stroked-button (click)="undo()" [disabled]="busy">
+              <button mat-stroked-button (click)="undo()" [disabled]="busy()">
                 <mat-icon>undo</mat-icon> Undo last cup
               </button>
             </div>
@@ -171,9 +171,9 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
               mat-flat-button
               color="primary"
               (click)="recordExpense()"
-              [disabled]="expenseForm.invalid || amountError() != null || busy"
+              [disabled]="expenseForm.invalid || amountError() != null || busy()"
             >
-              @if (busy) {
+              @if (busy()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
                 Save expense
@@ -185,17 +185,17 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
         <mat-card class="card">
           <h2>Recent activity</h2>
           <cc-activity-list
-            [entries]="activity"
+            [entries]="activity()"
             [showFilter]="true"
-            [canLoadMore]="hasMore"
-            [loadingMore]="loadingMore"
+            [canLoadMore]="hasMore()"
+            [loadingMore]="loadingMore()"
             (loadMore)="loadMore()"
           ></cc-activity-list>
         </mat-card>
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
       .cc-signed-in {
@@ -219,19 +219,19 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
 })
 export class CoffeeLandingComponent implements OnInit {
   token = '';
-  loginName = '';
-  summary: UserSummaryDto | null = null;
+  readonly loginName = signal('');
+  readonly summary = signal<UserSummaryDto | null>(null);
   /** The unified activity, paged client-side via "Load more". */
-  activity: ActivityEntryDto[] = [];
+  readonly activity = signal<ActivityEntryDto[]>([]);
   /** The optimistically-displayed count; reconciled to the server count after every action. */
-  displayCount: number | null = null;
-  busy = false;
-  loading = false;
-  loadingMore = false;
-  loadError = '';
-  hasMore = false;
+  readonly displayCount = signal<number | null>(null);
+  readonly busy = signal(false);
+  readonly loading = signal(false);
+  readonly loadingMore = signal(false);
+  readonly loadError = signal('');
+  readonly hasMore = signal(false);
 
-  showExpense = false;
+  readonly showExpense = signal(false);
   expenseWeightGrams: number | null = null;
   expenseAmountEuros = '';
   expenseNote = '';
@@ -246,7 +246,8 @@ export class CoffeeLandingComponent implements OnInit {
     private readonly capability: CapabilityTokenService,
     private readonly summaryService: SummaryService,
     private readonly profileService: ProfileService,
-    private readonly notifications: NotificationService
+    private readonly notifications: NotificationService,
+    private readonly cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -254,39 +255,39 @@ export class CoffeeLandingComponent implements OnInit {
     this.capability.set(this.token);
     this.profileService
       .get()
-      .then((profile) => (this.loginName = profile.loginName))
+      .then((profile) => this.loginName.set(profile.loginName))
       .catch(() => undefined);
     this.reload();
   }
 
   /** Loads the authoritative summary (and its first activity page); surfaces a retryable error on failure. */
   async reload(): Promise<void> {
-    this.loading = true;
-    this.loadError = '';
+    this.loading.set(true);
+    this.loadError.set('');
     try {
       this.applySummary(await this.summaryService.getSummary(ACTIVITY_PAGE_SIZE + 1, 0), true);
     } catch {
-      this.loadError = 'Could not load your coffee count. Your link may be invalid.';
+      this.loadError.set('Could not load your coffee count. Your link may be invalid.');
     } finally {
-      this.loading = false;
+      this.loading.set(false);
     }
   }
 
-  /** Appends the next page of the member's activity. */
+  /** Appends the next page of the user's activity. */
   async loadMore(): Promise<void> {
-    this.loadingMore = true;
+    this.loadingMore.set(true);
     try {
       const { entries, hasMore } = await loadActivityPage(
-        this.activity,
+        this.activity(),
         ACTIVITY_PAGE_SIZE,
         (limit, offset) => this.summaryService.getActivity(limit, offset)
       );
-      this.activity = entries;
-      this.hasMore = hasMore;
+      this.activity.set(entries);
+      this.hasMore.set(hasMore);
     } catch (error) {
       this.notifications.error(error, 'Could not load more activity.');
     } finally {
-      this.loadingMore = false;
+      this.loadingMore.set(false);
     }
   }
 
@@ -299,26 +300,27 @@ export class CoffeeLandingComponent implements OnInit {
    *   default-size first page and so falls back to the "page came back full" heuristic
    */
   private applySummary(summary: UserSummaryDto, peeked = false): void {
-    this.summary = summary;
-    this.displayCount = summary.count;
+    this.summary.set(summary);
+    this.displayCount.set(summary.count);
     if (peeked) {
-      this.activity = summary.activity.slice(0, ACTIVITY_PAGE_SIZE);
-      this.hasMore = summary.activity.length > ACTIVITY_PAGE_SIZE;
+      this.activity.set(summary.activity.slice(0, ACTIVITY_PAGE_SIZE));
+      this.hasMore.set(summary.activity.length > ACTIVITY_PAGE_SIZE);
     } else {
-      this.activity = summary.activity;
-      this.hasMore = summary.activity.length === ACTIVITY_PAGE_SIZE;
+      this.activity.set(summary.activity);
+      this.hasMore.set(summary.activity.length === ACTIVITY_PAGE_SIZE);
     }
   }
 
   /** Adds a coffee: bumps the displayed count optimistically, then reconciles to the server summary. */
   async addCoffee(): Promise<void> {
     // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
-    if (this.busy) {
+    if (this.busy()) {
       return;
     }
-    this.busy = true;
-    if (this.displayCount != null) {
-      this.displayCount += 1;
+    this.busy.set(true);
+    const current = this.displayCount();
+    if (current != null) {
+      this.displayCount.set(current + 1);
     }
     try {
       this.applySummary(await this.addCoffeeWithRetry());
@@ -326,12 +328,12 @@ export class CoffeeLandingComponent implements OnInit {
       this.notifications.error(error, 'Could not record that coffee. Reloading.');
       await this.reload();
     } finally {
-      this.busy = false;
+      this.busy.set(false);
     }
   }
 
   /**
-   * Posts one coffee, retrying a bounded number of times on a concurrent-update 409. The same member scanning
+   * Posts one coffee, retrying a bounded number of times on a concurrent-update 409. The same user scanning
    * from several tabs or devices loses the @Version optimistic-lock race on all but one concurrent write; the
    * documented contract is that the SPA retries, so each loser re-applies its tap rather than dropping it. A
    * small growing backoff de-synchronizes N concurrent writers so they converge instead of colliding again in
@@ -353,12 +355,13 @@ export class CoffeeLandingComponent implements OnInit {
 
   /** Undoes the most recent coffee within the grace period; a 409 means it is no longer cancellable. */
   async undo(): Promise<void> {
-    if (this.busy) {
+    if (this.busy()) {
       return;
     }
-    this.busy = true;
-    if (this.displayCount != null && this.displayCount > 0) {
-      this.displayCount -= 1;
+    this.busy.set(true);
+    const current = this.displayCount();
+    if (current != null && current > 0) {
+      this.displayCount.set(current - 1);
     }
     try {
       this.applySummary(await this.summaryService.cancelCoffee());
@@ -366,13 +369,13 @@ export class CoffeeLandingComponent implements OnInit {
       this.notifications.error(error, 'That coffee can no longer be undone.');
       await this.reload();
     } finally {
-      this.busy = false;
+      this.busy.set(false);
     }
   }
 
-  /** Records the member's own bean purchase; money is sent as integer cents, never as euros. */
+  /** Records the user's own bean purchase; money is sent as integer cents, never as euros. */
   async recordExpense(): Promise<void> {
-    if (this.busy) {
+    if (this.busy()) {
       return;
     }
     const amountCents = toCents(this.expenseAmountEuros);
@@ -386,7 +389,7 @@ export class CoffeeLandingComponent implements OnInit {
       this.notifications.error(null, 'Enter a whole-gram weight and a valid amount.');
       return;
     }
-    this.busy = true;
+    this.busy.set(true);
     try {
       const request: OwnExpenseRequest = {
         weightGrams: this.expenseWeightGrams,
@@ -397,12 +400,14 @@ export class CoffeeLandingComponent implements OnInit {
       this.expenseWeightGrams = null;
       this.expenseAmountEuros = '';
       this.expenseNote = '';
-      this.showExpense = false;
+      // the ngModel resets above are non-DOM writes, so mark this OnPush view for check to clear the fields
+      this.cdr.markForCheck();
+      this.showExpense.set(false);
       this.notifications.success('Expense recorded.');
     } catch (error) {
       this.notifications.error(error, 'Could not record the purchase.');
     } finally {
-      this.busy = false;
+      this.busy.set(false);
     }
   }
 }

@@ -18,12 +18,12 @@ import org.springframework.web.bind.annotation.RequestMapping
 import java.util.UUID
 
 /**
- * Admin read controller for the money views over members (JWT, admin only): every member's balance, and a
- * given member's activity feed (their coffees, purchases, and deposits). Kept separate from [UserController]
+ * Admin read controller for the money views over users (JWT, admin only): every user's balance, and a
+ * given user's activity feed (their coffees, purchases, and deposits). Kept separate from [UserController]
  * for cohesion; paging is validated through the shared [PageQuery] object (see its KDoc for why the project
  * validates paging via `@Valid` binding rather than a class-level `@Validated`).
  */
-@Tag(name = "Admin accounting", description = "Per-member balances and activity (admin only).")
+@Tag(name = "Admin accounting", description = "Per-user balances and activity (admin only).")
 @Controller
 @RequestMapping("/users")
 class AdminAccountingController(
@@ -33,12 +33,12 @@ class AdminAccountingController(
     private val currentUserProvider: CurrentUserProvider
 ) {
     /**
-     * Returns every member's current count and balance (admin only). Unpaged, like `GET /users`: the admin
-     * overview table shows all members at once, and a coffee group is small. Each member's balance is read
-     * from the maintained `member_balance` projection in one query, not by replaying their event stream; the
-     * per-member count is still read per member. Page it if membership grows large.
+     * Returns every user's current count and balance (admin only). Unpaged, like `GET /users`: the admin
+     * overview table shows all users at once, and a coffee group is small. Each user's balance is read
+     * from the maintained `user_balance` projection in one query, not by replaying their event stream; the
+     * per-user count is still read per user. Page it if membership grows large.
      */
-    @Operation(summary = "Get every member's current count and balance.")
+    @Operation(summary = "Get every user's current count and balance.")
     @GetMapping("/overview")
     fun overview(): ResponseEntity<List<UserBalanceDto>> {
         val admin = currentUserProvider.currentUser()
@@ -46,12 +46,12 @@ class AdminAccountingController(
     }
 
     /**
-     * Returns a page of the given member's activity feed (coffees, purchases, and deposits, newest first).
+     * Returns a page of the given user's activity feed (coffees, purchases, and deposits, newest first).
      *
-     * @param userId the member whose activity to read
+     * @param userId the user whose activity to read
      * @param page   the validated paging window (limit/offset)
      */
-    @Operation(summary = "Get a page of a member's activity.")
+    @Operation(summary = "Get a page of a user's activity.")
     @GetMapping("/{userId}/activity")
     fun userActivity(
         @PathVariable userId: UUID,
@@ -59,10 +59,10 @@ class AdminAccountingController(
     ): ResponseEntity<List<ActivityEntryDto>> {
         val admin = currentUserProvider.currentUser()
         return ResponseEntity.ok(
-            // the admin-by-id activity exposes the kitty-funded portion of a split expense (the member-serving
+            // the admin-by-id activity exposes the kitty-funded portion of a split expense (the user-serving
             // /api/activity does not, see AccountingService.userActivity)
             accountingDtoMapper.toEntryDtos(
-                activityService.memberActivity(
+                activityService.userActivity(
                     userId,
                     page.limitOr(DEFAULT_LIMIT),
                     page.offset,
@@ -74,7 +74,7 @@ class AdminAccountingController(
     }
 
     private companion object {
-        /** The default page size for the admin member-activity read when the caller supplies no limit. */
+        /** The default page size for the admin user-activity read when the caller supplies no limit. */
         private const val DEFAULT_LIMIT = 20
     }
 }

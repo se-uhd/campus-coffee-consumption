@@ -13,8 +13,8 @@ import org.springframework.test.web.servlet.client.returnResult
 import java.util.UUID
 
 /**
- * System tests for the member deletion guard: a member with any financial footprint (a non-zero count or a
- * deposit) cannot be hard-deleted (409), preserving the financial history, while a pristine member is
+ * System tests for the user deletion guard: a user with any financial footprint (a non-zero count or a
+ * deposit) cannot be hard-deleted (409), preserving the financial history, while a pristine user is
  * deleted (204).
  */
 class MemberDeletionSystemTests : AbstractSystemTest() {
@@ -71,8 +71,8 @@ class MemberDeletionSystemTests : AbstractSystemTest() {
     @Test
     fun `deleting a member who has an expense returns 409 Conflict`() {
         val id = createMember("hasexpense")
-        // record a fully-private bean purchase attributed to the member as buyer (their own purchase): the
-        // member now has a financial footprint, so the hard delete is refused
+        // record a fully-private bean purchase attributed to the user as buyer (their own purchase): the
+        // user now has a financial footprint, so the hard delete is refused
         client()
             .post()
             .uri("/api/users/{id}/expenses", id)

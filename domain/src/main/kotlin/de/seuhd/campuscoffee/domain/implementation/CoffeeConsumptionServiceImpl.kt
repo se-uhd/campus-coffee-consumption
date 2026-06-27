@@ -4,12 +4,12 @@ import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
 import de.seuhd.campuscoffee.domain.model.CancellableIncrement
+import de.seuhd.campuscoffee.domain.model.ChangeNoteContext
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.ConsumptionChange
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
-import de.seuhd.campuscoffee.domain.ports.ChangeNoteContext
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
@@ -24,10 +24,10 @@ import java.util.UUID
 
 /**
  * Domain implementation of [CoffeeConsumptionService]. Each `+1`/`-1` ([applyDelta]) and admin override
- * ([setTotal]) loads the member's consumption, applies the new count, and upserts it, recorded by the
+ * ([setTotal]) loads the user's consumption, applies the new count, and upserts it, recorded by the
  * event-sourced data adapter as a full-state event, reusing the same upsert path a review's approval
- * count used. Enforces the authorization rules: a member may view and step only their own count, an admin
- * may act on anyone, the absolute override is admin-only, a deactivated member is read-only, and the count
+ * count used. Enforces the authorization rules: a user may view and step only their own count, an admin
+ * may act on anyone, the absolute override is admin-only, a deactivated user is read-only, and the count
  * never goes negative.
  */
 @Suppress("TooManyFunctions")
@@ -111,15 +111,15 @@ class CoffeeConsumptionServiceImpl(
         userId: UUID,
         actingUser: User
     ): CoffeeConsumption {
-        // a cancel must be recorded by the owner, so its event is attributed to the member and the activity
+        // a cancel must be recorded by the owner, so its event is attributed to the user and the activity
         // credits it at the original increment's price; an admin corrects a count with setTotal instead
         if (actingUser.persistedId != userId) {
             throw ForbiddenException("Only the owner may undo their own coffee; an admin adjusts the count instead.")
         }
         if (actingUser.active != true) {
-            throw ForbiddenException("A deactivated member is read-only and cannot undo a coffee.")
+            throw ForbiddenException("A deactivated user is read-only and cannot undo a coffee.")
         }
-        // invariant: the grace/candidate gate here and the activity credit (which re-walks the member's
+        // invariant: the grace/candidate gate here and the activity credit (which re-walks the user's
         // increments LIFO) derive the same chosen increment from the same stack rules, so they must stay
         // rule-identical. The count <= 0 recheck below plus the @Version-guarded write prevent a double-undo
         // even though this candidate read is not serialized with the write.
@@ -151,7 +151,7 @@ class CoffeeConsumptionServiceImpl(
     override fun createForUser(user: User): CoffeeConsumption =
         coffeeConsumptionDataService.upsert(CoffeeConsumption(user = user, count = 0))
 
-    /** The member's most recent own increment if it is still within the grace period to undo, else null. */
+    /** The user's most recent own increment if it is still within the grace period to undo, else null. */
     private fun cancellableWithinGrace(
         userId: UUID,
         ownerLogin: String
@@ -176,7 +176,7 @@ class CoffeeConsumptionServiceImpl(
 
     /**
      * Allows a `+1`/`-1` only when [actingUser] owns the consumption of [userId] or is an admin, and, for
-     * the owner, only while the account is active (a deactivated member is authenticated read-only).
+     * the owner, only while the account is active (a deactivated user is authenticated read-only).
      */
     private fun requireMaySelfMutate(
         userId: UUID,
@@ -187,7 +187,7 @@ class CoffeeConsumptionServiceImpl(
             throw ForbiddenException("A coffee count may be changed only by its owner or an admin.")
         }
         if (!isAdmin && actingUser.active != true) {
-            throw ForbiddenException("A deactivated member is read-only and cannot change their coffee count.")
+            throw ForbiddenException("A deactivated user is read-only and cannot change their coffee count.")
         }
     }
 

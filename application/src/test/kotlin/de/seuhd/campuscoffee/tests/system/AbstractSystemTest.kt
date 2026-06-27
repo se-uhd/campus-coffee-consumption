@@ -22,7 +22,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 
 /**
  * Abstract base class for system tests. Sets up the Spring Boot test context, manages the PostgreSQL
- * testcontainer, seeds the fixture members (with their deterministic capability tokens) and their zeroed
+ * testcontainer, seeds the fixture users (with their deterministic capability tokens) and their zeroed
  * consumptions, and binds the shared RestTestClient. The id generator is the seeded (deterministic) one.
  */
 @SpringBootTest(
@@ -54,8 +54,8 @@ abstract class AbstractSystemTest {
     @BeforeEach
     fun beforeEach() {
         clearAll()
-        // seed the fixture members (with their known capability tokens and passwords) and their
-        // consumptions at zero, so a member can authenticate by token and an admin by JWT
+        // seed the fixture users (with their known capability tokens and passwords) and their
+        // consumptions at zero, so a user can authenticate by token and an admin by JWT
         seededUsers = TestFixtures.createUserFixtures(userService)
         TestFixtures.createConsumptionFixtures(coffeeConsumptionService, seededUsers)
         // seed the initial price after the users/consumptions, so a price is in effect before any coffee

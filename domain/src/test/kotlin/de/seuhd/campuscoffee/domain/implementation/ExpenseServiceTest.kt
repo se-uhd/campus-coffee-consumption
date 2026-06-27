@@ -7,7 +7,7 @@ import de.seuhd.campuscoffee.domain.model.Expense
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
-import de.seuhd.campuscoffee.domain.ports.data.BalanceLock
+import de.seuhd.campuscoffee.domain.ports.data.BalanceLockService
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.assertj.core.api.Assertions.assertThat
@@ -22,7 +22,7 @@ import org.mockito.kotlin.whenever
 import java.util.UUID
 
 /**
- * Unit tests for ExpenseServiceImpl, mocking the data ports. The invariants under test: a member's own
+ * Unit tests for ExpenseServiceImpl, mocking the data ports. The invariants under test: a user's own
  * purchase is always booked 100% private to themselves, a split or attribution by anyone but an admin is
  * forbidden, and the private and kitty portions must sum to the total with no negative values.
  */
@@ -30,7 +30,7 @@ class ExpenseServiceTest {
     private val expenseDataService: ExpenseDataService = mock()
     private val userDataService: UserDataService = mock()
     private val balanceDataService: BalanceDataService = mock()
-    private val balanceLock: BalanceLock = mock()
+    private val balanceLock: BalanceLockService = mock()
     private val service = ExpenseServiceImpl(expenseDataService, userDataService, balanceDataService, balanceLock)
 
     private val memberId: UUID = UUID(0L, 1L)

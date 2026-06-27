@@ -4,14 +4,14 @@ import { firstValueFrom } from 'rxjs';
 import { UserDto } from '../models';
 
 /**
- * Admin user-management calls against `/api/users` (the interceptor adds the JWT). Also exposes the member
+ * Admin user-management calls against `/api/users` (the interceptor adds the JWT). Also exposes the user
  * QR download URL, which the browser fetches directly with the capability token.
  */
 @Injectable({ providedIn: 'root' })
 export class UserService {
   constructor(private readonly http: HttpClient) {}
 
-  /** All members. */
+  /** All users. */
   list(): Promise<UserDto[]> {
     return firstValueFrom(this.http.get<UserDto[]>('/api/users'));
   }
@@ -21,45 +21,45 @@ export class UserService {
     return firstValueFrom(this.http.get<UserDto>('/api/users/me'));
   }
 
-  /** A single member by id. */
+  /** A single user by id. */
   get(id: string): Promise<UserDto> {
     return firstValueFrom(this.http.get<UserDto>(`/api/users/${id}`));
   }
 
-  /** Creates a member; the response includes the assigned capability URL. */
+  /** Creates a user; the response includes the assigned capability URL. */
   create(user: UserDto): Promise<UserDto> {
     return firstValueFrom(this.http.post<UserDto>('/api/users', user));
   }
 
-  /** Updates a member (profile, role, active state). */
+  /** Updates a user (profile, role, active state). */
   update(id: string, user: UserDto): Promise<UserDto> {
     return firstValueFrom(this.http.put<UserDto>(`/api/users/${id}`, user));
   }
 
-  /** Deletes a member. */
+  /** Deletes a user. */
   delete(id: string): Promise<void> {
     return firstValueFrom(this.http.delete<void>(`/api/users/${id}`));
   }
 
-  /** Rotates a member's capability link, returning the user with the new capability URL. */
+  /** Rotates a user's capability link, returning the user with the new capability URL. */
   rotateLink(id: string): Promise<UserDto> {
     return firstValueFrom(this.http.post<UserDto>(`/api/users/${id}/link/rotate`, {}));
   }
 
   /**
-   * A member's QR code as a PNG blob, by id. Fetched via HttpClient (so the interceptor attaches the JWT)
+   * A user's QR code as a PNG blob, by id. Fetched via HttpClient (so the interceptor attaches the JWT)
    * rather than an `<img src>`, which could not send the header.
    */
   qrBlob(id: string): Promise<Blob> {
     return firstValueFrom(this.http.get(`/api/users/${id}/qr.png`, { responseType: 'blob' }));
   }
 
-  /** A ZIP archive of every active member's QR code as a blob (each entry named `<loginName>.png`). */
+  /** A ZIP archive of every active user's QR code as a blob (each entry named `<loginName>.png`). */
   qrZipBlob(): Promise<Blob> {
     return firstValueFrom(this.http.get('/api/users/qr.zip', { responseType: 'blob' }));
   }
 
-  /** A printable PDF grid of every active member's QR code as a blob (each labeled by login name). */
+  /** A printable PDF grid of every active user's QR code as a blob (each labeled by login name). */
   qrPdfBlob(): Promise<Blob> {
     return firstValueFrom(this.http.get('/api/users/qr.pdf', { responseType: 'blob' }));
   }

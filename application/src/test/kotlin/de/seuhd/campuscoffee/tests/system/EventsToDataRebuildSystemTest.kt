@@ -102,7 +102,7 @@ class EventsToDataRebuildSystemTest {
 
     @Test
     fun `rebuilding the read model from the log leaves the balance, kitty, and activity unchanged`() {
-        // a coffee at 50, a member purchase (+900 private), and a deposit (+1000) -> balance 1850
+        // a coffee at 50, a user purchase (+900 private), and a deposit (+1000) -> balance 1850
         client()
             .post()
             .uri("/api/consumption")

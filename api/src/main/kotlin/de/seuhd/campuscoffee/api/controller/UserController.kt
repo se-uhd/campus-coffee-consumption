@@ -1,7 +1,5 @@
 package de.seuhd.campuscoffee.api.controller
 
-import de.seuhd.campuscoffee.api.capability.CapabilityQrResponder
-import de.seuhd.campuscoffee.api.capability.CapabilityUrlFactory
 import de.seuhd.campuscoffee.api.dtos.UserDto
 import de.seuhd.campuscoffee.api.mapper.DtoMapper
 import de.seuhd.campuscoffee.api.mapper.UserDtoMapper
@@ -14,6 +12,8 @@ import de.seuhd.campuscoffee.api.openapi.Operation.GET_BY_ID
 import de.seuhd.campuscoffee.api.openapi.Operation.UPDATE
 import de.seuhd.campuscoffee.api.openapi.Resource.USER
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
+import de.seuhd.campuscoffee.api.support.CapabilityQrResponder
+import de.seuhd.campuscoffee.api.support.CapabilityUrlFactory
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.CrudService
@@ -37,16 +37,16 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import java.util.UUID
 
 /**
- * Admin controller for managing SE@UHD members: user CRUD plus their capability links and QR codes. The
+ * Admin controller for managing SE@UHD users: user CRUD plus their capability links and QR codes. The
  * whole resource is admin-only (gated in the security configuration); the domain additionally enforces the
  * self-or-admin read rule. Every user response is enriched with the assembled capability URL ("coffee
- * link") so an admin can re-display and re-print any member's QR.
+ * link") so an admin can re-display and re-print any user's QR.
  *
- * A full member CRUD controller plus the capability link/QR endpoints, so it has many cohesive methods;
+ * A full user CRUD controller plus the capability link/QR endpoints, so it has many cohesive methods;
  * `TooManyFunctions` is suppressed.
  */
 @Suppress("TooManyFunctions")
-@Tag(name = "Users", description = "Admin operations for managing members and their capability links.")
+@Tag(name = "Users", description = "Admin operations for managing users and their capability links.")
 @Controller
 @RequestMapping("/users")
 class UserController(
@@ -61,8 +61,8 @@ class UserController(
     override fun mapper(): DtoMapper<User, UserDto> = userDtoMapper
 
     /**
-     * Returns every member (admin only). Deliberately unpaged, unlike the activity reads: the admin SPA needs
-     * the whole member set at once (the member-selector dropdown and the overview table), and a coffee group
+     * Returns every user (admin only). Deliberately unpaged, unlike the activity reads: the admin SPA needs
+     * the whole user set at once (the user-selector dropdown and the overview table), and a coffee group
      * is small enough that the full list is cheap. Bound it by paging only if the membership grows large.
      */
     @Operation
@@ -88,13 +88,13 @@ class UserController(
     @CrudOperation(operation = CREATE, resource = USER, roleRestricted = true)
     @PostMapping("")
     override fun create(
-        @Parameter(description = "Data of the member to create, including their role.", required = true)
+        @Parameter(description = "Data of the user to create, including their role.", required = true)
         @RequestBody
         @Valid dto: UserDto
     ): ResponseEntity<UserDto> {
         require(dto.id == null) { "ID must not be set when creating a new resource." }
-        // creating a member is an admin operation; the domain assigns the capability token and the
-        // member's consumption at count = 0
+        // creating a user is an admin operation; the domain assigns the capability token and the
+        // user's consumption at count = 0
         val created = userService.create(userDtoMapper.toDomain(dto), currentUserProvider.currentUser())
         return ResponseEntity.created(getLocation(created.persistedId)).body(withCapabilityUrl(created))
     }
@@ -123,7 +123,7 @@ class UserController(
     ): ResponseEntity<Void> {
         // resolve the principal so a deactivated admin's in-flight JWT is rejected here too (the resolver
         // throws ForbiddenException for a deactivated admin), keeping the lockout uniform across endpoints.
-        // Hard-deleting a member is irreversible, so this must not be reachable by a just-revoked admin.
+        // Hard-deleting a user is irreversible, so this must not be reachable by a just-revoked admin.
         currentUserProvider.currentUser()
         return super.delete(id)
     }
@@ -148,27 +148,27 @@ class UserController(
         ResponseEntity.ok(withCapabilityUrl(userService.getByLoginName(loginName, currentUserProvider.currentUser())))
 
     /**
-     * Retrieves a member's capability link (the URL encoded in their wall QR code).
+     * Retrieves a user's capability link (the URL encoded in their wall QR code).
      *
-     * @param id the id of the member whose link to retrieve
+     * @param id the id of the user whose link to retrieve
      */
-    @Operation(summary = "Get a member's capability link (the URL encoded in their QR code).")
+    @Operation(summary = "Get a user's capability link (the URL encoded in their QR code).")
     @GetMapping("/{id}/link")
     fun link(
-        @Parameter(description = "Unique identifier of the member.", required = true)
+        @Parameter(description = "Unique identifier of the user.", required = true)
         @PathVariable id: UUID
     ): ResponseEntity<UserDto> =
         ResponseEntity.ok(withCapabilityUrl(userService.getById(id, currentUserProvider.currentUser())))
 
     /**
-     * Rotates a member's capability link, issuing a new URL and invalidating the previously printed QR.
+     * Rotates a user's capability link, issuing a new URL and invalidating the previously printed QR.
      *
-     * @param id the id of the member whose link to rotate
+     * @param id the id of the user whose link to rotate
      */
-    @Operation(summary = "Rotate a member's capability link, invalidating the old QR code.")
+    @Operation(summary = "Rotate a user's capability link, invalidating the old QR code.")
     @PostMapping("/{id}/link/rotate")
     fun rotateLink(
-        @Parameter(description = "Unique identifier of the member.", required = true)
+        @Parameter(description = "Unique identifier of the user.", required = true)
         @PathVariable id: UUID
     ): ResponseEntity<UserDto> =
         ResponseEntity.ok(
@@ -176,20 +176,20 @@ class UserController(
         )
 
     /**
-     * Downloads a member's capability QR code as a high-resolution PNG.
+     * Downloads a user's capability QR code as a high-resolution PNG.
      *
-     * @param id the id of the member whose QR code to download
+     * @param id the id of the user whose QR code to download
      */
-    @Operation(summary = "Download a member's capability QR code (high-resolution PNG).")
+    @Operation(summary = "Download a user's capability QR code (high-resolution PNG).")
     @GetMapping("/{id}/qr.png", produces = [MediaType.IMAGE_PNG_VALUE])
     fun qrCode(
-        @Parameter(description = "Unique identifier of the member.", required = true)
+        @Parameter(description = "Unique identifier of the user.", required = true)
         @PathVariable id: UUID
     ): ResponseEntity<ByteArray> =
         capabilityQrResponder.qrResponse(userService.getById(id, currentUserProvider.currentUser()))
 
-    /** Downloads a ZIP archive of every active member's capability QR code, each entry named `<loginName>.png`. */
-    @Operation(summary = "Download a ZIP archive of every active member's capability QR code (one PNG per member).")
+    /** Downloads a ZIP archive of every active user's capability QR code, each entry named `<loginName>.png`. */
+    @Operation(summary = "Download a ZIP archive of every active user's capability QR code (one PNG per user).")
     @GetMapping("/qr.zip", produces = ["application/zip"])
     fun qrCodesZip(): ResponseEntity<StreamingResponseBody> {
         // resolve the principal so a deactivated admin's in-flight JWT is rejected here too
@@ -197,9 +197,9 @@ class UserController(
         return capabilityQrResponder.zipResponse(userService.getAll())
     }
 
-    /** Downloads a printable PDF grid of every active member's capability QR code, labeled by login name. */
+    /** Downloads a printable PDF grid of every active user's capability QR code, labeled by login name. */
     @Operation(
-        summary = "Download a printable PDF grid of every active member's QR code, labeled by login name."
+        summary = "Download a printable PDF grid of every active user's QR code, labeled by login name."
     )
     @GetMapping("/qr.pdf", produces = [MediaType.APPLICATION_PDF_VALUE])
     fun qrCodesPdf(): ResponseEntity<ByteArray> {
@@ -208,7 +208,7 @@ class UserController(
         return capabilityQrResponder.pdfResponse(userService.getAll())
     }
 
-    /** Maps a user to its DTO and fills in the assembled capability URL from the member's secret token. */
+    /** Maps a user to its DTO and fills in the assembled capability URL from the user's secret token. */
     private fun withCapabilityUrl(user: User): UserDto =
         userDtoMapper
             .fromDomain(

@@ -9,7 +9,7 @@ import de.seuhd.campuscoffee.domain.model.User
 /**
  * Service interface for the global coffee price. A port implemented by the domain and consumed by the API.
  *
- * Reading the current price is open to any member (it is shown on the landing page); changing it and
+ * Reading the current price is open to any user (it is shown on the landing page); changing it and
  * reading its history are admin-only. Every change is recorded as a full-state event, so the full price
  * history is retrievable from the log.
  */

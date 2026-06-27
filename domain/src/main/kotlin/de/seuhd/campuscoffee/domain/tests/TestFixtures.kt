@@ -11,7 +11,7 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 /**
- * Test and demo fixtures for the consumption domain: one admin and four members, each with a deterministic
+ * Test and demo fixtures for the consumption domain: one admin and four users, each with a deterministic
  * capability token (for repeatable demos) and a coffee consumption starting at zero. Lives in `src/main`
  * so the dev endpoint, the startup loader, and the system tests share a single source of fixture data.
  */
@@ -106,28 +106,28 @@ object TestFixtures {
 
     /**
      * The login name and raw password of the representative fixture user with [role]. Only an admin has a
-     * password (a member authenticates with their capability link, not a password), so this supports
+     * password (a user authenticates with their capability link, not a password), so this supports
      * [Role.ADMIN] only; it is the single source of the admin credentials reused by the system tests.
      *
      * @param role the role whose representative fixture credentials to return (must be [Role.ADMIN])
      */
     fun rawCredentialsFor(role: Role): Pair<String, String> {
-        require(role == Role.ADMIN) { "Only an admin has a password; a member authenticates with their link." }
+        require(role == Role.ADMIN) { "Only an admin has a password; a user authenticates with their link." }
         return admin().let { it.loginName to requireNotNull(it.password) }
     }
 
     /**
-     * The raw capability token of the fixture member with the given [loginName], used by the system tests
-     * to authenticate as a member via the `X-Capability-Token` header.
+     * The raw capability token of the fixture user with the given [loginName], used by the system tests
+     * to authenticate as a user via the `X-Capability-Token` header.
      *
-     * @param loginName the login name of the fixture member
+     * @param loginName the login name of the fixture user
      */
     fun rawCapabilityTokenFor(loginName: String): String =
         requireNotNull(getUserFixtures().first { it.loginName == loginName }.capabilityToken)
 
     /**
      * Returns the fixture users with their ids and timestamps stripped, ready for insertion. The
-     * capability token and raw password are kept so the seeded members have stable, demo-able coffee links.
+     * capability token and raw password are kept so the seeded users have stable, demo-able coffee links.
      */
     fun getUserFixturesForInsertion(): List<User> =
         getUserFixtures().map { it.copy(id = null, createdAt = null, updatedAt = null) }

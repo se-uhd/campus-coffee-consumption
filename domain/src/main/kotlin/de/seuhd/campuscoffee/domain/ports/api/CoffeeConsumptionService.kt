@@ -12,16 +12,16 @@ import de.seuhd.campuscoffee.domain.model.User
 import java.util.UUID
 
 /**
- * Service interface for coffee-consumption operations: the per-member running count and its change log.
+ * Service interface for coffee-consumption operations: the per-user running count and its change log.
  *
  * This is a port implemented by the domain layer and consumed by the API layer. Each mutation
- * ([applyDelta], [setTotal]) loads the target member's consumption, applies the new count, and upserts it,
+ * ([applyDelta], [setTotal]) loads the target user's consumption, applies the new count, and upserts it,
  * which the event-sourced data adapter records as a full-state event. There is deliberately no new
  * activity machinery: the count advances through the same upsert path a review's approval count did.
  *
- * Authorization is by [User.role] and ownership: a member may add a coffee or undo a recent one only on
+ * Authorization is by [User.role] and ownership: a user may add a coffee or undo a recent one only on
  * their own count, an admin may act on anyone, and the absolute override ([setTotal], an admin correction)
- * is admin-only. A deactivated member is authenticated read-only, so their mutations are rejected.
+ * is admin-only. A deactivated user is authenticated read-only, so their mutations are rejected.
  *
  * Extends [CrudService] for the generic operations the fixtures, dev endpoint, and event-sourcing
  * projector rely on; the methods here add the consumption-specific behavior.
@@ -66,7 +66,7 @@ interface CoffeeConsumptionService : CrudService<CoffeeConsumption, UUID> {
      * value, including zero). An optional [note] documents the change in the event log.
      *
      * This absolute override is authoritative: it writes the new [total] as the count's full state, so it
-     * intentionally supersedes any concurrent self-scan. A member `+1` that lands between the admin's read
+     * intentionally supersedes any concurrent self-scan. A user `+1` that lands between the admin's read
      * and write is overwritten by design (the admin asserts an absolute value, not a relative adjustment),
      * so this write is deliberately not guarded against that race.
      *
@@ -104,12 +104,12 @@ interface CoffeeConsumptionService : CrudService<CoffeeConsumption, UUID> {
     ): List<ConsumptionChange>
 
     /**
-     * Undoes the calling member's most recent coffee within the grace period (only the owner may do this;
+     * Undoes the calling user's most recent coffee within the grace period (only the owner may do this;
      * an admin uses [setTotal] instead). It reverts the most recent un-cancelled own increment, crediting
      * exactly the price it was charged at, so undoing nets to zero.
      *
-     * @param userId     the id of the member undoing a coffee (must be [actingUser])
-     * @param actingUser the authenticated member
+     * @param userId     the id of the user undoing a coffee (must be [actingUser])
+     * @param actingUser the authenticated user
      * @return the updated consumption
      * @throws ForbiddenException if [actingUser] is not the owner, or is deactivated
      * @throws ConflictException if there is no recent coffee to undo or the grace period has passed
@@ -121,13 +121,13 @@ interface CoffeeConsumptionService : CrudService<CoffeeConsumption, UUID> {
     ): CoffeeConsumption
 
     /**
-     * Returns the member's most recent coffee that is still within the grace period to undo, or null if
+     * Returns the user's most recent coffee that is still within the grace period to undo, or null if
      * there is none, used to show or hide the undo affordance. Subject to the same self-or-admin read rule
      * as [getByUserId].
      *
-     * @param userId     the id of the member whose cancellable coffee to check
+     * @param userId     the id of the user whose cancellable coffee to check
      * @param actingUser the authenticated user attempting the read
-     * @throws ForbiddenException if [actingUser] is neither that member nor an admin
+     * @throws ForbiddenException if [actingUser] is neither that user nor an admin
      */
     fun cancellableIncrement(
         userId: UUID,

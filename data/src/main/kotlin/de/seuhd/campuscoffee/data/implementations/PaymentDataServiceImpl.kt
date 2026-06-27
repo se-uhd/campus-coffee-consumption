@@ -4,8 +4,8 @@ import de.seuhd.campuscoffee.data.mapper.PaymentEntityMapper
 import de.seuhd.campuscoffee.data.persistence.entities.PaymentEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.PaymentRepository
 import de.seuhd.campuscoffee.domain.model.Payment
-import de.seuhd.campuscoffee.domain.ports.IdGenerator
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
+import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -17,7 +17,7 @@ import java.util.UUID
 class PaymentDataServiceImpl(
     repository: PaymentRepository,
     entityMapper: PaymentEntityMapper,
-    idGenerator: IdGenerator
+    idGenerator: IdGeneratorService
 ) : CrudDataServiceImpl<Payment, PaymentEntity, PaymentRepository, UUID>(
         repository,
         entityMapper,

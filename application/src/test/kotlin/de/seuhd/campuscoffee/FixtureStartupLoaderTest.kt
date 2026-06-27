@@ -4,12 +4,12 @@ import de.seuhd.campuscoffee.configuration.FixturesProperties
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.CoffeePrice
 import de.seuhd.campuscoffee.domain.model.User
-import de.seuhd.campuscoffee.domain.ports.IdGenerator
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.atLeastOnce
@@ -28,7 +28,7 @@ class FixtureStartupLoaderTest {
     private val coffeePriceService = mock<CoffeePriceService>()
     private val expenseService = mock<ExpenseService>()
     private val paymentService = mock<PaymentService>()
-    private val idGenerator = mock<IdGenerator>()
+    private val idGenerator = mock<IdGeneratorService>()
     private val loader =
         FixtureStartupLoader(
             userService,

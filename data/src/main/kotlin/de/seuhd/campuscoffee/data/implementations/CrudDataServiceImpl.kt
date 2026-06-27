@@ -8,8 +8,8 @@ import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
 import de.seuhd.campuscoffee.domain.exceptions.DuplicationException
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.model.DomainModel
-import de.seuhd.campuscoffee.domain.ports.IdGenerator
 import de.seuhd.campuscoffee.domain.ports.data.CrudDataService
+import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
@@ -38,7 +38,7 @@ abstract class CrudDataServiceImpl<DOMAIN : DomainModel<ID>, ENTITY : Entity, RE
      */
     protected val uniqueConstraints: Set<ConstraintMapping<DOMAIN>>,
     /** Generates the id for a new entity. */
-    private val idGenerator: IdGenerator
+    private val idGenerator: IdGeneratorService
 ) : CrudDataService<DOMAIN, ID>
     where REPOSITORY : JpaRepository<ENTITY, ID> {
     override fun clear() {

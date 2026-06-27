@@ -2,7 +2,7 @@ import { ActivityEntryType } from '../models';
 
 /**
  * The display form of an activity actor's login: the automated `system` actor reads as `SYSTEM` (uppercased so
- * the non-member actor stands out from member and admin logins); every other login is shown unchanged.
+ * the non-user actor stands out from user and admin logins); every other login is shown unchanged.
  *
  * @param login the actor login (the event's `createdBy`)
  */
@@ -11,7 +11,7 @@ export function displayActor(login: string): string {
 }
 
 /**
- * The Material icon name for an activity-entry type. Shared by the member/kitty activity list and the admin
+ * The Material icon name for an activity-entry type. Shared by the user/kitty activity list and the admin
  * global activity table so a row type renders the same glyph everywhere.
  *
  * @param type the activity-entry type
@@ -37,7 +37,7 @@ export function activityIcon(type: ActivityEntryType): string {
 }
 
 /**
- * A human-readable label for an activity-entry type. Shared by the member/kitty activity list and the admin
+ * A human-readable label for an activity-entry type. Shared by the user/kitty activity list and the admin
  * global activity table so a row type reads the same everywhere.
  *
  * @param type the activity-entry type

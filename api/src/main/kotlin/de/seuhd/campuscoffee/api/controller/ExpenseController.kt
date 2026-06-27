@@ -17,12 +17,12 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 
 /**
- * Member self-service controller for recording the member's own bean purchases (capability token). The
- * purchase is always booked 100% from the member's own pocket (the server attributes it to the calling
- * member, never to anyone the request names), and the response is the refreshed member summary. Correcting
- * or deleting a purchase is admin-only (the SPA states this to the member).
+ * User self-service controller for recording the user's own bean purchases (capability token). The
+ * purchase is always booked 100% from the user's own pocket (the server attributes it to the calling
+ * user, never to anyone the request names), and the response is the refreshed user summary. Correcting
+ * or deleting a purchase is admin-only (the SPA states this to the user).
  */
-@Tag(name = "Expenses", description = "A member recording their own bean purchases (X-Capability-Token).")
+@Tag(name = "Expenses", description = "A user recording their own bean purchases (X-Capability-Token).")
 @Controller
 @RequestMapping("/expenses")
 class ExpenseController(
@@ -32,11 +32,11 @@ class ExpenseController(
     private val currentUserProvider: CurrentUserProvider
 ) {
     /**
-     * Records the authenticated member's own bean purchase and returns the refreshed summary.
+     * Records the authenticated user's own bean purchase and returns the refreshed summary.
      *
      * @param dto the purchase (weight, amount, optional note)
      */
-    @Operation(summary = "Record the authenticated member's own bean purchase.")
+    @Operation(summary = "Record the authenticated user's own bean purchase.")
     @PostMapping("")
     fun record(
         @RequestBody @Valid dto: OwnExpenseDto

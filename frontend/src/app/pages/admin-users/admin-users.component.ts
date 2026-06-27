@@ -1,4 +1,13 @@
-import { Component, effect, OnInit, viewChild, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  computed,
+  effect,
+  Signal,
+  signal,
+  viewChild
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -17,36 +26,27 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { UserService } from '../../services/user.service';
-import { AccountingService } from '../../services/accounting.service';
+import { AdminUserService, UserRow } from '../../services/admin-user.service';
 import { NotificationService } from '../../services/notification.service';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
 import { EurosPipe } from '../../pipes/euros.pipe';
 import { triggerDownload } from '../../util/download';
-import { UserBalanceDto, Role, UserDto } from '../../models';
+import { Role, UserDto } from '../../models';
 
 /**
- * A members-table row: the full user (carrying the role, active state, and capability link the row actions
- * need) merged with the per-member coffee count and balance from the overview.
- */
-interface MemberRow {
-  user: UserDto;
-  loginName: string;
-  fullName: string;
-  role: Role;
-  active: boolean;
-  count: number;
-  balanceCents: number;
-}
-
-/**
- * Members page: the member-management hub. It pairs an "Add a member" form with a paginated members overview
- * table (login name, full name, role, cup count, and signed balance). The table's leading column is a "View
- * profile" jump that opens the admin profile page for the member (carrying their id as the `member` query
+ * Users page: the user-management hub. It pairs an "Add a user" form with a paginated users overview table
+ * (login name, full name, role, cup count, and signed balance). The table's leading column is a "View
+ * profile" jump that opens the admin profile page for the user (carrying their id as the `user` query
  * param); the trailing actions column carries the active/deactivate toggle, a rotate-link action, a QR
- * download, and a delete. Two bulk actions sit in the Members card header (right-aligned with the "Members"
- * heading): a ZIP of every active member's QR code, and a printable PDF grid of the same codes labeled by
+ * download, and a delete. Two bulk actions sit in the Users card header (right-aligned with the "Users"
+ * heading): a ZIP of every active user's QR code, and a printable PDF grid of the same codes labeled by
  * login name.
+ *
+ * The rows are served from {@link AdminUserService} (preloaded by a route resolver so the table paints already
+ * populated), and the table tracks rows by user id so paging or reloading reuses the existing row DOM
+ * instead of recreating each row's slide-toggle (which is what made the toggles visibly animate on into
+ * their state). The component runs OnPush: its mutable view state is held in signals.
  */
 @Component({
   selector: 'cc-admin-users',
@@ -69,15 +69,15 @@ interface MemberRow {
     AppHeaderComponent
   ],
   template: `
-    <cc-app-header [home]="'/admin'" title="Members" icon="group"></cc-app-header>
+    <cc-app-header [home]="'/admin'" title="Users" icon="group"></cc-app-header>
 
-    @if (loading) {
+    @if (loading()) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
     <div class="page">
       <mat-card class="card">
-        <h2>Add a member</h2>
+        <h2>Add a user</h2>
         <form #form="ngForm">
           <mat-form-field class="full-width">
             <mat-label>Login name</mat-label>
@@ -139,11 +139,11 @@ interface MemberRow {
             <mat-form-field>
               <mat-label>Role</mat-label>
               <mat-select name="role" [(ngModel)]="draft.role">
-                <mat-option value="USER">Member</mat-option>
+                <mat-option value="USER">User</mat-option>
                 <mat-option value="ADMIN">Admin</mat-option>
               </mat-select>
             </mat-form-field>
-            <!-- only an admin has a password; a member authenticates with their capability link -->
+            <!-- only an admin has a password; a regular user authenticates with their capability link -->
             @if (draft.role === 'ADMIN') {
               <mat-form-field>
                 <mat-label>Password</mat-label>
@@ -162,37 +162,37 @@ interface MemberRow {
               </mat-form-field>
             }
           </div>
-          <button mat-flat-button color="primary" (click)="create()" [disabled]="form.invalid || busy">
-            @if (busy) {
+          <button mat-flat-button color="primary" (click)="create()" [disabled]="form.invalid || busy()">
+            @if (busy()) {
               <mat-spinner diameter="20"></mat-spinner>
             } @else {
               Create
             }
           </button>
         </form>
-        @if (createdLink) {
-          <p class="muted break-word cc-created-link">Coffee link: {{ createdLink }}</p>
+        @if (createdLink()) {
+          <p class="muted break-word cc-created-link">Coffee link: {{ createdLink() }}</p>
         }
       </mat-card>
 
-      @if (loadError) {
+      @if (loadError() && !hasRows()) {
         <mat-card class="card">
-          <p class="warn">{{ loadError }}</p>
+          <p class="warn">Could not load the users.</p>
           <button mat-stroked-button (click)="reload()">Retry</button>
         </mat-card>
       } @else {
         <mat-card class="card">
           <div class="row">
-            <h2>Members</h2>
+            <h2>Users</h2>
             <span class="spacer"></span>
             <button
               mat-stroked-button
               (click)="downloadAllQr()"
-              [disabled]="downloadingAll"
+              [disabled]="downloadingAll()"
               aria-label="Download all QR codes"
               matTooltip="Download all QR codes (ZIP)"
             >
-              @if (downloadingAll) {
+              @if (downloadingAll()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
                 <mat-icon>folder_zip</mat-icon>
@@ -202,11 +202,11 @@ interface MemberRow {
             <button
               mat-stroked-button
               (click)="downloadAllQrPdf()"
-              [disabled]="downloadingAllPdf"
+              [disabled]="downloadingAllPdf()"
               aria-label="Download all QR codes as a PDF sheet"
               matTooltip="Download all QR codes (PDF sheet)"
             >
-              @if (downloadingAllPdf) {
+              @if (downloadingAllPdf()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
                 <mat-icon>picture_as_pdf</mat-icon>
@@ -214,11 +214,11 @@ interface MemberRow {
               PDF
             </button>
           </div>
-          @if (dataSource.data.length > 0) {
+          @if (hasRows()) {
             <div class="table-scroll">
-              <table mat-table [dataSource]="dataSource">
+              <table mat-table [dataSource]="dataSource" [trackBy]="trackById" class="cc-users-table">
                 <caption class="cc-visually-hidden">
-                  Members with their role, cup count, balance, and per-member actions.
+                  Users with their role, cup count, balance, and per-user actions.
                 </caption>
                 <ng-container matColumnDef="view">
                   <th mat-header-cell *matHeaderCellDef class="col-view">
@@ -232,8 +232,8 @@ interface MemberRow {
                       matTooltip="View profile"
                     >
                       <!-- Deliberate glyph split: account_box = "open this row's detail" (here), distinct from
-                         the member selector's person = identity/"you" marker. Keep the two glyphs apart so
-                         "view a member" never reads as the "this is you" affordance. -->
+                         the user selector's person = identity/"you" marker. Keep the two glyphs apart so
+                         "view a user" never reads as the "this is you" affordance. -->
                       <mat-icon>account_box</mat-icon>
                     </button>
                   </td>
@@ -253,7 +253,7 @@ interface MemberRow {
                     @if (row.role === 'ADMIN') {
                       <span class="cc-chip">Admin</span>
                     } @else {
-                      <span class="cc-chip cc-chip--neutral">Member</span>
+                      <span class="cc-chip cc-chip--neutral">User</span>
                     }
                   </td>
                 </ng-container>
@@ -302,7 +302,7 @@ interface MemberRow {
                       color="warn"
                       (click)="remove(row.user)"
                       aria-label="Delete"
-                      matTooltip="Delete member"
+                      matTooltip="Delete user"
                     >
                       <mat-icon>delete</mat-icon>
                     </button>
@@ -314,14 +314,14 @@ interface MemberRow {
               </table>
             </div>
             <mat-paginator [pageSize]="10" [pageSizeOptions]="[10, 25, 50]"></mat-paginator>
-          } @else if (!loading) {
-            <p class="muted">No members yet.</p>
+          } @else if (!loading()) {
+            <p class="muted">No users yet.</p>
           }
         </mat-card>
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
       .cc-inactive {
@@ -390,24 +390,29 @@ interface MemberRow {
         padding-right: 0;
       }
 
-      /* Space the two bulk-download buttons in the Members card header apart. */
+      /* Space the two bulk-download buttons in the Users card header apart. */
       .row button + button {
         margin-left: 8px;
       }
     `
   ]
 })
-export class AdminUsersComponent implements OnInit {
+export class AdminUsersComponent {
   draft: UserDto = this.emptyDraft();
-  createdLink = '';
-  busy = false;
-  downloadingAll = false;
-  downloadingAllPdf = false;
-  loading = false;
-  loadError = '';
+  readonly createdLink = signal('');
+  readonly busy = signal(false);
+  readonly downloadingAll = signal(false);
+  readonly downloadingAllPdf = signal(false);
+  readonly loading = signal(false);
+
+  /** The retryable load-error flag, owned by the store (a failed preload lands here, not a cancelled route). */
+  readonly loadError: Signal<boolean>;
 
   readonly columns = ['view', 'name', 'role', 'count', 'balance', 'actions'];
-  readonly dataSource = new MatTableDataSource<MemberRow>([]);
+  readonly dataSource = new MatTableDataSource<UserRow>([]);
+
+  /** Whether there are any rows to show (drives the table-vs-empty-state branch under OnPush). */
+  readonly hasRows: Signal<boolean>;
 
   // The table sits inside a conditional block, so query the paginator reactively: the signal query resolves
   // to undefined until the block renders, then to the paginator. An effect wires it onto the data source as
@@ -416,11 +421,22 @@ export class AdminUsersComponent implements OnInit {
 
   constructor(
     private readonly userService: UserService,
-    private readonly accountingService: AccountingService,
+    private readonly adminUserService: AdminUserService,
     private readonly router: Router,
     private readonly notifications: NotificationService,
-    private readonly dialog: MatDialog
+    private readonly dialog: MatDialog,
+    private readonly cdr: ChangeDetectorRef
   ) {
+    // These read the injected store, so they are assigned here rather than in field initializers (which run
+    // before the constructor's parameter properties are set).
+    this.loadError = this.adminUserService.loadError;
+    this.hasRows = computed(() => (this.adminUserService.rows()?.length ?? 0) > 0);
+    // The resolver guarantees rows are present before the component is created, so seed the table
+    // synchronously for a populated first frame; the effect below keeps it in sync with later reloads.
+    this.dataSource.data = this.adminUserService.rows() ?? [];
+    effect(() => {
+      this.dataSource.data = this.adminUserService.rows() ?? [];
+    });
     effect(() => {
       const paginator = this.paginator();
       if (paginator) {
@@ -429,93 +445,66 @@ export class AdminUsersComponent implements OnInit {
     });
   }
 
-  async ngOnInit(): Promise<void> {
-    await this.reload();
+  /** The mat-table track key: the stable per-user id, so a page change reuses rows instead of recreating them. */
+  trackById(_index: number, row: UserRow): string {
+    return row.user.id ?? row.loginName;
   }
 
-  /** Loads the members and the balance overview, merged into the table; surfaces a retryable error. */
+  /** Forces a fresh load of the users and the balance overview through the store; surfaces a retryable error. */
   async reload(): Promise<void> {
-    this.loading = true;
-    this.loadError = '';
+    this.loading.set(true);
     try {
-      const [users, overview] = await Promise.all([
-        this.userService.list(),
-        this.accountingService.overview()
-      ]);
-      this.dataSource.data = this.mergeRows(users, overview);
-    } catch {
-      this.loadError = 'Could not load the members.';
+      await this.adminUserService.reload();
     } finally {
-      this.loading = false;
+      this.loading.set(false);
     }
-  }
-
-  /** Merges each user with their overview count and balance into the table rows. */
-  private mergeRows(users: UserDto[], overview: UserBalanceDto[]): MemberRow[] {
-    const balanceById = new Map(overview.map((member) => [member.userId, member]));
-    // A row with no id cannot be keyed or acted on, so skip it explicitly rather than collapsing every such
-    // user to the '' key, which would collide them onto one another's balance and silently show wrong zeros
-    // (mirrors `viewProfile`, which also refuses a null id).
-    return users
-      .filter((user) => user.id != null)
-      .map((user) => {
-        const member = balanceById.get(user.id!);
-        return {
-          user,
-          loginName: user.loginName,
-          fullName: `${user.firstName} ${user.lastName}`.trim(),
-          role: user.role ?? 'USER',
-          active: user.active === true,
-          count: member?.count ?? 0,
-          balanceCents: member?.balanceCents ?? 0
-        };
-      });
   }
 
   /**
-   * Opens the admin profile page for the member, carrying their id as the `member` query param (the source
-   * of truth the profile page reads), which also pushes a history entry so Back returns to this list. A row
-   * with no id is skipped rather than navigating with an empty param (which would open the admin's own
-   * profile).
+   * Opens the admin profile page for the user, carrying their id as the `user` query param (the source of
+   * truth the profile page reads), which also pushes a history entry so Back returns to this list. A row with
+   * no id is skipped rather than navigating with an empty param (which would open the admin's own profile).
    */
   async viewProfile(user: UserDto): Promise<void> {
     if (!user.id) {
-      this.notifications.error(null, 'This member has no id to open.');
+      this.notifications.error(null, 'This user has no id to open.');
       return;
     }
     await this.router.navigate(['/admin/profile'], {
-      queryParams: { member: user.id },
+      queryParams: { user: user.id },
       queryParamsHandling: 'merge'
     });
   }
 
-  /** Creates a member and shows their assigned capability link. */
+  /** Creates a user and shows their assigned capability link. */
   async create(): Promise<void> {
     // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
-    if (this.busy) {
+    if (this.busy()) {
       return;
     }
-    this.busy = true;
-    this.createdLink = '';
+    this.busy.set(true);
+    this.createdLink.set('');
     try {
       const role: Role = this.draft.role ?? 'USER';
-      // a member authenticates with their capability link and has no password; only an admin sends one
+      // a regular user authenticates with their capability link and has no password; only an admin sends one
       // (the backend rejects a non-admin password, and `@Size(min=8)` would reject an empty one)
       const { password, ...rest } = this.draft;
       const payload: UserDto = role === 'ADMIN' ? { ...rest, role, password } : { ...rest, role };
       const created = await this.userService.create(payload);
-      this.createdLink = created.capabilityUrl ?? '';
+      this.createdLink.set(created.capabilityUrl ?? '');
       this.draft = this.emptyDraft();
-      this.notifications.success('Member created.');
-      await this.reload();
+      // the draft reset above is a non-DOM write, so mark this OnPush view for check to clear the form fields
+      this.cdr.markForCheck();
+      this.notifications.success('User created.');
+      await this.adminUserService.reload();
     } catch (error) {
-      this.notifications.error(error, 'Could not create the member (duplicate login or email?).');
+      this.notifications.error(error, 'Could not create the user (duplicate login or email?).');
     } finally {
-      this.busy = false;
+      this.busy.set(false);
     }
   }
 
-  /** Toggles a member's active state (deactivate/reactivate). */
+  /** Toggles a user's active state (deactivate/reactivate). */
   async toggleActive(user: UserDto): Promise<void> {
     try {
       // change only `active`; null out `role` so a concurrent role change is not reverted by the stale
@@ -528,14 +517,14 @@ export class AdminUsersComponent implements OnInit {
         role: null,
         active: !(user.active === true)
       });
-      this.notifications.success(user.active === true ? 'Member deactivated.' : 'Member reactivated.');
-      await this.reload();
+      this.notifications.success(user.active === true ? 'User deactivated.' : 'User reactivated.');
+      await this.adminUserService.reload();
     } catch (error) {
-      this.notifications.error(error, 'Could not change the member.');
+      this.notifications.error(error, 'Could not change the user.');
     }
   }
 
-  /** Rotates a member's capability link (invalidating the old QR), gated behind a confirmation. */
+  /** Rotates a user's capability link (invalidating the old QR), gated behind a confirmation. */
   async rotate(user: UserDto): Promise<void> {
     const confirmed = await firstValueFrom(
       this.dialog
@@ -554,13 +543,13 @@ export class AdminUsersComponent implements OnInit {
     try {
       await this.userService.rotateLink(user.id!);
       this.notifications.success('Coffee link rotated.');
-      await this.reload();
+      await this.adminUserService.reload();
     } catch (error) {
       this.notifications.error(error, 'Could not rotate the link.');
     }
   }
 
-  /** Downloads a member's QR code as a PNG named `<loginName>.png`. */
+  /** Downloads a user's QR code as a PNG named `<loginName>.png`. */
   async downloadQr(user: UserDto): Promise<void> {
     try {
       triggerDownload(await this.userService.qrBlob(user.id!), `${user.loginName}.png`);
@@ -569,37 +558,37 @@ export class AdminUsersComponent implements OnInit {
     }
   }
 
-  /** Downloads a ZIP archive of every active member's QR code (each entry named `<loginName>.png`). */
+  /** Downloads a ZIP archive of every active user's QR code (each entry named `<loginName>.png`). */
   async downloadAllQr(): Promise<void> {
-    this.downloadingAll = true;
+    this.downloadingAll.set(true);
     try {
       triggerDownload(await this.userService.qrZipBlob(), 'coffee-qr-codes.zip');
     } catch (error) {
       this.notifications.error(error, 'Could not download the QR codes.');
     } finally {
-      this.downloadingAll = false;
+      this.downloadingAll.set(false);
     }
   }
 
-  /** Downloads a printable PDF grid of every active member's QR code (each labeled by login name). */
+  /** Downloads a printable PDF grid of every active user's QR code (each labeled by login name). */
   async downloadAllQrPdf(): Promise<void> {
-    this.downloadingAllPdf = true;
+    this.downloadingAllPdf.set(true);
     try {
       triggerDownload(await this.userService.qrPdfBlob(), 'coffee-qr-codes.pdf');
     } catch (error) {
       this.notifications.error(error, 'Could not download the QR PDF.');
     } finally {
-      this.downloadingAllPdf = false;
+      this.downloadingAllPdf.set(false);
     }
   }
 
-  /** Deletes a member, gated behind a confirmation. */
+  /** Deletes a user, gated behind a confirmation. */
   async remove(user: UserDto): Promise<void> {
     const confirmed = await firstValueFrom(
       this.dialog
         .open(ConfirmDialogComponent, {
           data: {
-            title: 'Delete this member',
+            title: 'Delete this user',
             message: `Delete ${user.loginName}? This cannot be undone.`,
             confirmLabel: 'Delete',
             destructive: true
@@ -612,13 +601,13 @@ export class AdminUsersComponent implements OnInit {
     }
     try {
       await this.userService.delete(user.id!);
-      this.notifications.success('Member deleted.');
-      await this.reload();
+      this.notifications.success('User deleted.');
+      await this.adminUserService.reload();
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 409) {
-        this.notifications.error(error, 'This member has financial history. Deactivate them instead.');
+        this.notifications.error(error, 'This user has financial history. Deactivate them instead.');
       } else {
-        this.notifications.error(error, 'Could not delete the member.');
+        this.notifications.error(error, 'Could not delete the user.');
       }
     }
   }

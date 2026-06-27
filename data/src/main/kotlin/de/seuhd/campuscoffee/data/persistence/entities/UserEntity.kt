@@ -8,8 +8,8 @@ import jakarta.persistence.Table
 import jakarta.persistence.Version
 
 /**
- * Database entity for a member. [version] backs optimistic locking, so two concurrent admin edits of the
- * same member cannot silently overwrite each other.
+ * Database entity for a user. [version] backs optimistic locking, so two concurrent admin edits of the
+ * same user cannot silently overwrite each other.
  */
 @jakarta.persistence.Entity
 @Table(name = "users")

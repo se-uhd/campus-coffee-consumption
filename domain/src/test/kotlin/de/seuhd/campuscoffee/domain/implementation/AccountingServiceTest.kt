@@ -27,8 +27,8 @@ import java.util.UUID
 
 /**
  * Unit tests for AccountingServiceImpl, mocking the data ports and the price/consumption services. Covers the
- * read-side money numbers (the landing summary, the kitty balance, the all-member overview) and the
- * authorization rules: a member reads only their own summary and may not read the overview. The chronological
+ * read-side money numbers (the landing summary, the kitty balance, the all-user overview) and the
+ * authorization rules: a user reads only their own summary and may not read the overview. The chronological
  * feeds moved to [ActivityServiceImpl] (see [ActivityServiceTest]).
  */
 class AccountingServiceTest {
@@ -150,7 +150,7 @@ class AccountingServiceTest {
     @Test
     fun `allBalances returns each member's count and balance for an admin`() {
         whenever(userDataService.getAll()).thenReturn(listOf(member))
-        whenever(balanceDataService.allMemberBalancesCents()).thenReturn(mapOf(memberId to -50L))
+        whenever(balanceDataService.allUserBalancesCents()).thenReturn(mapOf(memberId to -50L))
         whenever(
             coffeeConsumptionDataService.getByUserId(memberId)
         ).thenReturn(CoffeeConsumption(user = member, count = 1))
@@ -165,7 +165,7 @@ class AccountingServiceTest {
     @Test
     fun `allBalances reports a zero balance for a member absent from the projection`() {
         whenever(userDataService.getAll()).thenReturn(listOf(member))
-        whenever(balanceDataService.allMemberBalancesCents()).thenReturn(emptyMap())
+        whenever(balanceDataService.allUserBalancesCents()).thenReturn(emptyMap())
         whenever(
             coffeeConsumptionDataService.getByUserId(memberId)
         ).thenReturn(CoffeeConsumption(user = member, count = 0))

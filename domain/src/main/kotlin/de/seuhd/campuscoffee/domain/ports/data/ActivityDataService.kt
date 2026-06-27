@@ -8,21 +8,21 @@ import java.util.UUID
 
 /**
  * Port for the read-side projections computed straight from the append-only event log (there is no activity
- * table), implemented by the data layer. It walks a member's event streams oldest-first, valuing each
+ * table), implemented by the data layer. It walks a user's event streams oldest-first, valuing each
  * coffee at the price in effect when it was consumed, to produce the unified activity with a running balance;
  * the kitty history is the same idea over the global money streams.
  */
 interface ActivityDataService {
     /**
-     * Returns a member's full unified activity oldest-first, each entry carrying its running balance: their
+     * Returns a user's full unified activity oldest-first, each entry carrying its running balance: their
      * coffees (valued at the price in effect at the time), their own private expenses, and their
-     * deposits. A coffee a member undid within the grace period is credited at the exact price of the
+     * deposits. A coffee a user undid within the grace period is credited at the exact price of the
      * increment it reversed; an admin count override is valued as a lump at the override-time price.
      *
-     * @param userId     the member's id
-     * @param ownerLogin the member's login name, used to tell the member's own increments/cancels (credited
+     * @param userId     the user's id
+     * @param ownerLogin the user's login name, used to tell the user's own increments/cancels (credited
      *   at the original price) from an admin override (valued as a lump)
-     * @return the activity oldest-first; the last entry's running balance is the member's current balance
+     * @return the activity oldest-first; the last entry's running balance is the user's current balance
      */
     fun userActivity(
         userId: UUID,
@@ -38,11 +38,11 @@ interface ActivityDataService {
     fun kittyHistory(): List<ActivityEntry>
 
     /**
-     * Returns the member's most recent un-cancelled own coffee increment (the one a cancel would undo),
+     * Returns the user's most recent un-cancelled own coffee increment (the one a cancel would undo),
      * found by walking their consumption events LIFO, or null if there is none.
      *
-     * @param userId     the member's id
-     * @param ownerLogin the member's login name, used to consider only the member's own increments
+     * @param userId     the user's id
+     * @param ownerLogin the user's login name, used to consider only the user's own increments
      */
     fun lastCancellableIncrement(
         userId: UUID,
@@ -58,11 +58,11 @@ interface ActivityDataService {
 
     /**
      * Returns the whole-installation activity oldest-first: every coffee, expense, deposit, kitty adjustment,
-     * and price change across all members, one [GlobalActivityEntry] per event, each carrying the subject
-     * member's running balance and the kitty's running balance (whichever the event moved). The single shared
-     * walk that backs [userActivity] and [kittyHistory] is replayed over the full log here, so the per-member
+     * and price change across all users, one [GlobalActivityEntry] per event, each carrying the subject
+     * user's running balance and the kitty's running balance (whichever the event moved). The single shared
+     * walk that backs [userActivity] and [kittyHistory] is replayed over the full log here, so the per-user
      * and kitty running balances match those feeds exactly. Each subject's login is resolved from the log's
-     * own `User` events (so a hard-deleted member still classifies and labels correctly); `subjectName` is left
+     * own `User` events (so a hard-deleted user still classifies and labels correctly); `subjectName` is left
      * null for the domain to enrich.
      *
      * @return the global activity oldest-first

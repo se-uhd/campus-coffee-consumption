@@ -1,9 +1,9 @@
 package de.seuhd.campuscoffee.api.controller
 
-import de.seuhd.campuscoffee.api.activity.ActivityCsvResponder
 import de.seuhd.campuscoffee.api.dtos.GlobalActivityEntryDto
 import de.seuhd.campuscoffee.api.mapper.AccountingDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
+import de.seuhd.campuscoffee.api.support.ActivityCsvResponder
 import de.seuhd.campuscoffee.domain.ports.api.ActivityService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -17,8 +17,8 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 /**
  * Admin read controller for the whole-installation activity feed (JWT, admin only): a paginated table of every
- * change across all members, the kitty, and the price, and a full CSV export of the same. It lives under
- * `/api/users` (already the admin-gated prefix, so no extra security rule is needed) as the all-members
+ * change across all users, the kitty, and the price, and a full CSV export of the same. It lives under
+ * `/api/users` (already the admin-gated prefix, so no extra security rule is needed) as the all-users
  * analogue of `GET /api/users/{id}/activity`; Spring matches the literal `/activity` ahead of `/{id}`. Paging
  * is validated through the shared [PageQuery] via `@Valid` binding, never a class-level `@Validated` (which
  * would trip HV000151 on a paginated read).
@@ -33,9 +33,9 @@ class AdminActivityController(
     private val currentUserProvider: CurrentUserProvider
 ) {
     /**
-     * Returns a page of the whole-installation activity feed (every member's coffees, purchases, and deposits,
-     * the kitty adjustments, and price changes), newest first, each row carrying the subject member, the
-     * actor, and the member and kitty running balances the event moved.
+     * Returns a page of the whole-installation activity feed (every user's coffees, purchases, and deposits,
+     * the kitty adjustments, and price changes), newest first, each row carrying the subject user, the
+     * actor, and the user and kitty running balances the event moved.
      *
      * @param page the validated paging window (limit/offset)
      */

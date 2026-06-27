@@ -15,16 +15,16 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 
 /**
- * Member self-service controller for adding and undoing the member's own coffees. The caller is
+ * User self-service controller for adding and undoing the user's own coffees. The caller is
  * authenticated by their capability token (the `X-Capability-Token` header), so every operation acts on the
- * token's member. A member adds one coffee at a time (`POST /consumption`) and may undo their most recent
+ * token's user. A user adds one coffee at a time (`POST /consumption`) and may undo their most recent
  * coffee within the grace period (`POST /consumption/cancel`); any other adjustment is the admin's job.
- * Each call returns the refreshed member summary (count, price, balance, kitty balance, activity), so the SPA
+ * Each call returns the refreshed user summary (count, price, balance, kitty balance, activity), so the SPA
  * repaints from one response.
  */
 @Tag(
     name = "Consumption",
-    description = "Adding and undoing a member's own coffees (X-Capability-Token)."
+    description = "Adding and undoing a user's own coffees (X-Capability-Token)."
 )
 @Controller
 @RequestMapping("/consumption")
@@ -34,8 +34,8 @@ class ConsumptionController(
     private val accountingDtoMapper: AccountingDtoMapper,
     private val currentUserProvider: CurrentUserProvider
 ) {
-    /** Adds one coffee to the authenticated member's count and returns the refreshed summary. */
-    @Operation(summary = "Add one coffee to the authenticated member's count.")
+    /** Adds one coffee to the authenticated user's count and returns the refreshed summary. */
+    @Operation(summary = "Add one coffee to the authenticated user's count.")
     @PostMapping("")
     fun add(): ResponseEntity<UserSummaryDto> {
         val user = currentUserProvider.currentUser()
@@ -44,10 +44,10 @@ class ConsumptionController(
     }
 
     /**
-     * Undoes the authenticated member's most recent coffee if it is still within the grace period, and
+     * Undoes the authenticated user's most recent coffee if it is still within the grace period, and
      * returns the refreshed summary. Nothing to undo or the grace period passed yields 409.
      */
-    @Operation(summary = "Undo the authenticated member's most recent coffee (within the grace period).")
+    @Operation(summary = "Undo the authenticated user's most recent coffee (within the grace period).")
     @PostMapping("/cancel")
     fun cancel(): ResponseEntity<UserSummaryDto> {
         val user = currentUserProvider.currentUser()

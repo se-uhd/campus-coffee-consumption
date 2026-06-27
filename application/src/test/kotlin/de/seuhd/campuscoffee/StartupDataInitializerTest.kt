@@ -1,6 +1,6 @@
 package de.seuhd.campuscoffee
 
-import de.seuhd.campuscoffee.domain.ports.StartupTask
+import de.seuhd.campuscoffee.domain.ports.system.StartupTaskService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
 import org.junit.jupiter.api.Test
@@ -16,7 +16,7 @@ class StartupDataInitializerTest {
         val sequence = mutableListOf<Int>()
 
         fun task(taskOrder: Int) =
-            object : StartupTask {
+            object : StartupTaskService {
                 override val order = taskOrder
 
                 override fun run() {

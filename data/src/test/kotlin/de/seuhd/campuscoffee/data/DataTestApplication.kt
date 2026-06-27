@@ -1,6 +1,6 @@
 package de.seuhd.campuscoffee.data
 
-import de.seuhd.campuscoffee.domain.ports.ChangeNoteContext
+import de.seuhd.campuscoffee.domain.model.ChangeNoteContext
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan
 import org.springframework.context.annotation.Bean
