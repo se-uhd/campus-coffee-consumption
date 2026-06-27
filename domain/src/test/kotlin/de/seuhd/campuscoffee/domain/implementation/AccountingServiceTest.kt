@@ -49,11 +49,11 @@ class AccountingServiceTest {
             userDataService
         )
 
-    private val memberId: UUID = UUID(0L, 1L)
+    private val userId: UUID = UUID(0L, 1L)
 
-    private val member =
+    private val user =
         User(
-            id = memberId,
+            id = userId,
             loginName = "max",
             emailAddress = "max@se.de",
             firstName = "Max",
@@ -89,17 +89,17 @@ class AccountingServiceTest {
     @Test
     fun `userSummary composes the count, price, balance, kitty, and activity for the owner`() {
         val activity = listOf(entry(ActivityEntryType.CONSUMPTION, -50, -50))
-        whenever(userDataService.getById(memberId)).thenReturn(member)
-        whenever(activityDataService.userActivity(memberId, "max")).thenReturn(activity)
+        whenever(userDataService.getById(userId)).thenReturn(user)
+        whenever(activityDataService.userActivity(userId, "max")).thenReturn(activity)
         whenever(
-            coffeeConsumptionDataService.getByUserId(memberId)
-        ).thenReturn(CoffeeConsumption(user = member, count = 1))
+            coffeeConsumptionDataService.getByUserId(userId)
+        ).thenReturn(CoffeeConsumption(user = user, count = 1))
         whenever(coffeePriceService.getCurrent()).thenReturn(CoffeePrice(amountCents = 50))
         whenever(balanceDataService.kittyBalanceCents()).thenReturn(0L)
-        whenever(coffeeConsumptionService.cancellableIncrement(memberId, member))
+        whenever(coffeeConsumptionService.cancellableIncrement(userId, user))
             .thenReturn(CancellableIncrement(LocalDateTime.now(), 50))
 
-        val summary = service.userSummary(memberId, 10, 0, member)
+        val summary = service.userSummary(userId, 10, 0, user)
 
         assertThat(summary.count).isEqualTo(1)
         assertThat(summary.priceCents).isEqualTo(50)
@@ -112,14 +112,14 @@ class AccountingServiceTest {
     @Test
     fun `userSummary reports cancellable false when the count is zero`() {
         // even if a stale increment is still within the grace period, a zero count is not cancellable
-        whenever(userDataService.getById(memberId)).thenReturn(member)
-        whenever(activityDataService.userActivity(memberId, "max")).thenReturn(emptyList())
+        whenever(userDataService.getById(userId)).thenReturn(user)
+        whenever(activityDataService.userActivity(userId, "max")).thenReturn(emptyList())
         whenever(
-            coffeeConsumptionDataService.getByUserId(memberId)
-        ).thenReturn(CoffeeConsumption(user = member, count = 0))
+            coffeeConsumptionDataService.getByUserId(userId)
+        ).thenReturn(CoffeeConsumption(user = user, count = 0))
         whenever(coffeePriceService.getCurrent()).thenReturn(CoffeePrice(amountCents = 50))
 
-        val summary = service.userSummary(memberId, 10, 0, member)
+        val summary = service.userSummary(userId, 10, 0, user)
 
         assertThat(summary.count).isEqualTo(0)
         assertThat(summary.cancellable).isFalse()
@@ -129,10 +129,10 @@ class AccountingServiceTest {
 
     @Test
     fun `userSummary by a non-owner non-admin throws ForbiddenException`() {
-        val stranger = member.copy(id = UUID(0L, 7L), loginName = "other")
-        whenever(userDataService.getById(memberId)).thenReturn(member)
+        val stranger = user.copy(id = UUID(0L, 7L), loginName = "other")
+        whenever(userDataService.getById(userId)).thenReturn(user)
 
-        assertThrows<ForbiddenException> { service.userSummary(memberId, 10, 0, stranger) }
+        assertThrows<ForbiddenException> { service.userSummary(userId, 10, 0, stranger) }
     }
 
     @Test
@@ -144,16 +144,16 @@ class AccountingServiceTest {
 
     @Test
     fun `allBalances by a non-admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.allBalances(member) }
+        assertThrows<ForbiddenException> { service.allBalances(user) }
     }
 
     @Test
-    fun `allBalances returns each member's count and balance for an admin`() {
-        whenever(userDataService.getAll()).thenReturn(listOf(member))
-        whenever(balanceDataService.allUserBalancesCents()).thenReturn(mapOf(memberId to -50L))
+    fun `allBalances returns each user's count and balance for an admin`() {
+        whenever(userDataService.getAll()).thenReturn(listOf(user))
+        whenever(balanceDataService.allUserBalancesCents()).thenReturn(mapOf(userId to -50L))
         whenever(
-            coffeeConsumptionDataService.getByUserId(memberId)
-        ).thenReturn(CoffeeConsumption(user = member, count = 1))
+            coffeeConsumptionDataService.getByUserId(userId)
+        ).thenReturn(CoffeeConsumption(user = user, count = 1))
 
         val balances = service.allBalances(admin)
 
@@ -163,12 +163,12 @@ class AccountingServiceTest {
     }
 
     @Test
-    fun `allBalances reports a zero balance for a member absent from the projection`() {
-        whenever(userDataService.getAll()).thenReturn(listOf(member))
+    fun `allBalances reports a zero balance for a user absent from the projection`() {
+        whenever(userDataService.getAll()).thenReturn(listOf(user))
         whenever(balanceDataService.allUserBalancesCents()).thenReturn(emptyMap())
         whenever(
-            coffeeConsumptionDataService.getByUserId(memberId)
-        ).thenReturn(CoffeeConsumption(user = member, count = 0))
+            coffeeConsumptionDataService.getByUserId(userId)
+        ).thenReturn(CoffeeConsumption(user = user, count = 0))
 
         assertThat(service.allBalances(admin).first().balanceCents).isEqualTo(0)
     }

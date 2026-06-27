@@ -13,7 +13,7 @@ import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
@@ -28,9 +28,9 @@ import java.util.UUID
  * CSV format (UTF-8 BOM, headers, a non-ASCII name round-trip), paging, and a hard-deleted subject.
  */
 class AdminGlobalActivitySystemTests : AbstractSystemTest() {
-    private val member = "maxmustermann"
+    private val user = "maxmustermann"
 
-    private fun memberId(): UUID = seededUser(member).persistedId
+    private fun userId(): UUID = seededUser(user).persistedId
 
     private fun globalActivity(query: String = ""): List<GlobalActivityEntryDto> =
         client()
@@ -48,7 +48,7 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
             .post()
             .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(DepositRequestDto(userId = memberId(), amountCents = amountCents, note = "paid"))
+            .body(DepositRequestDto(userId = userId(), amountCents = amountCents, note = "paid"))
             .withAdmin()
             .exchange()
 
@@ -72,7 +72,7 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
         .withAdmin()
         .exchange()
 
-    private fun createMember(
+    private fun createUser(
         login: String,
         first: String,
         last: String
@@ -96,44 +96,44 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
             .id!!
 
     @Test
-    fun `the global activity feed returns 403 Forbidden for a member token`() {
+    fun `the global activity feed returns 403 Forbidden for a user token`() {
         val status =
             client()
                 .get()
                 .uri("/api/users/activity")
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .statusCode()
         assertThat(status).isEqualTo(403)
     }
 
     @Test
-    fun `the global activity CSV returns 403 Forbidden for a member token`() {
+    fun `the global activity CSV returns 403 Forbidden for a user token`() {
         val status =
             client()
                 .get()
                 .uri("/api/users/activity.csv")
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .statusCode()
         assertThat(status).isEqualTo(403)
     }
 
     @Test
-    fun `the global feed records the subject member and the admin actor on a count override`() {
+    fun `the global feed records the subject user and the admin actor on a count override`() {
         // an admin (jane_doe via JWT) overrides maxmustermann's count: the row's subject is the user, the
         // actor is the admin, so the two user columns differ (a user self-scan would make them coincide)
-        overrideCount(memberId(), 2)
+        overrideCount(userId(), 2)
 
         val entry =
-            globalActivity().first { it.subjectLogin == member && it.type == ActivityEntryType.CONSUMPTION }
+            globalActivity().first { it.subjectLogin == user && it.type == ActivityEntryType.CONSUMPTION }
         assertThat(entry.subjectLogin).isEqualTo("maxmustermann")
         assertThat(entry.subjectName).isNotBlank()
         assertThat(entry.actorLogin).isEqualTo("jane_doe")
     }
 
     @Test
-    fun `a deposit fills both the member and the kitty balance columns`() {
+    fun `a deposit fills both the user and the kitty balance columns`() {
         deposit(1000)
 
         val entry = globalActivity().first { it.type == ActivityEntryType.DEPOSIT }
@@ -149,7 +149,7 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
         fundKitty(1000)
         client()
             .post()
-            .uri("/api/users/{id}/expenses", memberId())
+            .uri("/api/users/{id}/expenses", userId())
             .contentType(MediaType.APPLICATION_JSON)
             .body(
                 AdminExpenseDto(
@@ -206,7 +206,7 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
     @Test
     fun `the global activity CSV is UTF-8 with a BOM, a header, and a non-ASCII subject round-tripping intact`() {
         // a user with an umlaut display name, given activity so it appears in the export
-        val umlautId = createMember("juergen", "Jürgen", "Müller")
+        val umlautId = createUser("juergen", "Jürgen", "Müller")
         overrideCount(umlautId, 1)
 
         val result =
@@ -230,10 +230,10 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `the global feed renders a hard-deleted member's orphan events without failing`() {
+    fun `the global feed renders a hard-deleted user's orphan events without failing`() {
         // a user who is bumped to one cup and corrected back to zero has no financial footprint, so they can
         // be hard-deleted; their consumption events remain in the append-only log as orphans
-        val orphanId = createMember("ephemeral", "Eph", "Emeral")
+        val orphanId = createUser("ephemeral", "Eph", "Emeral")
         overrideCount(orphanId, 1)
         overrideCount(orphanId, 0)
 
@@ -258,7 +258,7 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
     fun `the CSV neutralizes a spreadsheet formula-injection display name`() {
         // a user whose display name begins with a formula trigger ('='): the CSV must prefix it with a quote
         // so a spreadsheet renders it as literal text rather than evaluating it (formula injection)
-        val id = createMember("formulauser", "=cmd", "Test")
+        val id = createUser("formulauser", "=cmd", "Test")
         overrideCount(id, 1)
 
         val text =

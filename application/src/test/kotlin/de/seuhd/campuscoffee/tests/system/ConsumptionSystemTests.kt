@@ -10,7 +10,7 @@ import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
@@ -26,14 +26,14 @@ import java.util.concurrent.Executors
  * the seeded `maxmustermann` fixture.
  */
 class ConsumptionSystemTests : AbstractSystemTest() {
-    private val member = "maxmustermann"
+    private val user = "maxmustermann"
 
     private fun summary(): UserSummaryDto =
         client()
             .get()
             .uri("/api/summary")
             .accept(MediaType.APPLICATION_JSON)
-            .withMember(member)
+            .withUser(user)
             .exchange()
             .returnResult<UserSummaryDto>()
             .responseBody!!
@@ -42,22 +42,22 @@ class ConsumptionSystemTests : AbstractSystemTest() {
         client()
             .post()
             .uri("/api/consumption")
-            .withMember(member)
+            .withUser(user)
             .exchange()
 
     private fun cancel() =
         client()
             .post()
             .uri("/api/consumption/cancel")
-            .withMember(member)
+            .withUser(user)
             .exchange()
 
-    private fun memberId(): UUID = seededUser(member).persistedId
+    private fun userId(): UUID = seededUser(user).persistedId
 
     private fun overrideCount(total: Int) =
         client()
             .put()
-            .uri("/api/users/{id}/consumption", memberId())
+            .uri("/api/users/{id}/consumption", userId())
             .contentType(MediaType.APPLICATION_JSON)
             .body(ConsumptionOverrideDto(total, "manual"))
             .withAdmin()
@@ -90,7 +90,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `adding a coffee leaves the member owing the price of one cup`() {
+    fun `adding a coffee leaves the user owing the price of one cup`() {
         add()
 
         // a coffee at 50 cents leaves the user owing 50 cents (a negative balance)
@@ -161,7 +161,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
         val activity = summary().activity
         assertThat(activity.first().count).isEqualTo(1)
         assertThat(activity.first().delta).isEqualTo(1)
-        assertThat(activity.first().createdBy).isEqualTo(member)
+        assertThat(activity.first().createdBy).isEqualTo(user)
     }
 
     @Test
@@ -171,12 +171,12 @@ class ConsumptionSystemTests : AbstractSystemTest() {
                 .get()
                 .uri("/api/profile")
                 .accept(MediaType.APPLICATION_JSON)
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .returnResult<UserDto>()
                 .responseBody!!
 
-        assertThat(profile.loginName).isEqualTo(member)
+        assertThat(profile.loginName).isEqualTo(user)
         assertThat(profile.capabilityUrl).contains("/login/")
     }
 
@@ -186,7 +186,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
             client()
                 .get()
                 .uri("/api/profile/qr.png")
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .returnResult<ByteArray>()
 
@@ -229,7 +229,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `renaming a member's login name is ignored, so their undo and balance survive`() {
+    fun `renaming a user's login name is ignored, so their undo and balance survive`() {
         // give the user history: one coffee, so the balance is negative and the cup is still cancellable
         add()
         val before = summary()
@@ -238,7 +238,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
         assertThat(before.cancellable).isTrue()
 
         // an admin tries to rename the user; the login name is immutable (pinned), so the change is dropped
-        val target = seededUser(member)
+        val target = seededUser(user)
         val response =
             client()
                 .put()
@@ -258,7 +258,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
                 .exchange()
                 .returnResult<UserDto>()
                 .responseBody!!
-        assertThat(response.loginName).isEqualTo(member)
+        assertThat(response.loginName).isEqualTo(user)
 
         // the activity classifies the user's own scan by the (unchanged) login, so undo and balance survive
         val after = summary()

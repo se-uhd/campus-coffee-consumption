@@ -57,8 +57,8 @@ class DevDemoDataLoaderTest {
         )
 
     // an existing fixture user the loader resolves by login to enrich with a varied history; built with a
-    // persisted id so member.persistedId resolves
-    private fun fixtureMember(login: String): User =
+    // persisted id so user.persistedId resolves
+    private fun fixtureUser(login: String): User =
         admin.copy(id = UUID.randomUUID(), loginName = login, role = Role.USER)
 
     // The loader builds each user through userService.upsert; echo the argument back with a stable id so
@@ -67,10 +67,10 @@ class DevDemoDataLoaderTest {
         whenever(userService.getByLoginName("jane_doe")).thenReturn(admin)
         // the loader also resolves the primary demo user and the enriched fixture users by login to seed
         // their histories: each must be an active user with a persisted id
-        whenever(userService.getByLoginName("maxmustermann")).thenReturn(fixtureMember("maxmustermann"))
-        whenever(userService.getByLoginName("student2023")).thenReturn(fixtureMember("student2023"))
-        whenever(userService.getByLoginName("lisa_lee")).thenReturn(fixtureMember("lisa_lee"))
-        whenever(userService.getByLoginName("olivia_lee")).thenReturn(fixtureMember("olivia_lee"))
+        whenever(userService.getByLoginName("maxmustermann")).thenReturn(fixtureUser("maxmustermann"))
+        whenever(userService.getByLoginName("student2023")).thenReturn(fixtureUser("student2023"))
+        whenever(userService.getByLoginName("lisa_lee")).thenReturn(fixtureUser("lisa_lee"))
+        whenever(userService.getByLoginName("olivia_lee")).thenReturn(fixtureUser("olivia_lee"))
         whenever(userService.upsert(any())).thenAnswer { invocation ->
             val user = invocation.arguments[0] as User
             if (user.id != null) user else user.copy(id = UUID.randomUUID())
@@ -83,7 +83,7 @@ class DevDemoDataLoaderTest {
     }
 
     @Test
-    fun `loadDemoData seeds the nine extra demo members on an empty fixture set bringing the total to fourteen`() {
+    fun `loadDemoData seeds the nine extra demo users on an empty fixture set bringing the total to fourteen`() {
         // the database holds only the five seeded fixtures (none of them a demo user)
         whenever(userService.getAll()).thenReturn(listOf(admin))
         stubCreatePath()
@@ -114,7 +114,7 @@ class DevDemoDataLoaderTest {
     }
 
     @Test
-    fun `loadDemoData deactivates an inactive demo member only after seeding their history`() {
+    fun `loadDemoData deactivates an inactive demo user only after seeding their history`() {
         whenever(userService.getAll()).thenReturn(listOf(admin))
         stubCreatePath()
 
@@ -126,11 +126,11 @@ class DevDemoDataLoaderTest {
     }
 
     @Test
-    fun `loadDemoData skips when the demo members already exist`() {
+    fun `loadDemoData skips when the demo users already exist`() {
         // the first demo user is already present (a restart without a reset), so the loader is a no-op
-        val existingDemoMember =
+        val existingDemoUser =
             admin.copy(id = UUID(0L, 2L), loginName = "anna_schneider", role = Role.USER)
-        whenever(userService.getAll()).thenReturn(listOf(admin, existingDemoMember))
+        whenever(userService.getAll()).thenReturn(listOf(admin, existingDemoUser))
 
         loader.loadDemoData()
 

@@ -17,7 +17,7 @@ import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
@@ -30,9 +30,9 @@ import java.util.UUID
  * communal kitty. Users authenticate by their capability token; admins by JWT.
  */
 class AccountingSystemTests : AbstractSystemTest() {
-    private val member = "maxmustermann"
+    private val user = "maxmustermann"
 
-    private fun memberId(): UUID = seededUser(member).persistedId
+    private fun userId(): UUID = seededUser(user).persistedId
 
     private fun setPrice(amountCents: Int) =
         client()
@@ -47,7 +47,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         client()
             .post()
             .uri("/api/consumption")
-            .withMember(member)
+            .withUser(user)
             .exchange()
 
     private fun userSummary(): UserSummaryDto =
@@ -55,7 +55,7 @@ class AccountingSystemTests : AbstractSystemTest() {
             .get()
             .uri("/api/summary")
             .accept(MediaType.APPLICATION_JSON)
-            .withMember(member)
+            .withUser(user)
             .exchange()
             .returnResult<UserSummaryDto>()
             .responseBody!!
@@ -136,14 +136,14 @@ class AccountingSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a member records a purchase and the balance is credited by the private amount`() {
+    fun `a user records a purchase and the balance is credited by the private amount`() {
         val summary =
             client()
                 .post()
                 .uri("/api/expenses")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(OwnExpenseDto(weightGrams = 1000, amountCents = 900, note = "beans"))
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .returnResult<UserSummaryDto>()
                 .responseBody!!
@@ -158,7 +158,7 @@ class AccountingSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `an admin split expense credits the member privately and draws the kitty down`() {
+    fun `an admin split expense credits the user privately and draws the kitty down`() {
         // start the kitty with a float so the kitty-funded portion is visible against a known base
         client()
             .post()
@@ -172,7 +172,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         val expense =
             client()
                 .post()
-                .uri("/api/users/{id}/expenses", memberId())
+                .uri("/api/users/{id}/expenses", userId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
@@ -201,7 +201,7 @@ class AccountingSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a deposit credits the member and feeds the kitty`() {
+    fun `a deposit credits the user and feeds the kitty`() {
         val kittyBefore = kitty().balanceCents
 
         val payment =
@@ -209,7 +209,7 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .post()
                 .uri("/api/kitty/deposit")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(DepositRequestDto(userId = memberId(), amountCents = 1000, note = "paid"))
+                .body(DepositRequestDto(userId = userId(), amountCents = 1000, note = "paid"))
                 .withAdmin()
                 .exchange()
                 .returnResult<PaymentDto>()
@@ -220,7 +220,7 @@ class AccountingSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a kitty adjustment changes the kitty without changing a member balance`() {
+    fun `a kitty adjustment changes the kitty without changing a user balance`() {
         val kittyBefore = kitty().balanceCents
 
         client()
@@ -244,7 +244,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         val expenseId =
             client()
                 .post()
-                .uri("/api/users/{id}/expenses", memberId())
+                .uri("/api/users/{id}/expenses", userId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
@@ -263,7 +263,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         val corrected =
             client()
                 .put()
-                .uri("/api/users/{userId}/expenses/{expenseId}", memberId(), expenseId)
+                .uri("/api/users/{userId}/expenses/{expenseId}", userId(), expenseId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
@@ -288,7 +288,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         val expenseId =
             client()
                 .post()
-                .uri("/api/users/{id}/expenses", memberId())
+                .uri("/api/users/{id}/expenses", userId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
@@ -326,14 +326,14 @@ class AccountingSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `an admin lists a member's expenses with their ids and amounts`() {
+    fun `an admin lists a user's expenses with their ids and amounts`() {
         // fund the kitty so the second expense's kitty-funded portion (500) has somewhere to come from
         fundKitty(1000)
 
         val first =
             client()
                 .post()
-                .uri("/api/users/{id}/expenses", memberId())
+                .uri("/api/users/{id}/expenses", userId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
@@ -350,7 +350,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         val second =
             client()
                 .post()
-                .uri("/api/users/{id}/expenses", memberId())
+                .uri("/api/users/{id}/expenses", userId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
@@ -368,7 +368,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         val list =
             client()
                 .get()
-                .uri("/api/users/{id}/expenses", memberId())
+                .uri("/api/users/{id}/expenses", userId())
                 .accept(MediaType.APPLICATION_JSON)
                 .withAdmin()
                 .exchange()
@@ -380,13 +380,13 @@ class AccountingSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a member listing another member's expenses is forbidden with 403`() {
+    fun `a user listing another user's expenses is forbidden with 403`() {
         val status =
             client()
                 .get()
-                .uri("/api/users/{id}/expenses", memberId())
+                .uri("/api/users/{id}/expenses", userId())
                 .accept(MediaType.APPLICATION_JSON)
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .statusCode()
         assertThat(status).isEqualTo(403)
@@ -400,7 +400,7 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .uri("/api/expenses")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(OwnExpenseDto(weightGrams = 1000, amountCents = 0, note = "beans"))
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .statusCode()
         assertThat(status).isEqualTo(400)
@@ -419,7 +419,7 @@ class AccountingSystemTests : AbstractSystemTest() {
 
         client()
             .post()
-            .uri("/api/users/{id}/expenses", memberId())
+            .uri("/api/users/{id}/expenses", userId())
             .contentType(MediaType.APPLICATION_JSON)
             .body(
                 AdminExpenseDto(
@@ -439,7 +439,7 @@ class AccountingSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `the admin overview reports every member's count and balance`() {
+    fun `the admin overview reports every user's count and balance`() {
         addCoffee()
 
         val overview =
@@ -452,7 +452,7 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .returnResult<Array<UserBalanceDto>>()
                 .responseBody!!
 
-        val max = overview.first { it.loginName == member }
+        val max = overview.first { it.loginName == user }
         assertThat(max.count).isEqualTo(1)
         assertThat(max.balanceCents).isEqualTo(-50)
     }
@@ -465,7 +465,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         val status =
             client()
                 .post()
-                .uri("/api/users/{id}/expenses", memberId())
+                .uri("/api/users/{id}/expenses", userId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(

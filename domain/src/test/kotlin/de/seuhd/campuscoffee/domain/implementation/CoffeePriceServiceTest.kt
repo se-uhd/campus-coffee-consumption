@@ -30,7 +30,7 @@ class CoffeePriceServiceTest {
     private val activityDataService: ActivityDataService = mock()
     private val service = CoffeePriceServiceImpl(coffeePriceDataService, activityDataService)
 
-    private val member =
+    private val user =
         User(
             id = UUID(0L, 1L),
             loginName = "max",
@@ -116,7 +116,7 @@ class CoffeePriceServiceTest {
 
     @Test
     fun `setPrice by a non-admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.setPrice(70, member) }
+        assertThrows<ForbiddenException> { service.setPrice(70, user) }
         verify(coffeePriceDataService, never()).upsert(any())
     }
 
@@ -150,6 +150,6 @@ class CoffeePriceServiceTest {
 
     @Test
     fun `priceHistory by a non-admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.priceHistory(member) }
+        assertThrows<ForbiddenException> { service.priceHistory(user) }
     }
 }

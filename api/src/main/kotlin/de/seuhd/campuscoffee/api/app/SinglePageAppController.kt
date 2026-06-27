@@ -14,11 +14,11 @@ import org.springframework.web.bind.annotation.GetMapping
  * routes are listed explicitly so this never shadows the API paths, the actuator, the API docs, or a static
  * asset (which carries a file extension and is served directly).
  *
- * It is deliberately in `api.web`, not `api.controller`: `ApiWebConfig` adds the `/api` base path to every
+ * It is deliberately in `api.app`, not `api.controller`: `ApiWebConfig` adds the `/api` base path to every
  * controller in the `api.controller` package, but this controller serves the non-`/api` SPA routes above
  * (the root, the `/admin` pages, and the `/login` capability routes). In `api.controller` those mappings
  * would be rewritten under `/api` and stop matching the browser's requests, so it lives in a sibling
- * `api.web` package the prefix does not cover.
+ * `api.app` package the prefix does not cover.
  */
 @Hidden
 @Controller

@@ -1,13 +1,16 @@
 package de.seuhd.campuscoffee.tests.architecture
 
+import com.tngtech.archunit.base.DescribedPredicate
 import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
+import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import com.tngtech.archunit.library.Architectures.layeredArchitecture
 import com.tngtech.archunit.library.dependencies.SliceAssignment
 import com.tngtech.archunit.library.dependencies.SliceIdentifier
 import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
 import org.junit.jupiter.api.Test
+import org.springframework.context.annotation.Configuration
 
 /**
  * Architecture tests that ensure that the application follows the ports-and-adapters pattern.
@@ -57,8 +60,8 @@ class ArchitectureTests {
     @Test
     fun `the production packages are free of cycles`() {
         // No package may depend (even transitively) back on a package that depends on it, across every
-        // module - e.g. data.configuration <-> data.persistence.eventsourcing. Each distinct package path is
-        // its own slice, so legitimate one-way edges (like the decorators' eventsourcing -> implementations)
+        // module - e.g. data.implementations <-> data.persistence.events. Each distinct package path is
+        // its own slice, so legitimate one-way edges (like the read-services' implementations -> events)
         // are not mistaken for cycles. Test sources are excluded; this is about the production structure.
         val productionClasses =
             ClassFileImporter()
@@ -73,6 +76,44 @@ class ArchitectureTests {
             .assignedFrom(RootInclusiveSliceAssignment)
             .should()
             .beFreeOfCycles()
+            .check(productionClasses)
+    }
+
+    @Test
+    fun `production code depends on ports, never on Impl types`() {
+        val productionClasses =
+            ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages("de.seuhd.campuscoffee")
+
+        // The five EventSourced* data-service decorators are the one allowed exception: each must inject the
+        // concrete relational *DataServiceImpl it wraps, because injecting the port would resolve to the
+        // @Primary decorator itself and self-loop. The exemption also covers their synthetic users (the
+        // lambda classes the Kotlin compiler generates for the delegating calls). @Configuration classes are
+        // exempt because composing the beans is their whole job. Everything else depends on the port, not the
+        // impl. The target is restricted to our own *Impl classes so a Kotlin-runtime *Impl (e.g. a lambda's
+        // FunctionReferenceImpl supertype) is not mistaken for a layering violation.
+        val isEventSourcedDecorator =
+            object : DescribedPredicate<JavaClass>("an EventSourced* data-service decorator or its users") {
+                override fun test(javaClass: JavaClass): Boolean {
+                    val name = javaClass.name.substringAfterLast('.')
+                    return name.startsWith("EventSourced") && name.contains("DataService")
+                }
+            }
+        val isOwnImplementation =
+            object : DescribedPredicate<JavaClass>("a campus-coffee class whose simple name ends with 'Impl'") {
+                override fun test(javaClass: JavaClass): Boolean =
+                    javaClass.simpleName.endsWith("Impl") && javaClass.packageName.startsWith("de.seuhd.campuscoffee")
+            }
+
+        noClasses()
+            .that()
+            .haveSimpleNameNotEndingWith("Impl")
+            .and()
+            .areNotAnnotatedWith(Configuration::class.java)
+            .and(DescribedPredicate.not(isEventSourcedDecorator))
+            .should()
+            .dependOnClassesThat(isOwnImplementation)
             .check(productionClasses)
     }
 

@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component
  *
  * On top of that it gives a rich, varied history to **every** other existing user too: the fixture admin
  * `jane_doe` and the remaining fixture users (`student2023`, `lisa_lee`, `olivia_lee`) via
- * [ENRICHED_FIXTURE_LOGINS], plus each demo user with a non-empty [DemoMember] spec, so the activity and
+ * [ENRICHED_FIXTURE_LOGINS], plus each demo user with a non-empty [DemoUser] spec, so the activity and
  * change-log views are populated for almost everyone. A couple of users are deliberately left **empty** to
  * demo the empty state: the freshly created user [EMPTY_DEMO_LOGIN] (`new_user`, no history at all) and the
  * inactive demo user `hannes_schulz` (its spec carries no coffees, expenses, or deposit).
@@ -62,7 +62,7 @@ class DevDemoDataLoader(
      * is how many cups to add (each a `+1`), [ownExpenses] the user's own bean purchases (weight grams to
      * amount cents), and [depositCents] an optional deposit the user paid into the kitty.
      */
-    private data class DemoMember(
+    private data class DemoUser(
         val loginName: String,
         val firstName: String,
         val lastName: String,
@@ -93,61 +93,61 @@ class DevDemoDataLoader(
      */
     fun loadDemoData() {
         val existingLogins = userService.getAll().mapTo(HashSet()) { it.loginName }
-        if (DEMO_MEMBERS.first().loginName in existingLogins) {
-            log.info { "Skipping the dev demo data: the demo members already exist." }
+        if (DEMO_USERS.first().loginName in existingLogins) {
+            log.info { "Skipping the dev demo data: the demo users already exist." }
             return
         }
         val admin = userService.getByLoginName(ADMIN_LOGIN)
         var coffeeTotal = 0
         var expenseTotal = 0
         var depositTotal = 0
-        DEMO_MEMBERS.forEach { spec ->
-            val member = createMember(spec)
+        DEMO_USERS.forEach { spec ->
+            val user = createUser(spec)
             repeat(spec.coffees) {
-                coffeeConsumptionService.applyDelta(member.persistedId, 1, member)
+                coffeeConsumptionService.applyDelta(user.persistedId, 1, user)
                 coffeeTotal++
             }
             spec.ownExpenses.forEach { (weightGrams, amountCents) ->
-                expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", member)
+                expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", user)
                 expenseTotal++
             }
             spec.depositCents?.let { amount ->
-                paymentService.recordDeposit(member.persistedId, amount, "demo deposit", admin)
+                paymentService.recordDeposit(user.persistedId, amount, "demo deposit", admin)
                 depositTotal++
             }
             // deactivate last, after the user's history is seeded: a deactivated user is read-only and
             // could not record their own coffees or purchases, so an inactive demo user is created active,
             // given a realistic past, then deactivated here
             if (!spec.active) {
-                userService.upsert(member.copy(active = false))
+                userService.upsert(user.copy(active = false))
             }
         }
         // one pure kitty adjustment (an initial float) so the kitty history and balance are non-zero on a
         // fresh dev start; deposits only ever add to the kitty, so it can never go negative here
         paymentService.adjustKitty(KITTY_FLOAT_CENTS, "demo initial kitty float", admin)
-        seedPrimaryDemoMemberHistory(admin)
-        seedFixtureMemberHistories(admin)
+        seedPrimaryDemoUserHistory(admin)
+        seedFixtureUserHistories(admin)
         // the three admin-recorded expense variants (all booked against the primary demo user as buyer), so
         // the admin expense log shows every split type: private-only, kitty-only, and a private+kitty split.
         // Placed after the kitty float and all deposits above, so the kitty portion these draw (only the
         // kitty-only and the split contribute) is covered and the kitty stays >= 0.
-        seedPrimaryDemoMemberAdminExpenses(admin)
+        seedPrimaryDemoUserAdminExpenses(admin)
         // a price change and an admin count correction so the admin global activity feed shows a PRICE_CHANGE
         // row and an admin-override consumption row (every activity type appears on a fresh dev start)
         seedPriceChangeAndCorrection(admin)
         // an extra active user with no history at all, to demo the empty activity/change-log state
-        createMember(EMPTY_DEMO_MEMBER)
+        createUser(EMPTY_DEMO_USER)
         log.info {
-            "Seeded the dev demo data: ${DEMO_MEMBERS.size} extra members, $coffeeTotal coffees, " +
+            "Seeded the dev demo data: ${DEMO_USERS.size} extra users, $coffeeTotal coffees, " +
                 "$expenseTotal own purchases, $depositTotal deposits, one kitty float, plus varied " +
-                "histories for ${ENRICHED_FIXTURE_LOGINS.size} other fixture users and one empty member " +
+                "histories for ${ENRICHED_FIXTURE_LOGINS.size} other fixture users and one empty user " +
                 "($EMPTY_DEMO_LOGIN)."
         }
     }
 
     /**
      * Gives a rich, varied history to every remaining existing fixture user (the admin and the fixture
-     * users other than the primary demo user, which [seedPrimaryDemoMemberHistory] already covers), so
+     * users other than the primary demo user, which [seedPrimaryDemoUserHistory] already covers), so
      * nearly every user has populated activity and change-log views. The counts and amounts are varied by the
      * user's index in [ENRICHED_FIXTURE_LOGINS] so the rows look realistic rather than identical. Each user
      * is an existing, active fixture user, so seeding only appends events. The admin is just another user
@@ -155,39 +155,39 @@ class DevDemoDataLoader(
      *
      * @param admin the resolved fixture admin, acting for the admin-only deposits
      */
-    private fun seedFixtureMemberHistories(admin: User) {
+    private fun seedFixtureUserHistories(admin: User) {
         ENRICHED_FIXTURE_LOGINS.forEachIndexed { index, login ->
             seedVariedHistory(userService.getByLoginName(login), index, admin)
         }
     }
 
     /**
-     * Seeds a varied coffee, own-bean-purchase, and deposit history onto an existing, active [member].
+     * Seeds a varied coffee, own-bean-purchase, and deposit history onto an existing, active [user].
      * The volume varies with [index] so consecutive users do not get identical rows: a handful of cups, one
      * to three own purchases, and one or two deposits, all attributed to the user (the deposits acted by
      * the [admin]). User purchases are 100% private, and deposits only add to the kitty, so this never
      * draws the kitty down.
      *
-     * @param member the existing active user to enrich
+     * @param user the existing active user to enrich
      * @param index  the user's position, used to vary the counts and amounts
      * @param admin  the resolved fixture admin, acting for the admin-only deposits
      */
     private fun seedVariedHistory(
-        member: User,
+        user: User,
         index: Int,
         admin: User
     ) {
         repeat(BASE_COFFEES + index * COFFEE_STEP) {
-            coffeeConsumptionService.applyDelta(member.persistedId, 1, member)
+            coffeeConsumptionService.applyDelta(user.persistedId, 1, user)
         }
         repeat(1 + index % MAX_EXTRA_OWN_EXPENSES) { purchase ->
             val weightGrams = BASE_EXPENSE_GRAMS + (index + purchase) * EXPENSE_GRAMS_STEP
             val amountCents = BASE_EXPENSE_CENTS + (index + purchase) * EXPENSE_CENTS_STEP
-            expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", member)
+            expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", user)
         }
         repeat(1 + index % MAX_EXTRA_DEPOSITS) { deposit ->
             val amountCents = BASE_DEPOSIT_CENTS + (index + deposit) * DEPOSIT_CENTS_STEP
-            paymentService.recordDeposit(member.persistedId, amountCents, "demo deposit", admin)
+            paymentService.recordDeposit(user.persistedId, amountCents, "demo deposit", admin)
         }
     }
 
@@ -196,7 +196,7 @@ class DevDemoDataLoader(
      * which bypasses the admin-only `create` check), then creates their consumption at zero so the count can
      * be advanced. Returns the persisted user (with their assigned id and capability token).
      */
-    private fun createMember(spec: DemoMember): User {
+    private fun createUser(spec: DemoUser): User {
         val created =
             userService.upsert(
                 User(
@@ -225,16 +225,16 @@ class DevDemoDataLoader(
      *
      * @param admin the resolved fixture admin, acting for the admin-only deposit
      */
-    private fun seedPrimaryDemoMemberHistory(admin: User) {
-        val member = userService.getByLoginName(PRIMARY_DEMO_LOGIN)
+    private fun seedPrimaryDemoUserHistory(admin: User) {
+        val user = userService.getByLoginName(PRIMARY_DEMO_LOGIN)
         repeat(PRIMARY_DEMO_COFFEES) {
-            coffeeConsumptionService.applyDelta(member.persistedId, 1, member)
+            coffeeConsumptionService.applyDelta(user.persistedId, 1, user)
         }
         PRIMARY_DEMO_OWN_EXPENSES.forEach { (weightGrams, amountCents) ->
-            expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", member)
+            expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", user)
         }
-        paymentService.recordDeposit(member.persistedId, PRIMARY_DEMO_DEPOSIT_CENTS, "demo deposit", admin)
-        log.info { "Seeded the primary demo member ($PRIMARY_DEMO_LOGIN) with a full demo activity." }
+        paymentService.recordDeposit(user.persistedId, PRIMARY_DEMO_DEPOSIT_CENTS, "demo deposit", admin)
+        log.info { "Seeded the primary demo user ($PRIMARY_DEMO_LOGIN) with a full demo activity." }
     }
 
     /**
@@ -251,11 +251,11 @@ class DevDemoDataLoader(
      *
      * @param admin the resolved fixture admin, acting for the admin-only records
      */
-    private fun seedPrimaryDemoMemberAdminExpenses(admin: User) {
-        val member = userService.getByLoginName(PRIMARY_DEMO_LOGIN)
+    private fun seedPrimaryDemoUserAdminExpenses(admin: User) {
+        val user = userService.getByLoginName(PRIMARY_DEMO_LOGIN)
         ADMIN_EXPENSE_VARIANTS.forEach { variant ->
             expenseService.record(
-                buyerUserId = member.persistedId,
+                buyerUserId = user.persistedId,
                 weightGrams = variant.weightGrams,
                 amountCents = variant.totalCents,
                 privateAmountCents = variant.privateCents,
@@ -264,7 +264,7 @@ class DevDemoDataLoader(
                 actingUser = admin
             )
             log.info {
-                "Seeded an admin ${variant.label} expense for the primary demo member ($PRIMARY_DEMO_LOGIN): " +
+                "Seeded an admin ${variant.label} expense for the primary demo user ($PRIMARY_DEMO_LOGIN): " +
                     "${variant.totalCents}c total = ${variant.privateCents}c private + ${variant.kittyCents}c kitty."
             }
         }
@@ -280,9 +280,9 @@ class DevDemoDataLoader(
      */
     private fun seedPriceChangeAndCorrection(admin: User) {
         coffeePriceService.setPrice(DEMO_NEW_PRICE_CENTS, admin)
-        val member = userService.getByLoginName(PRIMARY_DEMO_LOGIN)
+        val user = userService.getByLoginName(PRIMARY_DEMO_LOGIN)
         coffeeConsumptionService.setTotal(
-            member.persistedId,
+            user.persistedId,
             PRIMARY_DEMO_COFFEES + DEMO_CORRECTION_DELTA,
             "demo admin count correction",
             admin
@@ -377,8 +377,8 @@ class DevDemoDataLoader(
 
         // a freshly created active user with no history at all, to demo the empty activity/change-log state
         private const val EMPTY_DEMO_LOGIN = "new_user"
-        private val EMPTY_DEMO_MEMBER =
-            DemoMember(
+        private val EMPTY_DEMO_USER =
+            DemoUser(
                 EMPTY_DEMO_LOGIN,
                 "Nina",
                 "Neumann",
@@ -395,9 +395,9 @@ class DevDemoDataLoader(
         // inactive), most with a little consumption, purchase, and deposit history so the lists paginate
         // (5/page) and the activity/history views are not empty; one (`hannes_schulz`) is deliberately left
         // empty to demo the empty state
-        private val DEMO_MEMBERS =
+        private val DEMO_USERS =
             listOf(
-                DemoMember(
+                DemoUser(
                     "anna_schneider",
                     "Anna",
                     "Schneider",
@@ -407,7 +407,7 @@ class DevDemoDataLoader(
                     ownExpenses = listOf(500 to 1299),
                     depositCents = 1000
                 ),
-                DemoMember(
+                DemoUser(
                     "bernd_fischer",
                     "Bernd",
                     "Fischer",
@@ -417,7 +417,7 @@ class DevDemoDataLoader(
                     ownExpenses = emptyList(),
                     depositCents = null
                 ),
-                DemoMember(
+                DemoUser(
                     "clara_weber",
                     "Clara",
                     "Weber",
@@ -427,7 +427,7 @@ class DevDemoDataLoader(
                     ownExpenses = listOf(1000 to 2499, 250 to 799),
                     depositCents = 2000
                 ),
-                DemoMember(
+                DemoUser(
                     "david_meyer",
                     "David",
                     "Meyer",
@@ -437,7 +437,7 @@ class DevDemoDataLoader(
                     ownExpenses = listOf(500 to 1199),
                     depositCents = null
                 ),
-                DemoMember(
+                DemoUser(
                     "emma_wagner",
                     "Emma",
                     "Wagner",
@@ -447,7 +447,7 @@ class DevDemoDataLoader(
                     ownExpenses = emptyList(),
                     depositCents = null
                 ),
-                DemoMember(
+                DemoUser(
                     "felix_becker",
                     "Felix",
                     "Becker",
@@ -457,7 +457,7 @@ class DevDemoDataLoader(
                     ownExpenses = listOf(750 to 1899),
                     depositCents = 1500
                 ),
-                DemoMember(
+                DemoUser(
                     "greta_hoffmann",
                     "Greta",
                     "Hoffmann",
@@ -469,7 +469,7 @@ class DevDemoDataLoader(
                 ),
                 // deliberately left empty (no coffees, purchases, or deposit) to demo the empty state on
                 // an inactive user, alongside the active empty user `new_user`
-                DemoMember(
+                DemoUser(
                     "hannes_schulz",
                     "Hannes",
                     "Schulz",
@@ -479,7 +479,7 @@ class DevDemoDataLoader(
                     ownExpenses = emptyList(),
                     depositCents = null
                 ),
-                DemoMember(
+                DemoUser(
                     "ida_koch",
                     "Ida",
                     "Koch",

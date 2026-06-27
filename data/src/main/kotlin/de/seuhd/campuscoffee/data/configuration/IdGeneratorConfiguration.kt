@@ -1,6 +1,6 @@
 package de.seuhd.campuscoffee.data.configuration
 
-import de.seuhd.campuscoffee.data.adapters.IdGeneratorServiceImpl
+import de.seuhd.campuscoffee.data.system.IdGeneratorServiceImpl
 import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -46,7 +46,7 @@ class IdGeneratorConfiguration {
         }
 
     companion object {
-        /** Bean name of the dedicated generator for event ids (the qualifier the event store injects). */
+        /** Bean name of the dedicated generator for the event log's ids (the qualifier the event appender injects). */
         const val EVENT_ID_GENERATOR = "eventIdGenerator"
     }
 }

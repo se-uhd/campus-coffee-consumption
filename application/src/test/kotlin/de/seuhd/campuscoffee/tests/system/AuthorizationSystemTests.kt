@@ -15,7 +15,7 @@ import de.seuhd.campuscoffee.tests.SystemTestUtils.jwtFor
 import de.seuhd.campuscoffee.tests.SystemTestUtils.postToken
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
 import de.seuhd.campuscoffee.tests.SystemTestUtils.tokenErrorFor
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpHeaders
@@ -27,7 +27,7 @@ import org.springframework.test.web.servlet.client.returnResult
  * token and the admin JWT.
  */
 class AuthorizationSystemTests : AbstractSystemTest() {
-    private val member = "maxmustermann"
+    private val user = "maxmustermann"
 
     // Creates a second active admin (with a known password) so the seeded admin can be deactivated without
     // tripping the last-active-admin guard. Returns the created admin (used as the acting user that
@@ -73,9 +73,9 @@ class AuthorizationSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a deactivated member is read-only and cannot add a coffee`() {
+    fun `a deactivated user is read-only and cannot add a coffee`() {
         val admin = seededUser("jane_doe")
-        val max = seededUser(member)
+        val max = seededUser(user)
         userService.update(max.copy(active = false), admin)
 
         // the deactivated user still authenticates (a read works) but the mutation is forbidden
@@ -83,14 +83,14 @@ class AuthorizationSystemTests : AbstractSystemTest() {
             client()
                 .get()
                 .uri("/api/summary")
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .statusCode()
         val writeStatus =
             client()
                 .post()
                 .uri("/api/consumption")
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .statusCode()
 
@@ -99,14 +99,14 @@ class AuthorizationSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a member capability token may not access admin user management`() {
+    fun `a user capability token may not access admin user management`() {
         val status =
             client()
                 .get()
                 .uri(
                     "/api/users"
                 ).accept(MediaType.APPLICATION_JSON)
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .statusCode()
 
@@ -114,9 +114,9 @@ class AuthorizationSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a deactivated member updating their own profile returns 403 Forbidden`() {
+    fun `a deactivated user updating their own profile returns 403 Forbidden`() {
         val admin = seededUser("jane_doe")
-        val max = seededUser(member)
+        val max = seededUser(user)
         userService.update(max.copy(active = false), admin)
 
         // the deactivated user still authenticates, but a profile edit is a mutation and is forbidden
@@ -127,12 +127,12 @@ class AuthorizationSystemTests : AbstractSystemTest() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     UserDto(
-                        loginName = member,
+                        loginName = user,
                         emailAddress = "new.email@example.com",
                         firstName = "New",
                         lastName = "Name"
                     )
-                ).withMember(member)
+                ).withUser(user)
                 .exchange()
                 .statusCode()
 
@@ -171,14 +171,14 @@ class AuthorizationSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a member request to a non-health actuator endpoint returns 403 Forbidden`() {
+    fun `a user request to a non-health actuator endpoint returns 403 Forbidden`() {
         // a ROLE_USER user is authenticated but not an admin, so the `/actuator/** -> ADMIN` rule forbids
         // it (403): actuator is closed to users as well as to anonymous callers.
         val status =
             client()
                 .get()
                 .uri("/actuator/env")
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .statusCode()
 
@@ -332,10 +332,10 @@ class AuthorizationSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `an in-flight admin JWT after deactivation returns 403 on a member delete`() {
+    fun `an in-flight admin JWT after deactivation returns 403 on a user delete`() {
         val secondAdmin = createSecondAdmin()
         val seededAdmin = seededUser("jane_doe")
-        val target = seededUser(member)
+        val target = seededUser(user)
         val (login, password) = TestFixtures.rawCredentialsFor(Role.ADMIN)
         // issue a JWT while the admin is still active, then deactivate them
         val inFlight = jwtFor(login, password)
@@ -357,7 +357,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
     @Test
     fun `a rotated capability token no longer authenticates`() {
         val admin = seededUser("jane_doe")
-        val max = seededUser(member)
+        val max = seededUser(user)
         userService.rotateCapabilityToken(max.persistedId, admin)
 
         // the old (fixture) token is now invalid, so a request bearing it is unauthorized
@@ -365,7 +365,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
             client()
                 .get()
                 .uri("/api/summary")
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .statusCode()
 

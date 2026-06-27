@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.data.implementations
 
-import de.seuhd.campuscoffee.data.constraints.ConstraintMapping
 import de.seuhd.campuscoffee.data.mapper.CoffeePriceEntityMapper
+import de.seuhd.campuscoffee.data.persistence.ConstraintMapping
 import de.seuhd.campuscoffee.data.persistence.entities.CoffeePriceEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeePriceRepository
 import de.seuhd.campuscoffee.domain.model.CoffeePrice

@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.data.implementations
 
-import de.seuhd.campuscoffee.data.constraints.ConstraintMapping
 import de.seuhd.campuscoffee.data.mapper.UserEntityMapper
+import de.seuhd.campuscoffee.data.persistence.ConstraintMapping
 import de.seuhd.campuscoffee.data.persistence.entities.UserEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.UserRepository
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException

@@ -43,13 +43,13 @@ class UserServiceTest {
 
     private lateinit var service: UserServiceImpl
 
-    private val memberId: UUID = UUID(0L, 1L)
+    private val userId: UUID = UUID(0L, 1L)
     private val adminId: UUID = UUID(0L, 99L)
 
     // a user has no password (they authenticate with their capability token)
-    private val storedMember =
+    private val storedUser =
         User(
-            id = memberId,
+            id = userId,
             loginName = "max",
             emailAddress = "max@se.de",
             firstName = "Max",
@@ -118,7 +118,7 @@ class UserServiceTest {
     }
 
     @Test
-    fun `create of a member assigns no password and creates a consumption`() {
+    fun `create of a user assigns no password and creates a consumption`() {
         whenever(capabilityTokenGenerator.newToken()).thenReturn("NEW-TOKEN")
         whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
         whenever(coffeeConsumptionService.createForUser(any())).thenReturn(mock<CoffeeConsumption>())
@@ -126,10 +126,10 @@ class UserServiceTest {
         // a password sent for a user is ignored
         val toCreate =
             User(
-                loginName = "newmember",
-                emailAddress = "newmember@se.de",
+                loginName = "newuser",
+                emailAddress = "newuser@se.de",
                 firstName = "New",
-                lastName = "Member",
+                lastName = "User",
                 role = Role.USER,
                 password = "ignored-password"
             )
@@ -158,9 +158,9 @@ class UserServiceTest {
 
     @Test
     fun `create by a non-admin throws ForbiddenException`() {
-        val toCreate = User(loginName = "new", emailAddress = "new@se.de", firstName = "New", lastName = "Member")
+        val toCreate = User(loginName = "new", emailAddress = "new@se.de", firstName = "New", lastName = "User")
 
-        assertThrows<ForbiddenException> { service.create(toCreate, storedMember) }
+        assertThrows<ForbiddenException> { service.create(toCreate, storedUser) }
         verify(userDataService, never()).upsert(any())
     }
 
@@ -188,11 +188,11 @@ class UserServiceTest {
 
     @Test
     fun `update by a non-admin self keeps the stored role and ignores an attempted escalation`() {
-        whenever(userDataService.getById(memberId)).thenReturn(storedMember)
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
         whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
 
-        val attempted = storedMember.copy(role = Role.ADMIN, firstName = "Maximilian")
-        val updated = service.update(attempted, storedMember)
+        val attempted = storedUser.copy(role = Role.ADMIN, firstName = "Maximilian")
+        val updated = service.update(attempted, storedUser)
 
         assertThat(updated.role).isEqualTo(Role.USER)
         assertThat(updated.firstName).isEqualTo("Maximilian")
@@ -201,11 +201,11 @@ class UserServiceTest {
 
     @Test
     fun `update promoting a user to admin requires and hashes a password`() {
-        whenever(userDataService.getById(memberId)).thenReturn(storedMember)
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
         whenever(passwordHasher.hash("admin-pw")).thenReturn("PROMOTED-HASH")
         whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
 
-        val attempted = storedMember.copy(role = Role.ADMIN, password = "admin-pw")
+        val attempted = storedUser.copy(role = Role.ADMIN, password = "admin-pw")
         val updated = service.update(attempted, admin)
 
         assertThat(updated.role).isEqualTo(Role.ADMIN)
@@ -214,13 +214,13 @@ class UserServiceTest {
 
     @Test
     fun `update promoting a user to admin without a password throws MissingFieldException`() {
-        whenever(userDataService.getById(memberId)).thenReturn(storedMember)
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
 
-        assertThrows<MissingFieldException> { service.update(storedMember.copy(role = Role.ADMIN), admin) }
+        assertThrows<MissingFieldException> { service.update(storedUser.copy(role = Role.ADMIN), admin) }
     }
 
     @Test
-    fun `update demoting an admin to a member clears the password`() {
+    fun `update demoting an admin to a user clears the password`() {
         whenever(userDataService.getById(adminId)).thenReturn(admin)
         whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
         // a second active admin remains, so demoting this one is allowed (it is not the last active admin)
@@ -257,14 +257,14 @@ class UserServiceTest {
     }
 
     @Test
-    fun `update with a partial body keeps the stored token and role and assigns a member no password`() {
-        whenever(userDataService.getById(memberId)).thenReturn(storedMember)
+    fun `update with a partial body keeps the stored token and role and assigns a user no password`() {
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
         whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
 
         // a partial update as the mapper produces it: no token, no role, no active flag, no password
         val partial =
             User(
-                id = memberId,
+                id = userId,
                 loginName = "max",
                 emailAddress = "max@se.de",
                 firstName = "Maximilian",
@@ -275,7 +275,7 @@ class UserServiceTest {
                 passwordHash = null,
                 password = null
             )
-        val updated = service.update(partial, storedMember)
+        val updated = service.update(partial, storedUser)
 
         assertThat(updated.capabilityToken).isEqualTo("OLD-TOKEN")
         assertThat(updated.role).isEqualTo(Role.USER)
@@ -284,10 +284,10 @@ class UserServiceTest {
     }
 
     @Test
-    fun `upsert of a member stores no password even if one is supplied`() {
+    fun `upsert of a user stores no password even if one is supplied`() {
         whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
 
-        val member =
+        val user =
             User(
                 loginName = "preset",
                 emailAddress = "preset@se.de",
@@ -298,87 +298,87 @@ class UserServiceTest {
                 capabilityToken = "tok",
                 password = "supplied-password"
             )
-        val saved = service.upsert(member)
+        val saved = service.upsert(user)
 
         assertThat(saved.passwordHash).isNull()
     }
 
     @Test
     fun `update of another user by a non-admin throws ForbiddenException`() {
-        whenever(userDataService.getById(memberId)).thenReturn(storedMember)
-        val stranger = storedMember.copy(id = UUID(0L, 7L), loginName = "stranger")
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
+        val stranger = storedUser.copy(id = UUID(0L, 7L), loginName = "stranger")
 
-        assertThrows<ForbiddenException> { service.update(storedMember, stranger) }
+        assertThrows<ForbiddenException> { service.update(storedUser, stranger) }
     }
 
     @Test
     fun `getById of another user by a non-admin throws ForbiddenException`() {
-        whenever(userDataService.getById(memberId)).thenReturn(storedMember)
-        val stranger = storedMember.copy(id = UUID(0L, 7L), loginName = "stranger")
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
+        val stranger = storedUser.copy(id = UUID(0L, 7L), loginName = "stranger")
 
-        assertThrows<ForbiddenException> { service.getById(memberId, stranger) }
+        assertThrows<ForbiddenException> { service.getById(userId, stranger) }
     }
 
     @Test
     fun `getById of own account is allowed`() {
-        whenever(userDataService.getById(memberId)).thenReturn(storedMember)
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
 
-        val result = service.getById(memberId, storedMember)
+        val result = service.getById(userId, storedUser)
 
         assertThat(result.loginName).isEqualTo("max")
     }
 
     @Test
     fun `getById of any user by an admin is allowed`() {
-        whenever(userDataService.getById(memberId)).thenReturn(storedMember)
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
 
-        assertThat(service.getById(memberId, admin).loginName).isEqualTo("max")
+        assertThat(service.getById(userId, admin).loginName).isEqualTo("max")
     }
 
     @Test
     fun `getByLoginName of own account is allowed`() {
-        whenever(userDataService.getByLoginName("max")).thenReturn(storedMember)
+        whenever(userDataService.getByLoginName("max")).thenReturn(storedUser)
 
-        assertThat(service.getByLoginName("max", storedMember).loginName).isEqualTo("max")
+        assertThat(service.getByLoginName("max", storedUser).loginName).isEqualTo("max")
     }
 
     @Test
     fun `getByLoginName of another user by a non-admin throws ForbiddenException`() {
-        whenever(userDataService.getByLoginName("max")).thenReturn(storedMember)
-        val stranger = storedMember.copy(id = UUID(0L, 7L), loginName = "stranger")
+        whenever(userDataService.getByLoginName("max")).thenReturn(storedUser)
+        val stranger = storedUser.copy(id = UUID(0L, 7L), loginName = "stranger")
 
         assertThrows<ForbiddenException> { service.getByLoginName("max", stranger) }
     }
 
     @Test
     fun `getByLoginName without an acting user delegates to the data service`() {
-        whenever(userDataService.getByLoginName("max")).thenReturn(storedMember)
+        whenever(userDataService.getByLoginName("max")).thenReturn(storedUser)
 
         assertThat(service.getByLoginName("max").loginName).isEqualTo("max")
     }
 
     @Test
     fun `rotateCapabilityToken by an admin issues a new token`() {
-        whenever(userDataService.getById(memberId)).thenReturn(storedMember)
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
         whenever(capabilityTokenGenerator.newToken()).thenReturn("ROTATED-TOKEN")
         whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
 
-        val rotated = service.rotateCapabilityToken(memberId, admin)
+        val rotated = service.rotateCapabilityToken(userId, admin)
 
         assertThat(rotated.capabilityToken).isEqualTo("ROTATED-TOKEN")
     }
 
     @Test
     fun `rotateCapabilityToken by a non-admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.rotateCapabilityToken(memberId, storedMember) }
+        assertThrows<ForbiddenException> { service.rotateCapabilityToken(userId, storedUser) }
         verify(userDataService, never()).upsert(any())
     }
 
     @Test
     fun `findByCapabilityToken delegates to the data service`() {
-        whenever(userDataService.findByCapabilityToken("a-token")).thenReturn(storedMember)
+        whenever(userDataService.findByCapabilityToken("a-token")).thenReturn(storedUser)
 
-        assertThat(service.findByCapabilityToken("a-token")).isEqualTo(storedMember)
+        assertThat(service.findByCapabilityToken("a-token")).isEqualTo(storedUser)
     }
 
     @Test
@@ -401,14 +401,14 @@ class UserServiceTest {
     }
 
     @Test
-    fun `upsert of an existing member with no incoming role or active falls back to the stored values`() {
-        whenever(userDataService.getById(memberId)).thenReturn(storedMember)
+    fun `upsert of an existing user with no incoming role or active falls back to the stored values`() {
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
         whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
 
         // an update with role and active both null falls back to the stored role/active (the elvis chain)
         val saved =
             service.upsert(
-                storedMember.copy(role = null, active = null, capabilityToken = null, firstName = "Maximilian")
+                storedUser.copy(role = null, active = null, capabilityToken = null, firstName = "Maximilian")
             )
 
         assertThat(saved.role).isEqualTo(Role.USER)
@@ -443,7 +443,7 @@ class UserServiceTest {
     }
 
     @Test
-    fun `upsert of a brand-new member without a token generates one`() {
+    fun `upsert of a brand-new user without a token generates one`() {
         whenever(capabilityTokenGenerator.newToken()).thenReturn("GENERATED")
         whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
 
@@ -453,7 +453,7 @@ class UserServiceTest {
                     loginName = "fresh",
                     emailAddress = "fresh@se.de",
                     firstName = "Fresh",
-                    lastName = "Member",
+                    lastName = "User",
                     role = Role.USER,
                     active = false,
                     capabilityToken = null
@@ -466,35 +466,35 @@ class UserServiceTest {
     }
 
     @Test
-    fun `delete of a pristine member removes the user`() {
-        whenever(coffeeConsumptionDataService.getByUserId(memberId))
-            .thenReturn(CoffeeConsumption(user = storedMember, count = 0))
-        whenever(expenseDataService.getAllByBuyer(memberId)).thenReturn(emptyList())
-        whenever(paymentDataService.getAllByUser(memberId)).thenReturn(emptyList())
+    fun `delete of a pristine user removes the user`() {
+        whenever(coffeeConsumptionDataService.getByUserId(userId))
+            .thenReturn(CoffeeConsumption(user = storedUser, count = 0))
+        whenever(expenseDataService.getAllByBuyer(userId)).thenReturn(emptyList())
+        whenever(paymentDataService.getAllByUser(userId)).thenReturn(emptyList())
 
-        service.delete(memberId)
+        service.delete(userId)
 
-        verify(userDataService).delete(memberId)
+        verify(userDataService).delete(userId)
     }
 
     @Test
-    fun `delete of a member with a non-zero count throws DeletionConflictException`() {
-        whenever(coffeeConsumptionDataService.getByUserId(memberId))
-            .thenReturn(CoffeeConsumption(user = storedMember, count = 3))
+    fun `delete of a user with a non-zero count throws DeletionConflictException`() {
+        whenever(coffeeConsumptionDataService.getByUserId(userId))
+            .thenReturn(CoffeeConsumption(user = storedUser, count = 3))
 
-        assertThrows<DeletionConflictException> { service.delete(memberId) }
+        assertThrows<DeletionConflictException> { service.delete(userId) }
         verify(userDataService, never()).delete(any())
     }
 
     @Test
-    fun `delete of a member with an expense throws DeletionConflictException`() {
-        whenever(coffeeConsumptionDataService.getByUserId(memberId))
-            .thenReturn(CoffeeConsumption(user = storedMember, count = 0))
-        whenever(expenseDataService.getAllByBuyer(memberId))
+    fun `delete of a user with an expense throws DeletionConflictException`() {
+        whenever(coffeeConsumptionDataService.getByUserId(userId))
+            .thenReturn(CoffeeConsumption(user = storedUser, count = 0))
+        whenever(expenseDataService.getAllByBuyer(userId))
             .thenReturn(
                 listOf(
                     Expense(
-                        buyer = storedMember,
+                        buyer = storedUser,
                         weightGrams = 1,
                         amountCents = 1,
                         privateAmountCents = 1,
@@ -503,19 +503,19 @@ class UserServiceTest {
                 )
             )
 
-        assertThrows<DeletionConflictException> { service.delete(memberId) }
+        assertThrows<DeletionConflictException> { service.delete(userId) }
         verify(userDataService, never()).delete(any())
     }
 
     @Test
-    fun `delete of a member with a deposit throws DeletionConflictException`() {
-        whenever(coffeeConsumptionDataService.getByUserId(memberId))
-            .thenReturn(CoffeeConsumption(user = storedMember, count = 0))
-        whenever(expenseDataService.getAllByBuyer(memberId)).thenReturn(emptyList())
-        whenever(paymentDataService.getAllByUser(memberId))
-            .thenReturn(listOf(Payment(user = storedMember, amountCents = 100)))
+    fun `delete of a user with a deposit throws DeletionConflictException`() {
+        whenever(coffeeConsumptionDataService.getByUserId(userId))
+            .thenReturn(CoffeeConsumption(user = storedUser, count = 0))
+        whenever(expenseDataService.getAllByBuyer(userId)).thenReturn(emptyList())
+        whenever(paymentDataService.getAllByUser(userId))
+            .thenReturn(listOf(Payment(user = storedUser, amountCents = 100)))
 
-        assertThrows<DeletionConflictException> { service.delete(memberId) }
+        assertThrows<DeletionConflictException> { service.delete(userId) }
         verify(userDataService, never()).delete(any())
     }
 
@@ -523,7 +523,7 @@ class UserServiceTest {
     fun `update deactivating the last active admin throws ConflictException`() {
         whenever(userDataService.getById(adminId)).thenReturn(admin)
         // the admin is the only active admin in the store
-        whenever(userDataService.getAll()).thenReturn(listOf(admin, storedMember))
+        whenever(userDataService.getAll()).thenReturn(listOf(admin, storedUser))
 
         assertThrows<ConflictException> { service.update(admin.copy(active = false), admin) }
         verify(userDataService, never()).upsert(any())
@@ -532,7 +532,7 @@ class UserServiceTest {
     @Test
     fun `update demoting the last active admin throws ConflictException`() {
         whenever(userDataService.getById(adminId)).thenReturn(admin)
-        whenever(userDataService.getAll()).thenReturn(listOf(admin, storedMember))
+        whenever(userDataService.getAll()).thenReturn(listOf(admin, storedUser))
 
         assertThrows<ConflictException> { service.update(admin.copy(role = Role.USER), admin) }
         verify(userDataService, never()).upsert(any())
@@ -552,7 +552,7 @@ class UserServiceTest {
     @Test
     fun `delete of the last active admin throws ConflictException`() {
         whenever(userDataService.getById(adminId)).thenReturn(admin)
-        whenever(userDataService.getAll()).thenReturn(listOf(admin, storedMember))
+        whenever(userDataService.getAll()).thenReturn(listOf(admin, storedUser))
 
         assertThrows<ConflictException> { service.delete(adminId) }
         verify(userDataService, never()).delete(any())

@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.data.implementations
 
-import de.seuhd.campuscoffee.data.constraints.ConstraintMapping
 import de.seuhd.campuscoffee.data.mapper.EntityMapper
+import de.seuhd.campuscoffee.data.persistence.ConstraintMapping
 import de.seuhd.campuscoffee.data.persistence.entities.Entity
 import de.seuhd.campuscoffee.domain.exceptions.ConcurrentUpdateException
 import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
@@ -10,7 +10,6 @@ import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.model.DomainModel
 import de.seuhd.campuscoffee.domain.ports.data.CrudDataService
 import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
-import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.OptimisticLockingFailureException
 import org.springframework.data.jpa.repository.JpaRepository
@@ -79,7 +78,7 @@ abstract class CrudDataServiceImpl<DOMAIN : DomainModel<ID>, ENTITY : Entity, RE
             throw ConcurrentUpdateException(domainClass, domain.id, e)
         } catch (e: DataIntegrityViolationException) {
             // the database reports which named constraint was violated; map it to the declared domain field
-            val violated = constraintNameOf(e)
+            val violated = ConstraintMapping.constraintNameOf(e)
             if (violated != null) {
                 for (constraint in uniqueConstraints) {
                     if (violated.equals(constraint.constraintName, ignoreCase = true)) {
@@ -129,25 +128,4 @@ abstract class CrudDataServiceImpl<DOMAIN : DomainModel<ID>, ENTITY : Entity, RE
         fieldValue: String
     ): DOMAIN =
         queryFunction()?.let { mapper.fromEntity(it) } ?: throw NotFoundException(domainClass, fieldName, fieldValue)
-
-    companion object {
-        /**
-         * Returns the name of the database constraint reported by a data integrity violation, or null
-         * when the cause chain contains no Hibernate [ConstraintViolationException]. Reading the name
-         * the driver reported avoids matching on database-specific error-message text. Exposed (not
-         * private) so it can be unit-tested directly with a crafted exception.
-         *
-         * @param exception the data integrity violation whose cause chain is inspected
-         */
-        fun constraintNameOf(exception: DataIntegrityViolationException): String? {
-            var cause: Throwable? = exception
-            while (cause != null) {
-                if (cause is ConstraintViolationException) {
-                    return cause.constraintName
-                }
-                cause = cause.cause
-            }
-            return null
-        }
-    }
 }
