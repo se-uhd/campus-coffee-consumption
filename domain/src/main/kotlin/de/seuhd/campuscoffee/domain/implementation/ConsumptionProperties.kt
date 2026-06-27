@@ -8,7 +8,7 @@ import java.time.Duration
  * is enforced there (the domain cannot depend on the api or application modules), and it gives the key a
  * typed binding so it resolves in the IDE's `application.yaml` editor.
  *
- * @property cancelGracePeriod how long after adding a coffee a member may still undo it
+ * @property cancelGracePeriod how long after adding a coffee a user may still undo it
  *   (`POST /api/consumption/cancel`); an undo after this window is refused with 409. Bound from
  *   `campus-coffee.consumption.cancel-grace-period`, default 5 minutes (matching `application.yaml`).
  */

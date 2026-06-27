@@ -18,7 +18,7 @@ import java.util.UUID
 import java.util.zip.ZipInputStream
 
 /**
- * System tests for the admin member-management and consumption-by-id flow, authenticated by a JWT minted
+ * System tests for the admin user-management and consumption-by-id flow, authenticated by a JWT minted
  * at the token endpoint with the seeded admin fixture credentials.
  */
 class UserAdminSystemTests : AbstractSystemTest() {
@@ -80,7 +80,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .returnResult<UserDto>()
                 .responseBody!!
 
-        // delete succeeds (the user_id FK cascades the member's consumption row away)
+        // delete succeeds (the user_id FK cascades the user's consumption row away)
         val delete =
             client()
                 .delete()
@@ -90,7 +90,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                 .returnResult<Void>()
         assertThat(delete.status.value()).isEqualTo(204)
 
-        // the member is gone
+        // the user is gone
         val afterGet =
             client()
                 .get()
@@ -214,7 +214,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
         assertThat(result.status.value()).isEqualTo(200)
         assertThat(result.responseHeaders.contentType.toString()).isEqualTo("application/zip")
         val entries = zipEntryNames(result.responseBody!!)
-        // one PNG per seeded user (the admin and the four members), each named after the member's login
+        // one PNG per seeded user (the admin and the four users), each named after the user's login
         assertThat(entries).hasSize(5)
         assertThat(entries).allMatch { it.endsWith(".png") }
         assertThat(entries).contains("jane_doe.png", "maxmustermann.png")
@@ -222,7 +222,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
 
     @Test
     fun `a member capability token downloading all QR codes returns 403 Forbidden`() {
-        // the bulk QR ZIP is admin-only; a member's capability token grants only self-service
+        // the bulk QR ZIP is admin-only; a user's capability token grants only self-service
         val status =
             client()
                 .get()
@@ -264,7 +264,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
 
     @Test
     fun `a deactivated member is excluded from the bulk QR downloads`() {
-        // deactivate one member; they must drop out of the ZIP (and the PDF, which shares the selection)
+        // deactivate one user; they must drop out of the ZIP (and the PDF, which shares the selection)
         val id = memberId()
         client()
             .put()
@@ -293,7 +293,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
                     .returnResult<ByteArray>()
                     .responseBody!!
             )
-        // four of the five seeded members remain; the deactivated one is gone
+        // four of the five seeded users remain; the deactivated one is gone
         assertThat(entries).hasSize(4)
         assertThat(entries).doesNotContain("maxmustermann.png")
 

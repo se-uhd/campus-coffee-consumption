@@ -9,6 +9,28 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Renamed the product term for a person from "member" to "user" throughout the UI, the API, and the
+  codebase, so the frontend vocabulary matches the backend's existing `User` model and `ROLE_USER` instead
+  of diverging from it. The members page is now **Users** ("Add a user", "No users yet"), the role badge
+  reads **User** or **Admin**, the admin "Record member expense" page is now just **Expenses**, the admin
+  "view this user" deep link uses the `?user=` query parameter, and the public activity feed and its CSV
+  export expose `userEffectCents` / `userBalanceCents` (were `member*Cents`). The `/admin/users` route and
+  the `/api/users` endpoints are unchanged. A new migration renames the `member_balance` projection table
+  to `user_balance`. The rename is behavior-preserving.
+- The whole SPA now runs under `OnPush` change detection with signal-based view state, and the admin users
+  page preloads its data through a route resolver and a small cached store, so it paints already populated
+  instead of empty-then-filled and repaints instantly on a revisit. A thin top progress bar shows while a
+  route navigation is in flight.
+- Tightened the codebase-wide naming and package conventions (behavior-preserving). Every cross-module port
+  interface is now `*Service`/`*DataService` with a `<Port>Impl` adapter, and no implementation leaks a
+  library name (`ZxingQrCodeGenerator`→`QrCodeServiceImpl`, `PostgresBalanceLock`→`BalanceLockServiceImpl`,
+  `BCryptPasswordHasher`→`PasswordHasherServiceImpl`, `SeededUuidGenerator`→`IdGeneratorServiceImpl`,
+  `BalanceProjection`→`BalanceDataServiceImpl`); the two QR ports collapsed into one `QrCodeService`;
+  utility-function files are `*Util` (`ReadSupport`→`ReadUtil`); and every file holds a single top-level type
+  (`ActivityDataServiceImpl`, `ActivityEntry`, and `LoginPayloadDecryptor` were split accordingly). Packages
+  were reorganized to match: `domain/ports/system/` for the SPI ports, `data/adapters/` for the technology
+  adapters, `data/persistence/` for the advisory-lock adapter, and `api/app` + `api/support`. The frontend
+  `UsersStore` became `AdminUserService`. All conventions are now documented in CLAUDE.md.
 - Aligned the Material theme with the official Universität Heidelberg corporate design. Every primary control
   now resolves to the exact house red (Pantone 1805 C, #C61826) instead of the tonal palette's rounded
   #bd0e21; cards are white on the Sand background; and the neutral greys (form-field borders, dividers, the
@@ -17,17 +39,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   kept as the selected-state accent: the activity-filter tabs, the add-coffee button, the selected dropdown
   option, and the Admin role badge.
 - Renamed the automated event actor from "system" to "SYSTEM" everywhere it is recorded and shown (the actor
-  providers, the event log, and every activity view), so the non-member actor stands out from member and
+  providers, the event log, and every activity view), so the non-user actor stands out from user and
   admin logins. The frontend reads it through one shared pipe, and any legacy lowercase "system" row still
   displays as "SYSTEM". The value is only a label, so the rename is behavior-preserving.
-- The admin Activity and Members tables size their columns by percentage under a fixed table layout, so the
+- The admin Activity and Users tables size their columns by percentage under a fixed table layout, so the
   proportions hold at any width and the columns no longer re-measure (and shift) when "Load more" appends
-  rows. The activity "By" column, which shows only a login, is narrower than the member-name column.
+  rows. The activity "By" column, which shows only a login, is narrower than the user-name column.
 - Every consumption row shows its cup delta in parentheses, including a normal single coffee (+1), matching
   how a cancel (-1) and an admin correction (for example +45) were already annotated.
 
 ### Fixed
 
+- The slide-toggles in the admin users table no longer visibly flash from off into their real state when
+  paging or reloading. Rows now track by user id so they are reused instead of destroyed and recreated, and
+  the toggle's enter transition is suppressed on that table, so a checked toggle paints checked with no
+  glide.
 - "Load more" no longer shows a button with nothing left to load. The activity feeds peek one row past the
   page, so the button reflects whether more rows actually remain instead of guessing from a full page (which
   left a dead button whenever the total was an exact multiple of the page size).

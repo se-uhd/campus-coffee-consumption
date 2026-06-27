@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
 import de.seuhd.campuscoffee.domain.model.DomainModel
-import de.seuhd.campuscoffee.domain.ports.IdGenerator
+import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -16,18 +16,18 @@ import kotlin.reflect.KClass
  * throws and the whole transaction rolls back, so the log never keeps an invalid event.
  *
  * The decorators pass the per-type steps in as lambdas (how to build the domain object via `copy`, and how
- * to read one back), so this holds no per-type knowledge. Ids come from the primary [IdGenerator], so the
+ * to read one back), so this holds no per-type knowledge. Ids come from the primary [IdGeneratorService], so the
  * assigned entity ids are produced by the same generator the relational delegate (the read model) uses.
  *
- * After projecting an event it also refreshes the [BalanceProjection] in the same transaction, so the
- * materialized member and kitty balances stay consistent with the log (and roll back together with it).
+ * After projecting an event it also refreshes the [BalanceDataServiceImpl] in the same transaction, so the
+ * materialized user and kitty balances stay consistent with the log (and roll back together with it).
  */
 @Component
 class EventSourcedWriter(
     private val eventStore: EventStore,
     private val projector: ReadModelProjector,
-    private val balanceProjection: BalanceProjection,
-    private val idGenerator: IdGenerator
+    private val balanceProjection: BalanceDataServiceImpl,
+    private val idGenerator: IdGeneratorService
 ) {
     /**
      * Creates (no id) or updates (id present) a domain object. On create it assigns a new id and both
@@ -68,7 +68,7 @@ class EventSourcedWriter(
      * [DeletionConflictException][de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException]).
      *
      * The DELETE event carries the id, plus any owner-key body fields [ownerKeys] derives from the loaded
-     * object, so a deleted expense or deposit is still matched to its owner by the member-activity and kitty-history
+     * object, so a deleted expense or deposit is still matched to its owner by the user-activity and kitty-history
      * reads (which key on `buyerUserId`/`userId`) and the deletion is reversed there.
      *
      * @param domainType the domain type of the object to delete

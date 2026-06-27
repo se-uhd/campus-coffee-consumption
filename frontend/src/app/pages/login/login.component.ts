@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -21,7 +21,7 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
     MatProgressSpinnerModule,
     AppHeaderComponent
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <cc-app-header [home]="'/admin'"></cc-app-header>
 
@@ -58,21 +58,21 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
               <mat-error>Enter your password.</mat-error>
             }
           </mat-form-field>
-          <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || loading">
-            @if (loading) {
+          <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || loading()">
+            @if (loading()) {
               <mat-spinner diameter="20"></mat-spinner>
             } @else {
               Sign in
             }
           </button>
-          @if (error) {
-            <p class="warn">{{ error }}</p>
+          @if (error()) {
+            <p class="warn">{{ error() }}</p>
           }
         </form>
       </mat-card>
       <p class="muted">
-        Members don't sign in here. Open your personal link to record coffee consumption and check your
-        balance. The link itself is your credential.
+        Users don't sign in here. Open your personal link to record coffee consumption and check your balance.
+        The link itself is your credential.
       </p>
     </div>
   `
@@ -80,8 +80,8 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
 export class LoginComponent {
   loginName = '';
   password = '';
-  loading = false;
-  error = '';
+  readonly loading = signal(false);
+  readonly error = signal('');
 
   constructor(
     private readonly auth: AuthService,
@@ -90,15 +90,15 @@ export class LoginComponent {
 
   /** Submits the credentials and navigates to the admin landing on success. */
   async submit(): Promise<void> {
-    this.loading = true;
-    this.error = '';
+    this.loading.set(true);
+    this.error.set('');
     try {
       await this.auth.login(this.loginName, this.password);
       await this.router.navigate(['/admin']);
     } catch {
-      this.error = 'Login failed. Check your credentials.';
+      this.error.set('Login failed. Check your credentials.');
     } finally {
-      this.loading = false;
+      this.loading.set(false);
     }
   }
 }

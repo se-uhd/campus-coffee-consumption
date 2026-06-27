@@ -20,9 +20,9 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 
 /**
- * System tests for the member self-service consumption and profile flow, authenticated by the
- * `X-Capability-Token` header. A member adds a coffee (`POST /consumption`, no body) and undoes the most recent
- * one within the grace period (`POST /consumption/cancel`); reads come from `GET /summary`. The member is
+ * System tests for the user self-service consumption and profile flow, authenticated by the
+ * `X-Capability-Token` header. A user adds a coffee (`POST /consumption`, no body) and undoes the most recent
+ * one within the grace period (`POST /consumption/cancel`); reads come from `GET /summary`. The user is
  * the seeded `maxmustermann` fixture.
  */
 class ConsumptionSystemTests : AbstractSystemTest() {
@@ -93,7 +93,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
     fun `adding a coffee leaves the member owing the price of one cup`() {
         add()
 
-        // a coffee at 50 cents leaves the member owing 50 cents (a negative balance)
+        // a coffee at 50 cents leaves the user owing 50 cents (a negative balance)
         assertThat(summary().balanceCents).isEqualTo(-50)
     }
 
@@ -133,7 +133,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
         add()
         overrideCount(0)
 
-        // the member cannot undo a coffee the admin already removed
+        // the user cannot undo a coffee the admin already removed
         assertThat(cancel().statusCode()).isEqualTo(409)
     }
 
@@ -230,14 +230,14 @@ class ConsumptionSystemTests : AbstractSystemTest() {
 
     @Test
     fun `renaming a member's login name is ignored, so their undo and balance survive`() {
-        // give the member history: one coffee, so the balance is negative and the cup is still cancellable
+        // give the user history: one coffee, so the balance is negative and the cup is still cancellable
         add()
         val before = summary()
         assertThat(before.count).isEqualTo(1)
         assertThat(before.balanceCents).isLessThan(0)
         assertThat(before.cancellable).isTrue()
 
-        // an admin tries to rename the member; the login name is immutable (pinned), so the change is dropped
+        // an admin tries to rename the user; the login name is immutable (pinned), so the change is dropped
         val target = seededUser(member)
         val response =
             client()
@@ -260,7 +260,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
                 .responseBody!!
         assertThat(response.loginName).isEqualTo(member)
 
-        // the activity classifies the member's own scan by the (unchanged) login, so undo and balance survive
+        // the activity classifies the user's own scan by the (unchanged) login, so undo and balance survive
         val after = summary()
         assertThat(after.count).isEqualTo(1)
         assertThat(after.balanceCents).isEqualTo(before.balanceCents)

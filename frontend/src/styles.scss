@@ -138,8 +138,8 @@ a {
 // ---------------------------------------------------------------------------
 
 // One width for every page so the panels keep a consistent width as you navigate. The widest content is the
-// members table; 720px fits it at the width it needs with no column overflowing, and every other page (the
-// forms and the mobile-first member landing) uses the same width. On a narrow phone the page is full-width
+// users table; 720px fits it at the width it needs with no column overflowing, and every other page (the
+// forms and the mobile-first user landing) uses the same width. On a narrow phone the page is full-width
 // (the max-width does not bind); on a wide desktop the column is centered so it reads as an intentional
 // card column, not lost in a void.
 .page {
@@ -325,7 +325,7 @@ mat-card.card h2:last-child {
   color: var(--cc-brand);
 }
 
-// A small inline role badge in the members table. The brand variant marks an ADMIN role in the light-red
+// A small inline role badge in the users table. The brand variant marks an ADMIN role in the light-red
 // tonal (the same soft accent as the selected tabs and the add-coffee button); the neutral variant
 // (`.cc-chip--neutral`) marks a plain USER role on the sand surface.
 .cc-chip {
@@ -345,7 +345,7 @@ mat-card.card h2:last-child {
 }
 
 // The add-coffee FAB keeps the M3 light-red tonal fill at rest (a soft, friendly accent for the most-tapped
-// member action), deepening to the darker brand tone on hover/press.
+// user action), deepening to the darker brand tone on hover/press.
 .mat-mdc-fab.mat-primary:hover {
   --mat-fab-container-color: var(--cc-brand-dark);
 }
@@ -378,7 +378,7 @@ mat-card.card h2:last-child {
 }
 
 // ---------------------------------------------------------------------------
-// Admin members table
+// Admin users table
 // ---------------------------------------------------------------------------
 
 .table-scroll {
@@ -424,6 +424,24 @@ table.mat-mdc-table {
 
 .mat-mdc-paginator {
   background: transparent;
+}
+
+// Suppress the slide-toggle's enter transition inside the users table only. A page change (or a row rebuild)
+// mounts a fresh toggle that paints in its default OFF state, then the MDC switch's short CSS transition
+// glides it to its real CHECKED state, which reads as the toggle "being set" on every paginate. Zeroing
+// exactly the transitions Material's own `_mat-animation-noopable` zeroes makes a checked toggle paint
+// checked instantly, with no glide, while leaving every other Material animation intact (the global
+// `provideNoopAnimations` would kill them all). Row identity (`[trackBy]`) already prevents the rebuild on a
+// same-set reload; this covers the genuine page change, where the next page's rows must be created fresh.
+.cc-users-table {
+  .mdc-switch__handle-track,
+  .mdc-switch__handle::before,
+  .mdc-switch__handle::after,
+  .mdc-switch__track::before,
+  .mdc-switch__track::after,
+  .mdc-switch__icon {
+    transition: none;
+  }
 }
 
 // Respect an operating-system "reduce motion" preference: drop the Material transitions/animations to a

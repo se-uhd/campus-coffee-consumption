@@ -7,32 +7,32 @@ import de.seuhd.campuscoffee.domain.exceptions.MissingFieldException
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
-import de.seuhd.campuscoffee.domain.ports.CapabilityTokenGenerator
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.CrudDataService
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
-import de.seuhd.campuscoffee.domain.ports.data.PasswordHasher
+import de.seuhd.campuscoffee.domain.ports.data.PasswordHasherService
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
+import de.seuhd.campuscoffee.domain.ports.system.CapabilityTokenGeneratorService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * Domain implementation of [UserService]. Enforces the member-management rules: a user is created only by
+ * Domain implementation of [UserService]. Enforces the user-management rules: a user is created only by
  * an admin (with a freshly generated capability token and a coffee consumption at zero), a user may edit
  * only their own profile unless they are an admin, and only an admin may change a user's role or active
- * state or rotate a capability token. Passwords are hashed via the [PasswordHasher] port and never read
+ * state or rotate a capability token. Passwords are hashed via the [PasswordHasherService] port and never read
  * back.
  */
 @Suppress("TooManyFunctions")
 @Service
 class UserServiceImpl(
     private val userDataService: UserDataService,
-    private val passwordHasher: PasswordHasher,
-    private val capabilityTokenGenerator: CapabilityTokenGenerator,
+    private val passwordHasher: PasswordHasherService,
+    private val capabilityTokenGenerator: CapabilityTokenGeneratorService,
     private val coffeeConsumptionService: CoffeeConsumptionService,
     private val coffeeConsumptionDataService: CoffeeConsumptionDataService,
     private val expenseDataService: ExpenseDataService,
@@ -42,13 +42,13 @@ class UserServiceImpl(
     override fun dataService(): CrudDataService<User, UUID> = userDataService
 
     /**
-     * Refuses to hard-delete a member who has any financial footprint (a non-zero coffee count, or any
+     * Refuses to hard-delete a user who has any financial footprint (a non-zero coffee count, or any
      * expense or deposit) so the financial history is preserved (an admin deactivates them instead).
-     * A pristine member (count zero, no money records) is deleted, cascading their zeroed consumption row.
+     * A pristine user (count zero, no money records) is deleted, cascading their zeroed consumption row.
      * Also refuses to delete the last remaining active admin, so the system never locks every admin out.
      *
      * @throws ConflictException if deleting the last remaining active admin
-     * @throws DeletionConflictException if the member has financial history
+     * @throws DeletionConflictException if the user has financial history
      */
     @Transactional
     override fun delete(id: UUID) {
@@ -67,11 +67,11 @@ class UserServiceImpl(
 
     /**
      * Normalizes a user's server-owned secrets before persisting, enforcing the invariant that **a
-     * password exists only for an admin**: a member (USER) authenticates solely with their capability token
+     * password exists only for an admin**: a user (USER) authenticates solely with their capability token
      * and never has a password, so any supplied password is dropped and the stored hash is cleared. An
      * admin's password hash is, in order: a freshly supplied raw password (hashed), else the hash already
      * stored for that admin (on an update that does not supply a new one). When neither is present, for a
-     * newly created admin or a member being promoted (who had no stored hash), the admin would end up
+     * newly created admin or a user being promoted (who had no stored hash), the admin would end up
      * with no password, which fails with a [MissingFieldException]. A capability token is generated for a
      * new user without one (otherwise the existing token is kept); role and active default to USER/active
      * for a create. The acting-user policy is enforced by [create]/[update] before they call this.
@@ -81,7 +81,7 @@ class UserServiceImpl(
         val role = domainObject.role ?: existing?.role ?: Role.USER
         val capabilityToken =
             domainObject.capabilityToken ?: existing?.capabilityToken ?: capabilityTokenGenerator.newToken()
-        // only an admin has a password; a member gets none (so a member cannot mint a JWT and is limited to
+        // only an admin has a password; a user gets none (so a user cannot mint a JWT and is limited to
         // their capability link)
         val passwordHash =
             when {
@@ -127,7 +127,7 @@ class UserServiceImpl(
         actingUser: User
     ): User {
         requireAdmin(actingUser, "create users")
-        // a fresh member: drop any client id, default the role, and let upsert assign the capability token
+        // a fresh user: drop any client id, default the role, and let upsert assign the capability token
         val created = upsert(user.copy(id = null, role = user.role ?: Role.USER, active = user.active ?: true))
         // the consumption is created after the user so its user_id FK resolves
         coffeeConsumptionService.createForUser(created)
@@ -146,11 +146,11 @@ class UserServiceImpl(
         if (!isSelf && !isAdmin) {
             throw ForbiddenException("A user may update only their own account unless they are an admin.")
         }
-        // a deactivated member is read-only: a self profile edit (PUT /api/profile) by an inactive,
-        // still-authenticated member is rejected, matching every other member mutation. An admin may still
+        // a deactivated user is read-only: a self profile edit (PUT /api/profile) by an inactive,
+        // still-authenticated user is rejected, matching every other user mutation. An admin may still
         // edit anyone (including themselves) so a deactivated admin is not locked out of administration.
         if (isSelf && !isAdmin && actingUser.active != true) {
-            throw ForbiddenException("A deactivated member is read-only and cannot edit their profile.")
+            throw ForbiddenException("A deactivated user is read-only and cannot edit their profile.")
         }
         // only an admin may change the role or the active flag; a non-admin update keeps the stored values
         val newRole = if (isAdmin) user.role ?: existing.role else existing.role
@@ -162,7 +162,7 @@ class UserServiceImpl(
         // the login name is immutable after creation (pinned to the stored value, mirroring the capability
         // token): the append-only event log attributes each change to the actor's login name, and the activity
         // classifies an owner self-scan vs an admin step by that login, so a rename would silently break a
-        // member's undo and could misvalue their balance.
+        // user's undo and could misvalue their balance.
         return upsert(user.copy(loginName = existing.loginName, role = newRole, active = newActive))
     }
 

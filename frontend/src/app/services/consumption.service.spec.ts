@@ -18,7 +18,7 @@ describe('ConsumptionService', () => {
 
   afterEach(() => httpMock.verify());
 
-  it('GETs a member consumption by id with the limit and offset params', async () => {
+  it('GETs a user consumption by id with the limit and offset params', async () => {
     const expected: ConsumptionDto = { total: 3, changes: [] };
     const promise = service.getForUser('user-1', 5, 0);
     const req = httpMock.expectOne((r) => r.url === '/api/users/user-1/consumption');
@@ -29,7 +29,7 @@ describe('ConsumptionService', () => {
     expect(await promise).toEqual(expected);
   });
 
-  it('POSTs a +1 delta to apply a single-step change for a member', async () => {
+  it('POSTs a +1 delta to apply a single-step change for a user', async () => {
     const expected: ConsumptionDto = { total: 4, changes: [] };
     const promise = service.changeForUser('user-1', 1);
     const req = httpMock.expectOne('/api/users/user-1/consumption');

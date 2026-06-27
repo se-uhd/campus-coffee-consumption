@@ -1,4 +1,12 @@
-import { Component, DestroyRef, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  inject,
+  OnInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  signal
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
@@ -22,16 +30,16 @@ import { EurosPipe } from '../../pipes/euros.pipe';
 import { UtcDatePipe } from '../../pipes/utc-date.pipe';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
-import { MemberSelectComponent } from '../../components/member-select/member-select.component';
+import { UserSelectComponent } from '../../components/user-select/user-select.component';
 import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import { AdminExpenseRequest, ExpenseDto, UserDto } from '../../models';
 import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../util/money';
 
 /**
- * Admin expenses page: records a bean purchase for a selected member with the explicit kitty/private split
- * (the two amounts must sum to the total), and lists that member's purchases (loaded by id) so an admin can
+ * Admin expenses page: records a bean purchase for a selected user with the explicit kitty/private split
+ * (the two amounts must sum to the total), and lists that user's purchases (loaded by id) so an admin can
  * correct or delete each one by id. The buyer is fixed for the lifetime of a purchase: a correction keeps
- * the same member (the backend rejects changing a purchase's buyer), so the selector chooses whose purchases
+ * the same user (the backend rejects changing a purchase's buyer), so the selector chooses whose purchases
  * to manage, not a reassignment target.
  */
 @Component({
@@ -52,42 +60,42 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
     EurosPipe,
     UtcDatePipe,
     AppHeaderComponent,
-    MemberSelectComponent,
+    UserSelectComponent,
     EuroAmountDirective
   ],
   template: `
     <cc-app-header
       [home]="'/admin'"
       queryParamsHandling="preserve"
-      title="Record member expense"
+      title="Expenses"
       icon="shopping_cart"
     ></cc-app-header>
 
-    @if (loading) {
+    @if (loading()) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
     <div class="page">
-      @if (loadError) {
+      @if (loadError()) {
         <mat-card class="card">
-          <p class="warn">{{ loadError }}</p>
+          <p class="warn">{{ loadError() }}</p>
           <button mat-stroked-button (click)="reload()">Retry</button>
         </mat-card>
       } @else {
         <mat-card class="card">
-          <cc-member-select
-            [users]="users"
-            [selectedId]="selectedId"
+          <cc-user-select
+            [users]="users()"
+            [selectedId]="selectedId()"
             [ownUserId]="selection.ownUserId"
             (selectionChange)="onMemberChange($event)"
-          ></cc-member-select>
-          @if (editingId) {
+          ></cc-user-select>
+          @if (editingId()) {
             <p class="muted">Correcting a purchase keeps the same buyer.</p>
           }
         </mat-card>
 
         <mat-card class="card">
-          <h2>{{ editingId ? 'Correct a purchase' : 'Record a purchase' }}</h2>
+          <h2>{{ editingId() ? 'Correct a purchase' : 'Record a purchase' }}</h2>
           <form #form="ngForm">
             <mat-form-field class="full-width">
               <mat-label>Weight (grams)</mat-label>
@@ -114,7 +122,7 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                 name="amount"
                 #amountModel="ngModel"
                 [(ngModel)]="amountEuros"
-                (ngModelChange)="error = ''"
+                (ngModelChange)="error.set('')"
                 ccEuroAmount
                 required
               />
@@ -132,7 +140,7 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                   name="private"
                   #privateModel="ngModel"
                   [(ngModel)]="privateEuros"
-                  (ngModelChange)="error = ''"
+                  (ngModelChange)="error.set('')"
                   ccEuroAmount
                   required
                 />
@@ -149,7 +157,7 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                   name="kitty"
                   #kittyModel="ngModel"
                   [(ngModel)]="kittyEuros"
-                  (ngModelChange)="error = ''"
+                  (ngModelChange)="error.set('')"
                   ccEuroAmount
                   required
                 />
@@ -172,30 +180,30 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                   amountError() != null ||
                   privateError() != null ||
                   kittyError() != null ||
-                  busy
+                  busy()
                 "
               >
-                @if (busy) {
+                @if (busy()) {
                   <mat-spinner diameter="20"></mat-spinner>
                 } @else {
-                  {{ editingId ? 'Save correction' : 'Record purchase' }}
+                  {{ editingId() ? 'Save correction' : 'Record purchase' }}
                 }
               </button>
-              @if (editingId) {
-                <button mat-stroked-button (click)="cancelEdit()" [disabled]="busy">Cancel</button>
+              @if (editingId()) {
+                <button mat-stroked-button (click)="cancelEdit()" [disabled]="busy()">Cancel</button>
               }
             </div>
             <!-- the private/kitty split sum is inherently cross-field, so it reads as one line under the form -->
-            @if (error) {
-              <p class="warn">{{ error }}</p>
+            @if (error()) {
+              <p class="warn">{{ error() }}</p>
             }
           </form>
         </mat-card>
 
         <mat-card class="card">
-          <h2>This member's purchases</h2>
+          <h2>This user's purchases</h2>
           <mat-list>
-            @for (expense of purchases; track expense.id) {
+            @for (expense of purchases(); track expense.id) {
               <mat-list-item lines="3">
                 <span matListItemTitle>
                   {{ expense.amountCents | euros }} · {{ expense.weightGrams }} g
@@ -231,14 +239,14 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
                 </span>
               </mat-list-item>
             } @empty {
-              <p class="muted">No purchases recorded for this member yet.</p>
+              <p class="muted">No purchases recorded for this user yet.</p>
             }
           </mat-list>
         </mat-card>
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
       .cc-row-actions {
@@ -250,21 +258,21 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
   ]
 })
 export class AdminExpensesComponent implements OnInit {
-  users: UserDto[] = [];
-  selectedId = '';
-  /** The member whose purchases are currently loaded, used to skip a redundant reload on a repeated param. */
+  readonly users = signal<UserDto[]>([]);
+  readonly selectedId = signal('');
+  /** The user whose purchases are currently loaded, used to skip a redundant reload on a repeated param. */
   private loadedId = '';
   weightGrams: number | null = null;
   amountEuros = '';
   privateEuros = '';
   kittyEuros = '';
   note = '';
-  editingId: string | null = null;
-  purchases: ExpenseDto[] = [];
-  busy = false;
-  loading = false;
-  loadError = '';
-  error = '';
+  readonly editingId = signal<string | null>(null);
+  readonly purchases = signal<ExpenseDto[]>([]);
+  readonly busy = signal(false);
+  readonly loading = signal(false);
+  readonly loadError = signal('');
+  readonly error = signal('');
 
   private readonly destroyRef = inject(DestroyRef);
 
@@ -275,6 +283,7 @@ export class AdminExpensesComponent implements OnInit {
     private readonly dialog: MatDialog,
     private readonly router: Router,
     private readonly route: ActivatedRoute,
+    private readonly cdr: ChangeDetectorRef,
     readonly selection: AdminSelectionService
   ) {}
 
@@ -295,118 +304,118 @@ export class AdminExpensesComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.reload();
-    // The URL is the source of truth for the selected member: follow the `member` query param (so the
-    // browser Back/Forward buttons, which change it, re-select and reload the member's purchases). Skip the
-    // initial emission's reload while the member list is still loading (the param is applied in `reload`).
+    // The URL is the source of truth for the selected user: follow the `user` query param (so the
+    // browser Back/Forward buttons, which change it, re-select and reload the user's purchases). Skip the
+    // initial emission's reload while the user list is still loading (the param is applied in `reload`).
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-      if (this.loading || this.loadError) {
+      if (this.loading() || this.loadError()) {
         return;
       }
-      void this.applySelectionFromUrl(params.get('member'));
+      void this.applySelectionFromUrl(params.get('user'));
     });
   }
 
-  /** Loads the members and the selected member's purchases; surfaces a retryable error on failure. */
+  /** Loads the users and the selected user's purchases; surfaces a retryable error on failure. */
   async reload(): Promise<void> {
-    this.loading = true;
-    this.loadError = '';
+    this.loading.set(true);
+    this.loadError.set('');
     try {
-      this.users = await this.userService.list();
+      this.users.set(await this.userService.list());
       // resolve the admin's own account as the shared default so a direct visit to this page (with no prior
-      // selection) still defaults to the admin's own account rather than the first member
+      // selection) still defaults to the admin's own account rather than the first user
       const me = await this.userService.me();
       this.selection.setOwnUserId(me.id ?? '');
-      // take the selection from the URL's `member` param (the source of truth, the admin's own account
-      // when it is absent), so a deep link or a refresh on `/admin/expenses?member=<id>` lands on that member
-      this.selectedId = this.selection.selectFromParam(this.route.snapshot.queryParamMap.get('member'));
+      // take the selection from the URL's `user` param (the source of truth, the admin's own account
+      // when it is absent), so a deep link or a refresh on `/admin/expenses?user=<id>` lands on that user
+      this.selectedId.set(this.selection.selectFromParam(this.route.snapshot.queryParamMap.get('user')));
       await this.loadPurchases();
     } catch {
-      this.loadError = 'Could not load the expenses.';
+      this.loadError.set('Could not load the expenses.');
     } finally {
-      this.loading = false;
+      this.loading.set(false);
     }
   }
 
   /**
-   * Pushes the newly-selected member onto the URL as the `member` query param (a history entry, so Back
+   * Pushes the newly-selected user onto the URL as the `user` query param (a history entry, so Back
    * undoes the switch). The `queryParamMap` subscription then mirrors it into the shared selection and
-   * reloads the member's purchases; the URL stays the source of truth.
+   * reloads the user's purchases; the URL stays the source of truth.
    *
-   * @param memberId the member id picked in the selector
+   * @param memberId the user id picked in the selector
    */
   async onMemberChange(memberId: string): Promise<void> {
-    this.selectedId = memberId;
+    this.selectedId.set(memberId);
     await this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { member: memberId },
+      queryParams: { user: memberId },
       queryParamsHandling: 'merge'
     });
   }
 
   /**
-   * Selects the member named by the URL's `member` param (or the admin's own account when it is absent),
-   * resets the form, and reloads the member's purchases, unless that member's purchases are already loaded,
-   * so a redundant re-emission of the same param does not reload. `loadedId` (the member actually loaded) is
+   * Selects the user named by the URL's `user` param (or the admin's own account when it is absent),
+   * resets the form, and reloads the user's purchases, unless that user's purchases are already loaded,
+   * so a redundant re-emission of the same param does not reload. `loadedId` (the user actually loaded) is
    * the guard, not the bound `selectedId` (which the dropdown already advanced before navigating).
    *
-   * @param memberId the value of the `member` query param, or null when it is absent
+   * @param memberId the value of the `user` query param, or null when it is absent
    */
   private async applySelectionFromUrl(memberId: string | null): Promise<void> {
     const effective = this.selection.selectFromParam(memberId);
     if (effective === this.loadedId) {
-      this.selectedId = effective;
+      this.selectedId.set(effective);
       return;
     }
-    this.selectedId = effective;
+    this.selectedId.set(effective);
     this.cancelEdit();
     // unlike `reload()`, this post-navigation load runs outside a try/catch boundary (the queryParamMap
-    // subscription only `void`s it), so a failed load for the navigated-to member would silently keep the
-    // previous member's purchases on screen; surface it as a retryable error instead (matching profile)
+    // subscription only `void`s it), so a failed load for the navigated-to user would silently keep the
+    // previous user's purchases on screen; surface it as a retryable error instead (matching profile)
     try {
       await this.loadPurchases();
     } catch (error) {
-      this.loadError = 'Could not load that member.';
-      this.notifications.error(error, 'Could not load that member.');
+      this.loadError.set('Could not load that user.');
+      this.notifications.error(error, 'Could not load that user.');
     }
   }
 
   /**
-   * Loads the selected member's recorded purchases (with their ids) for correction/deletion. The member id
-   * is captured at the start so a slower earlier load, fired by a rapid member switch, discards its result
-   * instead of showing the wrong member's purchases.
+   * Loads the selected user's recorded purchases (with their ids) for correction/deletion. The user id
+   * is captured at the start so a slower earlier load, fired by a rapid user switch, discards its result
+   * instead of showing the wrong user's purchases.
    */
   private async loadPurchases(): Promise<void> {
-    const requestedId = this.selectedId;
+    const requestedId = this.selectedId();
     if (!requestedId) {
-      this.purchases = [];
+      this.purchases.set([]);
       return;
     }
     this.loadedId = requestedId;
     const purchases = await this.expenseService.adminList(requestedId);
-    if (requestedId !== this.selectedId) {
+    if (requestedId !== this.selectedId()) {
       return;
     }
-    this.purchases = purchases;
+    this.purchases.set(purchases);
   }
 
   /** Creates or corrects a purchase; all euro inputs are converted to integer cents before sending. */
   async save(): Promise<void> {
     // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
-    if (this.busy) {
+    if (this.busy()) {
       return;
     }
-    this.error = '';
+    this.error.set('');
     const request = this.buildRequest();
     if (!request) {
       return;
     }
-    this.busy = true;
+    this.busy.set(true);
     try {
-      if (this.editingId) {
-        await this.expenseService.adminUpdate(this.selectedId, this.editingId, request);
+      if (this.editingId()) {
+        await this.expenseService.adminUpdate(this.selectedId(), this.editingId()!, request);
         this.notifications.success('Purchase corrected.');
       } else {
-        await this.expenseService.adminCreate(this.selectedId, request);
+        await this.expenseService.adminCreate(this.selectedId(), request);
         this.notifications.success('Purchase recorded.');
       }
       this.resetForm();
@@ -414,7 +423,7 @@ export class AdminExpensesComponent implements OnInit {
     } catch (error) {
       this.notifications.error(error, 'Could not save the purchase (do the shares sum to the total?).');
     } finally {
-      this.busy = false;
+      this.busy.set(false);
     }
   }
 
@@ -432,11 +441,11 @@ export class AdminExpensesComponent implements OnInit {
       privateAmountCents == null ||
       kittyAmountCents == null
     ) {
-      this.error = 'Enter a whole-gram weight, a total, and both shares.';
+      this.error.set('Enter a whole-gram weight, a total, and both shares.');
       return null;
     }
     if (privateAmountCents + kittyAmountCents !== amountCents) {
-      this.error = 'The private and kitty shares must sum to the total.';
+      this.error.set('The private and kitty shares must sum to the total.');
       return null;
     }
     return { weightGrams, amountCents, privateAmountCents, kittyAmountCents, note: this.note || undefined };
@@ -444,7 +453,7 @@ export class AdminExpensesComponent implements OnInit {
 
   /** Loads a purchase into the form for correction; the euro inputs are populated without float math. */
   edit(expense: ExpenseDto): void {
-    this.editingId = expense.id;
+    this.editingId.set(expense.id);
     this.weightGrams = expense.weightGrams;
     this.amountEuros = centsToEuroString(expense.amountCents);
     this.privateEuros = centsToEuroString(expense.privateAmountCents);
@@ -469,11 +478,11 @@ export class AdminExpensesComponent implements OnInit {
     if (!confirmed) {
       return;
     }
-    this.busy = true;
-    this.error = '';
+    this.busy.set(true);
+    this.error.set('');
     try {
-      await this.expenseService.adminDelete(this.selectedId, expense.id);
-      if (this.editingId === expense.id) {
+      await this.expenseService.adminDelete(this.selectedId(), expense.id);
+      if (this.editingId() === expense.id) {
         this.cancelEdit();
       }
       this.notifications.success('Purchase deleted.');
@@ -481,22 +490,24 @@ export class AdminExpensesComponent implements OnInit {
     } catch (error) {
       this.notifications.error(error, 'Could not delete the purchase.');
     } finally {
-      this.busy = false;
+      this.busy.set(false);
     }
   }
 
   /** Leaves correction mode without saving. */
   cancelEdit(): void {
-    this.editingId = null;
+    this.editingId.set(null);
     this.resetForm();
   }
 
   private resetForm(): void {
-    this.editingId = null;
+    this.editingId.set(null);
     this.weightGrams = null;
     this.amountEuros = '';
     this.privateEuros = '';
     this.kittyEuros = '';
     this.note = '';
+    // the form-field resets above are non-DOM writes, so mark this OnPush view for check to clear them
+    this.cdr.markForCheck();
   }
 }

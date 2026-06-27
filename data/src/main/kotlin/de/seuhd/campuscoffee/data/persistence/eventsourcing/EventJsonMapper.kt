@@ -109,7 +109,7 @@ object EventJsonMapper {
 
     /**
      * Serializes a [Payment] with its user flattened to an id (`userId`), written as JSON null for a pure
-     * kitty adjustment (no member). The projector resolves a non-null id back to the user read model row.
+     * kitty adjustment (no user). The projector resolves a non-null id back to the user read model row.
      */
     private class PaymentEventSerializer : ValueSerializer<Payment>() {
         override fun serialize(

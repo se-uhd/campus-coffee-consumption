@@ -1,6 +1,6 @@
 /**
  * Triggers a browser download of `blob` under `filename` via a temporary object URL. Shared by the pages that
- * download a server-built file (the members page's QR ZIP/PDF, the activity page's CSV), so the object-URL
+ * download a server-built file (the users page's QR ZIP/PDF, the activity page's CSV), so the object-URL
  * lifecycle lives in one place.
  *
  * @param blob the file contents to download

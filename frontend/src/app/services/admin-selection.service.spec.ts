@@ -9,7 +9,7 @@ describe('AdminSelectionService', () => {
     service = TestBed.inject(AdminSelectionService);
   });
 
-  it('selectFromParam selects the member named by the param and returns it', () => {
+  it('selectFromParam selects the user named by the param and returns it', () => {
     service.setOwnUserId('admin-1');
     expect(service.selectFromParam('member-7')).toBe('member-7');
     expect(service.selectedUserId()).toBe('member-7');

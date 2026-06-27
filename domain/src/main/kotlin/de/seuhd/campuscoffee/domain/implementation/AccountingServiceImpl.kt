@@ -16,9 +16,9 @@ import java.util.UUID
 
 /**
  * Domain implementation of [AccountingService]. Composes the price, consumption, and balance data into the
- * read-side money numbers: a member's landing summary, the kitty balance, and the all-member overview. The
+ * read-side money numbers: a user's landing summary, the kitty balance, and the all-user overview. The
  * chronological feeds live on [ActivityServiceImpl]; this service keeps the summary self-contained, reading
- * the full member walk once (via [ActivityDataService]) so the headline balance is the true current balance
+ * the full user walk once (via [ActivityDataService]) so the headline balance is the true current balance
  * and not the running balance of some paged slice.
  */
 @Service
@@ -37,7 +37,7 @@ class AccountingServiceImpl(
         actingUser: User
     ): UserSummary {
         val user = requireMayViewUser(userId, actingUser, userDataService)
-        // read the full oldest-first walk once: its last entry's running balance is the member's current
+        // read the full oldest-first walk once: its last entry's running balance is the user's current
         // balance, and a page of it is the landing activity. Deriving the balance from a paged, newest-first
         // slice would instead report the running balance of whatever entry happened to land last in that page.
         val fullActivity = activityDataService.userActivity(userId, user.loginName)
@@ -47,12 +47,12 @@ class AccountingServiceImpl(
             priceCents = coffeePriceService.getCurrent().amountCents,
             balanceCents = fullActivity.lastOrNull()?.runningBalanceCents ?: 0L,
             // the kitty balance is a single maintained number, so reading it never replays the global money
-            // stream the way every member landing load used to
+            // stream the way every user landing load used to
             kittyBalanceCents = balanceDataService.kittyBalanceCents(),
             // only offer undo when there is actually a coffee to remove (a stale stack entry could otherwise
             // mark a zero count cancellable)
             cancellable = count > 0 && coffeeConsumptionService.cancellableIncrement(userId, actingUser) != null,
-            // the summary is the member-serving view: strip the kitty split so it never reaches a member
+            // the summary is the user-serving view: strip the kitty split so it never reaches a user
             activity =
                 pageNewestFirst(fullActivity, activityLimit, activityOffset)
                     .map { it.withoutKittyPortion() }
@@ -63,10 +63,10 @@ class AccountingServiceImpl(
 
     override fun allBalances(actingUser: User): List<UserBalance> {
         requireAdmin(actingUser)
-        // read every member's balance from the maintained projection in one query instead of replaying each
-        // member's whole stream; a member with no recorded activity is absent from the map and defaults to 0
-        val balances = balanceDataService.allMemberBalancesCents()
-        // sort by login name so the per-member overview keeps a stable, human-readable order; a mutation
+        // read every user's balance from the maintained projection in one query instead of replaying each
+        // user's whole stream; a user with no recorded activity is absent from the map and defaults to 0
+        val balances = balanceDataService.allUserBalancesCents()
+        // sort by login name so the per-user overview keeps a stable, human-readable order; a mutation
         // (a deactivation, a token rotation) must never reshuffle the admin's overview
         return userDataService
             .getAll()

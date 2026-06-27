@@ -49,7 +49,7 @@ import { ActivityEntryDto } from './api/model/activityEntryDto';
 export type Role = UserDto.RoleEnum;
 
 /**
- * The kind of an activity-feed row. The first four appear in a member's activity feed; the kitty-funded ones
+ * The kind of an activity-feed row. The first four appear in a user's activity feed; the kitty-funded ones
  * (plus `DEPOSIT`) appear in the admin-only kitty history; `PRICE_CHANGE` appears only in the admin global
  * activity feed. All money is signed integer euro cents.
  */

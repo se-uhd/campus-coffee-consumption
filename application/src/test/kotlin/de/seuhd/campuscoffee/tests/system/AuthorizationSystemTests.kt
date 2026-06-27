@@ -23,7 +23,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.client.returnResult
 
 /**
- * System tests for the authentication and authorization rules of the two mechanisms: a member capability
+ * System tests for the authentication and authorization rules of the two mechanisms: a user capability
  * token and the admin JWT.
  */
 class AuthorizationSystemTests : AbstractSystemTest() {
@@ -78,7 +78,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
         val max = seededUser(member)
         userService.update(max.copy(active = false), admin)
 
-        // the deactivated member still authenticates (a read works) but the mutation is forbidden
+        // the deactivated user still authenticates (a read works) but the mutation is forbidden
         val readStatus =
             client()
                 .get()
@@ -119,7 +119,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
         val max = seededUser(member)
         userService.update(max.copy(active = false), admin)
 
-        // the deactivated member still authenticates, but a profile edit is a mutation and is forbidden
+        // the deactivated user still authenticates, but a profile edit is a mutation and is forbidden
         val status =
             client()
                 .put()
@@ -172,8 +172,8 @@ class AuthorizationSystemTests : AbstractSystemTest() {
 
     @Test
     fun `a member request to a non-health actuator endpoint returns 403 Forbidden`() {
-        // a ROLE_USER member is authenticated but not an admin, so the `/actuator/** -> ADMIN` rule forbids
-        // it (403): actuator is closed to members as well as to anonymous callers.
+        // a ROLE_USER user is authenticated but not an admin, so the `/actuator/** -> ADMIN` rule forbids
+        // it (403): actuator is closed to users as well as to anonymous callers.
         val status =
             client()
                 .get()

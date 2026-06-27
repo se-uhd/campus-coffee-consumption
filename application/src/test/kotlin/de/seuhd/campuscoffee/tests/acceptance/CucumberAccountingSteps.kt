@@ -17,8 +17,8 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.client.returnResult
 
 /**
- * Step definitions for the money-feature acceptance scenarios: an admin sets the price, a member buys beans
- * and drinks coffee, an admin records a deposit, and the member's balance reflects each in euro cents
+ * Step definitions for the money-feature acceptance scenarios: an admin sets the price, a user buys beans
+ * and drinks coffee, an admin records a deposit, and the user's balance reflects each in euro cents
  * (negative ⇒ they owe the fund).
  */
 class CucumberAccountingSteps(

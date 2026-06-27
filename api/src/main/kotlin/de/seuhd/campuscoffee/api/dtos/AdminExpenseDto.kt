@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
 
 /**
- * Request body for an admin recording or correcting a bean purchase for a member
+ * Request body for an admin recording or correcting a bean purchase for a user
  * (`POST`/`PUT /api/users/{userId}/expenses`). The buyer is the `{userId}` path variable; the body carries
  * the weight, total, and the kitty/private split (which the service requires to sum to the total).
  */

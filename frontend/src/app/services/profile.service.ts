@@ -5,7 +5,7 @@ import { ProfileUpdateRequest, UserDto } from '../models';
 
 /**
  * The authenticated user's own profile against `/api/profile` (the interceptor adds the X-Capability-Token).
- * Used by both the member profile page and the admin's own profile page.
+ * Used by both the user profile page and the admin's own profile page.
  */
 @Injectable({ providedIn: 'root' })
 export class ProfileService {

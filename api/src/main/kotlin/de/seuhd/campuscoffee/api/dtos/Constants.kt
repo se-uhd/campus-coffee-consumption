@@ -22,7 +22,7 @@ const val MIN_WEIGHT_GRAMS: Long = 100
 const val MAX_WEIGHT_GRAMS: Long = 1_000
 
 /**
- * The minimum length of an admin password (only an admin has one; a member authenticates with their
+ * The minimum length of an admin password (only an admin has one; a user authenticates with their
  * capability link). Length is favored over forced composition, so the floor is generous. Shared by the
  * [UserDto] `@Size` and the bootstrap-admin check so the policy lives in one place.
  */

@@ -8,7 +8,7 @@ import { CapabilityTokenService } from '../services/capability-token.service';
 /** Admin endpoint prefixes, authenticated by the JWT (`Authorization: Bearer`). */
 const ADMIN_PREFIXES = ['/api/users', '/api/price', '/api/kitty'];
 
-/** Member endpoint prefixes, authenticated by the capability token (`X-Capability-Token`). */
+/** User endpoint prefixes, authenticated by the capability token (`X-Capability-Token`). */
 const MEMBER_PREFIXES = [
   '/api/summary',
   '/api/activity',
@@ -28,15 +28,15 @@ let redirectingToAdminLogin = false;
 /**
  * Attaches the right credential per audience, by URL prefix.
  *
- * Precedence: the admin prefixes are matched first, then the member prefixes. This matters because the
- * admin's member-scoped paths (`/api/users/{id}/activity`, `/api/users/{id}/expenses`) start with `/api/users`
- * and must take the JWT, not the capability token, even though "activity"/"expenses" also name member
- * endpoints. There is no genuinely dual-audience path: members never call `/api/price` or `/api/kitty`
+ * Precedence: the admin prefixes are matched first, then the user prefixes. This matters because the
+ * admin's user-scoped paths (`/api/users/{id}/activity`, `/api/users/{id}/expenses`) start with `/api/users`
+ * and must take the JWT, not the capability token, even though "activity"/"expenses" also name user
+ * endpoints. There is no genuinely dual-audience path: users never call `/api/price` or `/api/kitty`
  * (their price and kitty balance arrive in `/api/summary`). Anything else (`/api/auth/token`, the SPA
  * routes) is left credential-free.
  *
  * On a 401 the stale credential is cleared, per audience: an admin request drops the JWT and returns to the
- * admin login form (guarded so concurrent 401s redirect only once); a member request drops the now-invalid
+ * admin login form (guarded so concurrent 401s redirect only once); a user request drops the now-invalid
  * capability token, so the calling page surfaces its "this link is no longer valid" state instead of the
  * admin "sign in again" copy.
  */
@@ -74,7 +74,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       return next(req.clone({ setHeaders: { 'X-Capability-Token': token } })).pipe(
         catchError((error: unknown) => {
           // an unknown or rotated capability token: drop it so the page falls back to its invalid-link state
-          // (a member has no login form to redirect to; the page shows "your link may be invalid")
+          // (a user has no login form to redirect to; the page shows "your link may be invalid")
           if (error instanceof HttpErrorResponse && error.status === 401) {
             capability.clear();
           }

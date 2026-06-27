@@ -1,8 +1,8 @@
 package de.seuhd.campuscoffee.api.security
 
+import de.seuhd.campuscoffee.api.security.ActorProviderServiceImpl
 import de.seuhd.campuscoffee.api.security.CapabilityTokenAuthenticationFilter
 import de.seuhd.campuscoffee.api.security.DomainUserDetailsService
-import de.seuhd.campuscoffee.api.security.SecurityContextActorProvider
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
@@ -50,7 +50,7 @@ class SecurityComponentsTest {
 
     @Test
     fun `the actor provider returns system when there is no authentication`() {
-        assertThat(SecurityContextActorProvider().currentActor()).isEqualTo("SYSTEM")
+        assertThat(ActorProviderServiceImpl().currentActor()).isEqualTo("SYSTEM")
     }
 
     @Test
@@ -58,7 +58,7 @@ class SecurityComponentsTest {
         SecurityContextHolder.getContext().authentication =
             AnonymousAuthenticationToken("key", "anonymousUser", listOf(SimpleGrantedAuthority("ROLE_ANONYMOUS")))
 
-        assertThat(SecurityContextActorProvider().currentActor()).isEqualTo("SYSTEM")
+        assertThat(ActorProviderServiceImpl().currentActor()).isEqualTo("SYSTEM")
     }
 
     @Test
@@ -66,7 +66,7 @@ class SecurityComponentsTest {
         SecurityContextHolder.getContext().authentication =
             UsernamePasswordAuthenticationToken("alice", null, listOf(SimpleGrantedAuthority("ROLE_USER")))
 
-        assertThat(SecurityContextActorProvider().currentActor()).isEqualTo("alice")
+        assertThat(ActorProviderServiceImpl().currentActor()).isEqualTo("alice")
     }
 
     @Test

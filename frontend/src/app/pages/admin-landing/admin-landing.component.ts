@@ -1,4 +1,12 @@
-import { Component, DestroyRef, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  inject,
+  OnInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  signal
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -21,21 +29,21 @@ import { AdminSelectionService } from '../../services/admin-selection.service';
 import { ActivityListComponent } from '../../components/activity-list/activity-list.component';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { BalanceSummaryComponent } from '../../components/balance-summary/balance-summary.component';
-import { MemberSelectComponent } from '../../components/member-select/member-select.component';
+import { UserSelectComponent } from '../../components/user-select/user-select.component';
 import { ConsumptionDto, ActivityEntryDto, UserDto } from '../../models';
 import { loadActivityPage } from '../../util/activity';
 
-/** The page size for one activity page; "Load more" appends another page of this size (matching the member landing). */
+/** The page size for one activity page; "Load more" appends another page of this size (matching the user landing). */
 const ACTIVITY_PAGE_SIZE = 10;
 
 /**
- * Admin landing: the selected member's view, mirroring the member landing. A member selector at the top
- * (the admin's own account by default, marked with a person icon), then the same blocks as the member page: a big
+ * Admin landing: the selected user's view, mirroring the user landing. A user selector at the top
+ * (the admin's own account by default, marked with a person icon), then the same blocks as the user page: a big
  * coffee count with the admin's single-step +/- controls and an Edit action that opens an absolute count
- * correction folded into the count panel, the selected member's balance / kitty / price summary, and the
- * member's recent activity (the unified activity, paged with "Load more"). The all-members overview lives on the
- * Members page (`/admin/users`). The header links to the members, price, expenses, kitty, and own-profile
- * pages and signs out. A member is settled by recording a payment on the kitty page, not by zeroing their
+ * correction folded into the count panel, the selected user's balance / kitty / price summary, and the
+ * user's recent activity (the unified activity, paged with "Load more"). The all-users overview lives on the
+ * Users page (`/admin/users`). The header links to the users, price, expenses, kitty, and own-profile
+ * pages and signs out. A user is settled by recording a payment on the kitty page, not by zeroing their
  * count.
  */
 @Component({
@@ -54,11 +62,11 @@ const ACTIVITY_PAGE_SIZE = 10;
     ActivityListComponent,
     AppHeaderComponent,
     BalanceSummaryComponent,
-    MemberSelectComponent
+    UserSelectComponent
   ],
   template: `
     <cc-app-header [home]="'/admin'">
-      <a mat-icon-button routerLink="/admin/users" aria-label="Manage members" matTooltip="Members">
+      <a mat-icon-button routerLink="/admin/users" aria-label="Manage users" matTooltip="Users">
         <mat-icon>group</mat-icon>
       </a>
       <a
@@ -111,38 +119,38 @@ const ACTIVITY_PAGE_SIZE = 10;
       </button>
     </cc-app-header>
 
-    @if (loading) {
+    @if (loading()) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
     <div class="page">
-      @if (loadError) {
+      @if (loadError()) {
         <mat-card class="card">
-          <p class="warn">{{ loadError }}</p>
+          <p class="warn">{{ loadError() }}</p>
           <button mat-stroked-button (click)="reload()">Retry</button>
         </mat-card>
       } @else {
         <mat-card class="card">
-          <cc-member-select
-            [users]="users"
-            [selectedId]="selectedId"
+          <cc-user-select
+            [users]="users()"
+            [selectedId]="selectedId()"
             [ownUserId]="selection.ownUserId"
             (selectionChange)="onMemberChange($event)"
-          ></cc-member-select>
+          ></cc-user-select>
         </mat-card>
 
         <cc-balance-summary
-          [count]="consumption?.total ?? null"
-          [priceCents]="priceCents"
-          [balanceCents]="balanceCents"
-          [kittyBalanceCents]="kittyBalanceCents"
+          [count]="consumption()?.total ?? null"
+          [priceCents]="priceCents()"
+          [balanceCents]="balanceCents()"
+          [kittyBalanceCents]="kittyBalanceCents()"
           [showBalance]="true"
         >
           <button
             mat-fab
             class="cc-fab-neutral"
             (click)="change(-1)"
-            [disabled]="busy || consumption?.total === 0"
+            [disabled]="busy() || consumption()?.total === 0"
             aria-label="Remove a coffee"
             matTooltip="Remove a coffee"
           >
@@ -152,11 +160,11 @@ const ACTIVITY_PAGE_SIZE = 10;
             mat-fab
             color="primary"
             (click)="change(1)"
-            [disabled]="busy"
+            [disabled]="busy()"
             aria-label="Add a coffee"
             matTooltip="Add a coffee"
           >
-            @if (busy) {
+            @if (busy()) {
               <mat-spinner diameter="20"></mat-spinner>
             } @else {
               <mat-icon>add</mat-icon>
@@ -172,8 +180,8 @@ const ACTIVITY_PAGE_SIZE = 10;
             <mat-icon>edit</mat-icon>
           </button>
           <div extra>
-            @if (editMode) {
-              <p class="muted cc-edit-hint">Set the member's total coffee count.</p>
+            @if (editMode()) {
+              <p class="muted cc-edit-hint">Set the user's total coffee count.</p>
               <form #correctionForm="ngForm" class="form-row cc-edit-total">
                 <mat-form-field>
                   <mat-label>New total</mat-label>
@@ -185,7 +193,7 @@ const ACTIVITY_PAGE_SIZE = 10;
                     name="newTotal"
                     #newTotalModel="ngModel"
                     [(ngModel)]="newTotal"
-                    (ngModelChange)="error = ''"
+                    (ngModelChange)="error.set('')"
                     required
                   />
                   @if (newTotalModel.touched && newTotalError()) {
@@ -200,9 +208,9 @@ const ACTIVITY_PAGE_SIZE = 10;
                   mat-flat-button
                   color="primary"
                   (click)="override()"
-                  [disabled]="correctionForm.invalid || newTotalError() != null || busy"
+                  [disabled]="correctionForm.invalid || newTotalError() != null || busy()"
                 >
-                  @if (busy) {
+                  @if (busy()) {
                     <mat-spinner diameter="20"></mat-spinner>
                   } @else {
                     Set
@@ -210,8 +218,8 @@ const ACTIVITY_PAGE_SIZE = 10;
                 </button>
               </form>
             }
-            @if (error) {
-              <p class="warn">{{ error }}</p>
+            @if (error()) {
+              <p class="warn">{{ error() }}</p>
             }
           </div>
         </cc-balance-summary>
@@ -219,17 +227,17 @@ const ACTIVITY_PAGE_SIZE = 10;
         <mat-card class="card">
           <h2>Recent activity</h2>
           <cc-activity-list
-            [entries]="activity"
+            [entries]="activity()"
             [showFilter]="true"
-            [canLoadMore]="hasMore"
-            [loadingMore]="loadingMore"
+            [canLoadMore]="hasMore()"
+            [loadingMore]="loadingMore()"
             (loadMore)="loadMore()"
           ></cc-activity-list>
         </mat-card>
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
       .cc-edit-hint {
@@ -246,24 +254,24 @@ const ACTIVITY_PAGE_SIZE = 10;
   ]
 })
 export class AdminLandingComponent implements OnInit {
-  users: UserDto[] = [];
-  selectedId = '';
-  /** The member whose data is currently loaded, used to skip a redundant reload on a repeated `member` param. */
+  readonly users = signal<UserDto[]>([]);
+  readonly selectedId = signal('');
+  /** The user whose data is currently loaded, used to skip a redundant reload on a repeated `user` param. */
   private loadedId = '';
-  consumption: ConsumptionDto | null = null;
-  activity: ActivityEntryDto[] = [];
-  balanceCents: number | null = null;
-  priceCents: number | null = null;
-  kittyBalanceCents: number | null = null;
-  editMode = false;
+  readonly consumption = signal<ConsumptionDto | null>(null);
+  readonly activity = signal<ActivityEntryDto[]>([]);
+  readonly balanceCents = signal<number | null>(null);
+  readonly priceCents = signal<number | null>(null);
+  readonly kittyBalanceCents = signal<number | null>(null);
+  readonly editMode = signal(false);
   newTotal = 0;
   note = '';
-  busy = false;
-  loading = false;
-  loadingMore = false;
-  loadError = '';
-  error = '';
-  hasMore = false;
+  readonly busy = signal(false);
+  readonly loading = signal(false);
+  readonly loadingMore = signal(false);
+  readonly loadError = signal('');
+  readonly error = signal('');
+  readonly hasMore = signal(false);
 
   private readonly destroyRef = inject(DestroyRef);
 
@@ -277,6 +285,7 @@ export class AdminLandingComponent implements OnInit {
     private readonly notifications: NotificationService,
     private readonly router: Router,
     private readonly route: ActivatedRoute,
+    private readonly cdr: ChangeDetectorRef,
     readonly selection: AdminSelectionService
   ) {}
 
@@ -294,63 +303,63 @@ export class AdminLandingComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.reload();
-    // The URL is the source of truth for the selected member: follow the `member` query param (so the
+    // The URL is the source of truth for the selected user: follow the `user` query param (so the
     // browser Back/Forward buttons, which change it, re-select and reload). The first emission ran the
-    // initial selection above via `reload`; later emissions (a member switch, or a Back/Forward) are
-    // applied here. Skip while still loading the initial member list (the param is applied in `reload`).
+    // initial selection above via `reload`; later emissions (a user switch, or a Back/Forward) are
+    // applied here. Skip while still loading the initial user list (the param is applied in `reload`).
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-      if (this.loading || this.loadError) {
+      if (this.loading() || this.loadError()) {
         return;
       }
-      void this.applySelectionFromUrl(params.get('member'));
+      void this.applySelectionFromUrl(params.get('user'));
     });
   }
 
   /**
-   * Selects the member named by the URL's `member` param (or the admin's own account when it is absent) and
-   * reloads, unless that member's data is already loaded, so a Back/Forward that changes the param re-loads,
-   * but a redundant re-emission of the same param does not load twice. `loadedId` (the member actually
+   * Selects the user named by the URL's `user` param (or the admin's own account when it is absent) and
+   * reloads, unless that user's data is already loaded, so a Back/Forward that changes the param re-loads,
+   * but a redundant re-emission of the same param does not load twice. `loadedId` (the user actually
    * loaded) is the guard, not the bound `selectedId` (which the dropdown already advanced before navigating).
    *
-   * @param memberId the value of the `member` query param, or null when it is absent
+   * @param memberId the value of the `user` query param, or null when it is absent
    */
   private async applySelectionFromUrl(memberId: string | null): Promise<void> {
     const effective = this.selection.selectFromParam(memberId);
     if (effective === this.loadedId) {
-      this.selectedId = effective;
+      this.selectedId.set(effective);
       return;
     }
-    this.selectedId = effective;
-    this.editMode = false;
+    this.selectedId.set(effective);
+    this.editMode.set(false);
     // unlike `reload()`, this post-navigation load runs outside a try/catch boundary (the queryParamMap
-    // subscription only `void`s it), so a failed load for the navigated-to member would silently keep the
-    // previous member's data on screen; surface it as a retryable error instead (matching profile)
+    // subscription only `void`s it), so a failed load for the navigated-to user would silently keep the
+    // previous user's data on screen; surface it as a retryable error instead (matching profile)
     try {
       await this.loadConsumption();
     } catch (error) {
-      this.loadError = 'Could not load that member.';
-      this.notifications.error(error, 'Could not load that member.');
+      this.loadError.set('Could not load that user.');
+      this.notifications.error(error, 'Could not load that user.');
     }
   }
 
-  /** Loads the members and the fund figures, then the default member's detail; surfaces a retryable error. */
+  /** Loads the users and the fund figures, then the default user's detail; surfaces a retryable error. */
   async reload(): Promise<void> {
-    this.loading = true;
-    this.loadError = '';
+    this.loading.set(true);
+    this.loadError.set('');
     try {
-      this.users = await this.userService.list();
+      this.users.set(await this.userService.list());
       await this.refreshFund();
       const me = await this.userService.me();
-      // record the admin's own id as the shared default, then take the selection from the URL's `member`
+      // record the admin's own id as the shared default, then take the selection from the URL's `user`
       // param (the source of truth, the admin's own account when it is absent), so a deep link or a
-      // refresh on `/admin?member=<id>` lands on that member
+      // refresh on `/admin?user=<id>` lands on that user
       this.selection.setOwnUserId(me.id ?? '');
-      this.selectedId = this.selection.selectFromParam(this.route.snapshot.queryParamMap.get('member'));
+      this.selectedId.set(this.selection.selectFromParam(this.route.snapshot.queryParamMap.get('user')));
       await this.loadConsumption();
     } catch {
-      this.loadError = 'Could not load the admin dashboard.';
+      this.loadError.set('Could not load the admin dashboard.');
     } finally {
-      this.loading = false;
+      this.loading.set(false);
     }
   }
 
@@ -358,168 +367,173 @@ export class AdminLandingComponent implements OnInit {
   private async refreshFund(): Promise<void> {
     // read just the current price (one GET), not the whole history, since only the latest value is shown
     const [price, kitty] = await Promise.all([this.priceService.current(), this.kittyService.history(1, 0)]);
-    this.priceCents = price.amountCents;
-    this.kittyBalanceCents = kitty.balanceCents;
+    this.priceCents.set(price.amountCents);
+    this.kittyBalanceCents.set(kitty.balanceCents);
   }
 
   /**
-   * Pushes the newly-selected member onto the URL as the `member` query param (a history entry, so Back
+   * Pushes the newly-selected user onto the URL as the `user` query param (a history entry, so Back
    * undoes the switch). The `queryParamMap` subscription then mirrors it into the shared selection and
    * reloads; the URL stays the source of truth, so the selection is never set directly here.
    *
-   * @param memberId the member id picked in the selector
+   * @param memberId the user id picked in the selector
    */
   async onMemberChange(memberId: string): Promise<void> {
-    this.selectedId = memberId;
+    this.selectedId.set(memberId);
     await this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { member: memberId },
+      queryParams: { user: memberId },
       queryParamsHandling: 'merge'
     });
   }
 
   /**
-   * Loads the selected member's total, balance, and unified activity. The member id is captured at the start
-   * so that a slower earlier load, fired by a rapid member switch, discards its result instead of clobbering
+   * Loads the selected user's total, balance, and unified activity. The user id is captured at the start
+   * so that a slower earlier load, fired by a rapid user switch, discards its result instead of clobbering
    * the current selection's data.
    */
   async loadConsumption(): Promise<void> {
-    const requestedId = this.selectedId;
+    const requestedId = this.selectedId();
     if (!requestedId) {
       return;
     }
     this.loadedId = requestedId;
-    this.error = '';
+    this.error.set('');
     const consumption = await this.consumptionService.getForUser(requestedId);
-    if (requestedId !== this.selectedId) {
+    if (requestedId !== this.selectedId()) {
       return;
     }
-    this.consumption = consumption;
+    this.consumption.set(consumption);
     this.newTotal = consumption.total;
+    this.cdr.markForCheck();
     await this.loadActivity(requestedId);
   }
 
   /**
-   * Loads the first page of the selected member's unified activity (newest-first; "Load more" appends the
-   * rest) and derives the current balance from its newest row. The member id is passed in (captured by the
+   * Loads the first page of the selected user's unified activity (newest-first; "Load more" appends the
+   * rest) and derives the current balance from its newest row. The user id is passed in (captured by the
    * caller) so a stale earlier load discards its result.
    *
-   * @param requestedId the member id captured when the load was started
+   * @param requestedId the user id captured when the load was started
    */
-  private async loadActivity(requestedId: string = this.selectedId): Promise<void> {
+  private async loadActivity(requestedId: string = this.selectedId()): Promise<void> {
     const { entries, hasMore } = await loadActivityPage([], ACTIVITY_PAGE_SIZE, (limit, offset) =>
-      this.accountingService.memberActivity(requestedId, limit, offset)
+      this.accountingService.userActivity(requestedId, limit, offset)
     );
-    if (requestedId !== this.selectedId) {
+    if (requestedId !== this.selectedId()) {
       return;
     }
-    this.activity = entries;
-    this.hasMore = hasMore;
-    this.balanceCents = entries.length > 0 ? entries[0].runningBalanceCents : 0;
+    this.activity.set(entries);
+    this.hasMore.set(hasMore);
+    this.balanceCents.set(entries.length > 0 ? entries[0].runningBalanceCents : 0);
   }
 
-  /** Appends the next page of the selected member's unified activity (incremental "Load more" server paging). */
+  /** Appends the next page of the selected user's unified activity (incremental "Load more" server paging). */
   async loadMore(): Promise<void> {
-    const requestedId = this.selectedId;
-    this.loadingMore = true;
+    const requestedId = this.selectedId();
+    this.loadingMore.set(true);
     try {
       const { entries, hasMore } = await loadActivityPage(
-        this.activity,
+        this.activity(),
         ACTIVITY_PAGE_SIZE,
-        (limit, offset) => this.accountingService.memberActivity(requestedId, limit, offset)
+        (limit, offset) => this.accountingService.userActivity(requestedId, limit, offset)
       );
-      if (requestedId !== this.selectedId) {
+      if (requestedId !== this.selectedId()) {
         return;
       }
-      this.activity = entries;
-      this.hasMore = hasMore;
+      this.activity.set(entries);
+      this.hasMore.set(hasMore);
     } catch (error) {
       this.notifications.error(error, 'Could not load more activity.');
     } finally {
-      this.loadingMore = false;
+      this.loadingMore.set(false);
     }
   }
 
   /** Toggles the count-correction form, seeding the New total field from the current count when it opens. */
   toggleEdit(): void {
-    this.editMode = !this.editMode;
-    if (this.editMode && this.consumption) {
-      this.newTotal = this.consumption.total;
+    this.editMode.set(!this.editMode());
+    const consumption = this.consumption();
+    if (this.editMode() && consumption) {
+      this.newTotal = consumption.total;
     }
   }
 
   /**
-   * Applies a +1/-1 to the selected member, optimistically then reconciling to the server total. The member
+   * Applies a +1/-1 to the selected user, optimistically then reconciling to the server total. The user
    * id is captured up front and every state write is guarded on it still being the current selection, so a
-   * rapid member switch mid-request never lands one member's count/activity on another's view.
+   * rapid user switch mid-request never lands one user's count/activity on another's view.
    */
   async change(delta: number): Promise<void> {
     // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
-    if (this.busy) {
+    if (this.busy()) {
       return;
     }
-    const id = this.selectedId;
-    this.busy = true;
-    this.error = '';
+    const id = this.selectedId();
+    this.busy.set(true);
+    this.error.set('');
     // optimistic: move the displayed total immediately, then reconcile to the server response below. Floor
     // at zero so a rapid double-click on `−` cannot momentarily flash a negative count before the server
     // (which is the real authority for the floor) reconciles.
-    if (this.consumption) {
-      this.consumption = { ...this.consumption, total: Math.max(0, this.consumption.total + delta) };
+    const current = this.consumption();
+    if (current) {
+      this.consumption.set({ ...current, total: Math.max(0, current.total + delta) });
     }
     try {
       const updated = await this.consumptionService.changeForUser(id, delta);
-      if (id !== this.selectedId) {
+      if (id !== this.selectedId()) {
         return;
       }
-      this.consumption = updated;
+      this.consumption.set(updated);
       // keep the absolute-correction field in step with the count so opening Edit after a +/- does not
       // pre-fill a stale total that, if Set without retyping, would silently revert the change
       this.newTotal = updated.total;
+      this.cdr.markForCheck();
       await this.loadActivity(id);
       await this.refreshFund();
     } catch (error) {
       this.notifications.error(error, delta < 0 ? 'Count is already zero.' : 'Could not record that.');
-      if (id === this.selectedId) {
+      if (id === this.selectedId()) {
         await this.loadConsumption();
       }
     } finally {
-      this.busy = false;
+      this.busy.set(false);
     }
   }
 
   /**
-   * Overrides the selected member's total (edit mode). The member id is captured up front and the result is
-   * committed only while it is still the current selection, so a member switch mid-request cannot apply one
-   * member's correction to another's view.
+   * Overrides the selected user's total (edit mode). The user id is captured up front and the result is
+   * committed only while it is still the current selection, so a user switch mid-request cannot apply one
+   * user's correction to another's view.
    */
   async override(): Promise<void> {
     // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
-    if (this.busy) {
+    if (this.busy()) {
       return;
     }
-    const id = this.selectedId;
-    this.error = '';
+    const id = this.selectedId();
+    this.error.set('');
     if (this.newTotalError() != null) {
-      this.error = 'The total cannot be negative.';
+      this.error.set('The total cannot be negative.');
       return;
     }
-    this.busy = true;
+    this.busy.set(true);
     try {
       const updated = await this.consumptionService.overrideForUser(id, this.newTotal, this.note);
-      if (id !== this.selectedId) {
+      if (id !== this.selectedId()) {
         return;
       }
-      this.consumption = updated;
-      this.editMode = false;
+      this.consumption.set(updated);
+      this.editMode.set(false);
       this.note = '';
+      this.cdr.markForCheck();
       this.notifications.success('Total updated.');
       await this.loadActivity(id);
       await this.refreshFund();
     } catch (error) {
       this.notifications.error(error, 'Could not set the total.');
     } finally {
-      this.busy = false;
+      this.busy.set(false);
     }
   }
 

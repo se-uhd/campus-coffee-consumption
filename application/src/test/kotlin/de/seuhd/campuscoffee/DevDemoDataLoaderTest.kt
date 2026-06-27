@@ -24,9 +24,9 @@ import java.util.UUID
 
 /**
  * Unit tests for the dev demo data loader's contract, mocking the services. They assert that the loader
- * creates its full set of extra demo members, layers consumption, bean-purchase, and deposit history on
- * top of them (plus one kitty float), deactivates a member marked inactive only after seeding their history,
- * and is idempotent: a second [DevDemoDataLoader.loadDemoData] call skips because the demo members already
+ * creates its full set of extra demo users, layers consumption, bean-purchase, and deposit history on
+ * top of them (plus one kitty float), deactivates a user marked inactive only after seeding their history,
+ * and is idempotent: a second [DevDemoDataLoader.loadDemoData] call skips because the demo users already
  * exist.
  */
 class DevDemoDataLoaderTest {
@@ -56,17 +56,17 @@ class DevDemoDataLoaderTest {
             active = true
         )
 
-    // an existing fixture member the loader resolves by login to enrich with a varied history; built with a
+    // an existing fixture user the loader resolves by login to enrich with a varied history; built with a
     // persisted id so member.persistedId resolves
     private fun fixtureMember(login: String): User =
         admin.copy(id = UUID.randomUUID(), loginName = login, role = Role.USER)
 
-    // The loader builds each member through userService.upsert; echo the argument back with a stable id so
-    // the caller has a persisted member (with an id) to seed history against.
+    // The loader builds each user through userService.upsert; echo the argument back with a stable id so
+    // the caller has a persisted user (with an id) to seed history against.
     private fun stubCreatePath() {
         whenever(userService.getByLoginName("jane_doe")).thenReturn(admin)
-        // the loader also resolves the primary demo member and the enriched fixture members by login to seed
-        // their histories: each must be an active member with a persisted id
+        // the loader also resolves the primary demo user and the enriched fixture users by login to seed
+        // their histories: each must be an active user with a persisted id
         whenever(userService.getByLoginName("maxmustermann")).thenReturn(fixtureMember("maxmustermann"))
         whenever(userService.getByLoginName("student2023")).thenReturn(fixtureMember("student2023"))
         whenever(userService.getByLoginName("lisa_lee")).thenReturn(fixtureMember("lisa_lee"))
@@ -84,17 +84,17 @@ class DevDemoDataLoaderTest {
 
     @Test
     fun `loadDemoData seeds the nine extra demo members on an empty fixture set bringing the total to fourteen`() {
-        // the database holds only the five seeded fixtures (none of them a demo member)
+        // the database holds only the five seeded fixtures (none of them a demo user)
         whenever(userService.getAll()).thenReturn(listOf(admin))
         stubCreatePath()
 
         loader.loadDemoData()
 
-        // nine demo members are each created via upsert (one create per member); the two inactive specs are
+        // nine demo users are each created via upsert (one create per user); the two inactive specs are
         // each upserted a second time to deactivate them after their history is seeded; and the extra empty
-        // member (new_user) is created via one more upsert -> 9 + 2 + 1 = 12 upserts
+        // user (new_user) is created via one more upsert -> 9 + 2 + 1 = 12 upserts
         verify(userService, times(12)).upsert(any())
-        // every demo member plus the empty member gets a consumption row at zero -> 9 + 1 = 10
+        // every demo user plus the empty user gets a consumption row at zero -> 9 + 1 = 10
         verify(coffeeConsumptionService, times(10)).createForUser(any())
     }
 
@@ -105,7 +105,7 @@ class DevDemoDataLoaderTest {
 
         loader.loadDemoData()
 
-        // the demo specs add coffees, own bean purchases, and member deposits, so each seed path runs
+        // the demo specs add coffees, own bean purchases, and user deposits, so each seed path runs
         verify(coffeeConsumptionService, atLeastOnce()).applyDelta(any(), eq(1), any())
         verify(expenseService, atLeastOnce()).recordOwn(any(), any(), any(), any())
         verify(paymentService, atLeastOnce()).recordDeposit(any(), any(), any(), any())
@@ -127,7 +127,7 @@ class DevDemoDataLoaderTest {
 
     @Test
     fun `loadDemoData skips when the demo members already exist`() {
-        // the first demo member is already present (a restart without a reset), so the loader is a no-op
+        // the first demo user is already present (a restart without a reset), so the loader is a no-op
         val existingDemoMember =
             admin.copy(id = UUID(0L, 2L), loginName = "anna_schneider", role = Role.USER)
         whenever(userService.getAll()).thenReturn(listOf(admin, existingDemoMember))

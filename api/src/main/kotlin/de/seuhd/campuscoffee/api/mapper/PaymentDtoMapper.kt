@@ -7,7 +7,7 @@ import org.mapstruct.Mapping
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 
 /**
- * MapStruct mapper from a [Payment] domain object to its response DTO (one-way), flattening the member (if
+ * MapStruct mapper from a [Payment] domain object to its response DTO (one-way), flattening the user (if
  * any) to their id and login name; both are null for a pure kitty adjustment.
  */
 @Mapper(componentModel = "spring")

@@ -9,5 +9,8 @@ interface Identifiable<T> {
     val id: T?
 }
 
-/** The identifier of a resource that must already be persisted; fails if it has not been created yet. */
+/**
+ * This object's non-null [id]. Use it only when the object is known to be saved; on an unsaved object (whose
+ * [id] is still null) it throws a `NullPointerException`.
+ */
 val <ID : Any> Identifiable<ID>.persistedId: ID get() = id!!

@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 
 /**
  * Admin controller for the global coffee price (JWT, admin only): set the price, read the current price
- * (`GET /api/price`, consumed by the admin landing), and read its history. Members do not call this
+ * (`GET /api/price`, consumed by the admin landing), and read its history. Users do not call this
  * resource; the current price reaches them through their landing summary (`GET /api/summary`).
  */
 @Tag(name = "Price", description = "Setting and inspecting the global coffee price (admin only).")

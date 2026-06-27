@@ -9,13 +9,13 @@ import de.seuhd.campuscoffee.domain.model.Expense
 import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
-import de.seuhd.campuscoffee.domain.ports.CapabilityTokenGenerator
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
-import de.seuhd.campuscoffee.domain.ports.data.PasswordHasher
+import de.seuhd.campuscoffee.domain.ports.data.PasswordHasherService
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
+import de.seuhd.campuscoffee.domain.ports.system.CapabilityTokenGeneratorService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -30,12 +30,12 @@ import java.util.UUID
 /**
  * Unit tests for UserServiceImpl, mocking the data ports, the password hasher, the capability-token
  * generator, and the consumption service. The central invariant under test is that a password exists only
- * for an admin: a member (USER) gets none and authenticates solely with their capability link.
+ * for an admin: a user (USER) gets none and authenticates solely with their capability link.
  */
 class UserServiceTest {
     private val userDataService: UserDataService = mock()
-    private val passwordHasher: PasswordHasher = mock()
-    private val capabilityTokenGenerator: CapabilityTokenGenerator = mock()
+    private val passwordHasher: PasswordHasherService = mock()
+    private val capabilityTokenGenerator: CapabilityTokenGeneratorService = mock()
     private val coffeeConsumptionService: CoffeeConsumptionService = mock()
     private val coffeeConsumptionDataService: CoffeeConsumptionDataService = mock()
     private val expenseDataService: ExpenseDataService = mock()
@@ -46,7 +46,7 @@ class UserServiceTest {
     private val memberId: UUID = UUID(0L, 1L)
     private val adminId: UUID = UUID(0L, 99L)
 
-    // a member has no password (they authenticate with their capability token)
+    // a user has no password (they authenticate with their capability token)
     private val storedMember =
         User(
             id = memberId,
@@ -123,7 +123,7 @@ class UserServiceTest {
         whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
         whenever(coffeeConsumptionService.createForUser(any())).thenReturn(mock<CoffeeConsumption>())
 
-        // a password sent for a member is ignored
+        // a password sent for a user is ignored
         val toCreate =
             User(
                 loginName = "newmember",

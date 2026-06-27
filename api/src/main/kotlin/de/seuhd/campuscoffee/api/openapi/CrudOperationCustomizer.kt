@@ -62,7 +62,7 @@ class CrudOperationCustomizer : OperationCustomizer {
         }
         // A role-restricted operation also answers 403 when the caller is authenticated but lacks the
         // role. Whether that applies depends on the resource (managing users needs ROLE_ADMIN, but the
-        // member self-service endpoints do not), so it is declared per method via @CrudOperation rather
+        // user self-service endpoints do not), so it is declared per method via @CrudOperation rather
         // than baked into the shared operation spec.
         val forbidden = HttpStatus.FORBIDDEN.value().toString()
         if (roleRestricted && !responses.containsKey(forbidden)) {

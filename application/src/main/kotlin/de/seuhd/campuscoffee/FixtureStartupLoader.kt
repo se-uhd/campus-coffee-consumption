@@ -1,13 +1,13 @@
 package de.seuhd.campuscoffee
 
 import de.seuhd.campuscoffee.configuration.FixturesProperties
-import de.seuhd.campuscoffee.domain.ports.IdGenerator
-import de.seuhd.campuscoffee.domain.ports.StartupTask
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
+import de.seuhd.campuscoffee.domain.ports.system.StartupTaskService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component
 
 /**
  * Loads the fixture data on startup when `campus-coffee.fixtures.load-on-startup` is true (declared by
- * `FixturesProperties`) and the database has no users yet, seeding the demo members (with deterministic
+ * `FixturesProperties`) and the database has no users yet, seeding the demo users (with deterministic
  * capability tokens) and their zeroed coffee consumptions.
  *
  * [StartupDataInitializer] runs this before the web server accepts requests, after any event sourcing
@@ -30,9 +30,9 @@ class FixtureStartupLoader(
     private val coffeePriceService: CoffeePriceService,
     private val expenseService: ExpenseService,
     private val paymentService: PaymentService,
-    private val idGenerator: IdGenerator,
+    private val idGenerator: IdGeneratorService,
     private val fixturesProperties: FixturesProperties
-) : StartupTask {
+) : StartupTaskService {
     override val order = ORDER
 
     override fun run() = loadOnStartup()

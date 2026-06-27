@@ -6,7 +6,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 
 /**
  * A card whose body folds away behind a header toggle, for a secondary form that is usually collapsed (the
- * member "Record expense" card and the admin "Adjust the kitty" card). The header carries the {@link title}
+ * user "Record expense" card and the admin "Adjust the kitty" card). The header carries the {@link title}
  * and an expand/collapse icon button; the body is projected via `<ng-content>` and rendered only while open,
  * so the projected `ngModel`/`ngForm` form stays in the host's template context and binds to its fields. The
  * open state is a two-way {@link open} model, so the host can read or preset it.
@@ -34,7 +34,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
       }
     </mat-card>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CollapsibleCardComponent {
   /** The card heading shown in the header row. */

@@ -2,8 +2,8 @@ package de.seuhd.campuscoffee
 
 import de.seuhd.campuscoffee.configuration.CoffeePriceProperties
 import de.seuhd.campuscoffee.domain.exceptions.DuplicationException
-import de.seuhd.campuscoffee.domain.ports.StartupTask
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
+import de.seuhd.campuscoffee.domain.ports.system.StartupTaskService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 
@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component
 class CoffeePriceStartupLoader(
     private val coffeePriceService: CoffeePriceService,
     private val coffeePriceProperties: CoffeePriceProperties
-) : StartupTask {
+) : StartupTaskService {
     override val order = ORDER
 
     override fun run() = seedInitialPrice()

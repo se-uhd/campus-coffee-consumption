@@ -24,8 +24,8 @@ import org.springframework.stereotype.Component
  * Admin-deactivation lockout (the in-flight-JWT half): a JWT minted before an admin was deactivated still
  * authenticates, so the resolved domain user is checked here. A deactivated **admin** is rejected with a
  * [ForbiddenException] (403), in the same single lookup that resolves the principal (no extra query). A
- * deactivated **member** is deliberately *not* rejected here: their reads must keep working, and the domain
- * services reject each member mutation on their own (the account stays read-only). The login-time half
+ * deactivated **user** is deliberately *not* rejected here: their reads must keep working, and the domain
+ * services reject each user mutation on their own (the account stays read-only). The login-time half
  * (refusing a deactivated admin's `POST /api/auth/token`) lives in the user-details service.
  */
 @Component
@@ -41,7 +41,7 @@ class CurrentUserProvider(
      *   principal no longer resolves to a user (a JWT minted for an admin who was then hard-deleted); both
      *   surface as a clean 401 so the client re-authenticates, rather than a 500 or a 404.
      * @throws ForbiddenException if the resolved user is a deactivated admin (an in-flight JWT minted before
-     *   the admin was deactivated); a deactivated member is allowed through here and limited to reads.
+     *   the admin was deactivated); a deactivated user is allowed through here and limited to reads.
      */
     fun currentUser(): User {
         val user = resolveAuthenticatedUser()

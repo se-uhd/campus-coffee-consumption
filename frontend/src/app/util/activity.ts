@@ -2,7 +2,7 @@ import { ActivityEntryDto } from '../models';
 
 /**
  * The result of appending an activity page: the merged entries plus how many rows were actually appended.
- * Generic over the row type ([ActivityEntryDto] for the member/kitty feeds, `GlobalActivityEntryDto` for the
+ * Generic over the row type ([ActivityEntryDto] for the user/kitty feeds, `GlobalActivityEntryDto` for the
  * admin global feed); both carry the stable per-entry `id` the merge de-duplicates on.
  */
 export interface AppendedActivityPage<T = ActivityEntryDto> {

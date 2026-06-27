@@ -4,8 +4,8 @@ import de.seuhd.campuscoffee.data.mapper.ExpenseEntityMapper
 import de.seuhd.campuscoffee.data.persistence.entities.ExpenseEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.ExpenseRepository
 import de.seuhd.campuscoffee.domain.model.Expense
-import de.seuhd.campuscoffee.domain.ports.IdGenerator
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
+import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -18,7 +18,7 @@ import java.util.UUID
 class ExpenseDataServiceImpl(
     repository: ExpenseRepository,
     entityMapper: ExpenseEntityMapper,
-    idGenerator: IdGenerator
+    idGenerator: IdGeneratorService
 ) : CrudDataServiceImpl<Expense, ExpenseEntity, ExpenseRepository, UUID>(
         repository,
         entityMapper,

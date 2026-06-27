@@ -6,9 +6,9 @@ import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
 
 /**
- * Request body for a member recording their own bean purchase (`POST /api/expenses`). It carries no buyer
- * or split: the server attributes the purchase to the calling member and books it 100% from their own
- * pocket, so a member cannot attribute it to someone else or fund it from the kitty.
+ * Request body for a user recording their own bean purchase (`POST /api/expenses`). It carries no buyer
+ * or split: the server attributes the purchase to the calling user and books it 100% from their own
+ * pocket, so a user cannot attribute it to someone else or fund it from the kitty.
  */
 data class OwnExpenseDto(
     @field:NotNull(message = "Weight is required.")
