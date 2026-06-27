@@ -6,7 +6,7 @@ import de.seuhd.campuscoffee.api.dtos.PriceUpdateDto
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -26,7 +26,7 @@ class AccountingEventLogSystemTests : AbstractSystemTest() {
 
     private val objectMapper = ObjectMapper()
 
-    private val member = "maxmustermann"
+    private val user = "maxmustermann"
 
     private data class EventRow(
         val body: Map<String, Any?>,
@@ -76,23 +76,23 @@ class AccountingEventLogSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a member purchase appends an Expense event with the buyer and amounts and the member login`() {
+    fun `a user purchase appends an Expense event with the buyer and amounts and the user login`() {
         client()
             .post()
             .uri("/api/expenses")
             .contentType(MediaType.APPLICATION_JSON)
             .body(OwnExpenseDto(weightGrams = 1000, amountCents = 900, note = "beans"))
-            .withMember(member)
+            .withUser(user)
             .exchange()
 
         val expenseEvents = eventsOf("Expense")
         assertThat(expenseEvents).hasSize(1)
         val event = expenseEvents.first()
-        assertThat(event.body["buyerUserId"]).isEqualTo(seededUser(member).persistedId.toString())
+        assertThat(event.body["buyerUserId"]).isEqualTo(seededUser(user).persistedId.toString())
         assertThat((event.body["amountCents"] as Number).toInt()).isEqualTo(900)
         assertThat((event.body["privateAmountCents"] as Number).toInt()).isEqualTo(900)
         assertThat((event.body["kittyAmountCents"] as Number).toInt()).isEqualTo(0)
-        assertThat(event.createdBy).isEqualTo(member)
+        assertThat(event.createdBy).isEqualTo(user)
     }
 
     @Test
@@ -100,7 +100,7 @@ class AccountingEventLogSystemTests : AbstractSystemTest() {
         val reason = "manual correction: spilled a pot"
         client()
             .put()
-            .uri("/api/users/{id}/consumption", seededUser(member).persistedId)
+            .uri("/api/users/{id}/consumption", seededUser(user).persistedId)
             .contentType(MediaType.APPLICATION_JSON)
             .body(mapOf("total" to 3, "note" to reason))
             .withAdmin()
@@ -117,19 +117,19 @@ class AccountingEventLogSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a deposit appends a Payment event with the member and amount and the admin login`() {
+    fun `a deposit appends a Payment event with the user and amount and the admin login`() {
         client()
             .post()
             .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(DepositRequestDto(userId = seededUser(member).persistedId, amountCents = 1000, note = "paid"))
+            .body(DepositRequestDto(userId = seededUser(user).persistedId, amountCents = 1000, note = "paid"))
             .withAdmin()
             .exchange()
 
         val paymentEvents = eventsOf("Payment")
         assertThat(paymentEvents).hasSize(1)
         val event = paymentEvents.first()
-        assertThat(event.body["userId"]).isEqualTo(seededUser(member).persistedId.toString())
+        assertThat(event.body["userId"]).isEqualTo(seededUser(user).persistedId.toString())
         assertThat((event.body["amountCents"] as Number).toInt()).isEqualTo(1000)
         // a deposit's note is carried in the full-state body (the event note column is the admin
         // override/reset reason, set only by the consumption service); the actor login is the admin

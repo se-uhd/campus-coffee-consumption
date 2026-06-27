@@ -3,7 +3,7 @@ package de.seuhd.campuscoffee.tests.system
 import de.seuhd.campuscoffee.Application
 import de.seuhd.campuscoffee.api.dtos.KittyDto
 import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
-import de.seuhd.campuscoffee.data.persistence.eventsourcing.EventsToDataRunner
+import de.seuhd.campuscoffee.data.persistence.events.EventsToDataRunner
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
@@ -15,7 +15,7 @@ import de.seuhd.campuscoffee.tests.SystemTestUtils.configureClient
 import de.seuhd.campuscoffee.tests.SystemTestUtils.configurePostgresContainers
 import de.seuhd.campuscoffee.tests.SystemTestUtils.getPostgresContainer
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -57,7 +57,7 @@ class EventsToDataRebuildSystemTest {
     @LocalServerPort
     private var port: Int = 0
 
-    private val member = "maxmustermann"
+    private val user = "maxmustermann"
 
     @BeforeEach
     fun setUp() {
@@ -77,14 +77,14 @@ class EventsToDataRebuildSystemTest {
         coffeePriceService.clear()
     }
 
-    private fun memberId() = userService.getByLoginName(member).id!!
+    private fun userId() = userService.getByLoginName(user).id!!
 
     private fun summary(): UserSummaryDto =
         client()
             .get()
             .uri("/api/summary")
             .accept(MediaType.APPLICATION_JSON)
-            .withMember(member)
+            .withUser(user)
             .exchange()
             .returnResult<UserSummaryDto>()
             .responseBody!!
@@ -106,20 +106,20 @@ class EventsToDataRebuildSystemTest {
         client()
             .post()
             .uri("/api/consumption")
-            .withMember(member)
+            .withUser(user)
             .exchange()
         client()
             .post()
             .uri("/api/expenses")
             .contentType(MediaType.APPLICATION_JSON)
             .body(mapOf("weightGrams" to 1000, "amountCents" to 900))
-            .withMember(member)
+            .withUser(user)
             .exchange()
         client()
             .post()
             .uri("/api/kitty/deposit")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(mapOf("userId" to memberId().toString(), "amountCents" to 1000))
+            .body(mapOf("userId" to userId().toString(), "amountCents" to 1000))
             .withAdmin()
             .exchange()
 

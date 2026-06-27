@@ -1,7 +1,7 @@
 package de.seuhd.campuscoffee.api.support
 
+import de.seuhd.campuscoffee.domain.model.LabeledQrCode
 import de.seuhd.campuscoffee.domain.model.User
-import de.seuhd.campuscoffee.domain.ports.system.LabeledQrCode
 import de.seuhd.campuscoffee.domain.ports.system.QrCodeService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.http.ContentDisposition
@@ -128,7 +128,7 @@ class CapabilityQrResponder(
      * Sanitizes a login name into a safe download/entry file stem: whitelist `[A-Za-z0-9_-]`, replacing every
      * other character with `_`. Defense in depth so neither the `Content-Disposition` header nor the
      * `ZipEntry` name can carry a path or header-injection character, independent of how strict the login-name
-     * validation upstream happens to be. A name that sanitizes to empty falls back to `member`.
+     * validation upstream happens to be. A name that sanitizes to empty falls back to `user`.
      */
     private fun safeName(loginName: String): String = UNSAFE_NAME_CHARS.replace(loginName, "_").ifEmpty { "user" }
 

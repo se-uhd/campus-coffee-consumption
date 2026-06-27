@@ -87,7 +87,7 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
             [users]="users()"
             [selectedId]="selectedId()"
             [ownUserId]="selection.ownUserId"
-            (selectionChange)="onMemberChange($event)"
+            (selectionChange)="onUserChange($event)"
           ></cc-user-select>
           @if (editingId()) {
             <p class="muted">Correcting a purchase keeps the same buyer.</p>
@@ -341,13 +341,13 @@ export class AdminExpensesComponent implements OnInit {
    * undoes the switch). The `queryParamMap` subscription then mirrors it into the shared selection and
    * reloads the user's purchases; the URL stays the source of truth.
    *
-   * @param memberId the user id picked in the selector
+   * @param userId the user id picked in the selector
    */
-  async onMemberChange(memberId: string): Promise<void> {
-    this.selectedId.set(memberId);
+  async onUserChange(userId: string): Promise<void> {
+    this.selectedId.set(userId);
     await this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { user: memberId },
+      queryParams: { user: userId },
       queryParamsHandling: 'merge'
     });
   }
@@ -358,10 +358,10 @@ export class AdminExpensesComponent implements OnInit {
    * so a redundant re-emission of the same param does not reload. `loadedId` (the user actually loaded) is
    * the guard, not the bound `selectedId` (which the dropdown already advanced before navigating).
    *
-   * @param memberId the value of the `user` query param, or null when it is absent
+   * @param userId the value of the `user` query param, or null when it is absent
    */
-  private async applySelectionFromUrl(memberId: string | null): Promise<void> {
-    const effective = this.selection.selectFromParam(memberId);
+  private async applySelectionFromUrl(userId: string | null): Promise<void> {
+    const effective = this.selection.selectFromParam(userId);
     if (effective === this.loadedId) {
       this.selectedId.set(effective);
       return;

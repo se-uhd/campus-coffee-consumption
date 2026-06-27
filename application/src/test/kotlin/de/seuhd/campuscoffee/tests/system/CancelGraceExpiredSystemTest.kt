@@ -12,7 +12,7 @@ import de.seuhd.campuscoffee.tests.SystemTestUtils.configureClient
 import de.seuhd.campuscoffee.tests.SystemTestUtils.configurePostgresContainers
 import de.seuhd.campuscoffee.tests.SystemTestUtils.getPostgresContainer
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -49,7 +49,7 @@ class CancelGraceExpiredSystemTest {
     @LocalServerPort
     private var port: Int = 0
 
-    private val member = "maxmustermann"
+    private val user = "maxmustermann"
 
     @BeforeEach
     fun setUp() {
@@ -77,14 +77,14 @@ class CancelGraceExpiredSystemTest {
         client()
             .post()
             .uri("/api/consumption")
-            .withMember(member)
+            .withUser(user)
             .exchange()
 
         val status =
             client()
                 .post()
                 .uri("/api/consumption/cancel")
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .statusCode()
 

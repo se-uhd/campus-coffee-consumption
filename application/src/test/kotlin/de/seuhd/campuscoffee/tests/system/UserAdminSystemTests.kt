@@ -8,7 +8,7 @@ import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
@@ -22,7 +22,7 @@ import java.util.zip.ZipInputStream
  * at the token endpoint with the seeded admin fixture credentials.
  */
 class UserAdminSystemTests : AbstractSystemTest() {
-    private fun memberId(): UUID = seededUser("maxmustermann").persistedId
+    private fun userId(): UUID = seededUser("maxmustermann").persistedId
 
     private fun adminConsumption(id: UUID): ConsumptionDto =
         client()
@@ -35,13 +35,13 @@ class UserAdminSystemTests : AbstractSystemTest() {
             .responseBody!!
 
     @Test
-    fun `creating a member returns 201 with the assembled capability URL`() {
+    fun `creating a user returns 201 with the assembled capability URL`() {
         val body =
             mapOf(
-                "loginName" to "newmember",
-                "emailAddress" to "new.member@se.de",
+                "loginName" to "newuser",
+                "emailAddress" to "new.user@se.de",
                 "firstName" to "New",
-                "lastName" to "Member",
+                "lastName" to "User",
                 "role" to "USER"
             )
 
@@ -60,7 +60,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `deleting a member returns 204 and cascades their consumption`() {
+    fun `deleting a user returns 204 and cascades their consumption`() {
         val body =
             mapOf(
                 "loginName" to "todelete",
@@ -103,7 +103,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `listing users returns the seeded members`() {
+    fun `listing users returns the seeded users`() {
         val result =
             client()
                 .get()
@@ -132,8 +132,8 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `updating a member deactivates the account`() {
-        val id = memberId()
+    fun `updating a user deactivates the account`() {
+        val id = userId()
         val body =
             mapOf(
                 "id" to id.toString(),
@@ -160,8 +160,8 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `rotating a member's link issues a new capability URL`() {
-        val id = memberId()
+    fun `rotating a user's link issues a new capability URL`() {
+        val id = userId()
         val before =
             client()
                 .get()
@@ -188,11 +188,11 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `downloading a member's QR code returns a PNG`() {
+    fun `downloading a user's QR code returns a PNG`() {
         val result =
             client()
                 .get()
-                .uri("/api/users/{id}/qr.png", memberId())
+                .uri("/api/users/{id}/qr.png", userId())
                 .withAdmin()
                 .exchange()
                 .returnResult<ByteArray>()
@@ -202,7 +202,7 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `downloading all QR codes returns a zip of per-member PNGs named by login`() {
+    fun `downloading all QR codes returns a zip of per-user PNGs named by login`() {
         val result =
             client()
                 .get()
@@ -221,13 +221,13 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a member capability token downloading all QR codes returns 403 Forbidden`() {
+    fun `a user capability token downloading all QR codes returns 403 Forbidden`() {
         // the bulk QR ZIP is admin-only; a user's capability token grants only self-service
         val status =
             client()
                 .get()
                 .uri("/api/users/qr.zip")
-                .withMember("maxmustermann")
+                .withUser("maxmustermann")
                 .exchange()
                 .statusCode()
         assertThat(status).isEqualTo(403)
@@ -251,21 +251,21 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `a member capability token downloading the QR PDF returns 403 Forbidden`() {
+    fun `a user capability token downloading the QR PDF returns 403 Forbidden`() {
         val status =
             client()
                 .get()
                 .uri("/api/users/qr.pdf")
-                .withMember("maxmustermann")
+                .withUser("maxmustermann")
                 .exchange()
                 .statusCode()
         assertThat(status).isEqualTo(403)
     }
 
     @Test
-    fun `a deactivated member is excluded from the bulk QR downloads`() {
+    fun `a deactivated user is excluded from the bulk QR downloads`() {
         // deactivate one user; they must drop out of the ZIP (and the PDF, which shares the selection)
-        val id = memberId()
+        val id = userId()
         client()
             .put()
             .uri("/api/users/{id}", id)
@@ -309,8 +309,8 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `an admin increments a member's count by id`() {
-        val id = memberId()
+    fun `an admin increments a user's count by id`() {
+        val id = userId()
 
         val result =
             client()
@@ -326,8 +326,8 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `an admin decrements a member's count and the change log records it`() {
-        val id = memberId()
+    fun `an admin decrements a user's count and the change log records it`() {
+        val id = userId()
         client()
             .post()
             .uri("/api/users/{id}/consumption", id)
@@ -352,8 +352,8 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `an admin overrides a member's count and records a note`() {
-        val id = memberId()
+    fun `an admin overrides a user's count and records a note`() {
+        val id = userId()
 
         client()
             .put()
@@ -368,8 +368,8 @@ class UserAdminSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `an admin resets a member's count to zero after payment`() {
-        val id = memberId()
+    fun `an admin resets a user's count to zero after payment`() {
+        val id = userId()
         client()
             .put()
             .uri("/api/users/{id}/consumption", id)

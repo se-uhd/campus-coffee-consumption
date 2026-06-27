@@ -11,10 +11,10 @@ import {
 } from './helpers';
 
 /**
- * Admin flow: the Members page (`/admin/users`) shows the overview table with role chips, cup counts and
- * signed balances and paginates; the price page persists a new price; a member deposit raises the kitty
+ * Admin flow: the Users page (`/admin/users`) shows the overview table with role chips, cup counts and
+ * signed balances and paginates; the price page persists a new price; a user deposit raises the kitty
  * balance; the kitty page keeps "Kitty balance" and "Kitty history" distinct; an expense can be recorded and
- * then deleted behind a confirm dialog; and the Members page offers a ZIP download of all QR codes.
+ * then deleted behind a confirm dialog; and the Users page offers a ZIP download of all QR codes.
  */
 test.describe('admin flow', () => {
   let api: APIRequestContext;
@@ -32,44 +32,44 @@ test.describe('admin flow', () => {
     await resetFixtures(api);
   });
 
-  // The startup state is reseeded away by the `PUT /api/dev/data` in `beforeEach` (the nine demo members
-  // load only at app startup), so this test is self-contained: it seeds enough members via the API to force a
-  // second page, then asserts the table paginates and the next page works, and tears the seeded members down.
-  test('the members table shows chips, cups, signed balances, and paginates', async ({ page }) => {
+  // The startup state is reseeded away by the `PUT /api/dev/data` in `beforeEach` (the nine demo users
+  // load only at app startup), so this test is self-contained: it seeds enough users via the API to force a
+  // second page, then asserts the table paginates and the next page works, and tears the seeded users down.
+  test('the users table shows chips, cups, signed balances, and paginates', async ({ page }) => {
     const token = await adminToken(api);
-    // the members table paginator's first page holds 10 rows; seed past that so a second page exists
+    // the users table paginator's first page holds 10 rows; seed past that so a second page exists
     const seeded = await ensureAtLeastUsers(api, token, 13);
 
     try {
       await loginAsAdmin(page);
-      // the members overview table now lives on the Members page, not the landing
+      // the users overview table now lives on the Users page, not the landing
       await page.goto('/admin/users');
 
-      const membersCard = page.locator('mat-card', {
+      const usersCard = page.locator('mat-card', {
         has: page.getByRole('heading', { name: 'Users' })
       });
 
       // role chips render for both audiences (exact text so the "Users" heading / caption cannot satisfy them)
-      await expect(membersCard.getByText('Admin', { exact: true }).first()).toBeVisible();
-      await expect(membersCard.getByText('User', { exact: true }).first()).toBeVisible();
+      await expect(usersCard.getByText('Admin', { exact: true }).first()).toBeVisible();
+      await expect(usersCard.getByText('User', { exact: true }).first()).toBeVisible();
 
       // a signed balance is rendered (the euros pipe uses the en-US format with the euro sign trailing)
-      await expect(membersCard.getByText(/[+-]?\d+\.\d{2} €/).first()).toBeVisible();
+      await expect(usersCard.getByText(/[+-]?\d+\.\d{2} €/).first()).toBeVisible();
 
       // the paginator starts on the first range and reports more than one page (the range separator is an
       // en-dash, so match the start/end/total with a numeric capture rather than splitting on a literal char)
-      const rangeLabel = membersCard.locator('.mat-mdc-paginator-range-label');
+      const rangeLabel = usersCard.locator('.mat-mdc-paginator-range-label');
       await expect(rangeLabel).toHaveText(/^\s*1\s*\D+\s*\d+\s+of\s+\d+\s*$/);
       const firstRange = (await rangeLabel.textContent())?.trim() ?? '';
       const [, firstPageEnd, total] = /1\s*\D+\s*(\d+)\s+of\s+(\d+)/.exec(firstRange)!.map(Number);
       expect(total).toBeGreaterThan(firstPageEnd); // there is a second page to go to
 
       // the next page works: the range advances off the first page and stays within the same total
-      await membersCard.getByRole('button', { name: 'Next page' }).click();
+      await usersCard.getByRole('button', { name: 'Next page' }).click();
       await expect(rangeLabel).not.toHaveText(firstRange);
       await expect(rangeLabel).toHaveText(new RegExp(`of\\s+${total}\\s*$`));
       // the second page renders at least the header row plus one data row
-      expect(await membersCard.getByRole('row').count()).toBeGreaterThan(1);
+      expect(await usersCard.getByRole('row').count()).toBeGreaterThan(1);
     } finally {
       await deleteUsers(api, token, seeded);
     }
@@ -96,7 +96,7 @@ test.describe('admin flow', () => {
     await expect(currentCard.locator('.display')).toHaveText('0.73 €');
   });
 
-  test('recording a member deposit increases the kitty balance', async ({ page }) => {
+  test('recording a user deposit increases the kitty balance', async ({ page }) => {
     // pin the price so the exact kitty figures cannot be perturbed by a leftover price from a previous run
     await pinPrice(api, await adminToken(api), 50);
     await loginAsAdmin(page);
@@ -108,7 +108,7 @@ test.describe('admin flow', () => {
     // the freshly reseeded fixture kitty is empty
     await expect(balanceCard.locator('.display')).toHaveText('0.00 €');
 
-    // record a 5.00 € deposit for the first member in the select
+    // record a 5.00 € deposit for the first user in the select
     await page.getByRole('combobox', { name: 'User' }).click();
     await page.getByRole('option').first().click();
     await page.getByLabel('Amount (€)').first().fill('5.00');
@@ -132,7 +132,7 @@ test.describe('admin flow', () => {
     await loginAsAdmin(page);
     await page.goto('/admin/expenses');
 
-    // default member is selected; record a purchase booked entirely private (the freshly reseeded kitty is
+    // default user is selected; record a purchase booked entirely private (the freshly reseeded kitty is
     // empty, so a positive kitty share would overdraw it and the backend would reject the purchase)
     await page.getByLabel('Weight (grams)').fill('500');
     await page.getByLabel('Total amount (€)').fill('6.00');
@@ -185,7 +185,7 @@ test.describe('admin flow', () => {
     await expect(row).toContainText('kitty 2.00 €');
   });
 
-  test('the Members page "Download all QR codes" button triggers a coffee-qr-codes.zip download', async ({
+  test('the Users page "Download all QR codes" button triggers a coffee-qr-codes.zip download', async ({
     page
   }) => {
     await loginAsAdmin(page);
@@ -202,12 +202,12 @@ test.describe('admin flow', () => {
 });
 
 /**
- * The selected member is URL state: picking a member on the landing pushes a `?user=<id>` history entry,
+ * The selected user is URL state: picking a user on the landing pushes a `?user=<id>` history entry,
  * so the browser Back button undoes the switch back to the admin's own account; the param carries across
- * admin pages (landing → expenses); and the "View profile" jump from the Members page deep-links the
- * selected member into `/admin/profile?user=<id>` with Back returning to the list.
+ * admin pages (landing → expenses); and the "View profile" jump from the Users page deep-links the
+ * selected user into `/admin/profile?user=<id>` with Back returning to the list.
  */
-test.describe('admin member-selection history', () => {
+test.describe('admin user-selection history', () => {
   let api: APIRequestContext;
 
   test.beforeAll(async () => {
@@ -222,12 +222,12 @@ test.describe('admin member-selection history', () => {
     await resetFixtures(api);
   });
 
-  test('picking a member adds a ?user= history entry that the Back button undoes', async ({ page }) => {
+  test('picking a user adds a ?user= history entry that the Back button undoes', async ({ page }) => {
     await loginAsAdmin(page);
-    // the landing defaults to the admin's own account, so there is no member param yet
+    // the landing defaults to the admin's own account, so there is no user param yet
     await expect(page).toHaveURL(/\/admin$/);
 
-    // pick a different member; the URL gains the member id as a query param (a pushed history entry)
+    // pick a different user; the URL gains the user id as a query param (a pushed history entry)
     await page.getByRole('combobox', { name: 'User' }).click();
     await page.getByRole('option', { name: /maxmustermann/ }).click();
     await expect(page).toHaveURL(/\/admin\?user=[0-9a-f-]+$/);
@@ -236,43 +236,43 @@ test.describe('admin member-selection history', () => {
     await page.goBack();
     await expect(page).toHaveURL(/\/admin$/);
 
-    // Forward re-applies the selection (the member param returns)
+    // Forward re-applies the selection (the user param returns)
     await page.goForward();
     await expect(page).toHaveURL(/\/admin\?user=[0-9a-f-]+$/);
   });
 
-  test('the selected member carries across admin pages and back', async ({ page }) => {
+  test('the selected user carries across admin pages and back', async ({ page }) => {
     await loginAsAdmin(page);
     await page.getByRole('combobox', { name: 'User' }).click();
     await page.getByRole('option', { name: /maxmustermann/ }).click();
     await expect(page).toHaveURL(/\/admin\?user=([0-9a-f-]+)$/);
     const userId = new URL(page.url()).searchParams.get('user');
 
-    // navigating to the expenses page preserves the selected member in the URL
+    // navigating to the expenses page preserves the selected user in the URL
     await page.getByRole('link', { name: 'Expenses' }).click();
     await expect(page).toHaveURL(new RegExp(`/admin/expenses\\?user=${userId}$`));
 
-    // the back arrow returns to the landing carrying the same member
+    // the back arrow returns to the landing carrying the same user
     await page.getByRole('link', { name: 'Back' }).click();
     await expect(page).toHaveURL(new RegExp(`/admin\\?user=${userId}$`));
   });
 
-  test('"View profile" deep-links the member into /admin/profile?user= and Back returns to the list', async ({
+  test('"View profile" deep-links the user into /admin/profile?user= and Back returns to the list', async ({
     page
   }) => {
     await loginAsAdmin(page);
     await page.goto('/admin/users');
 
-    const membersCard = page.locator('mat-card', {
+    const usersCard = page.locator('mat-card', {
       has: page.getByRole('heading', { name: 'Users' })
     });
-    const row = membersCard.getByRole('row').filter({ hasText: 'maxmustermann' }).first();
+    const row = usersCard.getByRole('row').filter({ hasText: 'maxmustermann' }).first();
     await row.getByRole('button', { name: 'View profile' }).click();
 
-    // the profile page opens deep-linked to that member via the member param
+    // the profile page opens deep-linked to that user via the user param
     await expect(page).toHaveURL(/\/admin\/profile\?user=[0-9a-f-]+$/);
 
-    // Back returns to the members list (no member param)
+    // Back returns to the users list (no user param)
     await page.goBack();
     await expect(page).toHaveURL(/\/admin\/users$/);
   });

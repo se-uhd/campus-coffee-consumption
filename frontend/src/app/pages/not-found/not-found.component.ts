@@ -5,7 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 
 /**
  * The catch-all page for an unmatched URL. A mistyped capability link (`/login/<wrong-token>`) still matches
- * the member route and shows its own invalid-link state, so this is reached only for a genuinely unknown
+ * the user route and shows its own invalid-link state, so this is reached only for a genuinely unknown
  * path; it gives an honest "not found" message and a link to the sign-in rather than silently redirecting
  * an unknown URL to the admin dashboard.
  */

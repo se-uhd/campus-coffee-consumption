@@ -10,8 +10,8 @@ import { CompactEncrypt, importJWK } from 'jose';
 /** The fixture admin's credentials (admin JWT login). */
 export const ADMIN = { loginName: 'jane_doe', password: 'aaaMbnPdFYDqkOpS3fVA2xyz' } as const;
 
-/** Fixture member capability tokens (the secret in the `/login/:token` URL), keyed by login name. */
-export const MEMBER_TOKENS = {
+/** Fixture user capability tokens (the secret in the `/login/:token` URL), keyed by login name. */
+export const USER_TOKENS = {
   maxmustermann: 'Pq3wE9rT5yU1iO7pA2sD8fG4hJ6kL0zXcVbN3mM1nBqe',
   student2023: 'Zx1cV7bN3mA9sD5fG2hJ8kL4qW0eR6tYuIoP1lK7jHzx',
   lisa_lee: 'Lk8jH4gF6dS2aP0oI9uY7tR3eW1qZ5xCvBnM2mN8bVlk',
@@ -21,7 +21,7 @@ export const MEMBER_TOKENS = {
 /**
  * Resets the backend to the known five-user FIXTURE baseline (clear + reseed) via `PUT /api/dev/data`.
  * Use before isolated mutation tests that need a deterministic starting point. Note this drops the nine
- * demo members (they load only at app startup), so the post-reset state has exactly five users.
+ * demo users (they load only at app startup), so the post-reset state has exactly five users.
  *
  * @param api a Playwright request context bound to the app's base URL
  */
@@ -77,8 +77,8 @@ async function encryptCredentials(
 
 /**
  * Signs in as the fixture admin through the real login page and waits for the admin landing to render.
- * The landing mirrors the member landing for the selected member, so it settles on the member selector and
- * the "Recent activity" block rather than the members overview table (which now lives on `/admin/users`).
+ * The landing mirrors the user landing for the selected user, so it settles on the user selector and
+ * the "Recent activity" block rather than the users overview table (which now lives on `/admin/users`).
  *
  * @param page the Playwright page
  */
@@ -108,20 +108,20 @@ export async function userCount(api: APIRequestContext, token: string): Promise<
   return ((await response.json()) as unknown[]).length;
 }
 
-/** The login-name prefix for the throwaway members `ensureAtLeastUsers` creates, used by the teardown. */
+/** The login-name prefix for the throwaway users `ensureAtLeastUsers` creates, used by the teardown. */
 export const E2E_PAGE_USER_PREFIX = 'e2e_pg_';
 
 /**
- * Creates extra `e2e_pg_*` members until at least [target] users exist, so a table that paginates at
+ * Creates extra `e2e_pg_*` users until at least [target] users exist, so a table that paginates at
  * <= [target] per page has a second page, and returns the ids it created so the caller can tear them down.
  * Each create is checked: a non-OK response (other than a duplicate-login conflict, which is benign) throws
- * a descriptive error rather than being ignored. The loop is bounded by the number of members it must create
+ * a descriptive error rather than being ignored. The loop is bounded by the number of users it must create
  * so a server that never grows the count fails fast instead of spinning to the test timeout.
  *
  * @param api a Playwright request context bound to the app base URL
  * @param token an admin JWT
  * @param target the minimum total user count to reach
- * @returns the ids of the members this call created (empty when the count already met the target)
+ * @returns the ids of the users this call created (empty when the count already met the target)
  */
 export async function ensureAtLeastUsers(
   api: APIRequestContext,
@@ -145,7 +145,7 @@ export async function ensureAtLeastUsers(
     });
     // a 409 means the login already exists (a prior run); that is fine and still grows the count via reuse
     if (!response.ok() && response.status() !== 409) {
-      throw new Error(`creating an e2e page member failed: ${response.status()} ${await response.text()}`);
+      throw new Error(`creating an e2e page user failed: ${response.status()} ${await response.text()}`);
     }
     if (response.ok()) {
       created.push(((await response.json()) as { id: string }).id);
@@ -159,13 +159,13 @@ export async function ensureAtLeastUsers(
 }
 
 /**
- * Hard-deletes the given members by id (used to tear down the throwaway members `ensureAtLeastUsers`
- * creates, so they do not persist across runs). A member with no financial footprint deletes cleanly;
+ * Hard-deletes the given users by id (used to tear down the throwaway users `ensureAtLeastUsers`
+ * creates, so they do not persist across runs). A user with no financial footprint deletes cleanly;
  * a failure is swallowed so a teardown never fails a passing test.
  *
  * @param api a Playwright request context bound to the app base URL
  * @param token an admin JWT
- * @param ids the member ids to delete
+ * @param ids the user ids to delete
  */
 export async function deleteUsers(api: APIRequestContext, token: string, ids: string[]): Promise<void> {
   for (const id of ids) {

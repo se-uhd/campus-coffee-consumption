@@ -68,7 +68,7 @@ import { UserDto } from '../../models';
             [users]="users()"
             [selectedId]="selectedId()"
             [ownUserId]="selection.ownUserId"
-            (selectionChange)="onMemberChange($event)"
+            (selectionChange)="onUserChange($event)"
           ></cc-user-select>
         </mat-card>
       }
@@ -330,13 +330,13 @@ export class ProfileComponent implements OnInit {
    * undoes the switch). The `queryParamMap` subscription then mirrors it into the shared selection and
    * reloads the profile; the URL stays the source of truth.
    *
-   * @param memberId the user id picked in the selector
+   * @param userId the user id picked in the selector
    */
-  async onMemberChange(memberId: string): Promise<void> {
-    this.selectedId.set(memberId);
+  async onUserChange(userId: string): Promise<void> {
+    this.selectedId.set(userId);
     await this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { user: memberId },
+      queryParams: { user: userId },
       queryParamsHandling: 'merge'
     });
   }
@@ -347,10 +347,10 @@ export class ProfileComponent implements OnInit {
    * same param does not reload. `loadedId` (the user actually loaded) is the guard, not the bound
    * `selectedId` (which the dropdown already advanced before navigating).
    *
-   * @param memberId the value of the `user` query param, or null when it is absent
+   * @param userId the value of the `user` query param, or null when it is absent
    */
-  private async applySelectionFromUrl(memberId: string | null): Promise<void> {
-    const effective = this.selection.selectFromParam(memberId);
+  private async applySelectionFromUrl(userId: string | null): Promise<void> {
+    const effective = this.selection.selectFromParam(userId);
     if (effective === this.loadedId) {
       this.selectedId.set(effective);
       return;

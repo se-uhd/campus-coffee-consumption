@@ -48,11 +48,11 @@ export class AdminSelectionService {
    * account. Returns the effective selection so a page can load it. The URL stays authoritative: a page
    * subscribes to its `user` param and calls this, rather than mutating the selection directly.
    *
-   * @param memberId the value of the `user` query param, or null when it is absent
+   * @param userId the value of the `user` query param, or null when it is absent
    * @returns the effective selected user id (the param, or the admin's own account as the default)
    */
-  selectFromParam(memberId: string | null): string {
-    const effective = memberId || this.ownId;
+  selectFromParam(userId: string | null): string {
+    const effective = userId || this.ownId;
     this.selectedUserId.set(effective);
     return effective;
   }

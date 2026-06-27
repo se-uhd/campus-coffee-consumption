@@ -153,11 +153,15 @@ import { Role, UserDto } from '../../models';
                   name="password"
                   #passwordModel="ngModel"
                   [(ngModel)]="draft.password"
-                  minlength="8"
+                  minlength="24"
+                  pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).*"
                   required
                 />
                 @if (passwordModel.invalid && passwordModel.touched) {
-                  <mat-error>At least 8 characters.</mat-error>
+                  <mat-error
+                    >At least 24 characters, with a lowercase letter, an uppercase letter, and a
+                    digit.</mat-error
+                  >
                 }
               </mat-form-field>
             }
@@ -487,7 +491,8 @@ export class AdminUsersComponent {
     try {
       const role: Role = this.draft.role ?? 'USER';
       // a regular user authenticates with their capability link and has no password; only an admin sends one
-      // (the backend rejects a non-admin password, and `@Size(min=8)` would reject an empty one)
+      // (the backend rejects a non-admin password; an admin password must be at least 24 characters with a
+      // lowercase letter, an uppercase letter, and a digit)
       const { password, ...rest } = this.draft;
       const payload: UserDto = role === 'ADMIN' ? { ...rest, role, password } : { ...rest, role };
       const created = await this.userService.create(payload);

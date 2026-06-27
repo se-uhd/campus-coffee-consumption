@@ -3,8 +3,8 @@ import { ADMIN, loginAsAdmin } from './helpers';
 
 /**
  * Authentication and routing: an unauthenticated visit to the root redirects to the login page, and a
- * successful admin sign-in lands on the admin dashboard (the selected-member view, mirroring the member
- * landing; the members overview table lives on `/admin/users`).
+ * successful admin sign-in lands on the admin dashboard (the selected-user view, mirroring the user
+ * landing; the users overview table lives on `/admin/users`).
  */
 test.describe('auth and routing', () => {
   test('an unauthenticated visit to / redirects to the login page', async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe('auth and routing', () => {
     await expect(page.getByLabel('Password')).toBeVisible();
   });
 
-  test('signing in as jane_doe lands on the admin dashboard with the selected-member view', async ({
+  test('signing in as jane_doe lands on the admin dashboard with the selected-user view', async ({
     page
   }) => {
     await page.goto('/admin/login');
@@ -24,7 +24,7 @@ test.describe('auth and routing', () => {
     await page.getByRole('button', { name: 'Sign in' }).click();
 
     await expect(page).toHaveURL(/\/admin$/);
-    // the landing mirrors the member page: a member selector, the big count, and the recent-activity block
+    // the landing mirrors the user page: a user selector, the big count, and the recent-activity block
     await expect(page.getByRole('combobox', { name: 'User' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent activity' })).toBeVisible();
     await expect(page.getByText('Personal balance')).toBeVisible();

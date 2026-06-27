@@ -28,11 +28,11 @@ class ActivityServiceTest {
 
     private val service = ActivityServiceImpl(activityDataService, userDataService)
 
-    private val memberId: UUID = UUID(0L, 1L)
+    private val userId: UUID = UUID(0L, 1L)
 
-    private val member =
+    private val user =
         User(
-            id = memberId,
+            id = userId,
             loginName = "max",
             emailAddress = "max@se.de",
             firstName = "Max",
@@ -83,13 +83,13 @@ class ActivityServiceTest {
 
     @Test
     fun `userActivity returns the newest-first page for an admin`() {
-        whenever(userDataService.getById(memberId)).thenReturn(member)
-        whenever(activityDataService.userActivity(memberId, "max"))
+        whenever(userDataService.getById(userId)).thenReturn(user)
+        whenever(activityDataService.userActivity(userId, "max"))
             .thenReturn(
                 listOf(entry(ActivityEntryType.CONSUMPTION, -50, -50), entry(ActivityEntryType.DEPOSIT, 100, 50))
             )
 
-        val page = service.userActivity(memberId, 10, 0, admin)
+        val page = service.userActivity(userId, 10, 0, admin)
 
         // newest first: the deposit, then the consumption
         assertThat(page.map { it.type }).containsExactly(ActivityEntryType.DEPOSIT, ActivityEntryType.CONSUMPTION)
@@ -97,21 +97,21 @@ class ActivityServiceTest {
 
     @Test
     fun `userActivity by a non-owner non-admin throws ForbiddenException`() {
-        val stranger = member.copy(id = UUID(0L, 7L), loginName = "other")
-        whenever(userDataService.getById(memberId)).thenReturn(member)
+        val stranger = user.copy(id = UUID(0L, 7L), loginName = "other")
+        whenever(userDataService.getById(userId)).thenReturn(user)
 
-        assertThrows<ForbiddenException> { service.userActivity(memberId, 10, 0, stranger) }
+        assertThrows<ForbiddenException> { service.userActivity(userId, 10, 0, stranger) }
     }
 
     @Test
-    fun `a member's activity reflects only the private portion of a split expense and never the kitty portion`() {
+    fun `a user's activity reflects only the private portion of a split expense and never the kitty portion`() {
         // the user activity the data service projects for a split bean purchase carries only the buyer's
         // private credit (PRIVATE_EXPENSE); the kitty-funded portion must never appear in the user view.
         val privateOnly = entry(ActivityEntryType.PRIVATE_EXPENSE, 400, 400)
-        whenever(userDataService.getById(memberId)).thenReturn(member)
-        whenever(activityDataService.userActivity(memberId, "max")).thenReturn(listOf(privateOnly))
+        whenever(userDataService.getById(userId)).thenReturn(user)
+        whenever(activityDataService.userActivity(userId, "max")).thenReturn(listOf(privateOnly))
 
-        val page = service.userActivity(memberId, 10, 0, admin)
+        val page = service.userActivity(userId, 10, 0, admin)
 
         assertThat(page).singleElement()
         assertThat(page.first().type).isEqualTo(ActivityEntryType.PRIVATE_EXPENSE)
@@ -123,10 +123,10 @@ class ActivityServiceTest {
     @Test
     fun `userActivity clamps a negative offset to zero and a limit above the cap to the maximum`() {
         val full = (1..120).map { entry(ActivityEntryType.CONSUMPTION, -50, -50L * it) }
-        whenever(userDataService.getById(memberId)).thenReturn(member)
-        whenever(activityDataService.userActivity(memberId, "max")).thenReturn(full)
+        whenever(userDataService.getById(userId)).thenReturn(user)
+        whenever(activityDataService.userActivity(userId, "max")).thenReturn(full)
 
-        val page = service.userActivity(memberId, limit = 1_000, offset = -10, actingUser = admin)
+        val page = service.userActivity(userId, limit = 1_000, offset = -10, actingUser = admin)
 
         // the limit is capped at the page maximum (100); a negative offset clamps to 0, so the page starts newest
         assertThat(page).hasSize(100)
@@ -136,15 +136,15 @@ class ActivityServiceTest {
     @Test
     fun `userActivity returns an empty page for an offset beyond the end of the activity`() {
         val full = listOf(entry(ActivityEntryType.CONSUMPTION, -50, -50))
-        whenever(userDataService.getById(memberId)).thenReturn(member)
-        whenever(activityDataService.userActivity(memberId, "max")).thenReturn(full)
+        whenever(userDataService.getById(userId)).thenReturn(user)
+        whenever(activityDataService.userActivity(userId, "max")).thenReturn(full)
 
-        assertThat(service.userActivity(memberId, limit = 10, offset = 5, actingUser = admin)).isEmpty()
+        assertThat(service.userActivity(userId, limit = 10, offset = 5, actingUser = admin)).isEmpty()
     }
 
     @Test
     fun `kittyHistory by a non-admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.kittyHistory(10, 0, member) }
+        assertThrows<ForbiddenException> { service.kittyHistory(10, 0, user) }
     }
 
     @Test
@@ -157,34 +157,34 @@ class ActivityServiceTest {
 
     @Test
     fun `globalActivity by a non-admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.globalActivity(10, 0, member) }
+        assertThrows<ForbiddenException> { service.globalActivity(10, 0, user) }
     }
 
     @Test
     fun `globalActivity enriches the subject name and labels a hard-deleted subject`() {
         val orphanId = UUID(0L, 2L)
-        whenever(userDataService.getAll()).thenReturn(listOf(member))
+        whenever(userDataService.getAll()).thenReturn(listOf(user))
         whenever(activityDataService.globalActivity())
-            .thenReturn(listOf(globalEntry(memberId), globalEntry(orphanId)))
+            .thenReturn(listOf(globalEntry(userId), globalEntry(orphanId)))
 
         val page = service.globalActivity(10, 0, admin)
 
         // a resolvable subject gets the user's display name; an unresolvable one (a hard-deleted user
         // whose events outlive their user row) is labeled rather than left blank or 500ing
-        assertThat(page.first { it.subjectUserId == memberId }.subjectName).isEqualTo("Max Mustermann")
+        assertThat(page.first { it.subjectUserId == userId }.subjectName).isEqualTo("Max Mustermann")
         assertThat(page.first { it.subjectUserId == orphanId }.subjectName).isEqualTo("(deleted user)")
     }
 
     @Test
     fun `globalActivityForExport by a non-admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.globalActivityForExport(member) }
+        assertThrows<ForbiddenException> { service.globalActivityForExport(user) }
     }
 
     @Test
     fun `globalActivityForExport returns the whole feed newest-first and unpaged`() {
         // more than one page worth of entries: the export must return all of them, not clamp to the page cap
-        val full = (1..150).map { globalEntry(memberId) }
-        whenever(userDataService.getAll()).thenReturn(listOf(member))
+        val full = (1..150).map { globalEntry(userId) }
+        whenever(userDataService.getAll()).thenReturn(listOf(user))
         whenever(activityDataService.globalActivity()).thenReturn(full)
 
         assertThat(service.globalActivityForExport(admin)).hasSize(150)

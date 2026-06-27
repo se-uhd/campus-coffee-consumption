@@ -8,7 +8,7 @@ import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
-import de.seuhd.campuscoffee.tests.SystemTestUtils.withMember
+import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
@@ -24,11 +24,11 @@ import org.springframework.test.web.servlet.client.returnResult
 class CucumberAccountingSteps(
     private val userService: UserService
 ) {
-    private lateinit var member: String
+    private lateinit var user: String
 
-    @Given("the coffee member {string}")
-    fun theCoffeeMember(loginName: String) {
-        member = loginName
+    @Given("the coffee user {string}")
+    fun theCoffeeUser(loginName: String) {
+        user = loginName
     }
 
     @Given("an admin sets the price to {int} cents")
@@ -43,31 +43,31 @@ class CucumberAccountingSteps(
             .returnResult<ByteArray>()
     }
 
-    @When("the member drinks a coffee")
-    fun theMemberDrinksACoffee() {
+    @When("the user drinks a coffee")
+    fun theUserDrinksACoffee() {
         client()
             .post()
             .uri("/api/consumption")
-            .withMember(member)
+            .withUser(user)
             .exchange()
             .returnResult<ByteArray>()
     }
 
-    @When("the member buys beans for {int} cents")
-    fun theMemberBuysBeansFor(amountCents: Int) {
+    @When("the user buys beans for {int} cents")
+    fun theUserBuysBeansFor(amountCents: Int) {
         client()
             .post()
             .uri("/api/expenses")
             .contentType(MediaType.APPLICATION_JSON)
             .body(mapOf("weightGrams" to 1000, "amountCents" to amountCents))
-            .withMember(member)
+            .withUser(user)
             .exchange()
             .returnResult<ByteArray>()
     }
 
-    @When("an admin records a {int} cent deposit for the member")
+    @When("an admin records a {int} cent deposit for the user")
     fun anAdminRecordsADeposit(amountCents: Int) {
-        val id = userService.getByLoginName(member).id!!
+        val id = userService.getByLoginName(user).id!!
         client()
             .post()
             .uri("/api/kitty/deposit")
@@ -78,22 +78,22 @@ class CucumberAccountingSteps(
             .returnResult<ByteArray>()
     }
 
-    @Then("the member's balance is {int} cents")
-    fun theMembersBalanceIs(balanceCents: Int) {
+    @Then("the user's balance is {int} cents")
+    fun theUsersBalanceIs(balanceCents: Int) {
         val summary =
             client()
                 .get()
                 .uri("/api/summary")
                 .accept(MediaType.APPLICATION_JSON)
-                .withMember(member)
+                .withUser(user)
                 .exchange()
                 .returnResult<UserSummaryDto>()
                 .responseBody!!
         assertThat(summary.balanceCents).isEqualTo(balanceCents.toLong())
     }
 
-    @Then("the global activity feed shows a {word} entry for the member")
-    fun theGlobalFeedShowsAnEntryForTheMember(type: String) {
+    @Then("the global activity feed shows a {word} entry for the user")
+    fun theGlobalFeedShowsAnEntryForTheUser(type: String) {
         val entries =
             client()
                 .get()
@@ -104,10 +104,10 @@ class CucumberAccountingSteps(
                 .returnResult<Array<GlobalActivityEntryDto>>()
                 .responseBody!!
         assertThat(entries)
-            .anyMatch { it.type == ActivityEntryType.valueOf(type) && it.subjectLogin == member }
+            .anyMatch { it.type == ActivityEntryType.valueOf(type) && it.subjectLogin == user }
     }
 
-    @Then("the activity CSV downloads with a UTF-8 BOM listing the member")
+    @Then("the activity CSV downloads with a UTF-8 BOM listing the user")
     fun theActivityCsvDownloads() {
         val result =
             client()
@@ -119,6 +119,6 @@ class CucumberAccountingSteps(
         assertThat(result.status.value()).isEqualTo(200)
         val bytes = result.responseBody!!
         assertThat(bytes.copyOfRange(0, 3)).isEqualTo(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
-        assertThat(bytes.decodeToString()).contains(member)
+        assertThat(bytes.decodeToString()).contains(user)
     }
 }

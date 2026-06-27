@@ -46,12 +46,12 @@ From `application/src/test/kotlin/de/seuhd/campuscoffee/tests/architecture/Archi
 The domain defines **port interfaces** that adapters implement:
 
 - **API Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/api/`): Generic service interface `CrudService<DOMAIN, ID>` and the concrete service interfaces `UserService`, `CoffeeConsumptionService`, `CoffeePriceService`, `ExpenseService`, `PaymentService`, `AccountingService` (the read-side money **numbers**: a user's summary, the kitty balance, and the per-user overview), and `ActivityService` (the read-side chronological **feeds**: a user's unified activity, the kitty history, and the admin global activity across everyone plus its CSV export). The two mirror the data-layer split (`ActivityDataService` for feeds beside `BalanceDataService` for the scalar balances).
-- **Data Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/data/`): Generic data service interface `CrudDataService<DOMAIN, ID>`, the concrete `UserDataService`, `CoffeeConsumptionDataService` (the latter adds `getByUserId`), `CoffeePriceDataService`, `ExpenseDataService`, and `PaymentDataService`, the event-log-backed `ConsumptionHistoryDataService` and `ActivityDataService` (one shared `ActivityWalk` over the log with three views: a user's unified activity, the kitty history, and `globalActivity` across everyone), the `BalanceDataService` port (reads the maintained `user_balance`/`kitty_balance` projections, implemented by `BalanceDataServiceImpl`), the `BalanceLockService` port (two Postgres advisory locks, `lockKitty()` serializing the kitty-overdraw check and `lockUser(userId)` serializing a user's balance recompute, implemented by `BalanceLockServiceImpl`), and the `PasswordHasherService` port.
-- **SPI / infrastructure ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/system/`): `IdGeneratorService`, `CapabilityTokenGeneratorService`, `QrCodeService` (the single QR port: a high-resolution PNG **and** the printable PDF grid), `StartupTaskService`, and the request-scoped `ActorProviderService`. The change-note metadata holder is a concrete class, not a port: `ChangeNoteContext` lives in `domain/.../model/`.
+- **Data Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/data/`): Generic data service interface `CrudDataService<DOMAIN, ID>`, the concrete `UserDataService`, `CoffeeConsumptionDataService` (the latter adds `getByUserId`), `CoffeePriceDataService`, `ExpenseDataService`, and `PaymentDataService`, the event-log-backed `ConsumptionHistoryDataService` and `ActivityDataService` (one shared `EventReducer` over the log with three views: a user's unified activity, the kitty history, and `globalActivity` across everyone), the `BalanceDataService` port (reads the maintained `user_balance`/`kitty_balance` projections, implemented by `BalanceDataServiceImpl`), the `BalanceLockService` port (two Postgres advisory locks, `lockKitty()` serializing the kitty-overdraw check and `lockUser(userId)` serializing a user's balance recompute, implemented by `BalanceLockServiceImpl`), and the `PasswordHasherService` port.
+- **SPI / infrastructure ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/system/`): `IdGeneratorService`, `CapabilityTokenGeneratorService`, `QrCodeService` (the single QR port: a high-resolution PNG **and** the printable PDF grid), `StartupTaskService`, and the request-scoped `ActorProviderService`. Concrete classes are not ports and live in `domain/.../model/`: `ChangeNoteContext` (the change-note metadata holder) and `LabeledQrCode` (a QR-grid cell, `QrCodeService`'s parameter type).
 
 Service **implementations**:
 - API services in `domain/src/main/kotlin/de/seuhd/campuscoffee/domain/implementation/` (`UserServiceImpl`, `CoffeeConsumptionServiceImpl`, `CoffeePriceServiceImpl`, `ExpenseServiceImpl`, `PaymentServiceImpl`, `AccountingServiceImpl`).
-- Data services (`*DataServiceImpl`) in `data/.../implementations/`; the technology adapters (`QrCodeServiceImpl`, `PasswordHasherServiceImpl`, `CapabilityTokenGeneratorServiceImpl`, `IdGeneratorServiceImpl`) in `data/.../adapters/`; the Postgres advisory-lock `BalanceLockServiceImpl`, the event-sourcing decorators, the activity walk, and `BalanceDataServiceImpl` in `data/.../persistence/` (and its `eventsourcing/` sub-package).
+- Data services (`*DataServiceImpl`, including the read-side `ActivityDataServiceImpl`/`ConsumptionHistoryDataServiceImpl`) and the event-sourced decorators (`EventSourced*DataService`) in `data/.../implementations/`; the technology adapters (`QrCodeServiceImpl`, `PasswordHasherServiceImpl`, `CapabilityTokenGeneratorServiceImpl`, `IdGeneratorServiceImpl`) in `data/.../system/`; the Postgres advisory-lock `BalanceLockServiceImpl`, the `ConstraintMapping`, and the event-body jsonb serialization (`EventJsonMapper` with the `EventSourcingHibernateConfiguration` that pins it onto Hibernate) in `data/.../persistence/`; the event-log write support (`EventAppender`, `ReadModelProjector`, `EventSourcedWriter`, `EventsToDataRunner`) in `data/.../persistence/events/`; and the read-model projection (`BalanceDataServiceImpl` behind the `BalanceProjectionMaintainer` interface, plus the `EventReducer` and its `EventProjection`/`EventProjectionType`/`PricePoint`/`EventReducerUtil`) in `data/.../persistence/projection/`. The event-row discriminators `ChangeType` and `LoggedEntityType` live beside `EventEntity` in `data/.../persistence/entities/`.
 
 ### Naming and File Conventions
 
@@ -60,12 +60,13 @@ Follow these in new code (enforced by review):
 - **A cross-module interface is a port, named `*Service` (or `*DataService` for a data-layer port), and its implementation is `<Port>Impl`.** "Cross-module" means the interface is defined in one module and *implemented or consumed in another*: the domain API services are consumed by `api` (`UserService`/`UserServiceImpl`); the domain data ports are implemented by `data` (`UserDataService`/`UserDataServiceImpl`); the SPI ports are implemented by `data` (`QrCodeService`/`QrCodeServiceImpl`, `IdGeneratorService`/`IdGeneratorServiceImpl`). An interface defined, implemented, **and** used entirely within one module is free-named.
 - **An implementation name never leaks a library or vendor.** A single-impl port's adapter is `<Port>Impl`, never `ZxingQrCodeService` / `PostgresBalanceLock` / `BCryptPasswordHasher`. When a port genuinely has several implementations, name them by behavior/role, not the library: the `EventSourced*` decorators that wrap the relational `*DataServiceImpl`, and the `StartupTaskService` loaders.
 - **A concrete class is not a port:** it keeps a plain descriptive name and stays out of `ports/` (e.g. `ChangeNoteContext`, a request-scoped holder, lives in `domain/.../model/`).
-- **Utility helpers are `*Util`:** a file (or class) of pure, stateless functions with no injected dependencies (`ReadUtil`, `ActivityWalkUtil`). This differs from a package of injected collaborator beans (the controllers' `api/support` package): those are wired `@Component`s, not free functions, so they are not `*Util`.
+- **Utility helpers are `*Util`:** a file (or class) of pure, stateless functions with no injected dependencies (`ReadUtil`, `EventReducerUtil`). This differs from a package of injected collaborator beans (the controllers' `api/support` package): those are wired `@Component`s, not free functions, so they are not `*Util`.
 - **Database entities are `*Entity`** (`UserEntity`, `EventEntity`).
-- **One top-level type per file.** Each file holds one class / interface / object / enum. Related top-level functions, constants, and extension functions may sit beside the single type they support (`WalkedRecord.kt` carries its mapper functions; `ReadUtil.kt` is functions only, no type). The only multi-type exception is a tightly-bound sealed hierarchy.
+- **One top-level type per file.** Each file holds one class / interface / object / enum. Related top-level functions, constants, and extension functions may sit beside the single type they support (`EventProjection.kt` carries its mapper functions; `ReadUtil.kt` is functions only, no type). The only multi-type exception is a tightly-bound sealed hierarchy.
 - **Frontend Angular services are `*Service`** (`AdminUserService`, `AdminSelectionService`), including the stateful signal-holding singletons. No `*Store` (an NgRx idiom this app does not use).
+- **Depend on the port, never the implementation.** Production code injects and references the interface/port, not a `*Impl`; the ArchUnit test `production code depends on ports, never on Impl types` enforces it. The sole exception is the `EventSourced*` decorators: each must inject the concrete relational `*DataServiceImpl` it wraps, because injecting the port would resolve to the `@Primary` decorator itself and self-loop. When a collaborator has no port yet (e.g. a data-internal projection-maintenance operation), introduce a small interface for it (`BalanceProjectionMaintainer`) rather than depending on the class.
 
-Package layout reflecting the above: `domain/ports/{api,data,system}/`; `data/{implementations (only `*DataServiceImpl`), adapters (technology adapters), persistence (entities, repositories, eventsourcing, the advisory-lock impl)}`; `api/{app (the SPA-forwarding controller), support (controller-delegate helper beans), controller, dtos, mapper, security, openapi, configuration, exceptions}`.
+Package layout reflecting the above: `domain/ports/{api,data,system}/`; `data/{implementations (the `*DataServiceImpl` and the event-sourced decorators), system (technology adapters), persistence (entities incl. the `ChangeType`/`LoggedEntityType` discriminators, repositories, events (the event-log write support), projection (the balance projection + the `EventReducer`), the advisory-lock impl, `ConstraintMapping`)}`; `api/{app (the SPA-forwarding controller), support (controller-delegate helper beans), controller, dtos, mapper, security, openapi, configuration, exceptions}`.
 
 ### Event Sourcing Is the Only Persistence Model
 
@@ -73,10 +74,10 @@ CampusCoffee shipped a configurable relational/event sourcing toggle; this app d
 **event sourcing as the sole persistence model**. An append-only **event log** (the `events` table) is the
 source of truth, and the relational tables are a **read model** projected from it:
 
-- The event-sourced **decorators** in `data/.../persistence/eventsourcing/`
+- The event-sourced **decorators** in `data/.../implementations/`
   (`EventSourcedUserDataService`, `EventSourcedCoffeeConsumptionDataService`) wrap the plain relational
   `*DataServiceImpl` (`: …DataService by delegate`, so the read and query methods auto-delegate) and are
-  `@Primary`, so the domain binds to them. Each write request appends one full-state event (`EventStore`)
+  `@Primary`, so the domain binds to them. Each write request appends one full-state event (`EventAppender`)
   and projects it into the tables (`ReadModelProjector`) in one transaction, so a constraint violation
   rolls both back and the log never holds an invalid event.
 - `EventSourcedWriter.upsert(domain, getById, buildForInsert, buildForUpdate)` is the shared event-first
@@ -90,7 +91,7 @@ Two additions versus CampusCoffee's event machinery:
 1. **`created_by` and `note` metadata on the generic event.** `events` and `EventEntity` carry a
    `created_by` (the actor's **login name** as a string: a user via their token, an admin, or `"system"`
    for startup fixtures/bootstrap) and a nullable `note` (the free-text note associated with the event). Both
-   are set at the single `EventStore.append*` boundary from the request-scoped `ActorProviderService` (reads the
+   are set at the single `EventAppender.append*` boundary from the request-scoped `ActorProviderService` (reads the
    `SecurityContext`) and the note source. The note is unified at that boundary: it is the admin's
    count-correction reason when present (from `ChangeNoteContext`, the thread-local the coffee-consumption
    service sets only around the count correction, the one operation that takes a reason with no entity field
@@ -176,7 +177,8 @@ for the consumption (`entity_type = 'CoffeeConsumption'` and `body ->> 'id' = :c
 carries the `count` at that time; the event row carries `created_at`, `created_by`, and `note`; each
 entry's `delta` is the difference from the previous event.
 
-The **unified activity feed** is the same idea, broadened. `ActivityDataService` (in the event-sourcing package)
+The **unified activity feed** is the same idea, broadened. `ActivityDataService` (implemented by
+`ActivityDataServiceImpl` in `data/.../implementations/`, over the event-log walk in `persistence/projection/`)
 walks the log with no activity table: a user's activity is one ascending `seq` pass over their three streams
 (consumptions, the expenses they bought, and the deposits they paid), keyed on the owning user id in each
 body (`userId` for consumptions and payments, `buyerUserId` for expenses), each entry carrying a signed
@@ -189,7 +191,7 @@ expression indexes (`body->>'userId'`, `body->>'buyerUserId'`) keep those scans 
 The activity and kitty **lists** are read by walking the log (the per-entry running balances are intrinsic to
 that walk), but the **balance numbers** that used to force a whole-stream replay on hot reads are served from
 two maintained projections instead (`user_balance`, `kitty_balance`; the `BalanceDataService` port,
-implemented by `BalanceDataServiceImpl` in the event-sourcing package). They are kept consistent by recomputing the
+implemented by `BalanceDataServiceImpl` in `data/.../persistence/projection/`). They are kept consistent by recomputing the
 affected user (and the kitty) from the same walk inside each money write's transaction, so a stored balance
 cannot drift from the authoritative walk, and they roll back with the write. So the per-user overview and
 the kitty-overdraw guard read one indexed row rather than replaying a stream, and the events-to-data rebuild
@@ -907,7 +909,7 @@ Custom OpenAPI annotations in `api/.../openapi/`: `@CrudOperation` for common CR
 ### Constraint Violations
 
 Database uniqueness constraints are converted to `DuplicationException` via `ConstraintMapping` in
-`data/.../constraints/`, declared in each data-service impl (login name, email, capability token, and the
+`data/.../persistence/`, declared in each data-service impl (login name, email, capability token, and the
 one-per-user consumption constraint). An entity with no database-unique key (`CoffeePrice`, `Expense`,
 `Payment`) declares `emptySet()`. The constraint name is the single source of truth shared between the
 entity companion constant, the `ConstraintMapping`, and the Flyway DDL. In event sourcing mode the

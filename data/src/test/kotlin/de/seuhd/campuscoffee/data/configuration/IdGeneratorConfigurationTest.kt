@@ -1,6 +1,6 @@
 package de.seuhd.campuscoffee.data.configuration
 
-import de.seuhd.campuscoffee.data.adapters.IdGeneratorServiceImpl
+import de.seuhd.campuscoffee.data.system.IdGeneratorServiceImpl
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.util.UUID
@@ -49,7 +49,7 @@ class IdGeneratorConfigurationTest {
     }
 
     @Test
-    fun `seed 42 produces the ids documented for the seeded fixture members`() {
+    fun `seed 42 produces the ids documented for the seeded fixture users`() {
         // the fixture users are loaded in a fixed order (jane_doe first, student2023 third), so the
         // seeded generator assigns them these documented ids; a change here means the docs must be updated
         val idGenerator = IdGeneratorServiceImpl(42L)

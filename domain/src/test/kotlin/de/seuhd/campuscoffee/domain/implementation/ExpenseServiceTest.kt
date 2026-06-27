@@ -33,12 +33,12 @@ class ExpenseServiceTest {
     private val balanceLock: BalanceLockService = mock()
     private val service = ExpenseServiceImpl(expenseDataService, userDataService, balanceDataService, balanceLock)
 
-    private val memberId: UUID = UUID(0L, 1L)
+    private val userId: UUID = UUID(0L, 1L)
     private val buyerId: UUID = UUID(0L, 2L)
 
-    private val member =
+    private val user =
         User(
-            id = memberId,
+            id = userId,
             loginName = "max",
             emailAddress = "max@se.de",
             firstName = "Max",
@@ -56,27 +56,27 @@ class ExpenseServiceTest {
             role = Role.ADMIN,
             active = true
         )
-    private val buyer = member.copy(id = buyerId, loginName = "buyer")
+    private val buyer = user.copy(id = buyerId, loginName = "buyer")
 
     @Test
-    fun `recordOwn books the member's purchase fully private to themselves`() {
+    fun `recordOwn books the user's purchase fully private to themselves`() {
         whenever(expenseDataService.upsert(any())).thenAnswer { it.arguments[0] as Expense }
 
-        val expense = service.recordOwn(weightGrams = 1000, amountCents = 900, note = "beans", actingUser = member)
+        val expense = service.recordOwn(weightGrams = 1000, amountCents = 900, note = "beans", actingUser = user)
 
-        assertThat(expense.buyer).isEqualTo(member)
+        assertThat(expense.buyer).isEqualTo(user)
         assertThat(expense.privateAmountCents).isEqualTo(900)
         assertThat(expense.kittyAmountCents).isEqualTo(0)
     }
 
     @Test
-    fun `recordOwn by a deactivated member throws ForbiddenException`() {
+    fun `recordOwn by a deactivated user throws ForbiddenException`() {
         assertThrows<ForbiddenException> {
             service.recordOwn(
                 weightGrams = 1000,
                 amountCents = 900,
                 note = null,
-                actingUser = member.copy(active = false)
+                actingUser = user.copy(active = false)
             )
         }
         verify(expenseDataService, never()).upsert(any())
@@ -85,7 +85,7 @@ class ExpenseServiceTest {
     @Test
     fun `recordOwn with a negative amount throws ValidationException`() {
         assertThrows<ValidationException> {
-            service.recordOwn(weightGrams = 1000, amountCents = -1, note = null, actingUser = member)
+            service.recordOwn(weightGrams = 1000, amountCents = -1, note = null, actingUser = user)
         }
         verify(expenseDataService, never()).upsert(any())
     }
@@ -140,7 +140,7 @@ class ExpenseServiceTest {
                 privateAmountCents = 400,
                 kittyAmountCents = 500,
                 note = null,
-                actingUser = member
+                actingUser = user
             )
         }
         verify(expenseDataService, never()).upsert(any())
@@ -180,7 +180,7 @@ class ExpenseServiceTest {
 
     @Test
     fun `delete by a non-admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.delete(UUID(0L, 5L), member) }
+        assertThrows<ForbiddenException> { service.delete(UUID(0L, 5L), user) }
         verify(expenseDataService, never()).delete(any())
     }
 
@@ -234,7 +234,7 @@ class ExpenseServiceTest {
             service.update(
                 expenseId = expenseId,
                 // a different buyer than the existing expense's buyer
-                buyerUserId = memberId,
+                buyerUserId = userId,
                 weightGrams = 1000,
                 amountCents = 900,
                 privateAmountCents = 400,
@@ -334,7 +334,7 @@ class ExpenseServiceTest {
 
     @Test
     fun `listByBuyer by a non-admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.listByBuyer(buyerId, member) }
+        assertThrows<ForbiddenException> { service.listByBuyer(buyerId, user) }
         verify(expenseDataService, never()).getAllByBuyer(any())
     }
 
