@@ -25,7 +25,7 @@ import java.util.UUID
 /**
  * System tests for the activity and kitty projections under correction and deletion: an admin correcting and
  * deleting an expense, a deposit and a kitty adjustment, and an admin count override. These exercise the
- * UPDATE/DELETE and admin-override branches of the member-activity and kitty-history walks.
+ * UPDATE/DELETE and admin-override branches of the user-activity and kitty-history walks.
  */
 class AccountingActivitySystemTests : AbstractSystemTest() {
     private val member = "maxmustermann"
@@ -52,8 +52,8 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
         .exchange()
 
     // Funds the kitty with an admin adjustment so a later kitty-funded admin expense does not drive the
-    // kitty balance below zero (the guard rejects that with 409). A pure kitty adjustment has no member,
-    // so it never touches a member balance.
+    // kitty balance below zero (the guard rejects that with 409). A pure kitty adjustment has no user,
+    // so it never touches a user balance.
     private fun fundKitty(amountCents: Int) =
         client()
             .post()
@@ -192,7 +192,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
             ).withAdmin()
             .exchange()
 
-        // the member's balance reflects the corrected private portion (the full state, not a double count)
+        // the user's balance reflects the corrected private portion (the full state, not a double count)
         assertThat(userSummary().balanceCents).isEqualTo(700)
         // the kitty reflects the corrected kitty portion (1000 float - 300, not - 500)
         assertThat(kitty().balanceCents).isEqualTo(700)
@@ -221,8 +221,8 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
                 .statusCode()
         assertThat(deleteStatus).isEqualTo(204)
 
-        // the DELETE event carries the buyer id, so both the member activity and the kitty reverse it:
-        // the member balance returns to 0 and the kitty returns to the float (1000)
+        // the DELETE event carries the buyer id, so both the user activity and the kitty reverse it:
+        // the user balance returns to 0 and the kitty returns to the float (1000)
         assertThat(userSummary().balanceCents).isEqualTo(0)
         assertThat(kitty().balanceCents).isEqualTo(1000)
     }
@@ -283,10 +283,10 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
     @Test
     fun `a member buys then an admin attributes a split purchase building the full activity`() {
         // fund the kitty so the admin split purchase's kitty-funded portion (500) stays non-negative;
-        // a pure kitty adjustment has no member, so the member balance assertion below is unaffected
+        // a pure kitty adjustment has no user, so the user balance assertion below is unaffected
         fundKitty(1000)
 
-        // a member's own purchase (100% private), an admin split purchase, a coffee, and a deposit
+        // a user's own purchase (100% private), an admin split purchase, a coffee, and a deposit
         client()
             .post()
             .uri("/api/expenses")
@@ -322,7 +322,7 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
     fun `an admin sees the kitty split on a member's expense but the member's own activity does not`() {
         // fund the kitty so the split purchase's kitty-funded portion (500) stays non-negative
         fundKitty(1000)
-        // an admin records a split bean purchase on the member: 900 = 400 private + 500 kitty
+        // an admin records a split bean purchase on the user: 900 = 400 private + 500 kitty
         adminExpense(amountCents = 900, privateAmountCents = 400, kittyAmountCents = 500)
 
         // the admin-by-id activity breaks the split out: the private portion is the balance effect, and both
@@ -339,14 +339,14 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
         assertThat(kittyEntry.privateAmountCents).isEqualTo(400)
         assertThat(kittyEntry.kittyAmountCents).isEqualTo(500)
 
-        // the SAME member's own activity never exposes the kitty split (it is admin-only): the entry is still
+        // the SAME user's own activity never exposes the kitty split (it is admin-only): the entry is still
         // there with the private amount, but both split portions are null
         val ownEntry = ownUserActivity().first { it.type == ActivityEntryType.PRIVATE_EXPENSE }
         assertThat(ownEntry.amountCents).isEqualTo(400)
         assertThat(ownEntry.privateAmountCents).isNull()
         assertThat(ownEntry.kittyAmountCents).isNull()
 
-        // and the member's summary activity (the landing-page view) likewise strips it
+        // and the user's summary activity (the landing-page view) likewise strips it
         val summaryEntry = userSummary().activity.first { it.type == ActivityEntryType.PRIVATE_EXPENSE }
         assertThat(summaryEntry.privateAmountCents).isNull()
         assertThat(summaryEntry.kittyAmountCents).isNull()

@@ -23,7 +23,7 @@ import java.time.LocalDateTime
  * updatedAt and no optimistic locking version.
  *
  * Two metadata columns sit alongside the body rather than inside it: [createdBy] (the actor's login name,
- * a member, an admin, or `"SYSTEM"`) makes a member's changes retrievable and displayable without parsing
+ * a user, an admin, or `"SYSTEM"`) makes a user's changes retrievable and displayable without parsing
  * the JSON, and [note] holds an admin's optional reason for a count override, a deposit, or a kitty
  * adjustment.
  */

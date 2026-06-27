@@ -3,7 +3,7 @@ import { MatCardModule } from '@angular/material/card';
 import { EurosPipe } from '../../pipes/euros.pipe';
 
 /**
- * A shared, presentational summary block reused by the member and admin landing pages so the top looks
+ * A shared, presentational summary block reused by the user and admin landing pages so the top looks
  * identical for both: a big coffee count with the per-cup price, then the balance and the kitty as signed /
  * plain euro amounts. Money is always rendered via `EurosPipe`; the balance is signed (negative shown in
  * red) and there is no "settled / owes / credit" wording, just the signed amount. Action buttons (the +1
@@ -40,7 +40,7 @@ import { EurosPipe } from '../../pipes/euros.pipe';
       </mat-card>
     }
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
       /* The count card and the balance card render inside this component's host, so they are not direct
@@ -103,7 +103,7 @@ export class BalanceSummaryComponent {
   /** The current price per cup, in integer euro cents. */
   readonly priceCents = input<number | null>(null);
 
-  /** The member's balance in integer euro cents (negative ⇒ owes the fund); shown signed and red if negative. */
+  /** The user's balance in integer euro cents (negative ⇒ owes the fund); shown signed and red if negative. */
   readonly balanceCents = input<number | null>(null);
 
   /** The communal kitty balance in integer euro cents. */

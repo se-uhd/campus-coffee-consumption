@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { PriceChangeDto, PriceDto, PriceUpdateRequest } from '../models';
 
 /**
- * The admin coffee-price calls against `/api/price` (the interceptor adds the JWT). Members never call
+ * The admin coffee-price calls against `/api/price` (the interceptor adds the JWT). Users never call
  * these directly; their current price arrives in the `UserSummaryDto`.
  */
 @Injectable({ providedIn: 'root' })

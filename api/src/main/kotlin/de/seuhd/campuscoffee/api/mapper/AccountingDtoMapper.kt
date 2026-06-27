@@ -17,7 +17,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 
 /**
  * MapStruct mapper assembling the read-side money response DTOs from the domain (one-way, domain to DTO):
- * activity entries, a member's summary, the price history, the kitty, and the balance overview.
+ * activity entries, a user's summary, the price history, the kitty, and the balance overview.
  */
 @Mapper(componentModel = "spring")
 @ConditionalOnMissingBean // prevent IntelliJ warning about duplicate beans
@@ -37,7 +37,7 @@ interface AccountingDtoMapper {
     fun toEntryDtos(entries: List<ActivityEntry>): List<ActivityEntryDto>
 
     /**
-     * Maps a single global activity entry (the admin all-members feed) to its response DTO.
+     * Maps a single global activity entry (the admin all-users feed) to its response DTO.
      *
      * @param entry the global activity entry to map
      */
@@ -51,9 +51,9 @@ interface AccountingDtoMapper {
     fun toGlobalEntryDtos(entries: List<GlobalActivityEntry>): List<GlobalActivityEntryDto>
 
     /**
-     * Maps a member summary to its response DTO.
+     * Maps a user summary to its response DTO.
      *
-     * @param summary the member summary to map
+     * @param summary the user summary to map
      */
     fun toSummaryDto(summary: UserSummary): UserSummaryDto
 
@@ -83,9 +83,9 @@ interface AccountingDtoMapper {
     ): KittyDto = KittyDto(balanceCents, toEntryDtos(entries))
 
     /**
-     * Maps a balance-overview row to its response DTO, flattening the member.
+     * Maps a balance-overview row to its response DTO, flattening the user.
      *
-     * @param balance the member balance to map
+     * @param balance the user balance to map
      */
     fun toBalanceDto(balance: UserBalance): UserBalanceDto =
         UserBalanceDto(
@@ -100,7 +100,7 @@ interface AccountingDtoMapper {
     /**
      * Maps the balance overview to its response DTOs.
      *
-     * @param balances the member balances to map
+     * @param balances the user balances to map
      */
     fun toBalanceDtos(balances: List<UserBalance>): List<UserBalanceDto> = balances.map { toBalanceDto(it) }
 }

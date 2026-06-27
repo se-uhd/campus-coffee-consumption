@@ -25,9 +25,9 @@ import org.springframework.test.web.servlet.client.returnResult
 import java.util.UUID
 
 /**
- * System tests for the money feature: the global price, member and admin expenses, deposits and kitty
- * adjustments, the per-member balance (a coffee valued at the price in effect when it was consumed), and the
- * communal kitty. Members authenticate by their capability token; admins by JWT.
+ * System tests for the money feature: the global price, user and admin expenses, deposits and kitty
+ * adjustments, the per-user balance (a coffee valued at the price in effect when it was consumed), and the
+ * communal kitty. Users authenticate by their capability token; admins by JWT.
  */
 class AccountingSystemTests : AbstractSystemTest() {
     private val member = "maxmustermann"
@@ -71,8 +71,8 @@ class AccountingSystemTests : AbstractSystemTest() {
             .responseBody!!
 
     // Funds the kitty with an admin adjustment so a later kitty-funded admin expense does not drive the
-    // kitty balance below zero (the guard rejects that with 409). A pure kitty adjustment has no member,
-    // so it never touches a member balance.
+    // kitty balance below zero (the guard rejects that with 409). A pure kitty adjustment has no user,
+    // so it never touches a user balance.
     private fun fundKitty(amountCents: Int) =
         client()
             .post()
@@ -148,12 +148,12 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .returnResult<UserSummaryDto>()
                 .responseBody!!
 
-        // the purchase is 100% private, so the member's balance is credited by the full 900 cents
+        // the purchase is 100% private, so the user's balance is credited by the full 900 cents
         assertThat(summary.balanceCents).isEqualTo(900)
         val privateEntries = summary.activity.filter { it.type == ActivityEntryType.PRIVATE_EXPENSE }
         assertThat(privateEntries).hasSize(1)
         assertThat(privateEntries.first().amountCents).isEqualTo(900)
-        // a member's own purchase never touches the kitty
+        // a user's own purchase never touches the kitty
         assertThat(summary.activity.none { it.type == ActivityEntryType.KITTY_EXPENSE }).isTrue()
     }
 
@@ -188,7 +188,7 @@ class AccountingSystemTests : AbstractSystemTest() {
         assertThat(expense.status.value()).isEqualTo(201)
         assertThat(expense.responseBody!!.privateAmountCents).isEqualTo(400)
 
-        // the member's activity shows only the +400 private portion
+        // the user's activity shows only the +400 private portion
         val summary = userSummary()
         assertThat(summary.balanceCents).isEqualTo(400)
         assertThat(summary.activity.filter { it.type == ActivityEntryType.PRIVATE_EXPENSE }.map { it.amountCents })
@@ -232,7 +232,7 @@ class AccountingSystemTests : AbstractSystemTest() {
             .exchange()
 
         assertThat(kitty().balanceCents).isEqualTo(kittyBefore + 750)
-        // the member's balance is untouched by a pure kitty adjustment
+        // the user's balance is untouched by a pure kitty adjustment
         assertThat(userSummary().balanceCents).isEqualTo(0)
     }
 

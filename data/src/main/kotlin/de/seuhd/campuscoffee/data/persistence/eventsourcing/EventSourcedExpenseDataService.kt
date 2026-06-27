@@ -31,7 +31,7 @@ class EventSourcedExpenseDataService(
 
     @Transactional
     override fun delete(id: UUID) =
-        // carry the buyer id on the DELETE event so the member activity still matches it and reverses the credit
+        // carry the buyer id on the DELETE event so the user activity still matches it and reverses the credit
         writer.delete(Expense::class, id, delegate::getById) { mapOf("buyerUserId" to it.buyer.id) }
 
     @Transactional

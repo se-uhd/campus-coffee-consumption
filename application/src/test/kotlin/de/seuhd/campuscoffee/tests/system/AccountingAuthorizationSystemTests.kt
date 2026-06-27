@@ -11,7 +11,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.client.returnResult
 
 /**
- * System tests for the money-feature authorization split: a member may read their own landing summary (which
+ * System tests for the money-feature authorization split: a user may read their own landing summary (which
  * includes the kitty balance) but may not set the price or reach the admin-only kitty history and expense
  * routes.
  */
@@ -59,7 +59,7 @@ class AccountingAuthorizationSystemTests : AbstractSystemTest() {
                 .returnResult<UserSummaryDto>()
 
         assertThat(result.status.value()).isEqualTo(200)
-        // the kitty balance is present (zero with no money movements yet), readable by the member
+        // the kitty balance is present (zero with no money movements yet), readable by the user
         assertThat(result.responseBody!!.kittyBalanceCents).isEqualTo(0)
     }
 }

@@ -25,12 +25,12 @@ import org.testcontainers.utility.DockerImageName
 
 /**
  * Utilities for the system tests: the PostgreSQL container wiring, the shared RestTestClient, and helpers
- * for the two authentication mechanisms: an admin JWT minted at the token endpoint, and a member
+ * for the two authentication mechanisms: an admin JWT minted at the token endpoint, and a user
  * capability token sent as the `X-Capability-Token` header. The token endpoint takes an encrypted payload,
  * so the admin helpers fetch the server's published public key and encrypt the credentials before posting.
  */
 object SystemTestUtils {
-    /** The header a member authenticates with (their secret capability token). */
+    /** The header a user authenticates with (their secret capability token). */
     const val CAPABILITY_TOKEN_HEADER = "X-Capability-Token"
 
     // A fixed, test-only 2048-bit PKCS#8 RSA key, injected as the login-encryption key for every system
@@ -183,7 +183,7 @@ object SystemTestUtils {
     fun adminBearer(): String =
         TestFixtures.rawCredentialsFor(Role.ADMIN).let { (login, password) -> "Bearer ${jwtFor(login, password)}" }
 
-    /** The capability token of the seeded member fixture with the given login name. */
+    /** The capability token of the seeded user fixture with the given login name. */
     fun memberToken(loginName: String): String = TestFixtures.rawCapabilityTokenFor(loginName)
 
     /** The status code of a response, without asserting it. */
@@ -193,7 +193,7 @@ object SystemTestUtils {
     fun RestTestClient.RequestHeadersSpec<*>.withAdmin(): RestTestClient.RequestHeadersSpec<*> =
         header(HttpHeaders.AUTHORIZATION, adminBearer())
 
-    /** The X-Capability-Token header carrying the given member's capability token. */
+    /** The X-Capability-Token header carrying the given user's capability token. */
     fun RestTestClient.RequestHeadersSpec<*>.withMember(loginName: String): RestTestClient.RequestHeadersSpec<*> =
         header(CAPABILITY_TOKEN_HEADER, memberToken(loginName))
 }

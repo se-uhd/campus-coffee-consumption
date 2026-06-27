@@ -8,7 +8,7 @@ import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
-import de.seuhd.campuscoffee.domain.ports.data.BalanceLock
+import de.seuhd.campuscoffee.domain.ports.data.BalanceLockService
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.springframework.stereotype.Service
@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * Domain implementation of [PaymentService]. Every operation is admin-only. A deposit records a member
+ * Domain implementation of [PaymentService]. Every operation is admin-only. A deposit records a user
  * paying money in (positive only); a kitty adjustment changes the kitty alone and may be signed, but may not
  * drive the kitty balance below zero (409). Payments are never edited. A mistake is corrected with a
  * compensating entry.
@@ -26,7 +26,7 @@ class PaymentServiceImpl(
     private val paymentDataService: PaymentDataService,
     private val userDataService: UserDataService,
     private val balanceDataService: BalanceDataService,
-    private val balanceLock: BalanceLock
+    private val balanceLock: BalanceLockService
 ) : PaymentService {
     @Transactional
     override fun recordDeposit(
@@ -41,7 +41,7 @@ class PaymentServiceImpl(
         }
         // no explicit kitty lock here: a deposit is always positive and cannot overdraw, so it has no
         // overdraw check to serialize. Its kitty recompute is still serialized against concurrent kitty
-        // writers by the lock the projection takes around every recompute (see BalanceProjection.maintain).
+        // writers by the lock the projection takes around every recompute (see BalanceDataServiceImpl.maintain).
         val user = userDataService.getById(userId)
         return paymentDataService.upsert(Payment(user = user, amountCents = amountCents, note = note))
     }

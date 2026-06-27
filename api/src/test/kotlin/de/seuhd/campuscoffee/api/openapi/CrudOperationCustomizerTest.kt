@@ -1,10 +1,10 @@
 package de.seuhd.campuscoffee.api.openapi
 
-import de.seuhd.campuscoffee.api.capability.CapabilityQrResponder
-import de.seuhd.campuscoffee.api.capability.CapabilityUrlFactory
 import de.seuhd.campuscoffee.api.controller.UserController
 import de.seuhd.campuscoffee.api.mapper.UserDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
+import de.seuhd.campuscoffee.api.support.CapabilityQrResponder
+import de.seuhd.campuscoffee.api.support.CapabilityUrlFactory
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import io.swagger.v3.oas.models.Operation
 import io.swagger.v3.oas.models.media.Content

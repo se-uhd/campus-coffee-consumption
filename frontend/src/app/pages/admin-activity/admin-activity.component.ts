@@ -29,12 +29,12 @@ const ACTIVITY_PAGE_SIZE = 25;
 type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
 
 /**
- * Admin global activity page: one paginated table of every change across all members, the kitty, and the
- * price, newest first. Each row shows the subject member it concerns and the actor who performed it (the two
- * differ on an admin correction), with separate member-balance and kitty-balance columns (a deposit or split
+ * Admin global activity page: one paginated table of every change across all users, the kitty, and the
+ * price, newest first. Each row shows the subject user it concerns and the actor who performed it (the two
+ * differ on an admin correction), with separate user-balance and kitty-balance columns (a deposit or split
  * expense moves both). A client-side type filter hides rows without changing the server-computed running
  * balances, and a "Download CSV" button exports the full feed (the whole dataset, not just the loaded rows).
- * The table reuses the members page's responsive scroll container; on a narrow screen it scrolls horizontally.
+ * The table reuses the users page's responsive scroll container; on a narrow screen it scrolls horizontally.
  */
 @Component({
   selector: 'cc-admin-activity',
@@ -58,14 +58,14 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
   template: `
     <cc-app-header [home]="'/admin'" title="Activity" icon="receipt_long"></cc-app-header>
 
-    @if (loading) {
+    @if (loading()) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
     <div class="page">
-      @if (loadError) {
+      @if (loadError()) {
         <mat-card class="card">
-          <p class="warn">{{ loadError }}</p>
+          <p class="warn">{{ loadError() }}</p>
           <button mat-stroked-button (click)="loadFirst()">Retry</button>
         </mat-card>
       } @else {
@@ -76,11 +76,11 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
             <button
               mat-stroked-button
               (click)="downloadCsv()"
-              [disabled]="downloadingCsv"
+              [disabled]="downloadingCsv()"
               aria-label="Download all activity as CSV"
               matTooltip="Download all activity (CSV)"
             >
-              @if (downloadingCsv) {
+              @if (downloadingCsv()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
                 <mat-icon>download</mat-icon>
@@ -98,9 +98,9 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
             aria-label="Filter activity by type"
           >
             <mat-button-toggle value="ALL">All</mat-button-toggle>
-            <mat-button-toggle value="COFFEES">Coffees</mat-button-toggle>
-            <mat-button-toggle value="EXPENSES">Expenses</mat-button-toggle>
-            <mat-button-toggle value="MONEY">Deposits</mat-button-toggle>
+            <mat-button-toggle value="COFFEES">Coffee</mat-button-toggle>
+            <mat-button-toggle value="EXPENSES">Expense</mat-button-toggle>
+            <mat-button-toggle value="MONEY">Deposit</mat-button-toggle>
             <mat-button-toggle value="PRICE">Price</mat-button-toggle>
           </mat-button-toggle-group>
 
@@ -109,8 +109,8 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
               <div class="table-scroll">
                 <table mat-table [dataSource]="visible()" [trackBy]="trackById" class="cc-activity-table">
                   <caption class="cc-visually-hidden">
-                    Every activity across all members, the kitty, and the price, with the subject member, the
-                    actor, and the member and kitty running balances.
+                    Every activity across all users, the kitty, and the price, with the subject user, the
+                    actor, and the user and kitty running balances.
                   </caption>
 
                   <ng-container matColumnDef="when">
@@ -137,7 +137,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
                   </ng-container>
 
                   <ng-container matColumnDef="subject">
-                    <th mat-header-cell *matHeaderCellDef>Member</th>
+                    <th mat-header-cell *matHeaderCellDef>User</th>
                     <td mat-cell *matCellDef="let row" class="cc-subject">
                       @if (row.subjectLogin || row.subjectName) {
                         <div [ccTruncationTooltip]="row.subjectName || row.subjectLogin">
@@ -161,16 +161,16 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
                     </td>
                   </ng-container>
 
-                  <ng-container matColumnDef="member">
+                  <ng-container matColumnDef="user">
                     <th mat-header-cell *matHeaderCellDef class="col-numeric cc-balance">
-                      Member<br />balance
+                      User<br />balance
                     </th>
                     <td mat-cell *matCellDef="let row" class="col-numeric cc-balance">
-                      @if (row.memberEffectCents != null) {
-                        <div [class.warn]="row.memberEffectCents < 0">
-                          {{ row.memberEffectCents | euros: true }}
+                      @if (row.userEffectCents != null) {
+                        <div [class.warn]="row.userEffectCents < 0">
+                          {{ row.userEffectCents | euros: true }}
                         </div>
-                        <div class="muted">{{ row.memberBalanceCents | euros }}</div>
+                        <div class="muted">{{ row.userBalanceCents | euros }}</div>
                       } @else {
                         <span class="muted">&mdash;</span>
                       }
@@ -208,10 +208,10 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
               <p class="muted">No activity of this type in the loaded rows. Load more to keep looking.</p>
             }
 
-            @if (hasMore) {
+            @if (hasMore()) {
               <div class="cc-activity-more">
-                <button mat-stroked-button (click)="loadMore()" [disabled]="loadingMore">
-                  @if (loadingMore) {
+                <button mat-stroked-button (click)="loadMore()" [disabled]="loadingMore()">
+                  @if (loadingMore()) {
                     <mat-spinner diameter="20"></mat-spinner>
                   } @else {
                     Load more
@@ -219,14 +219,14 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
                 </button>
               </div>
             }
-          } @else if (!loading) {
+          } @else if (!loading()) {
             <p class="muted">No activity yet.</p>
           }
         </mat-card>
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
       .cc-activity-filter {
@@ -277,7 +277,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
         width: 16%;
       }
 
-      .mat-column-member,
+      .mat-column-user,
       .mat-column-kitty {
         width: 15%;
       }
@@ -301,7 +301,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
         white-space: nowrap;
       }
 
-      /* Only the header row wraps: a long column name such as "Member balance" breaks onto two lines instead
+      /* Only the header row wraps: a long column name such as "User balance" breaks onto two lines instead
          of being clipped. The data cells below stay on one line and truncate (see the ellipsis rule). */
       .cc-activity-table th.mat-mdc-header-cell {
         white-space: normal;
@@ -337,7 +337,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
   ]
 })
 export class AdminActivityComponent implements OnInit {
-  readonly columns = ['when', 'type', 'subject', 'actor', 'member', 'kitty'];
+  readonly columns = ['when', 'type', 'subject', 'actor', 'user', 'kitty'];
 
   /** The loaded rows (newest first), accumulated by "Load more". */
   readonly entries = signal<GlobalActivityEntryDto[]>([]);
@@ -352,11 +352,11 @@ export class AdminActivityComponent implements OnInit {
     return filter === 'ALL' ? entries : entries.filter((row) => this.bucketOf(row.type) === filter);
   });
 
-  loading = false;
-  loadingMore = false;
-  loadError = '';
-  hasMore = false;
-  downloadingCsv = false;
+  readonly loading = signal(false);
+  readonly loadingMore = signal(false);
+  readonly loadError = signal('');
+  readonly hasMore = signal(false);
+  readonly downloadingCsv = signal(false);
 
   constructor(
     private readonly accounting: AccountingService,
@@ -369,24 +369,24 @@ export class AdminActivityComponent implements OnInit {
 
   /** Loads the first page of the global activity feed; surfaces a retryable error. */
   async loadFirst(): Promise<void> {
-    this.loading = true;
-    this.loadError = '';
+    this.loading.set(true);
+    this.loadError.set('');
     try {
       const { entries, hasMore } = await loadActivityPage([], ACTIVITY_PAGE_SIZE, (limit, offset) =>
         this.accounting.allActivity(limit, offset)
       );
       this.entries.set(entries);
-      this.hasMore = hasMore;
+      this.hasMore.set(hasMore);
     } catch {
-      this.loadError = 'Could not load the activity.';
+      this.loadError.set('Could not load the activity.');
     } finally {
-      this.loading = false;
+      this.loading.set(false);
     }
   }
 
   /** Appends the next page of the global activity feed (incremental "Load more" server paging on the full feed). */
   async loadMore(): Promise<void> {
-    this.loadingMore = true;
+    this.loadingMore.set(true);
     try {
       const { entries, hasMore } = await loadActivityPage(
         this.entries(),
@@ -394,32 +394,32 @@ export class AdminActivityComponent implements OnInit {
         (limit, offset) => this.accounting.allActivity(limit, offset)
       );
       this.entries.set(entries);
-      this.hasMore = hasMore;
+      this.hasMore.set(hasMore);
     } catch (error) {
       this.notifications.error(error, 'Could not load more activity.');
     } finally {
-      this.loadingMore = false;
+      this.loadingMore.set(false);
     }
   }
 
   /** Downloads the entire global activity feed as a CSV file (the full dataset, not just the loaded rows). */
   async downloadCsv(): Promise<void> {
-    this.downloadingCsv = true;
+    this.downloadingCsv.set(true);
     try {
       triggerDownload(await this.accounting.activityCsvBlob(), 'activity.csv');
     } catch (error) {
       this.notifications.error(error, 'Could not download the activity CSV.');
     } finally {
-      this.downloadingCsv = false;
+      this.downloadingCsv.set(false);
     }
   }
 
-  /** The Material icon name for a row type (shared with the member/kitty activity list). */
+  /** The Material icon name for a row type (shared with the user/kitty activity list). */
   iconFor(type: ActivityEntryType): string {
     return activityIcon(type);
   }
 
-  /** A human-readable label for a row type (shared with the member/kitty activity list). */
+  /** A human-readable label for a row type (shared with the user/kitty activity list). */
   labelFor(type: ActivityEntryType): string {
     return activityLabel(type);
   }

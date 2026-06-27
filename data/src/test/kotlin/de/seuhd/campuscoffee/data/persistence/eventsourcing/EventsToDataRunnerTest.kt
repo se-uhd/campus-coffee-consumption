@@ -20,7 +20,7 @@ class EventsToDataRunnerTest : AbstractEventSourcingDataIntegrationTest() {
     private lateinit var readModelProjector: ReadModelProjector
 
     @Autowired
-    private lateinit var balanceProjection: BalanceProjection
+    private lateinit var balanceProjection: BalanceDataServiceImpl
 
     @Autowired
     private lateinit var coffeePriceRepository: CoffeePriceRepository

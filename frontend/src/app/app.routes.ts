@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { adminGuard } from './guards/admin.guard';
+import { usersResolver } from './resolvers/users.resolver';
 
 /**
  * Application routes. The member routes are public (the capability token in the path is the credential);
@@ -34,8 +35,9 @@ export const routes: Routes = [
   },
   {
     path: 'admin/users',
-    title: 'Members (SE@UHD)',
+    title: 'Users (SE@UHD)',
     canActivate: [adminGuard],
+    resolve: { users: usersResolver },
     loadComponent: () =>
       import('./pages/admin-users/admin-users.component').then((m) => m.AdminUsersComponent)
   },

@@ -46,12 +46,12 @@ test.describe('admin flow', () => {
       await page.goto('/admin/users');
 
       const membersCard = page.locator('mat-card', {
-        has: page.getByRole('heading', { name: 'Members' })
+        has: page.getByRole('heading', { name: 'Users' })
       });
 
-      // role chips render for both audiences
-      await expect(membersCard.getByText('ADMIN').first()).toBeVisible();
-      await expect(membersCard.getByText('USER').first()).toBeVisible();
+      // role chips render for both audiences (exact text so the "Users" heading / caption cannot satisfy them)
+      await expect(membersCard.getByText('Admin', { exact: true }).first()).toBeVisible();
+      await expect(membersCard.getByText('User', { exact: true }).first()).toBeVisible();
 
       // a signed balance is rendered (the euros pipe uses the en-US format with the euro sign trailing)
       await expect(membersCard.getByText(/[+-]?\d+\.\d{2} €/).first()).toBeVisible();
@@ -109,7 +109,7 @@ test.describe('admin flow', () => {
     await expect(balanceCard.locator('.display')).toHaveText('0.00 €');
 
     // record a 5.00 € deposit for the first member in the select
-    await page.getByRole('combobox', { name: 'Member' }).click();
+    await page.getByRole('combobox', { name: 'User' }).click();
     await page.getByRole('option').first().click();
     await page.getByLabel('Amount (€)').first().fill('5.00');
     await page.getByRole('button', { name: 'Record deposit' }).click();
@@ -142,7 +142,7 @@ test.describe('admin flow', () => {
     await expect(page.getByText('Purchase recorded.')).toBeVisible();
 
     const purchasesCard = page.locator('mat-card', {
-      has: page.getByRole('heading', { name: "This member's purchases" })
+      has: page.getByRole('heading', { name: "This user's purchases" })
     });
     const recorded = purchasesCard.locator('mat-list-item').filter({ hasText: '6.00 € · 500 g' }).first();
     await expect(recorded).toBeVisible();
@@ -177,7 +177,7 @@ test.describe('admin flow', () => {
     await expect(page.getByText('Purchase recorded.')).toBeVisible();
 
     const purchasesCard = page.locator('mat-card', {
-      has: page.getByRole('heading', { name: "This member's purchases" })
+      has: page.getByRole('heading', { name: "This user's purchases" })
     });
     const row = purchasesCard.locator('mat-list-item').filter({ hasText: '5.00 € · 250 g' }).first();
     await expect(row).toBeVisible();
@@ -190,7 +190,7 @@ test.describe('admin flow', () => {
   }) => {
     await loginAsAdmin(page);
     await page.goto('/admin/users');
-    await expect(page.getByRole('heading', { name: 'Add a member' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Add a user' })).toBeVisible();
 
     const downloadPromise = page.waitForEvent('download');
     // exact match: the sibling "Download all QR codes as a PDF sheet" button's accessible name also starts
@@ -202,10 +202,10 @@ test.describe('admin flow', () => {
 });
 
 /**
- * The selected member is URL state: picking a member on the landing pushes a `?member=<id>` history entry,
+ * The selected member is URL state: picking a member on the landing pushes a `?user=<id>` history entry,
  * so the browser Back button undoes the switch back to the admin's own account; the param carries across
  * admin pages (landing → expenses); and the "View profile" jump from the Members page deep-links the
- * selected member into `/admin/profile?member=<id>` with Back returning to the list.
+ * selected member into `/admin/profile?user=<id>` with Back returning to the list.
  */
 test.describe('admin member-selection history', () => {
   let api: APIRequestContext;
@@ -222,15 +222,15 @@ test.describe('admin member-selection history', () => {
     await resetFixtures(api);
   });
 
-  test('picking a member adds a ?member= history entry that the Back button undoes', async ({ page }) => {
+  test('picking a member adds a ?user= history entry that the Back button undoes', async ({ page }) => {
     await loginAsAdmin(page);
     // the landing defaults to the admin's own account, so there is no member param yet
     await expect(page).toHaveURL(/\/admin$/);
 
     // pick a different member; the URL gains the member id as a query param (a pushed history entry)
-    await page.getByRole('combobox', { name: 'Member' }).click();
+    await page.getByRole('combobox', { name: 'User' }).click();
     await page.getByRole('option', { name: /maxmustermann/ }).click();
-    await expect(page).toHaveURL(/\/admin\?member=[0-9a-f-]+$/);
+    await expect(page).toHaveURL(/\/admin\?user=[0-9a-f-]+$/);
 
     // Back undoes the selection: the param is gone and the landing is the admin's own account again
     await page.goBack();
@@ -238,39 +238,39 @@ test.describe('admin member-selection history', () => {
 
     // Forward re-applies the selection (the member param returns)
     await page.goForward();
-    await expect(page).toHaveURL(/\/admin\?member=[0-9a-f-]+$/);
+    await expect(page).toHaveURL(/\/admin\?user=[0-9a-f-]+$/);
   });
 
   test('the selected member carries across admin pages and back', async ({ page }) => {
     await loginAsAdmin(page);
-    await page.getByRole('combobox', { name: 'Member' }).click();
+    await page.getByRole('combobox', { name: 'User' }).click();
     await page.getByRole('option', { name: /maxmustermann/ }).click();
-    await expect(page).toHaveURL(/\/admin\?member=([0-9a-f-]+)$/);
-    const memberId = new URL(page.url()).searchParams.get('member');
+    await expect(page).toHaveURL(/\/admin\?user=([0-9a-f-]+)$/);
+    const userId = new URL(page.url()).searchParams.get('user');
 
     // navigating to the expenses page preserves the selected member in the URL
     await page.getByRole('link', { name: 'Expenses' }).click();
-    await expect(page).toHaveURL(new RegExp(`/admin/expenses\\?member=${memberId}$`));
+    await expect(page).toHaveURL(new RegExp(`/admin/expenses\\?user=${userId}$`));
 
     // the back arrow returns to the landing carrying the same member
     await page.getByRole('link', { name: 'Back' }).click();
-    await expect(page).toHaveURL(new RegExp(`/admin\\?member=${memberId}$`));
+    await expect(page).toHaveURL(new RegExp(`/admin\\?user=${userId}$`));
   });
 
-  test('"View profile" deep-links the member into /admin/profile?member= and Back returns to the list', async ({
+  test('"View profile" deep-links the member into /admin/profile?user= and Back returns to the list', async ({
     page
   }) => {
     await loginAsAdmin(page);
     await page.goto('/admin/users');
 
     const membersCard = page.locator('mat-card', {
-      has: page.getByRole('heading', { name: 'Members' })
+      has: page.getByRole('heading', { name: 'Users' })
     });
     const row = membersCard.getByRole('row').filter({ hasText: 'maxmustermann' }).first();
     await row.getByRole('button', { name: 'View profile' }).click();
 
     // the profile page opens deep-linked to that member via the member param
-    await expect(page).toHaveURL(/\/admin\/profile\?member=[0-9a-f-]+$/);
+    await expect(page).toHaveURL(/\/admin\/profile\?user=[0-9a-f-]+$/);
 
     // Back returns to the members list (no member param)
     await page.goBack();

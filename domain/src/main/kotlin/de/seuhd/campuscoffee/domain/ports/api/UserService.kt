@@ -15,7 +15,7 @@ import java.util.UUID
  *
  * Extends [CrudService] to inherit common CRUD operations and adds user-specific operations. Unlike
  * CampusCoffee there is no open self-registration: creating a user is an admin operation ([create]), and
- * the capability token a member authenticates with is issued by the service, never by the client.
+ * the capability token a user authenticates with is issued by the service, never by the client.
  */
 interface UserService : CrudService<User, UUID> {
     /**
@@ -30,7 +30,7 @@ interface UserService : CrudService<User, UUID> {
     fun getByLoginName(loginName: String): User
 
     /**
-     * Resolves a member by their secret capability token, used by the capability token authentication
+     * Resolves a user by their secret capability token, used by the capability token authentication
      * filter to turn an `X-Capability-Token` header into a principal. Returns null (rather than throwing) for
      * an unknown or rotated token, so the filter can answer 401 without surfacing an error.
      *
@@ -71,8 +71,8 @@ interface UserService : CrudService<User, UUID> {
      * Creates a new user on behalf of an admin [actingUser]. The service assigns a fresh, unguessable
      * capability token, honors the requested [User.role], and creates the user's
      * [de.seuhd.campuscoffee.domain.model.CoffeeConsumption] at `count = 0`. A password applies
-     * only to an admin: creating an `ADMIN` requires one (it is hashed), while a member (`USER`) gets none
-     * and authenticates solely with their capability token (any password sent for a member is ignored).
+     * only to an admin: creating an `ADMIN` requires one (it is hashed), while a user (`USER`) gets none
+     * and authenticates solely with their capability token (any password sent for a user is ignored).
      *
      * @param user       the user to create
      * @param actingUser the authenticated user attempting the create
@@ -102,7 +102,7 @@ interface UserService : CrudService<User, UUID> {
     ): User
 
     /**
-     * Rotates a member's capability token, invalidating the previously printed QR code and issuing a new
+     * Rotates a user's capability token, invalidating the previously printed QR code and issuing a new
      * capability URL. Admin-only.
      *
      * @param userId     the id of the user whose token to rotate

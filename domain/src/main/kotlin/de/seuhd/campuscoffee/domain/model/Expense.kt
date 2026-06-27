@@ -11,8 +11,8 @@ import java.util.UUID
  * The total is split into a [privateAmountCents] portion (paid from the buyer's own pocket, which credits
  * the buyer's balance) and a [kittyAmountCents] portion (paid from the communal kitty, which draws the
  * kitty down). The two always sum to [amountCents], enforced by the domain service before the upsert and
- * backed by a database CHECK. A member recording their own purchase always books it as 100% private to
- * themselves; only an admin may set a split or attribute the private portion to another member.
+ * backed by a database CHECK. A user recording their own purchase always books it as 100% private to
+ * themselves; only an admin may set a split or attribute the private portion to another user.
  */
 data class Expense(
     override val id: UUID? = null,

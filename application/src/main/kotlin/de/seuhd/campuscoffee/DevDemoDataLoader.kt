@@ -3,33 +3,33 @@ package de.seuhd.campuscoffee
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
-import de.seuhd.campuscoffee.domain.ports.StartupTask
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.system.StartupTaskService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 
 /**
- * Demo-data loader (`@Profile("dev")`, so it runs in local dev only) that layers extra members and some
+ * Demo-data loader (`@Profile("dev")`, so it runs in local dev only) that layers extra users and some
  * consumption, bean-purchase and deposit history on top of the
- * five-user fixture set, so the app comes up with enough members to paginate (5 per page) and with non-empty
+ * five-user fixture set, so the app comes up with enough users to paginate (5 per page) and with non-empty
  * activity and change-log views. It also layers a representative
- * history (cups, own purchases, and a deposit) onto the primary fixture member `maxmustermann` (the member
+ * history (cups, own purchases, and a deposit) onto the primary fixture user `maxmustermann` (the user
  * whose capability link is the demo link printed on the wall), so its unified activity exercises every entry
  * kind. `maxmustermann` stays active.
  *
  * On top of that it gives a rich, varied history to **every** other existing user too: the fixture admin
- * `jane_doe` and the remaining fixture members (`student2023`, `lisa_lee`, `olivia_lee`) via
- * [ENRICHED_FIXTURE_LOGINS], plus each demo member with a non-empty [DemoMember] spec, so the activity and
+ * `jane_doe` and the remaining fixture users (`student2023`, `lisa_lee`, `olivia_lee`) via
+ * [ENRICHED_FIXTURE_LOGINS], plus each demo user with a non-empty [DemoMember] spec, so the activity and
  * change-log views are populated for almost everyone. A couple of users are deliberately left **empty** to
- * demo the empty state: the freshly created member [EMPTY_DEMO_LOGIN] (`new_user`, no history at all) and the
- * inactive demo member `hannes_schulz` (its spec carries no coffees, expenses, or deposit).
+ * demo the empty state: the freshly created user [EMPTY_DEMO_LOGIN] (`new_user`, no history at all) and the
+ * inactive demo user `hannes_schulz` (its spec carries no coffees, expenses, or deposit).
  *
- * It is deliberately a separate `@Profile("dev")` [StartupTask] (order [ORDER], after the fixture
+ * It is deliberately a separate `@Profile("dev")` [StartupTaskService] (order [ORDER], after the fixture
  * reset+seed at 200 and the price seed at 250) rather than a change to
  * [de.seuhd.campuscoffee.domain.tests.TestFixtures]: the fixture set is asserted exactly by the system and
  * acceptance tests, which do not activate the dev profile, so this loader never runs in the
@@ -37,11 +37,11 @@ import org.springframework.stereotype.Component
  *
  * Determinism: the id generator is reset on every boot (the dev `reset-on-startup`), and the fixture
  * loader clears all data and reseeds before this runs, so every start reproduces the same demo data with the
- * same assigned ids. The loader is also idempotent within a run (it skips if its demo members already exist),
+ * same assigned ids. The loader is also idempotent within a run (it skips if its demo users already exist),
  * so a restart without a reset does not duplicate them.
  *
- * Actor attribution mirrors the fixtures: this runs outside any web request, so the `ActorProvider` finds no
- * principal and every seeded event is recorded with `created_by = "SYSTEM"` (the admin/member passed as the
+ * Actor attribution mirrors the fixtures: this runs outside any web request, so the `ActorProviderService` finds no
+ * principal and every seeded event is recorded with `created_by = "SYSTEM"` (the admin/user passed as the
  * acting user only satisfies the domain authorization checks).
  */
 @Component
@@ -52,15 +52,15 @@ class DevDemoDataLoader(
     private val coffeePriceService: CoffeePriceService,
     private val expenseService: ExpenseService,
     private val paymentService: PaymentService
-) : StartupTask {
+) : StartupTaskService {
     override val order = ORDER
 
     override fun run() = loadDemoData()
 
     /**
-     * One demo member to create, with the consumption and money history to layer on top of them. [coffees]
-     * is how many cups to add (each a `+1`), [ownExpenses] the member's own bean purchases (weight grams to
-     * amount cents), and [depositCents] an optional deposit the member paid into the kitty.
+     * One demo user to create, with the consumption and money history to layer on top of them. [coffees]
+     * is how many cups to add (each a `+1`), [ownExpenses] the user's own bean purchases (weight grams to
+     * amount cents), and [depositCents] an optional deposit the user paid into the kitty.
      */
     private data class DemoMember(
         val loginName: String,
@@ -88,7 +88,7 @@ class DevDemoDataLoader(
     )
 
     /**
-     * Creates the demo members and seeds their history, unless they already exist. Resolves the seeded
+     * Creates the demo users and seeds their history, unless they already exist. Resolves the seeded
      * fixture admin (`jane_doe`) to act for the admin-only operations (deposits and the kitty adjustment).
      */
     fun loadDemoData() {
@@ -115,8 +115,8 @@ class DevDemoDataLoader(
                 paymentService.recordDeposit(member.persistedId, amount, "demo deposit", admin)
                 depositTotal++
             }
-            // deactivate last, after the member's history is seeded: a deactivated member is read-only and
-            // could not record their own coffees or purchases, so an inactive demo member is created active,
+            // deactivate last, after the user's history is seeded: a deactivated user is read-only and
+            // could not record their own coffees or purchases, so an inactive demo user is created active,
             // given a realistic past, then deactivated here
             if (!spec.active) {
                 userService.upsert(member.copy(active = false))
@@ -127,7 +127,7 @@ class DevDemoDataLoader(
         paymentService.adjustKitty(KITTY_FLOAT_CENTS, "demo initial kitty float", admin)
         seedPrimaryDemoMemberHistory(admin)
         seedFixtureMemberHistories(admin)
-        // the three admin-recorded expense variants (all booked against the primary demo member as buyer), so
+        // the three admin-recorded expense variants (all booked against the primary demo user as buyer), so
         // the admin expense log shows every split type: private-only, kitty-only, and a private+kitty split.
         // Placed after the kitty float and all deposits above, so the kitty portion these draw (only the
         // kitty-only and the split contribute) is covered and the kitty stays >= 0.
@@ -135,7 +135,7 @@ class DevDemoDataLoader(
         // a price change and an admin count correction so the admin global activity feed shows a PRICE_CHANGE
         // row and an admin-override consumption row (every activity type appears on a fresh dev start)
         seedPriceChangeAndCorrection(admin)
-        // an extra active member with no history at all, to demo the empty activity/change-log state
+        // an extra active user with no history at all, to demo the empty activity/change-log state
         createMember(EMPTY_DEMO_MEMBER)
         log.info {
             "Seeded the dev demo data: ${DEMO_MEMBERS.size} extra members, $coffeeTotal coffees, " +
@@ -147,7 +147,7 @@ class DevDemoDataLoader(
 
     /**
      * Gives a rich, varied history to every remaining existing fixture user (the admin and the fixture
-     * members other than the primary demo member, which [seedPrimaryDemoMemberHistory] already covers), so
+     * users other than the primary demo user, which [seedPrimaryDemoMemberHistory] already covers), so
      * nearly every user has populated activity and change-log views. The counts and amounts are varied by the
      * user's index in [ENRICHED_FIXTURE_LOGINS] so the rows look realistic rather than identical. Each user
      * is an existing, active fixture user, so seeding only appends events. The admin is just another user
@@ -164,8 +164,8 @@ class DevDemoDataLoader(
     /**
      * Seeds a varied coffee, own-bean-purchase, and deposit history onto an existing, active [member].
      * The volume varies with [index] so consecutive users do not get identical rows: a handful of cups, one
-     * to three own purchases, and one or two deposits, all attributed to the member (the deposits acted by
-     * the [admin]). Member purchases are 100% private, and deposits only add to the kitty, so this never
+     * to three own purchases, and one or two deposits, all attributed to the user (the deposits acted by
+     * the [admin]). User purchases are 100% private, and deposits only add to the kitty, so this never
      * draws the kitty down.
      *
      * @param member the existing active user to enrich
@@ -192,9 +192,9 @@ class DevDemoDataLoader(
     }
 
     /**
-     * Creates one demo member directly through the service's upsert (the same seeding path the fixtures use,
+     * Creates one demo user directly through the service's upsert (the same seeding path the fixtures use,
      * which bypasses the admin-only `create` check), then creates their consumption at zero so the count can
-     * be advanced. Returns the persisted member (with their assigned id and capability token).
+     * be advanced. Returns the persisted user (with their assigned id and capability token).
      */
     private fun createMember(spec: DemoMember): User {
         val created =
@@ -208,7 +208,7 @@ class DevDemoDataLoader(
                     // always created active so the consumption/expense seeding succeeds; a spec marked
                     // inactive is deactivated by the caller after its history is seeded
                     active = true,
-                    // an admin needs a password; a member authenticates by their capability token alone
+                    // an admin needs a password; a user authenticates by their capability token alone
                     password = if (spec.role == Role.ADMIN) DEMO_ADMIN_PASSWORD else null
                 )
             )
@@ -217,11 +217,11 @@ class DevDemoDataLoader(
     }
 
     /**
-     * Layers a representative history onto the primary demo capability link, the fixture member
+     * Layers a representative history onto the primary demo capability link, the fixture user
      * [PRIMARY_DEMO_LOGIN] (the one printed on the wall for demos), so its unified activity has every entry kind
      * (cups, own bean purchases, and a deposit) and the "All"/"Cups"/"Expenses"/"Deposits" activity tabs each
-     * show data. The fixture loader already created this member (active, with a consumption row at zero), so
-     * this only adds events; the member stays active. Reuses the same service calls the demo members use.
+     * show data. The fixture loader already created this user (active, with a consumption row at zero), so
+     * this only adds events; the user stays active. Reuses the same service calls the demo users use.
      *
      * @param admin the resolved fixture admin, acting for the admin-only deposit
      */
@@ -238,13 +238,13 @@ class DevDemoDataLoader(
     }
 
     /**
-     * Records the three admin bean-purchase variants for the primary demo member [PRIMARY_DEMO_LOGIN], so the
+     * Records the three admin bean-purchase variants for the primary demo user [PRIMARY_DEMO_LOGIN], so the
      * dev app demonstrates every expense split type the admin can record: a **private-only** purchase (the
-     * whole total credited to the member, nothing from the kitty), a **kitty-only** purchase (the whole total
-     * drawn from the kitty, nothing credited to the member), and a **private+kitty split** (a portion each).
+     * whole total credited to the user, nothing from the kitty), a **kitty-only** purchase (the whole total
+     * drawn from the kitty, nothing credited to the user), and a **private+kitty split** (a portion each).
      * Each shows up on the admin expense log, and the kitty-touching ones on the kitty history too.
      *
-     * The buyer is the member; the actor is the [admin] (only an admin may record these). The kitty portions
+     * The buyer is the user; the actor is the [admin] (only an admin may record these). The kitty portions
      * (the kitty-only total and the split's kitty portion) draw the kitty down, so the caller must invoke this
      * only after the kitty float and all deposits are seeded; with the [KITTY_FLOAT_CENTS] float plus the
      * demo deposits available, these small draws keep the kitty non-negative.
@@ -271,9 +271,9 @@ class DevDemoDataLoader(
     }
 
     /**
-     * Raises the global price once and applies an admin absolute count correction to the primary demo member,
+     * Raises the global price once and applies an admin absolute count correction to the primary demo user,
      * so the admin global activity feed has a `PRICE_CHANGE` row and an admin-override consumption row (the two
-     * activity kinds the per-member and kitty seeds never produce). Both are recorded by the system actor
+     * activity kinds the per-user and kitty seeds never produce). Both are recorded by the system actor
      * (this runs outside a web request), so they sit on top of the existing seeded history.
      *
      * @param admin the resolved fixture admin, acting for the admin-only price change and count correction
@@ -295,7 +295,7 @@ class DevDemoDataLoader(
 
     private companion object {
         // runs after the fixture reset+seed (200) and the price seed (250), so a price is in effect before
-        // any demo coffee is added and the demo members layer on top of the seeded fixtures
+        // any demo coffee is added and the demo users layer on top of the seeded fixtures
         private const val ORDER = 260
 
         // a one-off price change and an admin count correction, so the admin global activity feed exercises
@@ -306,28 +306,28 @@ class DevDemoDataLoader(
         // the seeded fixture admin, resolved to satisfy the admin-only deposit and kitty operations
         private const val ADMIN_LOGIN = "jane_doe"
 
-        // a demo password for the extra admin members (dev only; an admin requires a password). Meets the
+        // a demo password for the extra admin users (dev only; an admin requires a password). Meets the
         // admin password policy: >= 24 chars, with lower/upper/digit.
         private const val DEMO_ADMIN_PASSWORD = "demoAdminPasswordSecure42"
 
         // an initial kitty float (euro cents) so the kitty history is non-empty on a fresh dev start
         private const val KITTY_FLOAT_CENTS = 5_000
 
-        // the fixture member whose capability link is the primary demo link (printed on the wall for demos);
+        // the fixture user whose capability link is the primary demo link (printed on the wall for demos);
         // given a full demo activity below so every activity tab shows data. Kept active.
         private const val PRIMARY_DEMO_LOGIN = "maxmustermann"
         private const val PRIMARY_DEMO_COFFEES = 8
         private val PRIMARY_DEMO_OWN_EXPENSES = listOf(500 to 1299, 1000 to 2499)
         private const val PRIMARY_DEMO_DEPOSIT_CENTS = 2000
 
-        // the three admin-recorded bean-purchase variants for the primary demo member, one per split type, so
+        // the three admin-recorded bean-purchase variants for the primary demo user, one per split type, so
         // the admin expense log shows every variant. Each satisfies private + kitty == total. The kitty
         // portions (the kitty-only total of 1000c and the split's 600c = 1600c drawn) are seeded after the
         // kitty float and all deposits; the float (KITTY_FLOAT_CENTS) plus deposits cover these small
         // draws, so the kitty stays >= 0.
         private val ADMIN_EXPENSE_VARIANTS =
             listOf(
-                // private-only: the whole total credited to the member, nothing from the kitty
+                // private-only: the whole total credited to the user, nothing from the kitty
                 AdminExpenseVariant(
                     label = "private-only",
                     weightGrams = 500,
@@ -336,7 +336,7 @@ class DevDemoDataLoader(
                     kittyCents = 0,
                     note = "demo private-only bean purchase"
                 ),
-                // kitty-only: the whole total drawn from the kitty, nothing credited to the member
+                // kitty-only: the whole total drawn from the kitty, nothing credited to the user
                 AdminExpenseVariant(
                     label = "kitty-only",
                     weightGrams = 750,
@@ -345,7 +345,7 @@ class DevDemoDataLoader(
                     kittyCents = 1_000,
                     note = "demo kitty-only bean purchase"
                 ),
-                // private+kitty split: a portion credited to the member, a portion drawn from the kitty
+                // private+kitty split: a portion credited to the user, a portion drawn from the kitty
                 AdminExpenseVariant(
                     label = "split",
                     weightGrams = 1_000,
@@ -356,8 +356,8 @@ class DevDemoDataLoader(
                 )
             )
 
-        // the remaining existing fixture users (the admin and the fixture members other than the primary
-        // demo member) given a rich, varied history so almost every user has populated activity/history views.
+        // the remaining existing fixture users (the admin and the fixture users other than the primary
+        // demo user) given a rich, varied history so almost every user has populated activity/history views.
         // The admin is just another user here: it has a consumption row and can hold cups, purchases, and
         // deposits like anyone.
         private val ENRICHED_FIXTURE_LOGINS = listOf(ADMIN_LOGIN, "student2023", "lisa_lee", "olivia_lee")
@@ -375,7 +375,7 @@ class DevDemoDataLoader(
         private const val BASE_DEPOSIT_CENTS = 1000
         private const val DEPOSIT_CENTS_STEP = 500
 
-        // a freshly created active member with no history at all, to demo the empty activity/change-log state
+        // a freshly created active user with no history at all, to demo the empty activity/change-log state
         private const val EMPTY_DEMO_LOGIN = "new_user"
         private val EMPTY_DEMO_MEMBER =
             DemoMember(
@@ -391,7 +391,7 @@ class DevDemoDataLoader(
 
         private val log = KotlinLogging.logger {}
 
-        // nine extra members with German names: a mix of roles (two admins) and active states (two
+        // nine extra users with German names: a mix of roles (two admins) and active states (two
         // inactive), most with a little consumption, purchase, and deposit history so the lists paginate
         // (5/page) and the activity/history views are not empty; one (`hannes_schulz`) is deliberately left
         // empty to demo the empty state
@@ -468,7 +468,7 @@ class DevDemoDataLoader(
                     depositCents = null
                 ),
                 // deliberately left empty (no coffees, purchases, or deposit) to demo the empty state on
-                // an inactive member, alongside the active empty member `new_user`
+                // an inactive user, alongside the active empty user `new_user`
                 DemoMember(
                     "hannes_schulz",
                     "Hannes",

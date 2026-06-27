@@ -22,8 +22,8 @@ import java.util.UUID
 
 /**
  * System tests for the admin global activity feed (`GET /api/users/activity`) and its CSV export
- * (`GET /api/users/activity.csv`): the whole-installation feed across all members, the kitty, and the price,
- * each row carrying the subject member and the actor and the member and kitty running balances. Covers the
+ * (`GET /api/users/activity.csv`): the whole-installation feed across all users, the kitty, and the price,
+ * each row carrying the subject user and the actor and the user and kitty running balances. Covers the
  * admin-only authorization, the subject-vs-actor distinction, the two balance columns, price-change rows, the
  * CSV format (UTF-8 BOM, headers, a non-ASCII name round-trip), paging, and a hard-deleted subject.
  */
@@ -121,8 +121,8 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
 
     @Test
     fun `the global feed records the subject member and the admin actor on a count override`() {
-        // an admin (jane_doe via JWT) overrides maxmustermann's count: the row's subject is the member, the
-        // actor is the admin, so the two user columns differ (a member self-scan would make them coincide)
+        // an admin (jane_doe via JWT) overrides maxmustermann's count: the row's subject is the user, the
+        // actor is the admin, so the two user columns differ (a user self-scan would make them coincide)
         overrideCount(memberId(), 2)
 
         val entry =
@@ -137,8 +137,8 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
         deposit(1000)
 
         val entry = globalActivity().first { it.type == ActivityEntryType.DEPOSIT }
-        assertThat(entry.memberEffectCents).isEqualTo(1000)
-        assertThat(entry.memberBalanceCents).isNotNull()
+        assertThat(entry.userEffectCents).isEqualTo(1000)
+        assertThat(entry.userBalanceCents).isNotNull()
         assertThat(entry.kittyEffectCents).isEqualTo(1000)
         assertThat(entry.kittyBalanceCents).isNotNull()
     }
@@ -163,11 +163,11 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
             .exchange()
 
         // the expense surfaces as one global row (the buyer is the subject); it moves the kitty but not the
-        // member, so the member columns are blank and the kitty columns carry the draw
+        // user, so the user columns are blank and the kitty columns carry the draw
         val entry = globalActivity().first { it.type == ActivityEntryType.PRIVATE_EXPENSE }
         assertThat(entry.subjectLogin).isEqualTo("maxmustermann")
-        assertThat(entry.memberEffectCents).isNull()
-        assertThat(entry.memberBalanceCents).isNull()
+        assertThat(entry.userEffectCents).isNull()
+        assertThat(entry.userBalanceCents).isNull()
         assertThat(entry.kittyEffectCents).isEqualTo(-800)
         assertThat(entry.kittyBalanceCents).isNotNull()
     }
@@ -184,7 +184,7 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
 
         val entry = globalActivity().first { it.type == ActivityEntryType.PRICE_CHANGE && it.priceAmountCents == 75 }
         assertThat(entry.subjectUserId).isNull()
-        assertThat(entry.memberEffectCents).isNull()
+        assertThat(entry.userEffectCents).isNull()
         assertThat(entry.kittyEffectCents).isNull()
     }
 
@@ -200,12 +200,12 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
         assertThat(globalActivity("?limit=100").first().id).isEqualTo(firstPage.first().id)
         // the newest deposit (300) is the most recent money movement
         assertThat(firstPage.first().type).isEqualTo(ActivityEntryType.DEPOSIT)
-        assertThat(firstPage.first().memberEffectCents).isEqualTo(300)
+        assertThat(firstPage.first().userEffectCents).isEqualTo(300)
     }
 
     @Test
     fun `the global activity CSV is UTF-8 with a BOM, a header, and a non-ASCII subject round-tripping intact`() {
-        // a member with an umlaut display name, given activity so it appears in the export
+        // a user with an umlaut display name, given activity so it appears in the export
         val umlautId = createMember("juergen", "Jürgen", "Müller")
         overrideCount(umlautId, 1)
 
@@ -231,7 +231,7 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
 
     @Test
     fun `the global feed renders a hard-deleted member's orphan events without failing`() {
-        // a member who is bumped to one cup and corrected back to zero has no financial footprint, so they can
+        // a user who is bumped to one cup and corrected back to zero has no financial footprint, so they can
         // be hard-deleted; their consumption events remain in the append-only log as orphans
         val orphanId = createMember("ephemeral", "Eph", "Emeral")
         overrideCount(orphanId, 1)
@@ -251,12 +251,12 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
         val deletedRows =
             globalActivity().filter { it.subjectUserId == orphanId }
         assertThat(deletedRows).isNotEmpty()
-        assertThat(deletedRows).allMatch { it.subjectName == "(deleted member)" && it.subjectLogin == "ephemeral" }
+        assertThat(deletedRows).allMatch { it.subjectName == "(deleted user)" && it.subjectLogin == "ephemeral" }
     }
 
     @Test
     fun `the CSV neutralizes a spreadsheet formula-injection display name`() {
-        // a member whose display name begins with a formula trigger ('='): the CSV must prefix it with a quote
+        // a user whose display name begins with a formula trigger ('='): the CSV must prefix it with a quote
         // so a spreadsheet renders it as literal text rather than evaluating it (formula injection)
         val id = createMember("formulauser", "=cmd", "Test")
         overrideCount(id, 1)

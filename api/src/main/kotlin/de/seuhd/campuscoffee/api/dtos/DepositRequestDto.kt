@@ -7,8 +7,8 @@ import jakarta.validation.constraints.Size
 import java.util.UUID
 
 /**
- * Request body for an admin recording that a member paid money into the kitty
- * (`POST /api/kitty/deposit`): the member, the positive amount in euro cents, and an optional note.
+ * Request body for an admin recording that a user paid money into the kitty
+ * (`POST /api/kitty/deposit`): the user, the positive amount in euro cents, and an optional note.
  */
 data class DepositRequestDto(
     @field:NotNull(message = "User id is required.")

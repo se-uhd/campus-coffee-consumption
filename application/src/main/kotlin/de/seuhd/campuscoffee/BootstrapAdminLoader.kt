@@ -5,9 +5,9 @@ import de.seuhd.campuscoffee.api.dtos.PASSWORD_COMPLEXITY_PATTERN
 import de.seuhd.campuscoffee.configuration.BootstrapAdminProperties
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
-import de.seuhd.campuscoffee.domain.ports.StartupTask
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.system.StartupTaskService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 
@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component
  * admin exists yet, so a fresh prod deployment (where fixtures are off) is reachable. It runs after the
  * fixture loader, so in dev (where the fixtures already seed an admin) it sees that admin and does
  * nothing. The created admin gets a generated capability token and a coffee consumption at zero, exactly
- * like a member created through the API.
+ * like a user created through the API.
  *
  * [StartupDataInitializer] runs it before the web server accepts requests.
  */
@@ -25,7 +25,7 @@ class BootstrapAdminLoader(
     private val userService: UserService,
     private val coffeeConsumptionService: CoffeeConsumptionService,
     private val bootstrapAdminProperties: BootstrapAdminProperties
-) : StartupTask {
+) : StartupTaskService {
     override val order = ORDER
 
     override fun run() = createBootstrapAdmin()

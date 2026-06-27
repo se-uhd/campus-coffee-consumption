@@ -6,7 +6,7 @@ import java.util.UUID
 /**
  * Immutable payment domain model: an admin-recorded movement of money into the communal kitty, in euro
  * cents ([amountCents]). The nullable [user] is the load-bearing distinction:
- * - present, a **deposit**: the member paid money in, which credits their balance and feeds the kitty;
+ * - present, a **deposit**: the user paid money in, which credits their balance and feeds the kitty;
  * - absent, a pure **kitty adjustment**: an initial float or a correction that changes only the kitty.
  *
  * Deposits are positive; a kitty adjustment may be signed (a correction can remove money). Payments are

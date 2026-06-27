@@ -12,10 +12,10 @@ import org.springframework.test.web.servlet.client.returnResult
 import tools.jackson.databind.ObjectMapper
 
 /**
- * Step definitions for the member coffee-consumption acceptance scenarios. The member authenticates with
+ * Step definitions for the user coffee-consumption acceptance scenarios. The user authenticates with
  * their seeded capability token; each step records the latest response so the Then steps can assert the
  * status and the returned count. Adding a coffee is `POST /consumption` (no body) and undoing the most
- * recent one is `POST /consumption/cancel`; both return the member summary.
+ * recent one is `POST /consumption/cancel`; both return the user summary.
  */
 class CucumberConsumptionSteps(
     private val objectMapper: ObjectMapper

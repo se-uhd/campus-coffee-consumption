@@ -16,33 +16,6 @@ import java.time.Instant
 import java.util.HexFormat
 
 /**
- * The credentials carried inside the encrypted login payload. This is an internal type (never a wire DTO):
- * the client serializes it as the JWE plaintext, and the controller hands it straight to the
- * authentication manager.
- *
- * @property loginName the admin's login name.
- * @property password the admin's password.
- */
-data class LoginCredentials(
-    val loginName: String,
-    val password: String
-)
-
-/**
- * Records login-payload fingerprints so a captured ciphertext cannot be replayed within its freshness
- * window. The `iat` check already bounds the window; this makes a ciphertext single-use inside it.
- */
-fun interface LoginReplayGuard {
-    /**
-     * Records [fingerprint] as seen and reports whether this was its first use.
-     *
-     * @param fingerprint a stable fingerprint of the encrypted payload (so the exact ciphertext is one-use).
-     * @return true if the fingerprint had not been seen before (accept), false if it is a replay (reject).
-     */
-    fun isFirstUse(fingerprint: String): Boolean
-}
-
-/**
  * Decrypts the compact JWE that a client sends to the token endpoint, recovering the login credentials.
  * The frontend encrypts `{ loginName, password, iat }` with the published RSA public key (`alg=RSA-OAEP-256`,
  * `enc=A256GCM`); only the configured private key here can decrypt it. Any failure to parse, decrypt, or

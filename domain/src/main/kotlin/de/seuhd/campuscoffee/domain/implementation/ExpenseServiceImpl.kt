@@ -9,7 +9,7 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
-import de.seuhd.campuscoffee.domain.ports.data.BalanceLock
+import de.seuhd.campuscoffee.domain.ports.data.BalanceLockService
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.springframework.stereotype.Service
@@ -17,10 +17,10 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * Domain implementation of [ExpenseService]. A member records only their own purchase, 100% private to
- * themselves. The buyer and split are derived here, never read from the request, so a member cannot
+ * Domain implementation of [ExpenseService]. A user records only their own purchase, 100% private to
+ * themselves. The buyer and split are derived here, never read from the request, so a user cannot
  * attribute a purchase to someone else or fund it from the kitty. Recording a split, attributing to another
- * member, correcting, and deleting are all admin-only. Every purchase is validated so the private and kitty
+ * user, correcting, and deleting are all admin-only. Every purchase is validated so the private and kitty
  * portions sum to the total, and an admin split whose kitty portion would overdraw the kitty is rejected (409).
  */
 @Service
@@ -28,7 +28,7 @@ class ExpenseServiceImpl(
     private val expenseDataService: ExpenseDataService,
     private val userDataService: UserDataService,
     private val balanceDataService: BalanceDataService,
-    private val balanceLock: BalanceLock
+    private val balanceLock: BalanceLockService
 ) : ExpenseService {
     @Transactional
     override fun recordOwn(
@@ -38,10 +38,10 @@ class ExpenseServiceImpl(
         actingUser: User
     ): Expense {
         if (actingUser.active != true) {
-            throw ForbiddenException("A deactivated member is read-only and cannot record a purchase.")
+            throw ForbiddenException("A deactivated user is read-only and cannot record a purchase.")
         }
         validateAmounts(weightGrams, amountCents, amountCents, 0)
-        // a member's own purchase is always 100% from their own pocket
+        // a user's own purchase is always 100% from their own pocket
         return expenseDataService.upsert(
             Expense(
                 buyer = actingUser,
@@ -99,7 +99,7 @@ class ExpenseServiceImpl(
         requireAdmin(actingUser)
         validateAmounts(weightGrams, amountCents, privateAmountCents, kittyAmountCents)
         val existing = expenseDataService.getById(expenseId)
-        // the buyer cannot be changed: the member activity keys on the buyer, so reassigning would leave the
+        // the buyer cannot be changed: the user activity keys on the buyer, so reassigning would leave the
         // old buyer credited and double-credit the new one. To move an expense, delete it and record a new one.
         if (buyerUserId != existing.buyer.persistedId) {
             throw ValidationException("An expense's buyer cannot be changed; delete it and record a new one.")
@@ -136,7 +136,7 @@ class ExpenseServiceImpl(
         requireAdmin(actingUser)
         // no explicit kitty lock here: a delete only shrinks the kitty draw (it cannot overdraw), so it has
         // no overdraw check to serialize. Its kitty recompute is still serialized against concurrent kitty
-        // writers by the lock the projection takes around every recompute (see BalanceProjection.maintain).
+        // writers by the lock the projection takes around every recompute (see BalanceDataServiceImpl.maintain).
         expenseDataService.delete(expenseId)
     }
 

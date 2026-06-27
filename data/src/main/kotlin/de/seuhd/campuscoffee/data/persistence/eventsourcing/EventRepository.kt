@@ -60,12 +60,12 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
     fun findByEntityTypeOrderBySeqAsc(entityType: String): List<EventEntity>
 
     /**
-     * Returns a member's full unified-activity stream in append order: their consumption events, the expenses
+     * Returns a user's full unified-activity stream in append order: their consumption events, the expenses
      * they bought, and the deposits they paid. Keyed on the owning user id embedded in each body
      * (`userId` for consumptions and payments, `buyerUserId` for expenses), so it survives a consumption row
      * being recreated. A native query because the match is on the `jsonb` body (the V7 owner-key indexes).
      *
-     * @param userId the owning member's id (its string form)
+     * @param userId the owning user's id (its string form)
      */
     @Query(
         value =
@@ -95,7 +95,7 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
     /**
      * Returns the whole-installation activity stream in append order: every consumption, expense, payment, and
      * price change (everything except the mutable user records), ordered by `seq` so the single global walk
-     * reads one ordered stream. This is the all-members, all-types superset of [findUserActivity] and
+     * reads one ordered stream. This is the all-users, all-types superset of [findUserActivity] and
      * [findKittyStream]; the price events are included so the global feed can show price-change rows (the walk
      * still values coffees from the price timeline, never from these inline rows).
      */

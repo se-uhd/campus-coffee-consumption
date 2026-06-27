@@ -18,8 +18,8 @@ export interface GlobalActivityEntryDto {
     subjectLogin?: string | null;
     subjectName?: string | null;
     note?: string | null;
-    memberEffectCents?: number | null;
-    memberBalanceCents?: number | null;
+    userEffectCents?: number | null;
+    userBalanceCents?: number | null;
     kittyEffectCents?: number | null;
     kittyBalanceCents?: number | null;
     count?: number | null;

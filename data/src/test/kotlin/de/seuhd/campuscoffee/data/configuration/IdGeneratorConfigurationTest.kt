@@ -1,11 +1,12 @@
 package de.seuhd.campuscoffee.data.configuration
 
+import de.seuhd.campuscoffee.data.adapters.IdGeneratorServiceImpl
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
 /**
- * Tests [IdGeneratorConfiguration] and the [SeededUuidGenerator] it builds: a numeric
+ * Tests [IdGeneratorConfiguration] and the [IdGeneratorServiceImpl] it builds: a numeric
  * `campus-coffee.id.entity-seed` produces the same id sequence every time, and `random` (or a blank value)
  * produces a different id on each call.
  */
@@ -34,7 +35,7 @@ class IdGeneratorConfigurationTest {
 
     @Test
     fun `two different seeds produce different first ids`() {
-        assertThat(SeededUuidGenerator(1L).newId()).isNotEqualTo(SeededUuidGenerator(2L).newId())
+        assertThat(IdGeneratorServiceImpl(1L).newId()).isNotEqualTo(IdGeneratorServiceImpl(2L).newId())
     }
 
     @Test
@@ -49,9 +50,9 @@ class IdGeneratorConfigurationTest {
 
     @Test
     fun `seed 42 produces the ids documented for the seeded fixture members`() {
-        // the fixture members are loaded in a fixed order (jane_doe first, student2023 third), so the
+        // the fixture users are loaded in a fixed order (jane_doe first, student2023 third), so the
         // seeded generator assigns them these documented ids; a change here means the docs must be updated
-        val idGenerator = SeededUuidGenerator(42L)
+        val idGenerator = IdGeneratorServiceImpl(42L)
         val firstIds = List(5) { idGenerator.newId() }
 
         assertThat(firstIds[0]).isEqualTo(JANE_DOE_ID)
@@ -59,7 +60,7 @@ class IdGeneratorConfigurationTest {
     }
 
     private companion object {
-        // the ids SeededUuidGenerator(42) assigns to the first and third fixture members (jane_doe and
+        // the ids IdGeneratorServiceImpl(42) assigns to the first and third fixture users (jane_doe and
         // student2023), also referenced by the docs
         val JANE_DOE_ID: UUID = UUID.fromString("ba419d35-0dfe-8af7-aee7-bbe10c45c028")
         val STUDENT2023_ID: UUID = UUID.fromString("aa616abe-1761-0c9a-e743-67bd738597dc")

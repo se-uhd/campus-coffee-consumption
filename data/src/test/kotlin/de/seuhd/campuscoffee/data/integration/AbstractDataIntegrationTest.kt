@@ -34,7 +34,7 @@ abstract class AbstractDataIntegrationTest {
 
     /**
      * Assigns an id to an entity that a test persists directly through a repository. The data services
-     * assign the id themselves (via the `IdGenerator`); a test that bypasses them and saves an entity
+     * assign the id themselves (via the `IdGeneratorService`); a test that bypasses them and saves an entity
      * built straight from the mapper must set the id here, because the database does not generate it.
      */
     protected fun <T : Entity> T.withGeneratedId(): T = apply { id = UUID.randomUUID() }

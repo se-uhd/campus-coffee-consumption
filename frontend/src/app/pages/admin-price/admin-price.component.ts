@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
@@ -40,18 +40,18 @@ import { ActorPipe } from '../../pipes/actor.pipe';
     AppHeaderComponent,
     EuroAmountDirective
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <cc-app-header [home]="'/admin'" title="Price" icon="sell"></cc-app-header>
 
-    @if (loading) {
+    @if (loading()) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
     <div class="page">
-      @if (loadError) {
+      @if (loadError()) {
         <mat-card class="card">
-          <p class="warn">{{ loadError }}</p>
+          <p class="warn">{{ loadError() }}</p>
           <button mat-stroked-button (click)="reload()">Retry</button>
         </mat-card>
       } @else {
@@ -83,9 +83,9 @@ import { ActorPipe } from '../../pipes/actor.pipe';
               mat-flat-button
               color="primary"
               (click)="save()"
-              [disabled]="form.invalid || priceError() != null || busy"
+              [disabled]="form.invalid || priceError() != null || busy()"
             >
-              @if (busy) {
+              @if (busy()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
                 Save price
@@ -97,7 +97,7 @@ import { ActorPipe } from '../../pipes/actor.pipe';
         <mat-card class="card">
           <h2>History</h2>
           <mat-list>
-            @for (entry of history; track $index) {
+            @for (entry of history(); track $index) {
               <mat-list-item lines="2">
                 <span matListItemTitle>{{ entry.amountCents | euros }}</span>
                 <span matListItemLine class="muted">
@@ -114,11 +114,11 @@ import { ActorPipe } from '../../pipes/actor.pipe';
   `
 })
 export class AdminPriceComponent implements OnInit {
-  history: PriceChangeDto[] = [];
+  readonly history = signal<PriceChangeDto[]>([]);
   newPriceEuros = '';
-  busy = false;
-  loading = false;
-  loadError = '';
+  readonly busy = signal(false);
+  readonly loading = signal(false);
+  readonly loadError = signal('');
 
   /** The validation message for the price input (e.g. the ambiguous comma+point case), or null. */
   priceError(): string | null {
@@ -127,7 +127,8 @@ export class AdminPriceComponent implements OnInit {
 
   constructor(
     private readonly priceService: PriceService,
-    private readonly notifications: NotificationService
+    private readonly notifications: NotificationService,
+    private readonly cdr: ChangeDetectorRef
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -136,26 +137,27 @@ export class AdminPriceComponent implements OnInit {
 
   /** Loads the price history; surfaces a retryable error on failure. */
   async reload(): Promise<void> {
-    this.loading = true;
-    this.loadError = '';
+    this.loading.set(true);
+    this.loadError.set('');
     try {
-      this.history = await this.priceService.history();
+      this.history.set(await this.priceService.history());
     } catch {
-      this.loadError = 'Could not load the price history.';
+      this.loadError.set('Could not load the price history.');
     } finally {
-      this.loading = false;
+      this.loading.set(false);
     }
   }
 
   /** The current price (the newest history entry), or zero cents when no price is set yet. */
   currentPriceCents(): number {
-    return this.history.length > 0 ? this.history[0].amountCents : 0;
+    const history = this.history();
+    return history.length > 0 ? history[0].amountCents : 0;
   }
 
   /** Sets a new price; the euro input is converted to integer cents before sending. */
   async save(): Promise<void> {
     // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
-    if (this.busy) {
+    if (this.busy()) {
       return;
     }
     const amountCents = toCents(this.newPriceEuros);
@@ -163,16 +165,18 @@ export class AdminPriceComponent implements OnInit {
       this.notifications.error(null, 'Enter a valid, non-negative price (e.g. 0.50).');
       return;
     }
-    this.busy = true;
+    this.busy.set(true);
     try {
       await this.priceService.setPrice(amountCents);
       this.newPriceEuros = '';
+      // the input reset above is a non-DOM write, so mark this OnPush view for check to clear the field
+      this.cdr.markForCheck();
       this.notifications.success('Price updated.');
       await this.reload();
     } catch (error) {
       this.notifications.error(error, 'Could not set the price.');
     } finally {
-      this.busy = false;
+      this.busy.set(false);
     }
   }
 }

@@ -30,7 +30,7 @@ class EventSourcedPaymentDataService(
 
     @Transactional
     override fun delete(id: UUID) =
-        // carry the member id (null for a pure kitty adjustment) so the member activity reverses a deposit
+        // carry the user id (null for a pure kitty adjustment) so the user activity reverses a deposit
         writer.delete(Payment::class, id, delegate::getById) { mapOf("userId" to it.user?.id) }
 
     @Transactional

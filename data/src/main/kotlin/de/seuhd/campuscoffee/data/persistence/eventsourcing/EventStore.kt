@@ -1,10 +1,10 @@
 package de.seuhd.campuscoffee.data.persistence.eventsourcing
 
 import de.seuhd.campuscoffee.data.configuration.IdGeneratorConfiguration
+import de.seuhd.campuscoffee.domain.model.ChangeNoteContext
 import de.seuhd.campuscoffee.domain.model.DomainModel
-import de.seuhd.campuscoffee.domain.ports.ActorProvider
-import de.seuhd.campuscoffee.domain.ports.ChangeNoteContext
-import de.seuhd.campuscoffee.domain.ports.IdGenerator
+import de.seuhd.campuscoffee.domain.ports.system.ActorProviderService
+import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import tools.jackson.core.type.TypeReference
@@ -19,18 +19,18 @@ import kotlin.reflect.KClass
  *
  * The body is the full JSON state of the domain object (INSERT/UPDATE), or just its id (DELETE), built with
  * [EventJsonMapper] so it matches the `jsonb` column. The domain object's own id is inside the body; the
- * event's own id comes from a dedicated [IdGenerator] bean, qualified
+ * event's own id comes from a dedicated [IdGeneratorService] bean, qualified
  * [IdGeneratorConfiguration.EVENT_ID_GENERATOR], with its own seed, separate from the entity-id generator.
  *
  * Each event is also stamped with two metadata fields sourced from request-scoped context ports: the
- * actor's login (from [ActorProvider]) as `created_by`, and an optional admin note (from
+ * actor's login (from [ActorProviderService]) as `created_by`, and an optional admin note (from
  * [ChangeNoteContext]) as `note`. Neither is part of the JSON body.
  */
 @Service
 class EventStore(
     private val eventRepository: EventRepository,
-    @param:Qualifier(IdGeneratorConfiguration.EVENT_ID_GENERATOR) private val idGenerator: IdGenerator,
-    private val actorProvider: ActorProvider,
+    @param:Qualifier(IdGeneratorConfiguration.EVENT_ID_GENERATOR) private val idGenerator: IdGeneratorService,
+    private val actorProvider: ActorProviderService,
     private val changeNoteContext: ChangeNoteContext
 ) {
     /**
@@ -51,13 +51,13 @@ class EventStore(
 
     /**
      * Appends a DELETE event carrying the id of the removed domain object, plus any [ownerKeys] that the
-     * member-activity and kitty-history reads key on (a deleted expense or deposit must still be matched to
+     * user-activity and kitty-history reads key on (a deleted expense or deposit must still be matched to
      * its owner so the activity feed reverses it; the projection ignores everything but the id). Each value
      * is stored as its string form to match the way the body flattens references.
      *
      * @param domainType the domain type of the removed object
      * @param id the id of the removed domain object
-     * @param ownerKeys extra body fields (e.g. `buyerUserId`, `userId`) so a member-activity query still
+     * @param ownerKeys extra body fields (e.g. `buyerUserId`, `userId`) so a user-activity query still
      *   matches the DELETE event; a null value is omitted
      */
     fun appendDelete(

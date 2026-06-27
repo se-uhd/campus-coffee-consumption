@@ -14,10 +14,10 @@ import java.util.UUID
  */
 interface PaymentService {
     /**
-     * Records that a member paid money into the kitty (a deposit): credits the member's balance and
+     * Records that a user paid money into the kitty (a deposit): credits the user's balance and
      * feeds the kitty.
      *
-     * @param userId      the member who paid
+     * @param userId      the user who paid
      * @param amountCents the amount paid in euro cents (must be positive)
      * @param note        an optional free-text note
      * @param actingUser  the authenticated user attempting the record
@@ -34,7 +34,7 @@ interface PaymentService {
     ): Payment
 
     /**
-     * Adjusts the kitty without involving a member (an initial float, or a correction). The amount may be
+     * Adjusts the kitty without involving a user (an initial float, or a correction). The amount may be
      * negative to remove money from the kitty.
      *
      * @param amountCents the signed adjustment in euro cents (must not be zero)

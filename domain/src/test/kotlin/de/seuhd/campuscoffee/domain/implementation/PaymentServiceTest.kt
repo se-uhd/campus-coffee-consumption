@@ -7,7 +7,7 @@ import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
-import de.seuhd.campuscoffee.domain.ports.data.BalanceLock
+import de.seuhd.campuscoffee.domain.ports.data.BalanceLockService
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import org.assertj.core.api.Assertions.assertThat
@@ -23,14 +23,14 @@ import java.util.UUID
 
 /**
  * Unit tests for PaymentServiceImpl, mocking the data ports. The invariants under test: every operation is
- * admin-only, a deposit amount must be positive (and carries the member), and a kitty adjustment must be
- * non-zero (and carries no member).
+ * admin-only, a deposit amount must be positive (and carries the user), and a kitty adjustment must be
+ * non-zero (and carries no user).
  */
 class PaymentServiceTest {
     private val paymentDataService: PaymentDataService = mock()
     private val userDataService: UserDataService = mock()
     private val balanceDataService: BalanceDataService = mock()
-    private val balanceLock: BalanceLock = mock()
+    private val balanceLock: BalanceLockService = mock()
     private val service = PaymentServiceImpl(paymentDataService, userDataService, balanceDataService, balanceLock)
 
     private val memberId: UUID = UUID(0L, 1L)

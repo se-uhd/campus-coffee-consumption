@@ -51,7 +51,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
       </span>
     </header>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
       .cc-header {
@@ -120,7 +120,7 @@ export class AppHeaderComponent {
 
   /**
    * How the back/home link carries the current URL query params. Defaults to `''` (drop them); an admin
-   * subpage sets `'preserve'` so the selected `member` carries back to the landing.
+   * subpage sets `'preserve'` so the selected `user` carries back to the landing.
    */
   readonly queryParamsHandling = input<QueryParamsHandling>('');
 }

@@ -22,8 +22,8 @@ import org.springframework.context.annotation.Configuration
         Info(
             title = "CampusCoffeeConsumption API",
             description =
-                "REST API for tracking the coffee consumption of SE@UHD group members: members bump their " +
-                    "own count via a secret capability link, and admins manage members and adjust counts."
+                "REST API for tracking the coffee consumption of SE@UHD users: users bump their " +
+                    "own count via a secret capability link, and admins manage users and adjust counts."
         )
 )
 class OpenApiConfig {

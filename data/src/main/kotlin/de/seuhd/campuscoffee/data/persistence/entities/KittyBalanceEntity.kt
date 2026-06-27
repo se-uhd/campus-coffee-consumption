@@ -6,7 +6,7 @@ import jakarta.persistence.Table
 
 /**
  * Read-model projection of the single global kitty balance in euro cents. Derived from the payment and
- * expense streams and maintained on every kitty-moving write, so the member landing summary and the
+ * expense streams and maintained on every kitty-moving write, so the user landing summary and the
  * kitty-overdraw guard read one number instead of replaying the whole global money stream. A single row
  * pinned to [SINGLETON_ID] by the table's `CHECK (id = 1)` constraint; [balanceCents] is the current kitty
  * balance.

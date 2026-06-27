@@ -1,9 +1,9 @@
 package de.seuhd.campuscoffee.api.dtos
 
 /**
- * Response DTO for a member's landing page in one read: the coffee [count], the current price per cup
- * ([priceCents]), the member's [balanceCents] (negative ⇒ they owe the fund), the communal
- * [kittyBalanceCents] (read-only for members), whether their most recent coffee is still [cancellable]
+ * Response DTO for a user's landing page in one read: the coffee [count], the current price per cup
+ * ([priceCents]), the user's [balanceCents] (negative ⇒ they owe the fund), the communal
+ * [kittyBalanceCents] (read-only for users), whether their most recent coffee is still [cancellable]
  * within the grace period, and the first page of their unified [activity] (newest first). Money is euro cents.
  */
 data class UserSummaryDto(

@@ -23,12 +23,12 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import java.util.UUID
 
 /**
- * Admin controller for recording and correcting a member's bean purchases (JWT, admin only). The buyer is
- * the `{userId}` path variable; the body carries the weight, total, and the kitty/private split. A member
+ * Admin controller for recording and correcting a user's bean purchases (JWT, admin only). The buyer is
+ * the `{userId}` path variable; the body carries the weight, total, and the kitty/private split. A user
  * records their own purchases through `/api/expenses` instead; only an admin reaches these split,
  * attribution, and correction operations.
  */
-@Tag(name = "Admin expenses", description = "Recording, correcting, and deleting members' bean purchases (admin only).")
+@Tag(name = "Admin expenses", description = "Recording, correcting, and deleting users' bean purchases (admin only).")
 @Controller
 @RequestMapping("/users/{userId}/expenses")
 class AdminExpenseController(
@@ -37,11 +37,11 @@ class AdminExpenseController(
     private val currentUserProvider: CurrentUserProvider
 ) {
     /**
-     * Lists the member's recorded bean purchases, so an admin can find one to correct or delete.
+     * Lists the user's recorded bean purchases, so an admin can find one to correct or delete.
      *
      * @param userId the buyer whose purchases to list
      */
-    @Operation(summary = "List a member's recorded bean purchases.")
+    @Operation(summary = "List a user's recorded bean purchases.")
     @GetMapping("")
     fun list(
         @PathVariable userId: UUID
@@ -51,12 +51,12 @@ class AdminExpenseController(
     }
 
     /**
-     * Records a bean purchase for the member, with a kitty/private split.
+     * Records a bean purchase for the user, with a kitty/private split.
      *
      * @param userId the buyer credited with the private portion
      * @param dto    the purchase (weight, total, split, optional note)
      */
-    @Operation(summary = "Record a bean purchase for a member, with a kitty/private split.")
+    @Operation(summary = "Record a bean purchase for a user, with a kitty/private split.")
     @ResponseStatus(HttpStatus.CREATED)
     @ResponseBody
     @PostMapping("")

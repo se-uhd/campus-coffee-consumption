@@ -5,7 +5,7 @@ import de.seuhd.campuscoffee.data.persistence.repositories.CoffeePriceRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.ExpenseRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.PaymentRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.UserRepository
-import de.seuhd.campuscoffee.domain.ports.StartupTask
+import de.seuhd.campuscoffee.domain.ports.system.StartupTaskService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
@@ -27,13 +27,13 @@ import org.springframework.transaction.annotation.Transactional
 class EventsToDataRunner(
     private val eventRepository: EventRepository,
     private val projector: ReadModelProjector,
-    private val balanceProjection: BalanceProjection,
+    private val balanceProjection: BalanceDataServiceImpl,
     private val userRepository: UserRepository,
     private val coffeeConsumptionRepository: CoffeeConsumptionRepository,
     private val coffeePriceRepository: CoffeePriceRepository,
     private val expenseRepository: ExpenseRepository,
     private val paymentRepository: PaymentRepository
-) : StartupTask {
+) : StartupTaskService {
     override val order = ORDER
 
     @Transactional
@@ -65,7 +65,7 @@ class EventsToDataRunner(
             total += batch.size
         }
         // the projector rebuilds only the relational rows; recompute the balance projections from the log
-        // once the read tables (and member logins) are in place
+        // once the read tables (and user logins) are in place
         balanceProjection.rebuildAll()
         log.info { "Rebuilt the read model and balances from $total events in the log." }
     }
@@ -73,7 +73,7 @@ class EventsToDataRunner(
     /**
      * Empties the read tables in foreign key order: the balance projections first, then the children that
      * reference users (consumptions, expenses, payments) before users; the price is independent and is
-     * cleared too. Clearing the balance projections here, rather than relying on the `member_balance` cascade
+     * cleared too. Clearing the balance projections here, rather than relying on the `user_balance` cascade
      * from the user delete, keeps the kitty_balance row from going stale during the replay.
      */
     private fun clearReadTables() {

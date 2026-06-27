@@ -6,8 +6,8 @@ import de.seuhd.campuscoffee.data.persistence.entities.CoffeeConsumptionEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeConsumptionRepository
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
-import de.seuhd.campuscoffee.domain.ports.IdGenerator
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
+import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -20,7 +20,7 @@ import java.util.UUID
 class CoffeeConsumptionDataServiceImpl(
     repository: CoffeeConsumptionRepository,
     entityMapper: CoffeeConsumptionEntityMapper,
-    idGenerator: IdGenerator
+    idGenerator: IdGeneratorService
 ) : CrudDataServiceImpl<CoffeeConsumption, CoffeeConsumptionEntity, CoffeeConsumptionRepository, UUID>(
         repository,
         entityMapper,

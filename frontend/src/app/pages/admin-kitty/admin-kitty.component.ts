@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -23,8 +23,8 @@ import { loadActivityPage } from '../../util/activity';
 const PAGE_SIZE = 20;
 
 /**
- * Admin kitty page: shows the communal kitty balance and history, and offers two money movements: a member
- * deposit (a member paid money in) and a kitty adjustment (a direct change to the kitty balance, which may
+ * Admin kitty page: shows the communal kitty balance and history, and offers two money movements: a user
+ * deposit (a user paid money in) and a kitty adjustment (a direct change to the kitty balance, which may
  * be negative). Euro inputs are converted to integer cents on submit, never via float math.
  */
 @Component({
@@ -44,41 +44,41 @@ const PAGE_SIZE = 20;
     CollapsibleCardComponent,
     EuroAmountDirective
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <cc-app-header [home]="'/admin'" title="Kitty" icon="savings"></cc-app-header>
 
-    @if (loading) {
+    @if (loading()) {
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
     <div class="page">
-      @if (loadError) {
+      @if (loadError()) {
         <mat-card class="card">
-          <p class="warn">{{ loadError }}</p>
+          <p class="warn">{{ loadError() }}</p>
           <button mat-stroked-button (click)="reload()">Retry</button>
         </mat-card>
       } @else {
         <mat-card class="card">
           <h2>Kitty balance</h2>
-          <div class="display">{{ kitty?.balanceCents ?? 0 | euros }}</div>
+          <div class="display">{{ kitty()?.balanceCents ?? 0 | euros }}</div>
         </mat-card>
 
         <mat-card class="card">
-          <h2>Record member deposit</h2>
-          <p class="muted">A member paid money into the fund. Their balance goes up by this amount.</p>
+          <h2>Record a deposit</h2>
+          <p class="muted">A user paid money into the fund. Their balance goes up by this amount.</p>
           <form #depositForm="ngForm">
             <mat-form-field class="full-width">
-              <mat-label>Member</mat-label>
-              <mat-select name="member" #memberModel="ngModel" [(ngModel)]="depositUserId" required>
-                @for (user of users; track user.id) {
+              <mat-label>User</mat-label>
+              <mat-select name="user" #userModel="ngModel" [(ngModel)]="depositUserId" required>
+                @for (user of users(); track user.id) {
                   <mat-option [value]="user.id">
                     {{ user.loginName }} ({{ user.firstName }} {{ user.lastName }})
                   </mat-option>
                 }
               </mat-select>
-              @if (memberModel.invalid && memberModel.touched) {
-                <mat-error>Choose a member.</mat-error>
+              @if (userModel.invalid && userModel.touched) {
+                <mat-error>Choose a user.</mat-error>
               }
             </mat-form-field>
             <mat-form-field class="full-width">
@@ -105,9 +105,9 @@ const PAGE_SIZE = 20;
               mat-flat-button
               color="primary"
               (click)="recordDeposit()"
-              [disabled]="depositForm.invalid || depositError() != null || busy"
+              [disabled]="depositForm.invalid || depositError() != null || busy()"
             >
-              @if (busy) {
+              @if (busy()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
                 Record deposit
@@ -119,16 +119,16 @@ const PAGE_SIZE = 20;
         <mat-card class="card">
           <h2>Kitty history</h2>
           <cc-activity-list
-            [entries]="entries"
+            [entries]="entries()"
             [showFilter]="false"
-            [canLoadMore]="hasMore"
-            [loadingMore]="loadingMore"
+            [canLoadMore]="hasMore()"
+            [loadingMore]="loadingMore()"
             (loadMore)="loadMore()"
           ></cc-activity-list>
         </mat-card>
 
         <!-- Adjusting the kitty directly is uncommon, so it is folded into a collapsed card (matching the
-             member "Record expense" card); the balance, deposit, and history above stay visible. -->
+             user "Record expense" card); the balance, deposit, and history above stay visible. -->
         <cc-collapsible-card
           title="Adjust the kitty"
           [(open)]="adjustOpen"
@@ -162,9 +162,9 @@ const PAGE_SIZE = 20;
               mat-flat-button
               color="primary"
               (click)="recordAdjustment()"
-              [disabled]="adjustForm.invalid || adjustmentError() != null || busy"
+              [disabled]="adjustForm.invalid || adjustmentError() != null || busy()"
             >
-              @if (busy) {
+              @if (busy()) {
                 <mat-spinner diameter="20"></mat-spinner>
               } @else {
                 Adjust kitty
@@ -177,9 +177,9 @@ const PAGE_SIZE = 20;
   `
 })
 export class AdminKittyComponent implements OnInit {
-  users: UserDto[] = [];
-  kitty: KittyDto | null = null;
-  entries: ActivityEntryDto[] = [];
+  readonly users = signal<UserDto[]>([]);
+  readonly kitty = signal<KittyDto | null>(null);
+  readonly entries = signal<ActivityEntryDto[]>([]);
 
   depositUserId = '';
   depositEuros = '';
@@ -190,16 +190,17 @@ export class AdminKittyComponent implements OnInit {
   /** Whether the "Adjust the kitty" form is expanded; collapsed by default (a rare operation). */
   adjustOpen = false;
 
-  busy = false;
-  loading = false;
-  loadingMore = false;
-  loadError = '';
-  hasMore = false;
+  readonly busy = signal(false);
+  readonly loading = signal(false);
+  readonly loadingMore = signal(false);
+  readonly loadError = signal('');
+  readonly hasMore = signal(false);
 
   constructor(
     private readonly userService: UserService,
     private readonly kittyService: KittyService,
-    private readonly notifications: NotificationService
+    private readonly notifications: NotificationService,
+    private readonly cdr: ChangeDetectorRef
   ) {}
 
   /** The validation message for the deposit amount (e.g. the ambiguous comma+point case), or null. */
@@ -216,50 +217,50 @@ export class AdminKittyComponent implements OnInit {
     await this.reload();
   }
 
-  /** Loads the members and the first page of the kitty history; surfaces a retryable error on failure. */
+  /** Loads the users and the first page of the kitty history; surfaces a retryable error on failure. */
   async reload(): Promise<void> {
-    this.loading = true;
-    this.loadError = '';
+    this.loading.set(true);
+    this.loadError.set('');
     try {
-      this.users = await this.userService.list();
+      this.users.set(await this.userService.list());
       const kitty = await this.kittyService.history(PAGE_SIZE + 1, 0);
-      this.kitty = kitty;
-      this.entries = kitty.entries.slice(0, PAGE_SIZE);
-      this.hasMore = kitty.entries.length > PAGE_SIZE;
+      this.kitty.set(kitty);
+      this.entries.set(kitty.entries.slice(0, PAGE_SIZE));
+      this.hasMore.set(kitty.entries.length > PAGE_SIZE);
     } catch {
-      this.loadError = 'Could not load the kitty.';
+      this.loadError.set('Could not load the kitty.');
     } finally {
-      this.loading = false;
+      this.loading.set(false);
     }
   }
 
   /** Appends the next page of the kitty history. */
   async loadMore(): Promise<void> {
-    this.loadingMore = true;
+    this.loadingMore.set(true);
     try {
-      const { entries, hasMore } = await loadActivityPage(this.entries, PAGE_SIZE, (limit, offset) =>
+      const { entries, hasMore } = await loadActivityPage(this.entries(), PAGE_SIZE, (limit, offset) =>
         this.kittyService.history(limit, offset).then((page) => page.entries)
       );
-      this.entries = entries;
-      this.hasMore = hasMore;
+      this.entries.set(entries);
+      this.hasMore.set(hasMore);
     } catch (error) {
       this.notifications.error(error, 'Could not load more history.');
     } finally {
-      this.loadingMore = false;
+      this.loadingMore.set(false);
     }
   }
 
-  /** Records a member deposit; the euro input is converted to integer cents before sending. */
+  /** Records a user deposit; the euro input is converted to integer cents before sending. */
   async recordDeposit(): Promise<void> {
-    if (this.busy) {
+    if (this.busy()) {
       return;
     }
     const amountCents = toCents(this.depositEuros);
     if (!this.depositUserId || amountCents == null || amountCents <= 0) {
-      this.notifications.error(null, 'Choose a member and a positive amount.');
+      this.notifications.error(null, 'Choose a user and a positive amount.');
       return;
     }
-    this.busy = true;
+    this.busy.set(true);
     try {
       await this.kittyService.deposit({
         userId: this.depositUserId,
@@ -268,18 +269,20 @@ export class AdminKittyComponent implements OnInit {
       });
       this.depositEuros = '';
       this.depositNote = '';
+      // the ngModel resets above are non-DOM writes, so mark this OnPush view for check to clear the fields
+      this.cdr.markForCheck();
       this.notifications.success('Deposit recorded.');
       await this.reload();
     } catch (error) {
       this.notifications.error(error, 'Could not record the deposit.');
     } finally {
-      this.busy = false;
+      this.busy.set(false);
     }
   }
 
   /** Adjusts the kitty (may be negative); the euro input is converted to integer cents before sending. */
   async recordAdjustment(): Promise<void> {
-    if (this.busy) {
+    if (this.busy()) {
       return;
     }
     const amountCents = toCents(this.adjustmentEuros);
@@ -287,17 +290,19 @@ export class AdminKittyComponent implements OnInit {
       this.notifications.error(null, 'Enter a non-zero amount.');
       return;
     }
-    this.busy = true;
+    this.busy.set(true);
     try {
       await this.kittyService.adjustment({ amountCents, note: this.adjustmentNote || undefined });
       this.adjustmentEuros = '';
       this.adjustmentNote = '';
+      // the ngModel resets above are non-DOM writes, so mark this OnPush view for check to clear the fields
+      this.cdr.markForCheck();
       this.notifications.success('Kitty adjusted.');
       await this.reload();
     } catch (error) {
       this.notifications.error(error, 'Could not adjust the kitty.');
     } finally {
-      this.busy = false;
+      this.busy.set(false);
     }
   }
 }

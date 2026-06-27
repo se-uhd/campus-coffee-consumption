@@ -10,7 +10,7 @@
 
 
 /**
- * Data of the member to create, including their role.
+ * Data of the user to create, including their role.
  */
 export interface UserDto { 
     id?: string | null;

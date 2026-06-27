@@ -3,7 +3,7 @@ package de.seuhd.campuscoffee.data.implementations
 import de.seuhd.campuscoffee.data.mapper.UserEntityMapper
 import de.seuhd.campuscoffee.data.persistence.repositories.UserRepository
 import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
-import de.seuhd.campuscoffee.domain.ports.IdGenerator
+import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.hibernate.exception.ConstraintViolationException
@@ -26,7 +26,7 @@ class CrudDataServiceImplTest {
         val id = UUID.randomUUID()
         whenever(repository.existsById(id)).thenReturn(true)
         doThrow(DataIntegrityViolationException("foreign key violation")).whenever(repository).flush()
-        val service = UserDataServiceImpl(repository, mock<UserEntityMapper>(), mock<IdGenerator>())
+        val service = UserDataServiceImpl(repository, mock<UserEntityMapper>(), mock<IdGeneratorService>())
 
         assertThatThrownBy { service.delete(id) }.isInstanceOf(DeletionConflictException::class.java)
     }

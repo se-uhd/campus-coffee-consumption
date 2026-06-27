@@ -6,8 +6,8 @@ import de.seuhd.campuscoffee.data.persistence.entities.UserEntity
 import de.seuhd.campuscoffee.data.persistence.repositories.UserRepository
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.model.User
-import de.seuhd.campuscoffee.domain.ports.IdGenerator
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
+import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -19,7 +19,7 @@ import java.util.UUID
 class UserDataServiceImpl(
     repository: UserRepository,
     entityMapper: UserEntityMapper,
-    idGenerator: IdGenerator
+    idGenerator: IdGeneratorService
 ) : CrudDataServiceImpl<User, UserEntity, UserRepository, UUID>(
         repository,
         entityMapper,

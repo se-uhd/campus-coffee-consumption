@@ -8,7 +8,7 @@ import jakarta.persistence.Version
 
 /**
  * Database entity for a kitty money movement (the projected read model row). The [user] reference is the
- * member who paid in for a deposit, or null for a pure kitty adjustment. [amountCents] is signed (a
+ * user who paid in for a deposit, or null for a pure kitty adjustment. [amountCents] is signed (a
  * deposit is positive; a correcting adjustment may be negative). [version] backs optimistic locking.
  * All money is in euro cents.
  */

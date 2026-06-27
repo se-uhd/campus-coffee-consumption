@@ -16,14 +16,14 @@ import org.springframework.stereotype.Controller
 import org.springframework.web.bind.annotation.GetMapping
 
 /**
- * The authenticated member's own self-service reads (capability token). `GET /summary` returns everything
- * the landing page needs in one call; `GET /activity` pages through the member's full activity feed (their
+ * The authenticated user's own self-service reads (capability token). `GET /summary` returns everything
+ * the landing page needs in one call; `GET /activity` pages through the user's full activity feed (their
  * unified activity of coffees, purchases, and deposits, newest first). Both page through the shared
  * [PageQuery] (`limit`/`offset`), validated via `@Valid` binding rather than a class-level `@Validated`.
  */
 @Tag(
     name = "Self-service",
-    description = "The authenticated member's own landing summary and activity (X-Capability-Token)."
+    description = "The authenticated user's own landing summary and activity (X-Capability-Token)."
 )
 @Controller
 class SelfServiceController(
@@ -33,12 +33,12 @@ class SelfServiceController(
     private val currentUserProvider: CurrentUserProvider
 ) {
     /**
-     * Returns the authenticated member's landing summary (count, price, balance, kitty balance, whether
+     * Returns the authenticated user's landing summary (count, price, balance, kitty balance, whether
      * the latest coffee is cancellable, and the first page of their activity).
      *
      * @param page the validated paging window for the embedded first page of activity
      */
-    @Operation(summary = "Get the authenticated member's landing summary.")
+    @Operation(summary = "Get the authenticated user's landing summary.")
     @GetMapping("/summary")
     fun summary(
         @Valid @ParameterObject page: PageQuery
@@ -52,12 +52,12 @@ class SelfServiceController(
     }
 
     /**
-     * Returns a page of the authenticated member's activity feed (coffees, purchases, and deposits, newest
+     * Returns a page of the authenticated user's activity feed (coffees, purchases, and deposits, newest
      * first).
      *
      * @param page the validated paging window (limit/offset)
      */
-    @Operation(summary = "Get a page of the authenticated member's activity.")
+    @Operation(summary = "Get a page of the authenticated user's activity.")
     @GetMapping("/activity")
     fun activity(
         @Valid @ParameterObject page: PageQuery
@@ -65,7 +65,7 @@ class SelfServiceController(
         val user = currentUserProvider.currentUser()
         return ResponseEntity.ok(
             accountingDtoMapper.toEntryDtos(
-                activityService.memberActivity(user.persistedId, page.limitOr(ACTIVITY_LIMIT), page.offset, user)
+                activityService.userActivity(user.persistedId, page.limitOr(ACTIVITY_LIMIT), page.offset, user)
             )
         )
     }
