@@ -8,28 +8,22 @@ spec is unchanged, gated by `.api-docs.hash`).
 
 This file is **committed** (it is the codegen input) and must be **refreshed whenever the REST API
 changes** (a new/changed DTO field, endpoint, or enum value). The generated `src/app/api/model/` files are
-committed too, so a standalone `npm run build` works without a generation step.
+committed too, so a standalone `npm run build` works without a generation step. A **drift gate** enforces
+the refresh: `DevSystemTests."the committed OpenAPI spec matches the live spec"` fails `gradle build` when
+this file diverges from the running app's spec.
 
 ## Refreshing the spec
 
-The spec is served by the running app at `GET /api/api-docs` (springdoc, enabled in the `dev` profile). A
-PostgreSQL database must be running on `:5432` (see the project `README`/`CLAUDE.md`).
+Run one command (Docker must be running for the Testcontainers PostgreSQL the gate boots):
 
 ```shell
-# from the repository root
-gradle :application:bootJar -x frontendBuild -x frontendInstall
-java -jar application/build/libs/application.jar --spring.profiles.active=dev &   # dev has an insecure JWT fallback
-# wait until http://localhost:8080/actuator/health is UP, then:
-curl -s http://localhost:8080/api/api-docs > frontend/src-gen/api-docs.json
-# stop the app (e.g. kill the background java process)
+gradle :application:refreshOpenApiSpec
 ```
 
-Then regenerate and rebuild:
-
-```shell
-scripts/generate-frontend-dtos.sh   # regenerates because the spec hash changed
-cd frontend && npm run build
-```
+It boots the app under the `dev` profile against a throwaway database, captures `GET /api/api-docs`,
+normalizes it (`info.version` is pinned to a placeholder and the `servers` block is dropped, so the spec is
+not coupled to the release number or the server URL), writes it to `api-docs.json`, and regenerates the
+DTOs. Commit the updated `api-docs.json` and the regenerated `src/app/api/model/` files.
 
 If the regenerated DTOs no longer match how the Angular components use them, fix the **backend** DTO's
 springdoc/`@Schema`/Bean-Validation annotations so the spec is correct (e.g. a `@NotNull` request field is

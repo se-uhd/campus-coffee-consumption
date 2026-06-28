@@ -92,6 +92,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - An end-to-end test that pins the resolved Material theme tokens to the house colors, so a future theme edit
   that breaks the brand (the off-brand red, the pink surfaces) fails the build instead of shipping.
 - Unit tests for the activity pagination helper covering the one-row peek and the boundary de-duplication.
+- An automated OpenAPI spec drift gate: a `dev`-profile system test compares the committed
+  `frontend/src-gen/api-docs.json` against the live `GET /api/api-docs` (normalizing away the volatile
+  version and server URL), so `gradle build` fails when the spec falls out of sync with the API. A new
+  `gradle :application:refreshOpenApiSpec` task regenerates the spec and the DTOs in one command, replacing
+  the manual `curl` refresh, and the committed spec no longer carries a release-coupled version.
 
 ## [0.6.1] - 2026-06-26
 

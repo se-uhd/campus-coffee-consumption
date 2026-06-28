@@ -83,6 +83,31 @@ val generateFrontendDtos by tasks.registering(Exec::class) {
     outputs.file(rootProject.file("frontend/src-gen/.api-docs.hash"))
 }
 
+// Refreshing the committed OpenAPI spec + frontend DTOs from the live app. The drift gate
+// (DevSystemTests."the committed OpenAPI spec matches the live spec") fails `gradle build` when the
+// committed frontend/src-gen/api-docs.json diverges from the running spec; this task regenerates it.
+// writeOpenApiSpec runs that gate test, which writes the canonical live spec to build/openapi/api-docs.json
+// even when it currently drifts (ignoreFailures), so refreshOpenApiSpec can copy it over the committed file
+// and regenerate the DTOs. Replaces the old manual bootJar/curl refresh.
+val writeOpenApiSpec by tasks.registering(Test::class) {
+    description = "Writes build/openapi/api-docs.json from the live app via the OpenAPI drift gate (ignoring drift)."
+    dependsOn(tasks.named("testClasses"))
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("de.seuhd.campuscoffee.tests.system.DevSystemTests") }
+    ignoreFailures = true
+    outputs.upToDateWhen { false }
+}
+
+val refreshOpenApiSpec by tasks.registering(Copy::class) {
+    description = "Refreshes the committed OpenAPI spec and the frontend DTOs from the live app."
+    dependsOn(writeOpenApiSpec)
+    from(layout.buildDirectory.file("openapi/api-docs.json"))
+    into(rootProject.file("frontend/src-gen"))
+    finalizedBy(generateFrontendDtos)
+}
+
 // `npm run build` produces frontend/dist/frontend/browser; cached on the sources. Depends on
 // generateFrontendDtos because the generated DTOs (frontend/src/app/api) are part of the build's sources.
 val frontendBuild by tasks.registering(NpmTask::class) {
