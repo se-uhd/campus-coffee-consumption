@@ -135,6 +135,13 @@ campus-coffee:
     # The public https origin; required in prod (PublicBaseUrlGuard rejects an empty, non-https, loopback, or
     # bare-hostname base at startup; WeakDevSecretGuard rejects the committed dev fallback secrets).
     base-url: ${CAMPUS_COFFEE_APP_BASE_URL:}
+  auth:
+    rate-limit:
+      # Direct Cloud Run: the Google Front End appends the real client IP as the last X-Forwarded-For hop, so
+      # key the login limiter on the trusted hop from the right (one proxy). Off-prod the default REMOTE_ADDR
+      # ignores the spoofable header. Set trusted-proxy-count to 2 if an L7 load balancer is added in front.
+      client-ip-strategy: forwarded-for
+      trusted-proxy-count: 1
   id:
     # Random ids in prod: the deterministic seeded generator would re-issue the same first UUIDs on every
     # restart and collide with existing rows (prod has no reset-on-startup to clear them first).
