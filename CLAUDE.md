@@ -612,15 +612,21 @@ admin deactivates them instead); `coffee_consumptions` stays `CASCADE` because e
   user administration, authorization).
 - **Architecture Tests**: ArchUnit tests enforcing the hexagonal layer rules.
 - Because event sourcing is the only mode, there is a single backend (no dual relational/event sourcing test split).
-- **The automated tests all run the `dev` profile, so prod-only behaviors are not covered.** The system tests,
-  acceptance tests, and the Playwright e2e all run under `dev`, so anything that activates only in another
-  profile is exercised by no test: the Content-Security-Policy, the `Secure` session cookie, and Angular's
-  production build optimizations (such as critical-CSS inlining). **When you change the CSP, the security
-  config, or the production build, verify against the `prod` profile, not just the dev e2e.** Example: the
-  first production deploy served an unstyled UI because the prod CSP's `script-src 'self'` blocked the inline
-  `onload` handler in Angular's deferred-stylesheet markup; the fix was to disable
-  `optimization.styles.inlineCritical` in `frontend/angular.json` (a plain render-blocking stylesheet, so the
-  CSP stays strict).
+- **Most automated tests run the default (no) profile; only `DevSystemTests` and the Playwright e2e run under
+  `dev`.** Prod-only behavior has a focused test set (a misconfigured prod CSP once shipped an unstyled UI):
+  `WeakDevSecretGuardTest` and `PublicBaseUrlGuardTest` unit-test the two `@Profile("prod")` fail-fast guards;
+  `ProdProfileSecuritySystemTest` boots the full app under `@ActiveProfiles("prod")` on Testcontainers (with a
+  freshly generated RSA login key, since the shared test key is the committed dev fallback the guard refuses)
+  and asserts the exact CSP header, the `Secure`/`HttpOnly`/`SameSite=Strict` session cookie, the prod boot,
+  and the locked-down dev/actuator surface; and the prod-CSP Playwright smoke (`frontend/e2e/prod-csp.spec.ts`,
+  run by `scripts/run-e2e-prod-csp.sh` in the opt-in `e2e-prod-csp` CI job) loads the **production** SPA under
+  the prod profile and prod CSP in a real browser and asserts zero CSP violations and a styled page. **When
+  you change the CSP, the security config, or the production build, update those tests.** What still cannot be
+  auto-tested: the real Cloud SQL connector and Secret Manager binding (tests override the datasource and
+  inject plain secrets), and a browser refusing a `Secure` cookie over plain http (the test asserts the
+  attribute is emitted, not the browser's enforcement). The original bug: the prod CSP's `script-src 'self'`
+  blocked the inline `onload` in Angular's deferred-stylesheet markup; the fix disabled
+  `optimization.styles.inlineCritical` in `frontend/angular.json`.
 
 ### Test Naming
 
