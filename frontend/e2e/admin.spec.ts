@@ -218,9 +218,8 @@ test.describe('admin user-selection history', () => {
     await api.dispose();
   });
 
-  test.beforeEach(async () => {
-    await resetFixtures(api);
-  });
+  // No reset: these navigation tests only pick a fixture user and assert URL/history behavior; they do not
+  // mutate or assert money state, and the fixture users (e.g. maxmustermann) are always present.
 
   test('picking a user adds a ?user= history entry that the Back button undoes', async ({ page }) => {
     await loginAsAdmin(page);

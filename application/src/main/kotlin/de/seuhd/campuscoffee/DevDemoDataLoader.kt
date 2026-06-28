@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee
 
+import de.seuhd.campuscoffee.configuration.FixturesProperties
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
@@ -51,11 +52,19 @@ class DevDemoDataLoader(
     private val coffeeConsumptionService: CoffeeConsumptionService,
     private val coffeePriceService: CoffeePriceService,
     private val expenseService: ExpenseService,
-    private val paymentService: PaymentService
+    private val paymentService: PaymentService,
+    private val fixturesProperties: FixturesProperties
 ) : StartupTaskService {
     override val order = ORDER
 
-    override fun run() = loadDemoData()
+    override fun run() {
+        // The e2e sets demo-data-on-startup=false: it resets to the 5-user fixtures per test, so seeding the
+        // demo users on boot is wasted startup work.
+        if (!fixturesProperties.demoDataOnStartup) {
+            return
+        }
+        loadDemoData()
+    }
 
     /**
      * One demo user to create, with the consumption and money history to layer on top of them. [coffees]

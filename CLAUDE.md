@@ -64,7 +64,7 @@ Follow these in new code (enforced by review):
 - **Database entities are `*Entity`** (`UserEntity`, `EventEntity`).
 - **One top-level type per file.** Each file holds one class / interface / object / enum. Related top-level functions, constants, and extension functions may sit beside the single type they support (`EventProjection.kt` carries its mapper functions; `ReadUtil.kt` is functions only, no type). The only multi-type exception is a tightly-bound sealed hierarchy.
 - **Frontend Angular services are `*Service`** (`AdminUserService`, `AdminSelectionService`), including the stateful signal-holding singletons. No `*Store` (an NgRx idiom this app does not use).
-- **Depend on the port, never the implementation.** Production code injects and references the interface/port, not a `*Impl`; the ArchUnit test `production code depends on ports, never on Impl types` enforces it. The sole exception is the `EventSourced*` decorators: each must inject the concrete relational `*DataServiceImpl` it wraps, because injecting the port would resolve to the `@Primary` decorator itself and self-loop. When a collaborator has no port yet (e.g. a data-internal projection-maintenance operation), introduce a small interface for it (`BalanceProjectionMaintainer`) rather than depending on the class.
+- **Depend on the port, never the implementation.** Production code injects and references the interface/port, not a `*Impl`. The ArchUnit test `production code depends on ports, never on Impl types` enforces it. The sole exception is the `EventSourced*` decorators: each must inject the concrete relational `*DataServiceImpl` it wraps, because injecting the port would resolve to the `@Primary` decorator itself and self-loop. When a collaborator has no port yet (e.g. a data-internal projection-maintenance operation), introduce a small interface for it (`BalanceProjectionMaintainer`) rather than depending on the class.
 
 Package layout reflecting the above: `domain/ports/{api,data,system}/`; `data/{implementations (the `*DataServiceImpl` and the event-sourced decorators), system (technology adapters), persistence (entities incl. the `ChangeType`/`LoggedEntityType` discriminators, repositories, events (the event-log write support), projection (the balance projection + the `EventReducer`), the advisory-lock impl, `ConstraintMapping`)}`; `api/{app (the SPA-forwarding controller), support (controller-delegate helper beans), controller, dtos, mapper, security, openapi, configuration, exceptions}`.
 
@@ -415,9 +415,15 @@ gradle :domain:test --tests "CoffeeConsumptionServiceTest.decrementing a count a
     configuration (`npm run build:coverage`, `sourceMap.scripts: true`, no output hashing), which
     `scripts/run-e2e-coverage.sh` builds and `:application:bootJar -PskipFrontendBuild` bundles as-is. A
     plain `npm run e2e` (no `PW_COVERAGE`) is unaffected.
-  - **CI.** A separate `e2e` job in `.github/workflows/build.yml` runs the whole flow against a PostgreSQL
-    service container and uploads the coverage artifacts (`e2e.exec`, the aggregate report, and
-    `frontend/coverage-e2e/`); the core `build` job is unchanged.
+  - **CI (split fast vs nightly).** In `.github/workflows/build.yml` the e2e is two jobs. The `e2e-fast`
+    job runs on every push/PR: it builds the production SPA + jar (no instrumentation), launches it, and runs
+    a plain `npm run e2e` (via `scripts/run-e2e.sh`) as the merge gate. The full-coverage `e2e` job (the flow
+    above, `:coverage:runE2eCoverage`, which uploads `e2e.exec`, the aggregate report, and
+    `frontend/coverage-e2e/`) is gated to a nightly `schedule` (and `workflow_dispatch`), so a routine push
+    does not pay the source-mapped build and the V8/monocart teardown. Both jobs cache Playwright's browser
+    binaries; the core `build` job is unchanged. (`playwright.config.ts` has a `webServer` block with
+    `reuseExistingServer: true`, so it reuses the script-launched app in CI and an already-running app
+    locally, starting one only when `:8080` is free.)
 
 ### Frontend
 

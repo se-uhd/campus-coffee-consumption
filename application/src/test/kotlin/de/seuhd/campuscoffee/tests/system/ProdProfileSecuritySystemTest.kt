@@ -4,6 +4,7 @@ import de.seuhd.campuscoffee.api.dtos.TokenRequestDto
 import de.seuhd.campuscoffee.api.dtos.TokenResponseDto
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
+import de.seuhd.campuscoffee.tests.SystemTestUtils.adminBearer
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.encryptCredentials
 import org.assertj.core.api.Assertions.assertThat
@@ -76,14 +77,29 @@ class ProdProfileSecuritySystemTest : AbstractProdProfileSystemTest() {
 
     @Test
     fun `the actuator env endpoint is not exposed under prod`() {
-        val status =
+        // env is exposed in dev but not in prod's exposure list (health, metrics). Authenticate as admin so the
+        // result reflects the exposure list (404 = not exposed) rather than the cross-profile anonymous 401, and
+        // assert metrics is reachable so the test proves the prod exposure list, not a blanket actuator block.
+        val bearer = adminBearer()
+        val envStatus =
             client()
                 .get()
                 .uri("/actuator/env")
+                .header(HttpHeaders.AUTHORIZATION, bearer)
                 .exchange()
                 .returnResult<ByteArray>()
                 .status
                 .value()
-        assertThat(status).isNotEqualTo(200)
+        assertThat(envStatus).isEqualTo(404)
+        val metricsStatus =
+            client()
+                .get()
+                .uri("/actuator/metrics")
+                .header(HttpHeaders.AUTHORIZATION, bearer)
+                .exchange()
+                .returnResult<ByteArray>()
+                .status
+                .value()
+        assertThat(metricsStatus).isEqualTo(200)
     }
 }

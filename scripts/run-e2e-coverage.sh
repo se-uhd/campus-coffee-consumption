@@ -46,7 +46,9 @@ run_node() {
 # --- 1. Build the source-mapped SPA and the jar -------------------------------------------------------
 if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
   log "Building the source-mapped SPA (npm run build:coverage)…"
-  ( cd frontend && run_node npm ci && run_node npm run build:coverage )
+  # Install deps only when missing: CI runs `npm ci` before invoking this script, so re-running it here just
+  # repeats a slow install. Locally a present node_modules is reused.
+  ( cd frontend && { [[ -d node_modules ]] || run_node npm ci; } && run_node npm run build:coverage )
 
   log "Assembling the application jar (gradle :application:bootJar -PskipFrontendBuild)…"
   # bootJar copies frontend/dist/frontend/browser into the jar's static resources. We pass

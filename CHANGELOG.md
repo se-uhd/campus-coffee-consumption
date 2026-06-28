@@ -9,6 +9,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Split the Playwright e2e into a fast no-coverage run and a nightly coverage run. The per-push/PR CI gate
+  now builds the production SPA and runs `npm run e2e` with no instrumentation (`scripts/run-e2e.sh`), while
+  the full-coverage run (backend JaCoCo + frontend V8) moved to a nightly `schedule` job, so a routine push
+  no longer pays the source-mapped build and the V8/monocart teardown. Playwright's browser binaries are
+  cached in CI, and `playwright.config.ts` gains a `webServer` block that reuses an already-running app
+  locally (and the CI-launched app), starting one only when nothing is on `:8080`. The fast run also boots
+  with a new dev-only `campus-coffee.fixtures.demo-data-on-startup` flag (a `FixturesProperties` key, default
+  true) set to false, so the dev demo-data seeding is skipped at startup (the suite resets to the five-user
+  fixtures per test anyway), and the pure-UI specs (the field-validation cases and the admin user-selection
+  navigation) no longer reset the fixtures, since they neither mutate nor assert money state.
 - Renamed the product term for a person from "member" to "user" throughout the UI, the API, and the
   codebase, so the frontend vocabulary matches the backend's existing `User` model and `ROLE_USER` instead
   of diverging from it. The members page is now **Users** ("Add a user", "No users yet"), the role badge

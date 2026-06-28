@@ -18,10 +18,9 @@ test.describe('validation and error states', () => {
     await api.dispose();
   });
 
-  test.beforeEach(async () => {
-    // a known baseline (the five fixture users, an empty kitty) before each validation/error-state check
-    await resetFixtures(api);
-  });
+  // No shared reset: the three field-validation tests below only fill fields and assert mat-errors (no DB
+  // mutation, no clean-state assertion), so they run against whatever data is present. Only the overdraw test
+  // needs a known empty kitty, and it resets itself.
 
   test('an empty required login name shows a mat-error and keeps Sign in disabled', async ({ page }) => {
     await page.goto('/admin/login');
@@ -67,6 +66,8 @@ test.describe('validation and error states', () => {
   });
 
   test('an overdrawing kitty adjustment surfaces a 409 error rather than succeeding', async ({ page }) => {
+    // this test alone needs a known baseline (an empty kitty), so the reset is scoped here, not shared
+    await resetFixtures(api);
     // pin the price so the exact kitty figure cannot be perturbed by a leftover price from a previous run
     await pinPrice(api, await adminToken(api), 50);
     await loginAsAdmin(page);
