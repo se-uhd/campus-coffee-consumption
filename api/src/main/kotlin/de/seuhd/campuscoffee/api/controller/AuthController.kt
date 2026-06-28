@@ -5,6 +5,7 @@ import de.seuhd.campuscoffee.api.dtos.PublicKeyDto
 import de.seuhd.campuscoffee.api.dtos.TokenRequestDto
 import de.seuhd.campuscoffee.api.dtos.TokenResponseDto
 import de.seuhd.campuscoffee.api.exceptions.LoginPayloadException
+import de.seuhd.campuscoffee.api.security.ClientIpResolver
 import de.seuhd.campuscoffee.api.security.LoginAttemptLimiter
 import de.seuhd.campuscoffee.api.security.LoginPayloadDecryptor
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -53,7 +54,8 @@ class AuthController(
     private val loginPayloadDecryptor: LoginPayloadDecryptor,
     private val loginPublicKey: PublicKeyDto,
     private val cookieProperties: AuthCookieProperties,
-    private val loginAttemptLimiter: LoginAttemptLimiter
+    private val loginAttemptLimiter: LoginAttemptLimiter,
+    private val clientIpResolver: ClientIpResolver
 ) {
     /**
      * Returns the RSA public key (as a JWK) the client uses to encrypt the login payload. Public material
@@ -87,7 +89,7 @@ class AuthController(
         // do not log the supplied login name: it is PII, and the canonical identifier (the user id) is not
         // resolved at the credential boundary (a failed attempt has no user). Logging the bare event is enough.
         log.info { "Token requested." }
-        val clientKey = rateLimitClientKey(httpRequest)
+        val clientKey = clientIpResolver.clientIp(httpRequest)
         // refuse a client that has used up its failure budget before doing any decrypt/bcrypt work (429)
         loginAttemptLimiter.ensureWithinLimit(clientKey)
         // decrypt the payload (a malformed/undecryptable one raises a LoginPayloadException -> 400), then
@@ -167,21 +169,6 @@ class AuthController(
             .maxAge(maxAge)
             .build()
 
-    /**
-     * The per-client key the login rate limiter counts against: the originating client IP. Behind a proxy
-     * (Cloud Run) the real client is the first hop of `X-Forwarded-For`; otherwise the direct socket address.
-     *
-     * @param httpRequest the servlet request to read the client address from.
-     */
-    private fun rateLimitClientKey(httpRequest: HttpServletRequest): String =
-        httpRequest
-            .getHeader(FORWARDED_FOR_HEADER)
-            ?.substringBefore(',')
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?: httpRequest.remoteAddr
-            ?: "unknown"
-
     /** Strips the `ROLE_` prefix from the granted authorities to produce the bare role names. */
     private fun rolesOf(authentication: Authentication): List<String> =
         authentication.authorities
@@ -193,6 +180,5 @@ class AuthController(
         private val log = KotlinLogging.logger {}
         private const val TOKEN_TTL_HOURS = 10L
         private const val ROLE_PREFIX = "ROLE_"
-        private const val FORWARDED_FOR_HEADER = "X-Forwarded-For"
     }
 }

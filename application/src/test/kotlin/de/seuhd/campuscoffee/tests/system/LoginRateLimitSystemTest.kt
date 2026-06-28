@@ -51,11 +51,22 @@ class LoginRateLimitSystemTest {
         assertThat(postMalformed("203.0.113.7")).isEqualTo(400)
     }
 
-    private fun postMalformed(clientIp: String): Int =
+    @Test
+    fun `a rotating X-Forwarded-For prefix with a fixed trusted hop still trips 429 Too Many Requests`() {
+        val trustedHop = "198.51.100.99"
+        // each attempt spoofs a different leftmost hop, but the trusted rightmost hop is the same client, so
+        // rotating the prefix cannot mint a fresh failure budget
+        repeat(MAX_FAILURES) { i ->
+            assertThat(postMalformed("10.0.0.$i, $trustedHop")).isEqualTo(400)
+        }
+        assertThat(postMalformed("172.16.0.42, $trustedHop")).isEqualTo(429)
+    }
+
+    private fun postMalformed(forwardedFor: String): Int =
         client
             .post()
             .uri("/api/auth/token")
-            .header("X-Forwarded-For", clientIp)
+            .header("X-Forwarded-For", forwardedFor)
             .contentType(MediaType.APPLICATION_JSON)
             .body(TokenRequestDto("not-a-valid-jwe"))
             .exchange()
@@ -77,6 +88,10 @@ class LoginRateLimitSystemTest {
             registry.add("campus-coffee.auth.rate-limit.enabled") { "true" }
             registry.add("campus-coffee.auth.rate-limit.max-failures") { MAX_FAILURES.toString() }
             registry.add("campus-coffee.auth.rate-limit.window") { "1h" }
+            // key on X-Forwarded-For (one trusted hop) so the per-client assertions are meaningful; the
+            // production default is REMOTE_ADDR, which would collapse every test request onto one socket peer
+            registry.add("campus-coffee.auth.rate-limit.client-ip-strategy") { "forwarded-for" }
+            registry.add("campus-coffee.auth.rate-limit.trusted-proxy-count") { "1" }
         }
     }
 }
