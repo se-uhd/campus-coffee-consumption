@@ -117,6 +117,59 @@ jobs:
             frontend/playwright-report/
           if-no-files-found: warn
 
+  # Boot the PRODUCTION SPA under the prod profile + prod CSP and run the prod-csp Playwright smoke. This is
+  # the only check that exercises the production build under the strict prod Content-Security-Policy in a real
+  # browser (every other suite runs the dev profile). Separate from the e2e job so a browser flake never blocks
+  # the merge gate, and opt-in for the same reason.
+  e2e-prod-csp:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: jdx/mise-action@v4 # provisions Node 24 and Java 25 from mise.toml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # Builds the production SPA + jar, launches it under --spring.profiles.active=prod with fresh secrets and
+      # a public https base URL, waits for health, then runs only frontend/e2e/prod-csp.spec.ts.
+      - name: Run the prod-CSP smoke (production SPA under the prod profile)
+        run: ./scripts/run-e2e-prod-csp.sh
+
+      - name: Upload the prod-csp report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-prod-csp-report
+          path: |
+            frontend/playwright-report/
+            application/build/prod-csp-app.log
+          if-no-files-found: warn
+
   # Build the Docker image so a broken Dockerfile fails CI. Independent of the build and e2e jobs: it builds
   # the image from the multi-stage Dockerfile (which runs the Gradle bootJar inside the build stage) and does
   # not consume their outputs. The tag is throwaway; the image is not pushed.

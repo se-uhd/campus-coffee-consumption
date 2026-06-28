@@ -89,6 +89,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Prod-profile security tests, so prod-only behavior is no longer untested. `WeakDevSecretGuardTest` and
+  `PublicBaseUrlGuardTest` cover the two `@Profile("prod")` fail-fast guards directly;
+  `ProdProfileSecuritySystemTest` boots the app under the `prod` profile on Testcontainers (with a freshly
+  generated RSA login key) and asserts the exact Content-Security-Policy header, the
+  `Secure`/`HttpOnly`/`SameSite=Strict` session cookie, the prod boot, and the locked-down dev/actuator
+  surface; and a prod-CSP Playwright smoke (`frontend/e2e/prod-csp.spec.ts`, the opt-in `e2e-prod-csp` CI job
+  via `scripts/run-e2e-prod-csp.sh`) loads the production SPA under the prod profile and CSP in a real browser
+  and asserts zero CSP violations and a styled page.
 - An end-to-end test that pins the resolved Material theme tokens to the house colors, so a future theme edit
   that breaks the brand (the off-brand red, the pink surfaces) fails the build instead of shipping.
 - Unit tests for the activity pagination helper covering the one-row peek and the boundary de-duplication.
