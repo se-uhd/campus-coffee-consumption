@@ -446,7 +446,13 @@ OpenAPI spec, not written by hand. The `generateFrontendDtos` Gradle task runs
 of `frontendBuild` and `frontendLint`, so the build keeps the DTOs current. `frontend/src/app/models.ts`
 re-exports the generated DTOs (aliasing request bodies and surfacing the enum unions), so the rest of the
 SPA imports from `models.ts` and the frontend/backend contracts cannot drift. **Do not hand-edit
-`frontend/src/app/api/model/`**: regenerate it.
+`frontend/src/app/api/model/`**: regenerate it. A **drift gate** keeps the committed spec honest: the
+`dev`-profile `DevSystemTests."the committed OpenAPI spec matches the live spec"` compares
+`frontend/src-gen/api-docs.json` against the live `GET /api/api-docs` (normalizing away `info.version` and
+the `servers` URL via `OpenApiSpecNormalizer`), so `gradle build` fails when the spec drifts from the API.
+Refresh with `gradle :application:refreshOpenApiSpec`, which boots the app on a throwaway Testcontainers
+database, recaptures the spec, and regenerates the DTOs in one step (it replaces the old manual `curl`
+refresh; the committed spec no longer carries a release-coupled version).
 
 **Frontend tests and coverage** (run via mise's Node): `npm test` (Vitest unit tests), `npm run
 test:coverage` (the same with a coverage report under `frontend/coverage/`), `npm run e2e` (Playwright
