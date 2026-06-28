@@ -7,6 +7,14 @@ on:
   pull_request:
     branches: [ "main" ]
 
+  # The heavyweight browser jobs run nightly, not on every push: the full-coverage e2e (source-mapped SPA,
+  # V8 instrumentation, the monocart teardown; the `e2e` job) and the prod-profile CSP smoke (`e2e-prod-csp`).
+  # The fast `e2e-fast` job is the per-push merge gate.
+  schedule:
+    - cron: '0 3 * * *' # 03:00 UTC daily
+
+  workflow_dispatch: # manual trigger; runs the fast, coverage, and prod-CSP e2e jobs
+
 # The build executes third-party Gradle plugins and annotation processors; restrict the token to
 # read-only so a compromised dependency cannot push or modify the repository.
 permissions:
@@ -15,6 +23,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' # the nightly schedule runs only the heavyweight e2e jobs
 
     steps:
       - uses: actions/checkout@v7
@@ -48,13 +57,79 @@ jobs:
             */build/reports/jacoco/
           if-no-files-found: warn
 
-  # End-to-end coverage: launches the real application jar under the JaCoCo agent against a PostgreSQL and
-  # drives it with the Playwright suite, collecting BOTH backend JVM coverage (coverage/build/jacoco/e2e.exec,
-  # mergeable into the JaCoCo gate) and frontend browser coverage (frontend/coverage-e2e/, the SPA TypeScript
-  # the JaCoCo agent can never see). Kept as a separate job so it does not slow the core `build` gate and a
-  # flaky browser run never blocks the merge gate.
+  # Fast end-to-end gate on every push/PR: builds the PRODUCTION (minified) SPA + jar with NO coverage
+  # instrumentation, launches it on the dev profile against PostgreSQL, waits for health, and runs the
+  # Playwright suite (plain `npm run e2e`, no V8 capture or monocart teardown). The full-coverage variant is
+  # the nightly `e2e` job below. Separate job so a flaky browser run never blocks the merge gate.
+  e2e-fast:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' # the nightly `e2e` job already exercises the browser layer
+
+    # The dev profile's datasource expects PostgreSQL at localhost:5432 (user/password postgres). A service
+    # container provides it; the health-check gates the job until it accepts connections.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: jdx/mise-action@v4 # provisions Node 24 and Java 25 from mise.toml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Cache Playwright's browser binaries so `playwright install` is a no-op on a hit; the key tracks the
+      # locked dependency set so a Playwright version bump re-primes the cache.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Playwright chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # Builds the production SPA + jar (no coverage), launches the jar on the dev profile, waits for health,
+      # and runs `npm run e2e`. See scripts/run-e2e.sh.
+      - name: Run the fast e2e (no coverage)
+        run: ./scripts/run-e2e.sh
+
+      - name: Upload the e2e report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: |
+            frontend/playwright-report/
+            application/build/e2e-app.log
+          if-no-files-found: warn
+
+  # End-to-end coverage (NIGHTLY): launches the real application jar under the JaCoCo agent against a
+  # PostgreSQL and drives it with the Playwright suite, collecting BOTH backend JVM coverage
+  # (coverage/build/jacoco/e2e.exec, mergeable into the JaCoCo gate) and frontend browser coverage
+  # (frontend/coverage-e2e/, the SPA TypeScript the JaCoCo agent can never see). This is the slow run, so it
+  # is gated to the nightly schedule (and manual dispatch) rather than every push; the fast `e2e-fast` job is
+  # the per-push gate. Separate job so a flaky browser run never blocks the merge gate.
   e2e:
     runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 
     # The dev profile's datasource expects PostgreSQL at localhost:5432 (user/password postgres). A service
     # container provides it; the health-check gates the job until it accepts connections.
@@ -85,6 +160,12 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
 
       - name: Install Playwright chromium
         working-directory: frontend
@@ -119,10 +200,11 @@ jobs:
 
   # Boot the PRODUCTION SPA under the prod profile + prod CSP and run the prod-csp Playwright smoke. This is
   # the only check that exercises the production build under the strict prod Content-Security-Policy in a real
-  # browser (every other suite runs the dev profile). Separate from the e2e job so a browser flake never blocks
-  # the merge gate, and opt-in for the same reason.
+  # browser (every other suite runs the dev profile). It runs nightly (and on manual dispatch), like the
+  # coverage `e2e` job, so this heavyweight, browser-dependent smoke never blocks the per-push merge gate.
   e2e-prod-csp:
     runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 
     services:
       postgres:
@@ -151,6 +233,12 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
       - name: Install Playwright chromium
         working-directory: frontend
         run: npx playwright install --with-deps chromium
@@ -175,6 +263,7 @@ jobs:
   # not consume their outputs. The tag is throwaway; the image is not pushed.
   docker-build:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' # the nightly schedule runs only the heavyweight e2e jobs
 
     steps:
       - uses: actions/checkout@v7

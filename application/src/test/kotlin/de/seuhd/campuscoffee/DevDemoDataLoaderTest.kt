@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee
 
+import de.seuhd.campuscoffee.configuration.FixturesProperties
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.Expense
 import de.seuhd.campuscoffee.domain.model.Payment
@@ -19,6 +20,7 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
 import java.util.UUID
 
@@ -36,13 +38,15 @@ class DevDemoDataLoaderTest {
     private val expenseService = mock<ExpenseService>()
     private val paymentService = mock<PaymentService>()
 
+    // the default loader has demo seeding enabled (the production default); the gate is exercised separately
     private val loader =
         DevDemoDataLoader(
             userService,
             coffeeConsumptionService,
             coffeePriceService,
             expenseService,
-            paymentService
+            paymentService,
+            FixturesProperties(demoDataOnStartup = true)
         )
 
     private val admin =
@@ -138,5 +142,40 @@ class DevDemoDataLoaderTest {
         verify(userService, never()).upsert(any())
         verify(coffeeConsumptionService, never()).createForUser(any())
         verify(paymentService, never()).adjustKitty(any(), any(), any())
+    }
+
+    @Test
+    fun `run skips all seeding when demo-data-on-startup is false`() {
+        val gatedLoader =
+            DevDemoDataLoader(
+                userService,
+                coffeeConsumptionService,
+                coffeePriceService,
+                expenseService,
+                paymentService,
+                FixturesProperties(demoDataOnStartup = false)
+            )
+
+        gatedLoader.run()
+
+        // the gate short-circuits before any service is touched (not even the getAll() existence probe)
+        verifyNoInteractions(
+            userService,
+            coffeeConsumptionService,
+            coffeePriceService,
+            expenseService,
+            paymentService
+        )
+    }
+
+    @Test
+    fun `run seeds the demo data when demo-data-on-startup is true`() {
+        whenever(userService.getAll()).thenReturn(listOf(admin))
+        stubCreatePath()
+
+        loader.run()
+
+        // run() delegates to loadDemoData() when the gate is open, so the seeding paths execute
+        verify(userService, atLeastOnce()).upsert(any())
     }
 }

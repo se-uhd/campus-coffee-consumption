@@ -12,6 +12,16 @@ export default defineConfig({
   // Finalizes the browser (V8) coverage the per-test fixture in e2e/fixtures.ts stages; a no-op unless
   // PW_COVERAGE=1 (the e2e:coverage script / CI e2e job). See e2e/coverage.global-teardown.ts.
   globalTeardown: './e2e/coverage.global-teardown.ts',
+  // Local convenience: if nothing is already serving :8080, start the app; otherwise reuse the running
+  // instance. reuseExistingServer is true in CI too, because the run-e2e scripts pre-launch the app there
+  // (the coverage run under the JaCoCo agent, which a Playwright-managed server cannot express), so letting
+  // Playwright start its own server would double-bind :8080.
+  webServer: {
+    command: 'cd .. && mise exec -- gradle :application:bootRun --args="--spring.profiles.active=dev"',
+    url: 'http://localhost:8080/actuator/health',
+    reuseExistingServer: true,
+    timeout: 180_000
+  },
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
