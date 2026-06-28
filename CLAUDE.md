@@ -666,7 +666,10 @@ Two authentication mechanisms, one per audience; there is **no HTTP Basic**:
   deactivated account) returns the **same** 401 body, so it does not reveal whether a login name exists. The
   endpoint is **rate-limited** per client IP (`LoginAttemptLimiter`, a Bucket4j token bucket): too many failed
   attempts in the window yield a 429 before any decrypt or bcrypt work, bounding online guessing and a bcrypt
-  CPU flood. An admin password must be at least 24 characters with a lowercase letter, an uppercase letter,
+  CPU flood. The client IP is resolved by `ClientIpResolver` per a configurable strategy (so the limiter is not
+  keyed on the spoofable leftmost `X-Forwarded-For` hop): the default `remote-addr` ignores `X-Forwarded-For`,
+  and `forwarded-for` reads the client as `trusted-proxy-count` hops from the right (the hop the trusted proxy
+  appended); prod (direct Cloud Run) uses `forwarded-for` with a count of 1. An admin password must be at least 24 characters with a lowercase letter, an uppercase letter,
   and a digit (`UserDto` and the bootstrap path; users have no password). The token endpoint sets the JWT in
   an **httpOnly, `SameSite=Strict`, Secure (outside dev) cookie**, so the browser stores it where JavaScript
   cannot read or exfiltrate it (an XSS cannot steal the session) and sends it automatically;
@@ -807,10 +810,14 @@ Notes on semantics:
   - `campus-coffee.auth.cookie.secure` / `name` (`AuthCookieProperties`, api module): whether the admin
     session cookie is marked `Secure` (default `true`; the dev profile, served over plain http, sets it
     `false`) and the cookie name. The cookie is always httpOnly and `SameSite=Strict`.
-  - `campus-coffee.auth.rate-limit.enabled` / `max-failures` / `window` (`LoginRateLimitProperties`, api
-    module): the login brute-force guard on `POST /api/auth/token`. A client (keyed on its IP) gets
-    `max-failures` failed attempts per `window` (default 10 per 15 minutes) before a 429; on by default, off
-    only where a test drives many failures from one client.
+  - `campus-coffee.auth.rate-limit.enabled` / `max-failures` / `window` / `client-ip-strategy` /
+    `trusted-proxy-count` (`LoginRateLimitProperties`, api module): the login brute-force guard on
+    `POST /api/auth/token`. A client (keyed on its IP) gets `max-failures` failed attempts per `window`
+    (default 10 per 15 minutes) before a 429; on by default, off only where a test drives many failures from
+    one client. `client-ip-strategy` (`ClientIpResolver`) chooses how the client IP is derived:
+    `remote-addr` (default; ignores `X-Forwarded-For`, safe off-prod) or `forwarded-for` (reads
+    `trusted-proxy-count` hops from the right of `X-Forwarded-For`, so a spoofed prefix cannot move the key);
+    prod sets `forwarded-for` with `trusted-proxy-count` 1 (direct Cloud Run, one Google Front End hop).
   - `campus-coffee.fixtures.load-on-startup` (`FixturesProperties`, application module): when `true` and
     the database has no users yet, load the fixtures on startup (on in dev, off in prod).
   - `campus-coffee.fixtures.reset-on-startup` (`FixturesProperties`, application module): when `true`, clear

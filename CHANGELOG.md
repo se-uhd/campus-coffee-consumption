@@ -65,6 +65,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The login rate limiter no longer keys on the spoofable leftmost `X-Forwarded-For` hop, which let an
+  attacker rotate the header to mint a fresh failure budget per request and bypass the brute-force and
+  bcrypt-CPU-flood guard. The client IP is now resolved by a configurable strategy
+  (`campus-coffee.auth.rate-limit.client-ip-strategy`): the default `remote-addr` ignores `X-Forwarded-For`
+  entirely (safe for a non-proxied deployment), and `forwarded-for` reads the client IP as
+  `trusted-proxy-count` hops from the right (the hop the trusted proxy appended, which a client cannot
+  forge). Production (direct Google Cloud Run) uses `forwarded-for` with a trusted-proxy count of 1.
 - The admin create-user form now enforces the same password policy as the backend (at least 24 characters
   with a lowercase letter, an uppercase letter, and a digit) instead of only 8 characters, so a too-short or
   too-simple admin password is caught in the form rather than failing server-side with a misleading
