@@ -33,8 +33,9 @@ class WeakDevSecretGuard(
             "campus-coffee.jwt.secret is the committed dev-only fallback, which is public; set a real " +
                 "JWT_SECRET for a prod deployment."
         }
-        val normalizedKey = loginEncryptionProperties.privateKeyPem.replace("\\n", "\n")
-        require(!normalizedKey.contains(DEV_LOGIN_KEY_FRAGMENT)) {
+        // The fragment is a single contiguous base64 line, so it appears verbatim whether the PEM uses real
+        // newlines or the single-line literal-`\n` encoding (Secret Manager); no newline normalization needed.
+        require(!loginEncryptionProperties.privateKeyPem.contains(DEV_LOGIN_KEY_FRAGMENT)) {
             "campus-coffee.login-encryption.private-key-pem is the committed dev-only fallback key, which is " +
                 "public; set a real LOGIN_PRIVATE_KEY_PEM for a prod deployment."
         }

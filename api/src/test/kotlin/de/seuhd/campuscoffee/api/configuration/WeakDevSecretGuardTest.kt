@@ -29,6 +29,7 @@ class WeakDevSecretGuardTest {
     fun `the committed dev JWT secret is rejected`() {
         assertThatThrownBy { guard(committedDevJwtSecret, freshKeyPem).rejectCommittedDevSecrets() }
             .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("jwt.secret")
     }
 
     @Test
@@ -36,6 +37,7 @@ class WeakDevSecretGuardTest {
         val pem = "-----BEGIN PRIVATE KEY-----\n$committedDevKeyFragment\nmoreBody\n-----END PRIVATE KEY-----"
         assertThatThrownBy { guard(freshSecret, pem).rejectCommittedDevSecrets() }
             .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("private-key-pem")
     }
 
     @Test
@@ -44,6 +46,7 @@ class WeakDevSecretGuardTest {
         val pem = "-----BEGIN PRIVATE KEY-----\\n$committedDevKeyFragment\\nmoreBody\\n-----END PRIVATE KEY-----"
         assertThatThrownBy { guard(freshSecret, pem).rejectCommittedDevSecrets() }
             .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("private-key-pem")
     }
 
     @Test
