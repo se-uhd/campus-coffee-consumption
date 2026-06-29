@@ -79,6 +79,13 @@ jobs:
       pull-requests: write # post the inspection summary as a PR comment (when triggered by a PR)
       checks: write        # publish findings as check-run annotations (used on push, where there is no PR)
       actions: read        # let the action read this workflow run for its status report (telemetry)
+    # The release qodana-js linter requires a Qodana Cloud connection (since 2023.2), so it cannot run without
+    # the QODANA_TOKEN secret. Expose the token at the job level and gate the scan steps on it: with the secret
+    # the JS/TS scan runs; without it the steps skip cleanly (no failing scan, no missing-SARIF warning). The
+    # frontend stays covered by the eslint/stylelint frontendLint gate in build.yml meanwhile. To enable this
+    # scan, register a free project at https://qodana.cloud and add its token as the QODANA_TOKEN repo secret.
+    env:
+      QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -88,12 +95,12 @@ jobs:
           persist-credentials: false # no step pushes back to the repository
 
       - name: Qodana Scan (frontend)
-        uses: JetBrains/qodana-action@v2026.1.3
-        # The JS/TS linter (unlike the JVM Community linter) requires a Qodana Cloud token, so without the
-        # QODANA_TOKEN secret this scan cannot run. Allow the step to fail so it never blocks CI: the backend
-        # `qodana` job and the eslint/stylelint `frontendLint` gate (in build.yml) still cover the frontend.
-        # To make this a real gate, set the QODANA_TOKEN repository secret and drop this continue-on-error.
+        # Run the JS/TS scan only when the QODANA_TOKEN secret is set; without it the qodana-js linter cannot
+        # connect to Qodana Cloud, so skip the step rather than fail with no SARIF. continue-on-error keeps it
+        # non-blocking even once the token is set; drop that line to make the frontend scan a real gate.
+        if: ${{ env.QODANA_TOKEN != '' }}
         continue-on-error: true
+        uses: JetBrains/qodana-action@v2026.1.3
         with:
           # Scan only the Angular SPA; its frontend/qodana.yaml selects the JS linter and sets
           # failThreshold: 0, so this job fails on any problem above the baseline. (Space-separated args;
@@ -104,16 +111,11 @@ jobs:
           results-dir: ${{ runner.temp }}/qodana-frontend/results
           cache-dir: ${{ runner.temp }}/qodana-frontend/cache
           artifact-name: qodana-report-frontend # distinct from the backend job's default report artifact
-        env:
-          # Optional. The Community linter needs no license, so the scan runs without this. Setting the
-          # QODANA_TOKEN repository secret additionally uploads results to Qodana Cloud and enables its
-          # server-side quality gate; the PR comment and SARIF work without it.
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
 
       - name: Upload frontend Qodana SARIF as an artifact
         # Distinct artifact name from the backend job's `qodana-sarif` so the two uploads do not collide.
-        # `if: always()` so a run that fails the threshold still yields the file.
-        if: always()
+        # Upload whenever the scan ran (the token is set), including a run that fails the threshold.
+        if: ${{ always() && env.QODANA_TOKEN != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: qodana-sarif-frontend
