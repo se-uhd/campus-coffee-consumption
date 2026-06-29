@@ -1,5 +1,4 @@
 package de.seuhd.campuscoffee.data.implementations
-import de.seuhd.campuscoffee.data.implementations.PaymentDataServiceImpl
 import de.seuhd.campuscoffee.data.persistence.events.EventSourcedWriter
 import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService

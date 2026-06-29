@@ -1,5 +1,4 @@
 package de.seuhd.campuscoffee.data.implementations
-import de.seuhd.campuscoffee.data.implementations.CoffeePriceDataServiceImpl
 import de.seuhd.campuscoffee.data.persistence.events.EventSourcedWriter
 import de.seuhd.campuscoffee.domain.model.CoffeePrice
 import de.seuhd.campuscoffee.domain.ports.data.CoffeePriceDataService

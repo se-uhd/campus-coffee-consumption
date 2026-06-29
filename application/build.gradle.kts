@@ -215,7 +215,7 @@ tasks.named("check") {
 // classpath static resources, so the single Cloud Run image serves the app and the API from one origin.
 // Only bootJar (part of `assemble`/`build`) triggers the npm build, so a bare `gradle test` does not.
 //
-// `-PskipFrontendBuild` (used by scripts/run-e2e-coverage.sh) skips the production SPA build so an
+// `-PskipFrontendBuild` (used by scripts/run-e2e.sh and scripts/run-e2e-coverage.sh) skips the production SPA build so an
 // already-built, source-mapped ("coverage") SPA in frontend/dist is bundled as-is instead of being
 // overwritten; the e2e coverage run needs the source maps to map browser V8 coverage back to .ts.
 val skipFrontendBuild = providers.gradleProperty("skipFrontendBuild").isPresent

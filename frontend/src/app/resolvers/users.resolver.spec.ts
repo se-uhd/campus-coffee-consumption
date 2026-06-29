@@ -21,7 +21,7 @@ describe('usersResolver', () => {
     expect(ensureLoaded).toHaveBeenCalledTimes(1);
   });
 
-  it('resolves (does not reject) when the preload fails, so navigation is not cancelled', async () => {
+  it('resolves (does not reject) when the preload fails, so navigation is not canceled', async () => {
     TestBed.configureTestingModule({
       providers: [
         AdminUserService,

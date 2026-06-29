@@ -9,69 +9,54 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Split the Playwright e2e into a fast no-coverage run and a nightly coverage run. The per-push/PR CI gate
-  now builds the production SPA and runs `npm run e2e` with no instrumentation (`scripts/run-e2e.sh`), while
-  the full-coverage run (backend JaCoCo + frontend V8) moved to a nightly `schedule` job, so a routine push
-  no longer pays the source-mapped build and the V8/monocart teardown. Playwright's browser binaries are
-  cached in CI, and `playwright.config.ts` gains a `webServer` block that reuses an already-running app
-  locally (and the CI-launched app), starting one only when nothing is on `:8080`. The fast run also boots
-  with a new dev-only `campus-coffee.fixtures.demo-data-on-startup` flag (a `FixturesProperties` key, default
-  true) set to false, so the dev demo-data seeding is skipped at startup (the suite resets to the five-user
-  fixtures per test anyway), and the pure-UI specs (the field-validation cases and the admin user-selection
-  navigation) no longer reset the fixtures, since they neither mutate nor assert money state.
-- Renamed the product term for a person from "member" to "user" throughout the UI, the API, and the
-  codebase, so the frontend vocabulary matches the backend's existing `User` model and `ROLE_USER` instead
-  of diverging from it. The members page is now **Users** ("Add a user", "No users yet"), the role badge
-  reads **User** or **Admin**, the admin "Record member expense" page is now just **Expenses**, the admin
-  "view this user" deep link uses the `?user=` query parameter, and the public activity feed and its CSV
-  export expose `userEffectCents` / `userBalanceCents` (were `member*Cents`). The `/admin/users` route and
-  the `/api/users` endpoints are unchanged. A new migration renames the `member_balance` projection table
-  to `user_balance` (a migration-replay test seeds rows in the pre-rename schema and asserts they survive the
-  migration, doubling as a reusable harness for future data migrations). The rename is behavior-preserving.
-- The whole SPA now runs under `OnPush` change detection with signal-based view state, and the admin users
-  page preloads its data through a route resolver and a small cached store, so it paints already populated
-  instead of empty-then-filled and repaints instantly on a revisit. A thin top progress bar shows while a
-  route navigation is in flight.
+- Split the Playwright e2e: a fast no-coverage run is the per-push/PR gate (`scripts/run-e2e.sh`, the
+  production SPA with no instrumentation), and the full-coverage run (backend JaCoCo + frontend V8) moved to
+  a nightly `schedule` job, so a routine push no longer pays the source-mapped build and the V8/monocart
+  teardown. CI caches Playwright's browsers; `playwright.config.ts` reuses an already-running app via a
+  `webServer` block; a new dev-only `campus-coffee.fixtures.demo-data-on-startup` flag (default true) lets the
+  fast run skip demo seeding; and the pure-UI specs no longer reset the fixtures.
+- `gradle :application:bootRun` now serves the full app (the API plus the bundled SPA) on `:8080` via a new
+  `stageFrontendForBootRun` task that builds the Angular SPA and stages it under `static/` on the classpath
+  (wired to `bootRun` only, honoring `-PskipFrontendBuild`), so the root URL serves the SPA rather than a 404,
+  matching the packaged jar. A "run frontend and backend separately" flow (the Angular dev server proxying
+  `/api`) is documented for live frontend reload.
+- Renamed the product term for a person from "member" to "user" across the UI, the API, and the codebase,
+  matching the backend's existing `User`/`ROLE_USER`. The page is now **Users**, the role badge reads
+  **User**/**Admin**, "Record member expense" is now **Expenses**, the admin deep link uses `?user=`, and the
+  admin global activity feed and its CSV export expose `userEffectCents`/`userBalanceCents` (were
+  `member*Cents`). The
+  `/admin/users` route and the `/api/users` endpoints are unchanged. A new migration renames the
+  `member_balance` projection table to `user_balance`, covered by a migration-replay test. Behavior-preserving.
+- Every page and feature component runs under `OnPush` change detection with signal-based view state (the two
+  trivial static components, the not-found page and the confirm dialog, stay eager), and the admin users page
+  preloads through a route resolver and a small cache, so it paints already populated instead of
+  empty-then-filled and repaints instantly when reopened. A thin top progress bar shows during navigation.
 - Tightened the codebase-wide naming and package conventions (behavior-preserving). Every cross-module port
-  interface is now `*Service`/`*DataService` with a `<Port>Impl` adapter, and no implementation leaks a
-  library name (`ZxingQrCodeGenerator`→`QrCodeServiceImpl`, `PostgresBalanceLock`→`BalanceLockServiceImpl`,
-  `BCryptPasswordHasher`→`PasswordHasherServiceImpl`, `SeededUuidGenerator`→`IdGeneratorServiceImpl`,
-  `BalanceProjection`→`BalanceDataServiceImpl`); the two QR ports collapsed into one `QrCodeService`;
-  utility-function files are `*Util` (`ReadSupport`→`ReadUtil`); and every file holds a single top-level type
-  (`ActivityDataServiceImpl`, `ActivityEntry`, and `LoginPayloadDecryptor` were split accordingly).
-  Production code now depends on ports, never on `*Impl` types, enforced by a new ArchUnit rule (the
-  `EventSourced*` decorators are the one documented exception, and a new `BalanceProjectionMaintainer` data
-  interface lets the event writer and the read-model rebuild depend on an abstraction rather than the
-  projection class). The `data` layer was reorganized into one package per concern, dissolving the old
-  `data/persistence/eventsourcing/` package: `domain/ports/system/` for the SPI ports; `data/system/` for the
-  technology adapters; `data/persistence/` root for the cross-cutting persistence mechanisms (the
-  advisory-lock `BalanceLockServiceImpl`, `ConstraintMapping`, and the event-body jsonb serialization
-  `EventJsonMapper` with the `EventSourcingHibernateConfiguration` that pins it onto Hibernate);
-  `data/persistence/events/` for the event-log write support (`EventStore`→`EventAppender`,
-  `ReadModelProjector`, `EventSourcedWriter`, `EventsToDataRunner`); `data/persistence/projection/` for the
-  read-model projection (`BalanceDataServiceImpl` plus the event-log reducer, renamed
-  `ActivityWalk`→`EventReducer` with its `EventProjection`/`EventProjectionType`); `data/persistence/entities/`
-  for the `ChangeType`/`LoggedEntityType` discriminators beside `EventEntity`; and `data/implementations/`
-  for the read-side `ActivityDataServiceImpl`/`ConsumptionHistoryDataServiceImpl` and the `EventSourced*`
-  decorators. The internal event-log layer is named `Event*` and the public feed `Activity*`; `api/web`
-  became `api/app`, with a new `api/support` for the controller-delegate helpers. The frontend `UsersStore`
-  became `AdminUserService`. All conventions are documented in CLAUDE.md.
-- Aligned the Material theme with the official Universität Heidelberg corporate design. Every primary control
-  now resolves to the exact house red (Pantone 1805 C, #C61826) instead of the tonal palette's rounded
-  #bd0e21; cards are white on the Sand background; and the neutral greys (form-field borders, dividers, the
-  snackbar) are warm greys rather than the red-tinted ones the generated palette produced. The fix was a
-  corrected Material system-variable prefix plus a thin set of brand-token overrides. The soft light red is
-  kept as the selected-state accent: the activity-filter tabs, the add-coffee button, the selected dropdown
-  option, and the Admin role badge.
-- Renamed the automated event actor from "system" to "SYSTEM" everywhere it is recorded and shown (the actor
-  providers, the event log, and every activity view), so the non-user actor stands out from user and
-  admin logins. The frontend reads it through one shared pipe, and any legacy lowercase "system" row still
-  displays as "SYSTEM". The value is only a label, so the rename is behavior-preserving.
-- The admin Activity and Users tables size their columns by percentage under a fixed table layout, so the
-  proportions hold at any width and the columns no longer re-measure (and shift) when "Load more" appends
-  rows. The activity "By" column, which shows only a login, is narrower than the user-name column.
+  is `*Service`/`*DataService` with a `<Port>Impl` adapter; no implementation leaks a library name (e.g.
+  `ZxingQrCodeGenerator`→`QrCodeServiceImpl`, `BCryptPasswordHasher`→`PasswordHasherServiceImpl`);
+  utility-function files are `*Util`; and each file holds one top-level type. Production code depends on
+  ports, never `*Impl` (a new ArchUnit rule; the `EventSourced*` decorators are the documented exception). The
+  `data` layer was reorganized into one package per concern, dissolving `data/persistence/eventsourcing/` into
+  `events/` (the write support, `EventStore`→`EventAppender`), `projection/` (the balance projection and the
+  reducer `ActivityWalk`→`EventReducer`), and the `persistence/` root (cross-cutting mechanisms); `api/web`
+  became `api/app` with a new `api/support`, and the frontend admin users cache is a new `AdminUserService`
+  (named per the no-`*Store` convention). All documented in CLAUDE.md.
+- Aligned the Material theme with the Universität Heidelberg corporate design: every primary control resolves
+  to the exact house red (Pantone 1805 C, #C61826) instead of the palette's rounded #bd0e21, cards are white
+  on the Sand background, and the neutral grays (form-field borders, dividers, the snackbar) are warm rather
+  than red-tinted, via a corrected Material system-variable prefix plus brand-token overrides. The soft light
+  red stays as the selected-state accent (filter tabs, the add-coffee button, the Admin badge).
+- Renamed the automated event actor from "system" to "SYSTEM" everywhere it is recorded and shown, so the
+  non-user actor stands out from user and admin logins; a legacy lowercase row still displays as "SYSTEM".
+  Label-only, so behavior-preserving.
+- The admin Activity and Users tables size columns by percentage under a fixed table layout, so the
+  proportions hold at any width and the columns no longer shift when "Load more" appends rows.
 - Every consumption row shows its cup delta in parentheses, including a normal single coffee (+1), matching
   how a cancel (-1) and an admin correction (for example +45) were already annotated.
+- Standardized on American spelling across code comments, KDoc, docs, and UI labels (for example "Coffee
+  canceled", "grays", "normalized"), introduced acronyms on first use in the docs (for example "single-page
+  application (SPA)"), and refreshed the frontend README to match the current Vitest/Playwright tooling,
+  routes, and vocabulary.
 
 ### Fixed
 
@@ -95,7 +80,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   left a dead button whenever the total was an exact multiple of the page size).
 - Keyboard focus is visible again on every control (a house-red focus ring), restoring the WCAG 2.4.7
   indicator the Material theme was drawing none of.
-- A negative member balance renders in red again rather than near-black.
+- A negative user balance renders in red again rather than near-black.
 
 ### Added
 
@@ -104,12 +89,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ProdProfileSecuritySystemTest` boots the app under the `prod` profile on Testcontainers (with a freshly
   generated RSA login key) and asserts the exact Content-Security-Policy header, the
   `Secure`/`HttpOnly`/`SameSite=Strict` session cookie, the prod boot, and the locked-down dev/actuator
-  surface; and a prod-CSP Playwright smoke (`frontend/e2e/prod-csp.spec.ts`, the opt-in `e2e-prod-csp` CI job
+  surface; and a prod-CSP Playwright smoke (`frontend/e2e/prod-csp.spec.ts`, the nightly `e2e-prod-csp` CI job
   via `scripts/run-e2e-prod-csp.sh`) loads the production SPA under the prod profile and CSP in a real browser
   and asserts zero CSP violations and a styled page.
 - An end-to-end test that pins the resolved Material theme tokens to the house colors, so a future theme edit
   that breaks the brand (the off-brand red, the pink surfaces) fails the build instead of shipping.
-- Unit tests for the activity pagination helper covering the one-row peek and the boundary de-duplication.
+- Unit tests for the activity pagination helper covering the one-row peek and the boundary de-duplication,
+  and Vitest specs for the admin users cache (`AdminUserService`, including its preload-and-revalidate
+  behavior) and the route resolver.
 - An automated OpenAPI spec drift gate: a `dev`-profile system test compares the committed
   `frontend/src-gen/api-docs.json` against the live `GET /api/api-docs` (normalizing away the volatile
   version and server URL), so `gradle build` fails when the spec falls out of sync with the API. A new

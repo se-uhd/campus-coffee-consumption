@@ -38,7 +38,7 @@ interface ActivityDataService {
     fun kittyHistory(): List<ActivityEntry>
 
     /**
-     * Returns the user's most recent un-cancelled own coffee increment (the one a cancel would undo),
+     * Returns the user's most recent un-canceled own coffee increment (the one a cancel would undo),
      * found by walking their consumption events LIFO, or null if there is none.
      *
      * @param userId     the user's id

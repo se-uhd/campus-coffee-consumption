@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * `FixtureStartupLoader` gates on via `@ConditionalOnProperty`.
  *
  * @property loadOnStartup when true and the database has no users yet, the fixture dataset is loaded on
- *   startup (enabled in the dev and prod profiles).
+ *   startup (enabled in the dev profile only; off in prod, which uses the bootstrap admin instead).
  * @property resetOnStartup when true (dev only), every startup first clears all data and reseeds the
  *   fixtures with their deterministic ids. The in-memory seeded id generators restart their sequence on
  *   every boot, so without this a persisted dev database keeps the previous run's rows and the next assigned

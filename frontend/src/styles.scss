@@ -73,8 +73,8 @@ $cc-theme: mat.define-theme(
     --mat-sys-on-surface-variant: var(--cc-ink-muted);
     --mat-sys-outline-variant: var(--cc-hairline);
 
-    // The generated neutral palette is red-tinted, so the un-pinned greys (the form-field border, the
-    // snackbar) come out mauve. Pin those to the Sand-derived warm-grey family (the CD's "Warm Gray"). The
+    // The generated neutral palette is red-tinted, so the un-pinned grays (the form-field border, the
+    // snackbar) come out mauve. Pin those to the Sand-derived warm-gray family (the CD's "Warm Gray"). The
     // selected button-toggle keeps the light-red tonal (its generated secondary-container) by preference.
     --mat-sys-outline: #ada596;
     --mat-sys-inverse-surface: #2b2926;
@@ -138,7 +138,7 @@ a {
 // ---------------------------------------------------------------------------
 
 // One width for every page so the panels keep a consistent width as you navigate. The widest content is the
-// users table; 720px fits it at the width it needs with no column overflowing, and every other page (the
+// users table; 740px fits it at the width it needs with no column overflowing, and every other page (the
 // forms and the mobile-first user landing) uses the same width. On a narrow phone the page is full-width
 // (the max-width does not bind); on a wide desktop the column is centered so it reads as an intentional
 // card column, not lost in a void.

@@ -85,7 +85,7 @@ describe('AdminUserService', () => {
     ]);
   });
 
-  it('on a revisit returns the cached rows immediately and revalidates in the background', async () => {
+  it('when reopened returns the cached rows immediately and revalidates in the background', async () => {
     userList.mockResolvedValueOnce([userDto('u1', { active: true })]);
     overview.mockResolvedValueOnce([balance('u1', 1, 0)]);
     await service.ensureLoaded();

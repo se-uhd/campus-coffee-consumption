@@ -11,14 +11,14 @@ describe('AdminSelectionService', () => {
 
   it('selectFromParam selects the user named by the param and returns it', () => {
     service.setOwnUserId('admin-1');
-    expect(service.selectFromParam('member-7')).toBe('member-7');
-    expect(service.selectedUserId()).toBe('member-7');
+    expect(service.selectFromParam('user-7')).toBe('user-7');
+    expect(service.selectedUserId()).toBe('user-7');
     expect(service.isOwnAccountSelected()).toBe(false);
   });
 
   it('selectFromParam falls back to the admin own account when the param is absent', () => {
     service.setOwnUserId('admin-1');
-    service.select('member-7');
+    service.select('user-7');
     expect(service.selectFromParam(null)).toBe('admin-1');
     expect(service.selectedUserId()).toBe('admin-1');
     expect(service.isOwnAccountSelected()).toBe(true);
@@ -38,7 +38,7 @@ describe('AdminSelectionService', () => {
 
   it('reset clears the selection and the own id so nothing leaks into the next session', () => {
     service.setOwnUserId('admin-1');
-    service.select('member-7');
+    service.select('user-7');
     service.reset();
     expect(service.selectedUserId()).toBe('');
     expect(service.ownUserId).toBe('');

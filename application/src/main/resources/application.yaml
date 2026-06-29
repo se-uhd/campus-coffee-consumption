@@ -152,7 +152,7 @@ campus-coffee:
   login-encryption:
     private-key-pem: ${LOGIN_PRIVATE_KEY_PEM} # required, no fallback (Secret Manager)
   fixtures:
-    load-on-startup: false # prod has real members, not fixtures
+    load-on-startup: false # prod has real users, not fixtures
   bootstrap-admin: # create one admin on first startup if none exists; all defaults live here, not in the class
     login-name: ${BOOTSTRAP_ADMIN_LOGIN:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}

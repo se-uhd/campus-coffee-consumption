@@ -14,8 +14,10 @@ import de.seuhd.campuscoffee.domain.ports.api.UserService
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.atLeastOnce
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
@@ -87,7 +89,7 @@ class DevDemoDataLoaderTest {
     }
 
     @Test
-    fun `loadDemoData seeds the nine extra demo users on an empty fixture set bringing the total to fourteen`() {
+    fun `loadDemoData creates the nine demo users and an empty user with twelve upserts and ten consumption rows`() {
         // the database holds only the five seeded fixtures (none of them a demo user)
         whenever(userService.getAll()).thenReturn(listOf(admin))
         stubCreatePath()
@@ -124,9 +126,26 @@ class DevDemoDataLoaderTest {
 
         loader.loadDemoData()
 
-        // a spec marked inactive is created active (so its consumption and purchase seeding succeeds), then
-        // deactivated by a follow-up upsert -> at least one upsert carries active = false
-        verify(userService, atLeastOnce()).upsert(argThat { active == false })
+        // An inactive demo spec is created active (so its history seeding succeeds), then deactivated. Find
+        // such a user: a deactivated user (active = false) whose id also received a coffee, i.e. it was
+        // seeded with history before being deactivated (emma_wagner; not the deliberately-empty hannes_schulz).
+        val upserts = argumentCaptor<User>()
+        verify(userService, atLeastOnce()).upsert(upserts.capture())
+        val seededUserIds = argumentCaptor<UUID>()
+        verify(coffeeConsumptionService, atLeastOnce()).applyDelta(seededUserIds.capture(), eq(1), any())
+        val deactivatedWithHistory =
+            upserts.allValues.firstOrNull { it.active == false && it.id in seededUserIds.allValues }
+        requireNotNull(
+            deactivatedWithHistory
+        ) { "expected an inactive demo user seeded with history before deactivation" }
+        val targetId = deactivatedWithHistory.id!!
+
+        // Assert the ORDER for that user: its coffee was seeded before its deactivation upsert, so a regression
+        // that deactivated first (which the domain rejects at runtime, since a deactivated user is read-only)
+        // turns this red instead of leaving it green.
+        val ordered = inOrder(coffeeConsumptionService, userService)
+        ordered.verify(coffeeConsumptionService, atLeastOnce()).applyDelta(eq(targetId), eq(1), any())
+        ordered.verify(userService).upsert(argThat { active == false && id == targetId })
     }
 
     @Test
