@@ -7,6 +7,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-06-29
+
+### Fixed
+
+- The admin users table no longer shows a horizontal scrollbar on a narrow (half-screen) window. The 0.8.0
+  fix for the truncated "Cups" header had raised the table's min-width past what a narrow window fits. The
+  per-row action controls are now denser (36px icon buttons with tighter spacing), the profile-icon column is
+  narrower, and the cell padding is trimmed, so the table fits a narrow window without scrolling while every
+  header still shows in full.
+
 ## [0.8.0] - 2026-06-29
 
 ### Added
@@ -901,6 +911,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.8.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.8.1
 [0.8.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.8.0
 [0.7.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.7.0
 [0.6.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.6.1

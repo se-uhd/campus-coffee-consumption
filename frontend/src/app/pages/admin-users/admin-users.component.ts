@@ -351,22 +351,32 @@ import { Role, UserDto } from '../../models';
          re-measure (and shift) when "Load more" appends rows. The min-width is the point below which the table
          scrolls horizontally instead of compressing; it is sized so every column still fits its content there
          (notably the "Balance"/"Cups" headers and the action cluster), so a narrow window scrolls rather than
-         truncating a header. */
+         truncating a header. The action icons and cell padding below are kept dense so this stays low enough
+         to fit a narrow (half-screen) window without a horizontal scrollbar. */
       table.mat-mdc-table {
-        min-width: 720px;
+        min-width: 580px;
         table-layout: fixed;
       }
 
+      /* Trim the table's horizontal cell padding from the global 16px to 8px: with six columns plus a
+         five-control action cluster, the generous default padding alone pushed the table past a narrow
+         window's width. The bulk-download header row keeps its own spacing; this targets the table cells. */
+      .mat-mdc-header-cell,
+      .mat-mdc-cell {
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+
       .mat-column-view {
-        width: 8%;
+        width: 7%;
       }
 
       .mat-column-name {
-        width: 20%;
+        width: 22%;
       }
 
       .mat-column-role {
-        width: 13%;
+        width: 12%;
       }
 
       /* The role cell holds a fixed, short chip ("User"/"Admin") that must never be truncated. Material's
@@ -381,15 +391,28 @@ import { Role, UserDto } from '../../models';
          narrow for the label plus its cell padding, so Material clipped it to "Cup…". Give it enough width
          that the header (the widest thing in the column) always fits. */
       .mat-column-count {
-        width: 11%;
+        width: 9%;
       }
 
       .mat-column-balance {
-        width: 13%;
+        width: 14%;
       }
 
       .mat-column-actions {
-        width: 35%;
+        width: 36%;
+      }
+
+      /* Keep the per-row controls dense so the action cluster (a toggle plus four icon buttons) stays narrow
+         enough that the table fits a half-screen window. The leading "view profile" button is sized to match.
+         Material's M3 icon button is a 48px touch target; 36px here is comfortable for a desktop admin table
+         and trims ~12px per button off the cluster. */
+      .col-actions button.mat-mdc-icon-button,
+      .col-view button.mat-mdc-icon-button {
+        --mdc-icon-button-state-layer-size: 36px;
+
+        width: 36px;
+        height: 36px;
+        padding: 6px;
       }
 
       /* The actions column holds fixed-size controls (a toggle and icon buttons), not text, so it must never
@@ -416,13 +439,15 @@ import { Role, UserDto } from '../../models';
       }
 
       .col-actions mat-slide-toggle + button {
-        margin-left: 10px;
+        margin-left: 8px;
       }
 
       /* The leading "View profile" column holds a single icon button; keep its content tight against the name
-         column (its width is set by .mat-column-view above). */
+         column (its width is set by .mat-column-view above), hugging the left edge so the narrow column fits
+         the 36px button. */
       .col-view {
         white-space: nowrap;
+        padding-left: 2px;
         padding-right: 0;
       }
 
