@@ -5,7 +5,7 @@ import { catchError, tap, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { CapabilityTokenService } from '../services/capability-token.service';
 
-/** Admin endpoint prefixes, authenticated by the JWT (`Authorization: Bearer`). */
+/** Admin endpoint prefixes, authenticated by the admin JWT in the httpOnly session cookie the browser sends. */
 const ADMIN_PREFIXES = ['/api/users', '/api/price', '/api/kitty'];
 
 /** User endpoint prefixes, authenticated by the capability token (`X-Capability-Token`). */

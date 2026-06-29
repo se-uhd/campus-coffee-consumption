@@ -72,7 +72,7 @@ class CancelGraceExpiredSystemTest {
     }
 
     @Test
-    fun `cancelling after the grace period has passed returns 409 Conflict`() {
+    fun `canceling after the grace period has passed returns 409 Conflict`() {
         // add a coffee, then try to undo it; with a zero grace period the undo is already too late
         client()
             .post()

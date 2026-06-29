@@ -3,12 +3,18 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Playwright end-to-end configuration for the CampusCoffeeConsumption SPA.
  *
- * The app is expected to be already running and self-contained at http://localhost:8080 (the Spring Boot jar
- * serving the bundled Angular SPA plus the /api backend, dev profile), so there is deliberately no
- * `webServer` block, so the tests neither start nor stop the app. Run with `npx playwright test`.
+ * The tests run against the app at http://localhost:8080 (the Spring Boot jar serving the bundled Angular
+ * SPA plus the /api backend, dev profile). The `webServer` block below reuses an already-running app (the
+ * CI-launched one or a local instance) and starts `bootRun` only when nothing is serving :8080. Run with
+ * `npx playwright test`.
  */
 export default defineConfig({
   testDir: './e2e',
+  // The prod-CSP smoke (@prod-csp) is meaningful only under the production SPA + strict prod CSP that
+  // scripts/run-e2e-prod-csp.sh sets up; exclude it by default so a bare `npm run e2e` against the dev app
+  // does not run it (it would pass meaninglessly). run-e2e-prod-csp.sh sets PW_PROD_CSP=1 to opt back in and
+  // selects it with --grep @prod-csp.
+  grepInvert: process.env.PW_PROD_CSP ? undefined : /@prod-csp/,
   // Finalizes the browser (V8) coverage the per-test fixture in e2e/fixtures.ts stages; a no-op unless
   // PW_COVERAGE=1 (the e2e:coverage script / CI e2e job). See e2e/coverage.global-teardown.ts.
   globalTeardown: './e2e/coverage.global-teardown.ts',

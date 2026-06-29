@@ -439,7 +439,7 @@ class AccountingSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `the admin overview reports every user's count and balance`() {
+    fun `the admin overview reports a user's count and balance`() {
         addCoffee()
 
         val overview =

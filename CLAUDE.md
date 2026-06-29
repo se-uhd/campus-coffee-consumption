@@ -8,7 +8,7 @@ CampusCoffeeConsumption is a Spring Boot application that tracks the coffee cons
 **SE@UHD** (the Software Engineering Group at Heidelberg University, hence the `de.seuhd` package). Each
 user has a running coffee count, valued at a global admin-set **price per cup**, which feeds a per-user
 **balance** (a prepaid-card figure) and a communal **kitty**. A user bumps their own count via a secret
-**capability URL** printed as a **QR code on the wall**; scanning it opens a small mobile-first Angular web
+**capability URL** printed as a **QR (Quick Response) code on the wall**; scanning it opens a small mobile-first Angular web
 app where they add a coffee (and may **undo** a recent one within a grace period) and record their own bean
 purchases. Admins create and manage users, set the price, record expenses and kitty deposits, and
 correct anyone's count. Settling up is a **deposit** (real money paid into the kitty); there is no reset.
@@ -18,7 +18,7 @@ running balance) is read. Money is stored as integer **euro cents** end to end. 
 `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`.
 
 It follows a **hexagonal (ports-and-adapters) architecture** with strict layer separation enforced by
-ArchUnit tests, derived from the CampusCoffee teaching project (the POS/review/OpenStreetMap domain was
+ArchUnit tests, derived from the CampusCoffee teaching project (the point-of-sale (POS)/review/OpenStreetMap domain was
 replaced by the consumption domain).
 
 ## Architecture
@@ -28,10 +28,10 @@ frontend.
 
 ### Module Dependencies
 - **domain**: Core business logic, domain models, and port interfaces. It depends on Bean Validation and, by design, on Spring (`@Service`/`@Component`/`@Transactional`/`@Value`/slf4j and `spring-tx`); it does not depend on the api, data, or application layers.
-- **api**: REST API layer: controllers, DTOs, DTO mappers, and the inbound web security (the Spring Security filter chain, the capability-token filter, the `UserDetailsService`, the JWT config, and the public base-url guard) (depends on: domain).
+- **api**: REST API layer: controllers, data transfer objects (DTOs), DTO mappers, and the inbound web security (the Spring Security filter chain, the capability-token filter, the `UserDetailsService`, the JSON Web Token (JWT) config, and the public base-url guard) (depends on: domain).
 - **data**: Data layer with JPA entities, repositories, the event sourcing machinery, and the QR/capability token adapters (depends on: domain).
 - **application**: The composition root: the Spring Boot main class plus the startup/bootstrap seeders and their `@ConfigurationProperties`. It holds no web, security, or business code (depends on: domain, api, data).
-- **frontend**: Angular SPA (sibling of the modules), built by Gradle and bundled into the application's `static/` resources.
+- **frontend**: the Angular single-page application (SPA), a sibling of the modules, built by Gradle and bundled into the application's `static/` resources.
 
 ### Layer Rules (Enforced by ArchUnit)
 From `application/src/test/kotlin/de/seuhd/campuscoffee/tests/architecture/ArchitectureTests.kt`:
@@ -47,10 +47,10 @@ The domain defines **port interfaces** that adapters implement:
 
 - **API Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/api/`): Generic service interface `CrudService<DOMAIN, ID>` and the concrete service interfaces `UserService`, `CoffeeConsumptionService`, `CoffeePriceService`, `ExpenseService`, `PaymentService`, `AccountingService` (the read-side money **numbers**: a user's summary, the kitty balance, and the per-user overview), and `ActivityService` (the read-side chronological **feeds**: a user's unified activity, the kitty history, and the admin global activity across everyone plus its CSV export). The two mirror the data-layer split (`ActivityDataService` for feeds beside `BalanceDataService` for the scalar balances).
 - **Data Ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/data/`): Generic data service interface `CrudDataService<DOMAIN, ID>`, the concrete `UserDataService`, `CoffeeConsumptionDataService` (the latter adds `getByUserId`), `CoffeePriceDataService`, `ExpenseDataService`, and `PaymentDataService`, the event-log-backed `ConsumptionHistoryDataService` and `ActivityDataService` (one shared `EventReducer` over the log with three views: a user's unified activity, the kitty history, and `globalActivity` across everyone), the `BalanceDataService` port (reads the maintained `user_balance`/`kitty_balance` projections, implemented by `BalanceDataServiceImpl`), the `BalanceLockService` port (two Postgres advisory locks, `lockKitty()` serializing the kitty-overdraw check and `lockUser(userId)` serializing a user's balance recompute, implemented by `BalanceLockServiceImpl`), and the `PasswordHasherService` port.
-- **SPI / infrastructure ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/system/`): `IdGeneratorService`, `CapabilityTokenGeneratorService`, `QrCodeService` (the single QR port: a high-resolution PNG **and** the printable PDF grid), `StartupTaskService`, and the request-scoped `ActorProviderService`. Concrete classes are not ports and live in `domain/.../model/`: `ChangeNoteContext` (the change-note metadata holder) and `LabeledQrCode` (a QR-grid cell, `QrCodeService`'s parameter type).
+- **SPI (service provider interface) / infrastructure ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/system/`): `IdGeneratorService`, `CapabilityTokenGeneratorService`, `QrCodeService` (the single QR port: a high-resolution PNG **and** the printable PDF grid), `StartupTaskService`, and the request-scoped `ActorProviderService`. Concrete classes are not ports and live in `domain/.../model/`: `ChangeNoteContext` (the change-note metadata holder) and `LabeledQrCode` (a QR-grid cell, `QrCodeService`'s parameter type).
 
 Service **implementations**:
-- API services in `domain/src/main/kotlin/de/seuhd/campuscoffee/domain/implementation/` (`UserServiceImpl`, `CoffeeConsumptionServiceImpl`, `CoffeePriceServiceImpl`, `ExpenseServiceImpl`, `PaymentServiceImpl`, `AccountingServiceImpl`).
+- API services in `domain/src/main/kotlin/de/seuhd/campuscoffee/domain/implementation/` (`UserServiceImpl`, `CoffeeConsumptionServiceImpl`, `CoffeePriceServiceImpl`, `ExpenseServiceImpl`, `PaymentServiceImpl`, `AccountingServiceImpl`, `ActivityServiceImpl`).
 - Data services (`*DataServiceImpl`, including the read-side `ActivityDataServiceImpl`/`ConsumptionHistoryDataServiceImpl`) and the event-sourced decorators (`EventSourced*DataService`) in `data/.../implementations/`; the technology adapters (`QrCodeServiceImpl`, `PasswordHasherServiceImpl`, `CapabilityTokenGeneratorServiceImpl`, `IdGeneratorServiceImpl`) in `data/.../system/`; the Postgres advisory-lock `BalanceLockServiceImpl`, the `ConstraintMapping`, and the event-body jsonb serialization (`EventJsonMapper` with the `EventSourcingHibernateConfiguration` that pins it onto Hibernate) in `data/.../persistence/`; the event-log write support (`EventAppender`, `ReadModelProjector`, `EventSourcedWriter`, `EventsToDataRunner`) in `data/.../persistence/events/`; and the read-model projection (`BalanceDataServiceImpl` behind the `BalanceProjectionMaintainer` interface, plus the `EventReducer` and its `EventProjection`/`EventProjectionType`/`PricePoint`/`EventReducerUtil`) in `data/.../persistence/projection/`. The event-row discriminators `ChangeType` and `LoggedEntityType` live beside `EventEntity` in `data/.../persistence/entities/`.
 
 ### Naming and File Conventions
@@ -64,9 +64,9 @@ Follow these in new code (enforced by review):
 - **Database entities are `*Entity`** (`UserEntity`, `EventEntity`).
 - **One top-level type per file.** Each file holds one class / interface / object / enum. Related top-level functions, constants, and extension functions may sit beside the single type they support (`EventProjection.kt` carries its mapper functions; `ReadUtil.kt` is functions only, no type). The only multi-type exception is a tightly-bound sealed hierarchy.
 - **Frontend Angular services are `*Service`** (`AdminUserService`, `AdminSelectionService`), including the stateful signal-holding singletons. No `*Store` (an NgRx idiom this app does not use).
-- **Depend on the port, never the implementation.** Production code injects and references the interface/port, not a `*Impl`. The ArchUnit test `production code depends on ports, never on Impl types` enforces it. The sole exception is the `EventSourced*` decorators: each must inject the concrete relational `*DataServiceImpl` it wraps, because injecting the port would resolve to the `@Primary` decorator itself and self-loop. When a collaborator has no port yet (e.g. a data-internal projection-maintenance operation), introduce a small interface for it (`BalanceProjectionMaintainer`) rather than depending on the class.
+- **Depend on the port, never the implementation.** Production code injects and references the interface/port, not a `*Impl`. The ArchUnit test `production code depends on ports, never on Impl types` enforces this; its source set is the non-`*Impl` classes (the `*Impl` adapters themselves are excluded as sources, because each extends a base `*Impl` such as `CrudDataServiceImpl`, an inheritance edge the rule cannot single out). The one explicit exception among the checked classes is the `EventSourced*` decorators: each must inject the concrete relational `*DataServiceImpl` it wraps, because injecting the port would resolve to the `@Primary` decorator itself and self-loop. When a collaborator has no port yet (e.g. a data-internal projection-maintenance operation), introduce a small interface for it (`BalanceProjectionMaintainer`) rather than depending on the class.
 
-Package layout reflecting the above: `domain/ports/{api,data,system}/`; `data/{implementations (the `*DataServiceImpl` and the event-sourced decorators), system (technology adapters), persistence (entities incl. the `ChangeType`/`LoggedEntityType` discriminators, repositories, events (the event-log write support), projection (the balance projection + the `EventReducer`), the advisory-lock impl, `ConstraintMapping`)}`; `api/{app (the SPA-forwarding controller), support (controller-delegate helper beans), controller, dtos, mapper, security, openapi, configuration, exceptions}`.
+Package layout reflecting the above: `domain/ports/{api,data,system}/`; `data/{implementations (the `*DataServiceImpl` and the event-sourced decorators), system (technology adapters), mapper (the MapStruct entity mappers), configuration (`IdGeneratorConfiguration`, `RepositoryConfiguration`, `EventContextConfiguration`, and the `@ConfigurationProperties`), persistence (entities incl. the `ChangeType`/`LoggedEntityType` discriminators, repositories, events (the event-log write support), projection (the balance projection + the `EventReducer`), the advisory-lock impl, `ConstraintMapping`)}`; `api/{app (the SPA-forwarding controller), support (controller-delegate helper beans), controller, dtos, mapper, security, openapi, configuration, exceptions}`.
 
 ### Event Sourcing Is the Only Persistence Model
 
@@ -89,7 +89,7 @@ source of truth, and the relational tables are a **read model** projected from i
 Two additions versus CampusCoffee's event machinery:
 
 1. **`created_by` and `note` metadata on the generic event.** `events` and `EventEntity` carry a
-   `created_by` (the actor's **login name** as a string: a user via their token, an admin, or `"system"`
+   `created_by` (the actor's **login name** as a string: a user via their token, an admin, or `"SYSTEM"`
    for startup fixtures/bootstrap) and a nullable `note` (the free-text note associated with the event). Both
    are set at the single `EventAppender.append*` boundary from the request-scoped `ActorProviderService` (reads the
    `SecurityContext`) and the note source. The note is unified at that boundary: it is the admin's
@@ -101,7 +101,7 @@ Two additions versus CampusCoffee's event machinery:
    that single column. A DELETE body carries only the id, so it contributes no note. Neither metadata field
    is part of the full-state JSON body, and the generic writer/decorator signatures are untouched.
    `created_by` is a login string, not a user id, so the audit trail is human-readable, represents the
-   non-user `"system"` actor naturally, and does not foreign key into the mutable users read model.
+   non-user `"SYSTEM"` actor naturally, and does not foreign key into the mutable users read model.
 2. **Several logged entities, each modeled exactly like CampusCoffee's `Review`.** `CoffeeConsumption`,
    `CoffeePrice`, `Expense`, and `Payment` are all logged the same way: a domain model, a JPA read-model
    entity, a relational `*DataServiceImpl`, and a `@Primary` event-sourced decorator. Each flattens its user
@@ -133,7 +133,7 @@ expose:
 - `ExpenseService` records and corrects bean purchases; `PaymentService` records deposits and kitty
   adjustments.
 
-A user adds **one** coffee at a time and may **undo** their most recent un-cancelled own coffee within a
+A user adds **one** coffee at a time and may **undo** their most recent un-canceled own coffee within a
 grace period (`campus-coffee.consumption.cancel-grace-period`, default 5 minutes), recorded by the owner so
 the event is attributed to the user. There is no free `−1` any more. Concurrent self-scans are handled by
 the entity's `@Version` optimistic-locking column → `ConcurrentUpdateException` (409); the SPA retries. An
@@ -201,13 +201,30 @@ recomputes both projections after replaying the log (which it now does in bounde
 
 The codebase uses extensive generics to reduce duplication:
 
-- **CrudController** (`api/.../controller/CrudController.kt`): generic REST controller for CRUD operations (used by `UserController`).
+- **CrudController** (`api/.../controller/CrudController.kt`): generic REST controller for CRUD (create, read, update, delete) operations (used by `UserController`).
 - **CrudService** / **CrudServiceImpl**, **CrudDataService** / **CrudDataServiceImpl**: generic service and data-service interfaces and base implementations.
 - **DtoMapper** / **EntityMapper**: generic mapping interfaces using MapStruct.
 
 Domain-specific controllers/services extend these base classes (e.g., `UserController extends CrudController<User, UserDto, UUID>`; the domain type comes first).
 
 ## Build and Run Commands
+
+### Shell environment (macOS, zsh, BSD tools)
+
+The shell is **zsh on macOS** with **BSD** command-line tools, not bash/GNU. The differences bite in ways
+that fail *silently* (a command that should match prints nothing, which reads as a false "clean" result):
+
+- **zsh does not word-split unquoted parameter expansions.** `FLAGS="--include=*.md --include=*.kt"; grep
+  $FLAGS .` passes the whole string as one argument, so grep matches nothing. Use an array and quote-splat
+  it (`FLAGS=(--include='*.md' --include='*.kt'); grep "${FLAGS[@]}" .`), or write the flags inline.
+- **BSD tools differ from GNU.** `sed -i` needs an explicit backup suffix (`sed -i '' 's/a/b/g' file`). BSD
+  `grep -E` handles `\b` (word boundary) unreliably, so `\bword\b` can match nothing; use `grep -w`, a plain
+  pattern, or `git grep`. `grep -P` (PCRE) is unavailable.
+- **Exclude build caches when scanning.** `grep -r` walks `frontend/.angular/`, `node_modules`, `dist`,
+  `build`, and `.gradle` (generated code that pollutes a prose scan); pass `--exclude-dir` for each, or
+  prefer `git grep` (tracked files only).
+- **Verify a "clean" result is real.** When a scan returns zero hits, confirm the command works by grepping
+  for a string you know exists; a silent zsh/BSD quirk once made a spelling scan report clean when it was not.
 
 ### Prerequisites
 - Docker daemon must be running to use a database in the `dev` profile or to run the tests that use *Testcontainers*.
@@ -291,7 +308,8 @@ The `dev` profile:
   deliberately left **empty** to demo the empty state: a freshly created active user `new_user` (no history
   at all) and the inactive demo user `hannes_schulz`. Demo users that get history are created active,
   given their history, then deactivated last (seeding history onto an inactive user is rejected by the
-  domain). It is `@Profile("dev")`, so the tests still see exactly the five-user fixture set.
+  domain). It is `@Profile("dev")`, so the tests still see exactly the five-user fixture set, and the fast
+  e2e run sets `campus-coffee.fixtures.demo-data-on-startup=false` to skip this seeding for a quicker boot.
 - Registers the dev-only `DevController` (in the `api` layer) under `/api/dev`:
   `GET /api/dev/data` reports the counts, `PUT /api/dev/data` replaces the data with the fixtures
   (clear + seed; idempotent, reassigning the same seeded ids), and `DELETE /api/dev/data` clears it.
@@ -303,7 +321,7 @@ to run the whole thing, but it rebuilds the SPA whenever the frontend sources ch
 For **active frontend development**, run the two halves separately: the Spring Boot backend on `:8080` and
 the **Angular dev server** (`ng serve`) on `:4200` with hot module reload. The dev server proxies every
 `/api` request to the backend (`frontend/src/proxy.conf.json` → `target: http://localhost:8080`), so the SPA
-and the API still look same-origin to the browser and no CORS config is needed.
+and the API still look same-origin to the browser and no Cross-Origin Resource Sharing (CORS) config is needed.
 
 1. Start PostgreSQL (see above) if it is not already running.
 2. Start the **backend** on `:8080`. You do not need the bundled SPA in this mode, so skip the (now
@@ -326,7 +344,7 @@ and the API still look same-origin to the browser and no CORS config is needed.
    browser; the backend keeps running untouched. This is the loop to use for any UI work.
 
 This is the same two-process split used in production-style deployments where the static SPA is served by a
-separate web server/CDN and the backend is a standalone API: point the SPA's `/api` calls at the backend
+separate web server or content delivery network (CDN) and the backend is a standalone API: point the SPA's `/api` calls at the backend
 origin (here via the dev-server proxy; in production via the deployment's reverse proxy or an absolute API
 base URL) instead of relying on the single-jar bundling.
 
@@ -415,7 +433,8 @@ gradle :domain:test --tests "CoffeeConsumptionServiceTest.decrementing a count a
     configuration (`npm run build:coverage`, `sourceMap.scripts: true`, no output hashing), which
     `scripts/run-e2e-coverage.sh` builds and `:application:bootJar -PskipFrontendBuild` bundles as-is. A
     plain `npm run e2e` (no `PW_COVERAGE`) is unaffected.
-  - **CI (split fast vs nightly).** In `.github/workflows/build.yml` the e2e is two jobs. The `e2e-fast`
+  - **CI (split fast vs nightly).** In `.github/workflows/build.yml` the e2e is split into a fast and a
+    full-coverage job (plus a third, the nightly `e2e-prod-csp` smoke described below). The `e2e-fast`
     job runs on every push/PR: it builds the production SPA + jar (no instrumentation), launches it, and runs
     a plain `npm run e2e` (via `scripts/run-e2e.sh`) as the merge gate. The full-coverage `e2e` job (the flow
     above, `:coverage:runE2eCoverage`, which uploads `e2e.exec`, the aggregate report, and
@@ -542,7 +561,7 @@ access to your working notes or any review document) must understand the change 
 
 - **Database**: PostgreSQL 18.
 - **Migrations**: Flyway (`data/src/main/resources/db/migration/`).
-- **ORM**: JPA with Spring Data.
+- **ORM (object-relational mapping)**: JPA with Spring Data.
 - **Connection**: Configured in `application/src/main/resources/application.yaml`.
 
 The schema is an eight-migration set, broadly one `CREATE` per table (V7 adds the two balance-projection
@@ -588,7 +607,7 @@ Each of `users`, `coffee_consumptions`, `coffee_prices`, `expenses`, and `paymen
 column for optimistic locking; the append-only `events` log and the `user_balance`/`kitty_balance`
 projections are deliberately unversioned.
 
-**Keep the migration files lean: plain DDL, no explanatory comments.** A column's or constraint's rationale
+**Keep the migration files lean: plain DDL (data definition language), no explanatory comments.** A column's or constraint's rationale
 belongs in the entity class's KDoc and the changelog, never in the `.sql`. And never edit an applied
 migration in place: Flyway's `validate-on-migrate` checksums the whole file, so even a comment change on an
 applied migration fails startup (needing a `flyway repair` or a fresh migration); land a schema change as a
@@ -613,19 +632,20 @@ admin deactivates them instead); `coffee_consumptions` stays `CASCADE` because e
     as-of price, the kitty balance), deactivation → mutations 403, deleting a user with financial history
     → 409, unknown/rotated token → 401, the response shapes, and event-log assertions (an event per change
     with the right body / `created_by` / `note`).
-- **Acceptance Tests**: Cucumber BDD tests in `application/src/test/kotlin/de/seuhd/campuscoffee/tests/acceptance/`
+- **Acceptance Tests**: Cucumber behavior-driven development (BDD) tests in `application/src/test/kotlin/de/seuhd/campuscoffee/tests/acceptance/`
   with `.feature` files under `application/src/test/resources/...` (consumption, pricing and the fund,
   user administration, authorization).
 - **Architecture Tests**: ArchUnit tests enforcing the hexagonal layer rules.
 - Because event sourcing is the only mode, there is a single backend (no dual relational/event sourcing test split).
 - **Most automated tests run the default (no) profile; only `DevSystemTests` and the Playwright e2e run under
-  `dev`.** Prod-only behavior has a focused test set (a misconfigured prod CSP once shipped an unstyled UI):
+  `dev`.** Prod-only behavior has a focused test set (a misconfigured prod Content-Security-Policy (CSP) once shipped an unstyled UI):
   `WeakDevSecretGuardTest` and `PublicBaseUrlGuardTest` unit-test the two `@Profile("prod")` fail-fast guards;
   `ProdProfileSecuritySystemTest` boots the full app under `@ActiveProfiles("prod")` on Testcontainers (with a
   freshly generated RSA login key, since the shared test key is the committed dev fallback the guard refuses)
   and asserts the exact CSP header, the `Secure`/`HttpOnly`/`SameSite=Strict` session cookie, the prod boot,
   and the locked-down dev/actuator surface; and the prod-CSP Playwright smoke (`frontend/e2e/prod-csp.spec.ts`,
-  run by `scripts/run-e2e-prod-csp.sh` in the opt-in `e2e-prod-csp` CI job) loads the **production** SPA under
+  run by `scripts/run-e2e-prod-csp.sh` in the nightly `e2e-prod-csp` CI job, on the `schedule` plus
+  `workflow_dispatch`) loads the **production** SPA under
   the prod profile and prod CSP in a real browser and asserts zero CSP violations and a styled page. **When
   you change the CSP, the security config, or the production build, update those tests.** What still cannot be
   auto-tested: the real Cloud SQL connector and Secret Manager binding (tests override the datasource and
@@ -644,7 +664,7 @@ vague status nouns. Examples:
 
 - ``fun `decrementing a count at zero returns 409 Conflict`()`` (system test)
 - ``fun `setTotal throws ForbiddenException for a non-admin`()`` (service test)
-- ``fun `findByCapabilityToken returns the matching member and null when none matches`()`` (repository test)
+- ``fun `findByCapabilityToken returns the matching user and null when none matches`()`` (repository test)
 
 Non-test functions (setup methods, `@MethodSource` providers, Cucumber step definitions, private helpers)
 keep conventional camelCase names.
@@ -653,7 +673,7 @@ keep conventional camelCase names.
 
 - **Spring Boot 4** (Spring Framework 7).
 - **Kotlin** on JDK 25; nullability is expressed with Kotlin's nullable types.
-- **MapStruct** for object mapping (DTOs <-> domain models <-> entities), run via kapt.
+- **MapStruct** for object mapping (DTOs <-> domain models <-> entities), run via kapt (the Kotlin annotation processing tool).
 - **ZXing** for backend QR-code generation.
 - **ktlint** for formatting and linting (the official Kotlin style), **detekt** for static analysis, plus the custom `campus-coffee-kdoc` rule set.
 - **Bean Validation** (Jakarta Validation) for input validation (in the controllers, before mapping DTOs to domain models).
@@ -671,10 +691,10 @@ keep conventional camelCase names.
 Two authentication mechanisms, one per audience; there is **no HTTP Basic**:
 
 - **Admins, JWT bearer via a session cookie.** `POST /api/auth/token` exchanges a username and password for a
-  signed JWT (a work-session TTL of ~10 hours, no refresh flow). The credentials are **encrypted in the
-  browser**: the request body is a compact JWE (`RSA-OAEP-256` + `A256GCM`), not plaintext, and carries an
+  signed JWT (a work-session time to live (TTL) of ~10 hours, no refresh flow). The credentials are **encrypted in the
+  browser**: the request body is a compact JSON Web Encryption (JWE) payload (`RSA-OAEP-256` + `A256GCM`), not plaintext, and carries an
   `iat` so a captured ciphertext cannot be replayed beyond `campus-coffee.login-encryption.max-payload-age`
-  (default 2 minutes). The backend publishes its RSA public key at the public `GET /api/auth/public-key` (a
+  (default 2 minutes). The backend publishes its RSA public key at the public `GET /api/auth/public-key` (a JSON Web Key, or
   JWK); the SPA encrypts `{ loginName, password, iat }` with it (the `jose` library), and
   `LoginPayloadDecryptor` (api layer) decrypts it (rejecting a stale payload) before authentication. A
   malformed, undecryptable, or stale payload is a 400 (`LoginPayloadException`), distinct from the 401 for
@@ -694,7 +714,7 @@ Two authentication mechanisms, one per audience; there is **no HTTP Basic**:
   `POST /api/auth/logout` clears the cookie. `CookieOrHeaderBearerTokenResolver` reads the bearer token from
   that cookie (the SPA) or the `Authorization` header (API clients and the system tests, which still use the
   header). The resource server maps the token's `roles` claim to a `ROLE_ADMIN` authority. The
-  `AuthenticationManager` / `DaoAuthenticationProvider` / `CampusUserDetailsService` / password-encoder
+  `AuthenticationManager` / `DaoAuthenticationProvider` / `DomainUserDetailsService` / password-encoder
   beans exist only for this login step. See `doc/2026-06-24_login-payload-encryption.md` and
   `doc/2026-06-24_security-hardening-and-cookie-auth.md` for the threat model and key management.
 - **Users, capability token.** `CapabilityTokenAuthenticationFilter` reads the `X-Capability-Token` header,
@@ -729,7 +749,7 @@ controllers map paths relative to the resource.
   current total, balance, the current price, the kitty balance, whether the most recent coffee is still
   `cancellable`, and the first page of the unified `activity` (`limit` defaults to 10).
 - `POST /consumption` (no body): add one coffee, returns the summary.
-- `POST /consumption/cancel`: undo the most recent un-cancelled own coffee within the grace period (nothing
+- `POST /consumption/cancel`: undo the most recent un-canceled own coffee within the grace period (nothing
   to undo / past the grace period → 409).
 - `GET  /activity?limit=20&offset=0`: own unified activity feed (coffees, own purchases, deposits) newest-first,
   each entry with a running balance.
@@ -747,7 +767,7 @@ controllers map paths relative to the resource.
 - `GET /users/filter?login_name=…`: filter users by query params (e.g. by login name).
 - `GET /users/overview`: a per-user overview (counts and balances); it now renders in the user-management page (`/admin/users`).
 - `GET /users/activity?limit=20&offset=0`: the whole-installation **global activity feed** (every user's coffees, purchases, and deposits, the kitty adjustments, and price changes), newest first; each row carries the subject user, the actor (`created_by`), and the user and kitty running balances the event moved (the all-users analogue of `/users/{id}/activity`). Renders in the admin **Activity** page (`/admin/activity`).
-- `GET /users/activity.csv`: the same global feed as a streamed CSV download (`activity.csv`), the full dataset unpaged, with a UTF-8 BOM, ISO-8601 UTC timestamps, and raw integer euro cents; free-text cells (user names, notes) are guarded against spreadsheet formula injection. Powers the Activity page's Download CSV button.
+- `GET /users/activity.csv`: the same global feed as a streamed CSV download (`activity.csv`), the full dataset unpaged, with a UTF-8 byte order mark (BOM), ISO-8601 UTC timestamps, and raw integer euro cents; free-text cells (user names, notes) are guarded against spreadsheet formula injection. Powers the Activity page's Download CSV button.
 
 The global feed (paged and CSV) is read by replaying the whole event log per request (the running balances are
 intrinsic to the walk, the same trade-off the per-user/kitty feeds make, see the activity-feed section), so
@@ -841,6 +861,10 @@ Notes on semantics:
   - `campus-coffee.fixtures.reset-on-startup` (`FixturesProperties`, application module): when `true`, clear
     the data and reseed the fixtures on every startup (on in dev, off in prod), so each dev restart returns
     to the deterministic seeded state.
+  - `campus-coffee.fixtures.demo-data-on-startup` (`FixturesProperties`, application module): when `true` (the
+    default; read only by `DevDemoDataLoader`, which is `@Profile("dev")`), seed the extra dev demo data on
+    startup. The fast e2e run sets it `false`, so the app boots with only the fixtures (the suite resets to
+    them per test anyway), shaving the demo seeding off startup.
   - `campus-coffee.bootstrap-admin.*` (`BootstrapAdminProperties`, application module): when set and no
     admin exists yet, create one admin on startup (used in prod, where fixtures are off). The class declares
     only the structure; the values and defaults live in `application.yaml`'s prod block. In prod the password
@@ -870,7 +894,7 @@ Domain exceptions in `domain/.../exceptions/`:
 - `DeletionConflictException`: Deletion blocked because other data references the entity (409), e.g. hard-deleting a user who has any financial history (a non-zero count, or any expense or deposit); the admin deactivates them instead.
 
 Global exception handler: `api/.../exceptions/GlobalExceptionHandler.kt`. It extends
-`ResponseEntityExceptionHandler`, so the standard Spring MVC exceptions also map to their proper status
+`ResponseEntityExceptionHandler`, so the standard Spring MVC (model-view-controller) exceptions also map to their proper status
 codes (an unmapped path returns 404, a wrong HTTP method 405) instead of a generic 500. It also maps a
 Jakarta `ConstraintViolationException` (an out-of-range paging `limit`/`offset` that violates the
 `@Max`/`@Min`/`@Positive` bounds) to a clean 400 instead of letting it fall through to a generic 500. The

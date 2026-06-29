@@ -337,7 +337,7 @@ import { Role, UserDto } from '../../models';
       }
 
       /* Fixed layout with percentage columns (summing to 100%), matching the activity table: the widths are
-         honoured exactly, the table fills its card and scrolls below the min-width, and the columns no longer
+         honored exactly, the table fills its card and scrolls below the min-width, and the columns no longer
          re-measure (and shift) when "Load more" appends rows. */
       table.mat-mdc-table {
         min-width: 600px;
@@ -409,7 +409,7 @@ export class AdminUsersComponent {
   readonly downloadingAllPdf = signal(false);
   readonly loading = signal(false);
 
-  /** The retryable load-error flag, owned by the store (a failed preload lands here, not a cancelled route). */
+  /** The retryable load-error flag, owned by the cache (a failed preload lands here, not a canceled route). */
   readonly loadError: Signal<boolean>;
 
   readonly columns = ['view', 'name', 'role', 'count', 'balance', 'actions'];
@@ -431,7 +431,7 @@ export class AdminUsersComponent {
     private readonly dialog: MatDialog,
     private readonly cdr: ChangeDetectorRef
   ) {
-    // These read the injected store, so they are assigned here rather than in field initializers (which run
+    // These read the injected cache, so they are assigned here rather than in field initializers (which run
     // before the constructor's parameter properties are set).
     this.loadError = this.adminUserService.loadError;
     this.hasRows = computed(() => (this.adminUserService.rows()?.length ?? 0) > 0);
@@ -454,7 +454,7 @@ export class AdminUsersComponent {
     return row.user.id ?? row.loginName;
   }
 
-  /** Forces a fresh load of the users and the balance overview through the store; surfaces a retryable error. */
+  /** Forces a fresh load of the users and the balance overview through the cache; surfaces a retryable error. */
   async reload(): Promise<void> {
     this.loading.set(true);
     try {
