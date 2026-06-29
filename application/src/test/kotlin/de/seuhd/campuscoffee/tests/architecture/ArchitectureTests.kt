@@ -61,8 +61,9 @@ class ArchitectureTests {
     fun `the production packages are free of cycles`() {
         // No package may depend (even transitively) back on a package that depends on it, across every
         // module - e.g. data.implementations <-> data.persistence.events. Each distinct package path is
-        // its own slice, so legitimate one-way edges (like the read-services' implementations -> events)
-        // are not mistaken for cycles. Test sources are excluded; this is about the production structure.
+        // its own slice, so legitimate one-way edges (the read services' implementations -> persistence.projection,
+        // and the EventSourced* decorators' implementations -> persistence.events) are not mistaken for cycles.
+        // Test sources are excluded; this is about the production structure.
         val productionClasses =
             ClassFileImporter()
                 .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
@@ -89,10 +90,18 @@ class ArchitectureTests {
         // The five EventSourced* data-service decorators are the one allowed exception: each must inject the
         // concrete relational *DataServiceImpl it wraps, because injecting the port would resolve to the
         // @Primary decorator itself and self-loop. The exemption also covers their synthetic users (the
-        // lambda classes the Kotlin compiler generates for the delegating calls). @Configuration classes are
+        // lambda classes the Kotlin compiler generates for the delegating calls). This exemption is blanket (the
+        // whole decorator is removed from the source set), so it is broader than that single delegate edge: a
+        // decorator injecting another data-module adapter *Impl directly would not be caught here, nor by the
+        // layer rule (same module). Accepted trade-off; today each decorator injects only its *DataServiceImpl
+        // delegate. @Configuration classes are
         // exempt because composing the beans is their whole job. Everything else depends on the port, not the
         // impl. The target is restricted to our own *Impl classes so a Kotlin-runtime *Impl (e.g. a lambda's
-        // FunctionReferenceImpl supertype) is not mistaken for a layering violation.
+        // FunctionReferenceImpl supertype) is not mistaken for a layering violation. The SOURCE set also
+        // excludes *Impl-named classes (haveSimpleNameNotEndingWith("Impl")): each relational *DataServiceImpl /
+        // *ServiceImpl extends a base *Impl (CrudDataServiceImpl / CrudServiceImpl), an inheritance edge that
+        // would otherwise trip the rule. The trade-off is that one *Impl depending on another is not checked;
+        // acceptable because the adapters are the leaves of the dependency graph and nothing does so today.
         val isEventSourcedDecorator =
             object : DescribedPredicate<JavaClass>("an EventSourced* data-service decorator or its users") {
                 override fun test(javaClass: JavaClass): Boolean {

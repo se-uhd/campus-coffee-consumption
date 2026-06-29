@@ -4,7 +4,7 @@ import { usersResolver } from './resolvers/users.resolver';
 
 /**
  * Application routes. The user routes are public (the capability token in the path is the credential);
- * the admin routes are guarded by an admin JWT. The matching backend `SpaForwardingController` serves
+ * the admin routes are guarded by an admin JWT. The matching backend `SinglePageAppController` serves
  * `index.html` for these paths on a full page load so deep links survive a refresh. Each route sets a human
  * `title` (the default title strategy writes it to the browser tab) so the tab shows the page, not the
  * internal app class name.

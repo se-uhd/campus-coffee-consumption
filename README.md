@@ -2,7 +2,7 @@
 
 A coffee consumption tracker for [**SE@UHD**](https://se-uhd.de/), the Software Engineering Group at Heidelberg University. Each
 user has a running coffee count, valued at a global admin-set **price per cup**, which feeds a
-per-user **balance** and a communal **kitty**. A user bumps their own count by scanning a **QR code on
+per-user **balance** and a communal **kitty**. A user bumps their own count by scanning a **QR (Quick Response) code on
 the wall**: a secret per-user **capability link**. Scanning it opens a small mobile-first web app where
 they add a coffee, **undo** a recent one within a grace period, record their own bean purchases, and see
 their balance. Admins create and manage users, set the price, record expenses and kitty deposits, and
@@ -11,7 +11,7 @@ Every change is recorded in an append-only **event log**, from which a **unified
 purchases, and deposits with a running balance) is read. Money is tracked in **euro cents**.
 
 The app is a Spring Boot / Kotlin backend (hexagonal architecture, event sourcing persistence) with an
-Angular 22 single-page frontend, derived from the CampusCoffee teaching project.
+Angular 22 single-page application (SPA) frontend, derived from the CampusCoffee teaching project.
 
 ## How it works
 
@@ -21,11 +21,11 @@ Angular 22 single-page frontend, derived from the CampusCoffee teaching project.
   entry point, so it stays out of API access logs. A user adds one coffee at a time, may **undo** the most
   recent one within a short grace period, records their own bean purchases, and sees their balance, the
   current price, the kitty balance, and a unified activity feed of their coffees, purchases, and deposits.
-- **Admins** authenticate with a **JWT** held in an httpOnly, `SameSite=Strict` session cookie, minted from a
+- **Admins** authenticate with a **JSON Web Token (JWT)** held in an httpOnly, `SameSite=Strict` session cookie, minted from a
   username-and-password login (`POST /api/auth/token`, ~10-hour work-session token, no refresh flow). The
-  credentials are encrypted in the browser (a compact JWE under the backend's published RSA public key, with
+  credentials are encrypted in the browser (a compact JSON Web Encryption (JWE) payload under the backend's published RSA public key, with
   an `iat` so a captured ciphertext cannot be replayed) before they are sent, so the raw password never
-  travels as plaintext, and the cookie keeps the token out of JavaScript's reach (an XSS cannot steal it). An
+  travels as plaintext, and the cookie keeps the token out of JavaScript's reach (a cross-site scripting (XSS) attack cannot steal it). An
   admin manages users (create, edit, deactivate, change
   role, view and rotate capability links, download any user's QR or all of them as a ZIP or printable PDF
   sheet), sets the global price, records expenses
@@ -34,9 +34,9 @@ Angular 22 single-page frontend, derived from the CampusCoffee teaching project.
   change is a correction (optionally with a note).
 - **SPA routing.** A user's capability link `/login/{token}` opens the user landing, with the user
   profile at `/login/{token}/profile`. The admin area is consolidated under `/admin/`: the login form at
-  `/admin/login`, the landing/dashboard at `/admin`, the users, price, expenses, and kitty pages at
-  `/admin/users`, `/admin/price`, `/admin/expenses`, and `/admin/kitty`, and the admin profile at
-  `/admin/profile`. The root path and any unknown route redirect to `/admin`.
+  `/admin/login`, the landing/dashboard at `/admin`, the users, price, expenses, kitty, and activity pages at
+  `/admin/users`, `/admin/price`, `/admin/expenses`, `/admin/kitty`, and `/admin/activity`, and the admin profile at
+  `/admin/profile`. The root path redirects to `/admin`; any unknown route shows a not-found page.
 - **Money is in euro cents and each cup is valued at the price when it was drunk.** A user's balance
   reads like a prepaid card (negative means they owe the fund), valuing each coffee at the price in effect
   when it was consumed.
@@ -51,7 +51,7 @@ A multi-module Gradle project (Kotlin DSL) following a hexagonal (ports-and-adap
 layer boundaries enforced by ArchUnit:
 
 - **domain**: domain models, port interfaces, and business logic (depends on Bean Validation and Spring, but not on the api, data, or application layers).
-- **api**: REST controllers, DTOs, MapStruct DTO mappers, the QR/capability URL helpers.
+- **api**: REST controllers, data transfer objects (DTOs), MapStruct DTO mappers, the QR/capability URL helpers.
 - **data**: JPA entities, repositories, the event sourcing machinery (event store, read model projector,
   decorators), and the ZXing QR and capability token adapters.
 - **application**: the Spring Boot app that wires it together: security (JWT + capability token filter),
@@ -83,17 +83,17 @@ Run the backend in the `dev` profile (loads the seeded fixtures on first start):
 gradle :application:bootRun --args='--spring.profiles.active=dev'
 ```
 
-The API is at `http://localhost:8080/api`, with Swagger UI at `http://localhost:8080/api/swagger-ui.html`.
+`bootRun` serves the full app (the bundled SPA plus the API) at `http://localhost:8080` (the first run builds
+the Angular SPA); the API is under `/api`, with Swagger UI at `http://localhost:8080/api/swagger-ui.html`.
 
 For frontend development, run the Angular dev server (it proxies `/api` to the backend on `:8080`, so the
-browser still sees a single origin and no CORS is needed):
+browser still sees a single origin and no Cross-Origin Resource Sharing (CORS) is needed):
 
 ```shell
 cd frontend && npm start
 ```
 
-Alternatively, `gradle build` bundles the SPA into the backend jar, so `http://localhost:8080` serves the
-whole app from one process.
+`gradle build` packages the same self-contained app (the SPA plus the API) into a single jar for deployment.
 
 ## Test fixtures (dev)
 
@@ -147,7 +147,7 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `GET /users/qr.pdf`: a printable PDF grid of every active user's QR code, each labeled by login name.
 - `GET  /users/{id}/consumption?limit=5&offset=0`, `GET /users/{id}/activity?limit=20&offset=0`.
 - `GET /users/activity?limit=20&offset=0`: the whole-installation global activity feed (every user's coffees, purchases, and deposits, the kitty adjustments, and price changes), newest first, each row carrying the subject user, the actor, and the user and kitty running balances. Renders in the admin **Activity** page (`/admin/activity`).
-- `GET /users/activity.csv`: the same global feed as a streamed CSV download of the full dataset, with a UTF-8 BOM, ISO-8601 UTC timestamps, and raw integer euro cents.
+- `GET /users/activity.csv`: the same global feed as a streamed comma-separated values (CSV) download of the full dataset, with a UTF-8 byte order mark (BOM), ISO-8601 UTC timestamps, and raw integer euro cents.
 - `POST /users/{id}/consumption` `{ "delta": 1 | -1 }`.
 - `PUT  /users/{id}/consumption` `{ "total": N, "note": "…" }`: absolute count correction (`note` optional).
 - `GET/POST/PUT/DELETE /users/{id}/expenses`: list, record, correct, or delete a user's purchases with a private/kitty split (the buyer cannot be changed on a correction).
@@ -157,7 +157,7 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `POST /kitty/adjustment` `{ "amountCents", "note"? }`: a pure kitty adjustment (an initial float or a correction).
 - `GET /kitty/history?limit=50&offset=0`: the kitty history with the running kitty balance.
 
-**Auth:** `GET /auth/public-key` returns the backend's RSA public key as a JWK; `POST /auth/token`
+**Auth:** `GET /auth/public-key` returns the backend's RSA public key as a JSON Web Key (JWK); `POST /auth/token`
 `{ "encryptedPayload": "<compact JWE of { loginName, password, iat }>" }` sets the JWT in an httpOnly
 `SameSite=Strict` cookie and also returns `{ "token": "<jwt>" }` for header-based API clients;
 `POST /auth/logout` clears the cookie. The SPA encrypts the credentials with the published key
@@ -172,7 +172,7 @@ records a correction; both stay in the append-only log.
 ## Inspecting the event log
 
 Every change (to a count, the price, an expense, or a payment) is one row in the append-only `events`
-table. The `created_by` column records the actor's login (a user, an admin, or `"system"` for the
+table. The `created_by` column records the actor's login (a user, an admin, or `"SYSTEM"` for the
 fixtures), and `note` records the note for that change: an admin's reason for an absolute count correction,
 or a deposit, kitty-adjustment, or expense note:
 

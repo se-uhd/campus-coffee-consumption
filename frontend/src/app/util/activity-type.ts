@@ -48,7 +48,7 @@ export function activityLabel(type: ActivityEntryType): string {
     case 'CONSUMPTION':
       return 'Coffee cup';
     case 'CONSUMPTION_CANCEL':
-      return 'Coffee cancelled';
+      return 'Coffee canceled';
     case 'PRIVATE_EXPENSE':
       return 'Expense';
     case 'KITTY_EXPENSE':

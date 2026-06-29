@@ -98,7 +98,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `cancelling within the grace period restores the count and balance to zero`() {
+    fun `canceling within the grace period restores the count and balance to zero`() {
         add()
         assertThat(summary().count).isEqualTo(1)
 
@@ -110,7 +110,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `cancelling with nothing to undo returns 409 Conflict`() {
+    fun `canceling with nothing to undo returns 409 Conflict`() {
         assertThat(cancel().statusCode()).isEqualTo(409)
     }
 
@@ -129,7 +129,7 @@ class ConsumptionSystemTests : AbstractSystemTest() {
     }
 
     @Test
-    fun `cancelling after an admin override removed the coffee returns 409 Conflict`() {
+    fun `canceling after an admin override removed the coffee returns 409 Conflict`() {
         add()
         overrideCount(0)
 
@@ -147,8 +147,8 @@ class ConsumptionSystemTests : AbstractSystemTest() {
         // owes 50 + 200 = 250
         assertThat(summary().balanceCents).isEqualTo(-250)
 
-        val cancelled = cancel().returnResult<UserSummaryDto>()
-        assertThat(cancelled.status.value()).isEqualTo(200)
+        val canceled = cancel().returnResult<UserSummaryDto>()
+        assertThat(canceled.status.value()).isEqualTo(200)
 
         // undoing the newest coffee credits exactly its 200, leaving only the first 50 owed
         assertThat(summary().balanceCents).isEqualTo(-50)

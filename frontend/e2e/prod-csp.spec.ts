@@ -10,7 +10,11 @@ import { expect, test } from './fixtures';
  */
 type CspWindow = Window & { __cspViolations?: string[] };
 
-test.describe('prod CSP', () => {
+// Tagged @prod-csp. playwright.config.ts excludes @prod-csp by default (grepInvert), so a bare `npm run e2e`
+// and the fast/coverage launchers skip it (it would pass meaninglessly against the dev app). Only
+// run-e2e-prod-csp.sh opts in: it sets PW_PROD_CSP=1 and selects this spec with `--grep @prod-csp`, under the
+// production SPA + strict prod CSP that script sets up, which is the only place this smoke is meaningful.
+test.describe('prod CSP', { tag: '@prod-csp' }, () => {
   test('the production build renders under the strict prod CSP with no violations', async ({ page }) => {
     const pageErrors: string[] = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));

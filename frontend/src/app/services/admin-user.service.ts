@@ -20,9 +20,9 @@ export interface UserRow {
 /**
  * Caches the admin users page's rows (each user merged with their balance and cup count). It holds the rows
  * in a signal so the page can be preloaded by a route resolver (the table paints already populated, with no
- * empty-then-fill flash) and so a revisit repaints the last rows instantly while a background reload
+ * empty-then-fill flash) and so returning to the page repaints the last rows instantly while a background reload
  * revalidates them. It never throws: a failed load records a retryable error flag instead, so the resolver
- * can preload without ever cancelling the navigation.
+ * can preload without ever canceling the navigation.
  */
 @Injectable({ providedIn: 'root' })
 export class AdminUserService {
@@ -43,7 +43,7 @@ export class AdminUserService {
 
   /**
    * Ensures the rows are loaded before the route activates. On a first visit it awaits the load (so the
-   * table renders populated); on a revisit it returns immediately with the cached rows and revalidates them
+   * table renders populated); when reopened it returns immediately with the cached rows and revalidates them
    * in the background. Resolves rather than rejects even on failure, so a route resolver using it never
    * cancels the navigation. A failed background revalidate keeps the cached rows (the page shows the error
    * card only when there are no rows to show).

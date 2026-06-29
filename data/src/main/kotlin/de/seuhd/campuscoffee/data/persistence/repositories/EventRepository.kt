@@ -63,7 +63,7 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
      * Returns a user's full unified-activity stream in append order: their consumption events, the expenses
      * they bought, and the deposits they paid. Keyed on the owning user id embedded in each body
      * (`userId` for consumptions and payments, `buyerUserId` for expenses), so it survives a consumption row
-     * being recreated. A native query because the match is on the `jsonb` body (the V7 owner-key indexes).
+     * being recreated. A native query because the match is on the `jsonb` body (the V3 owner-key indexes).
      *
      * @param userId the owning user's id (its string form)
      */
@@ -84,7 +84,7 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
      * Returns the whole kitty money stream in append order: every payment (a deposit or a kitty
      * adjustment) and every expense, ordered by `seq` in SQL so the kitty walk reads one ordered stream
      * instead of concatenating two type streams and re-sorting them in memory. The `(entity_type, seq)`
-     * index (V8) serves this directly.
+     * index (V3) serves this directly.
      */
     @Query(
         value = "SELECT * FROM events WHERE entity_type IN ('Payment', 'Expense') ORDER BY seq ASC",

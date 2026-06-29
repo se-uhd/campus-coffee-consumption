@@ -13,7 +13,7 @@ on:
   schedule:
     - cron: '0 3 * * *' # 03:00 UTC daily
 
-  workflow_dispatch: # manual trigger; runs the fast, coverage, and prod-CSP e2e jobs
+  workflow_dispatch: # manual trigger; runs all jobs, including the coverage and prod-CSP e2e the nightly schedule otherwise gates
 
 # The build executes third-party Gradle plugins and annotation processors; restrict the token to
 # read-only so a compromised dependency cannot push or modify the repository.

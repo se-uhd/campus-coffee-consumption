@@ -73,7 +73,7 @@ cancel grace-period guard, never for valuation.
 
 ## Undo instead of a free −1
 
-A member can no longer freely decrement. Instead they can **undo** their most recent un-cancelled own
+A member can no longer freely decrement. Instead they can **undo** their most recent un-canceled own
 coffee within a grace period (`campus-coffee.consumption.cancel-grace-period`, default 5 minutes). An undo
 is recorded by the owner (so the event is attributed to the member) and the read side credits it at the
 **exact price of the increment it reverses**, found by walking the member's own increments LIFO. This makes

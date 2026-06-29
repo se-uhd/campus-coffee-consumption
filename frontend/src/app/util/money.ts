@@ -1,7 +1,7 @@
 // Money is displayed in the English number format (a decimal point, a comma thousands separator) on
 // purpose: the whole UI is in English, so a single, consistent format reads better than mixing English copy
 // with German-formatted figures. The euro input separately accepts a comma OR a point as the decimal
-// separator (see parseEurosToCents), so a German user can still type "4,20"; only the display is normalised.
+// separator (see parseEurosToCents), so a German user can still type "4,20"; only the display is normalized.
 const EUROS_FORMAT = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2
@@ -72,14 +72,14 @@ export function parseEurosToCents(input: string | number | null | undefined): Eu
   if (hasComma && hasPoint) {
     return { ok: false, error: 'ambiguous-separator' };
   }
-  // normalise the single decimal separator (if any) to a point, then reuse the strict point grammar
-  const normalised = hasComma ? text.replace(',', '.') : text;
+  // normalize the single decimal separator (if any) to a point, then reuse the strict point grammar
+  const normalized = hasComma ? text.replace(',', '.') : text;
   // require at least one digit and at most two decimals; reject a lone sign or separator, "4.", ".5", "."
-  if (!/^-?\d+(\.\d{1,2})?$/.test(normalised)) {
+  if (!/^-?\d+(\.\d{1,2})?$/.test(normalized)) {
     return { ok: false, error: 'invalid' };
   }
-  const negative = normalised.startsWith('-');
-  const unsigned = negative ? normalised.slice(1) : normalised;
+  const negative = normalized.startsWith('-');
+  const unsigned = negative ? normalized.slice(1) : normalized;
   const [wholePart, fractionPart = ''] = unsigned.split('.');
   const wholeEuros = Number.parseInt(wholePart, 10);
   // pad the one-or-two-digit fraction to exactly two digits

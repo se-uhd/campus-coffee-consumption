@@ -105,7 +105,7 @@ interface CoffeeConsumptionService : CrudService<CoffeeConsumption, UUID> {
 
     /**
      * Undoes the calling user's most recent coffee within the grace period (only the owner may do this;
-     * an admin uses [setTotal] instead). It reverts the most recent un-cancelled own increment, crediting
+     * an admin uses [setTotal] instead). It reverts the most recent un-canceled own increment, crediting
      * exactly the price it was charged at, so undoing nets to zero.
      *
      * @param userId     the id of the user undoing a coffee (must be [actingUser])

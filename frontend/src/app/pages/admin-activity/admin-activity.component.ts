@@ -256,7 +256,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
         padding-right: 8px;
       }
 
-      /* Column widths are percentages that sum to 100%. Under table-layout: fixed they are honoured exactly
+      /* Column widths are percentages that sum to 100%. Under table-layout: fixed they are honored exactly
          (no surplus to redistribute), so the table fills its card responsively while the proportions hold at
          any width down to the min-width scroll. */
       .mat-column-when {

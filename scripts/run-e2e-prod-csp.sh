@@ -77,7 +77,7 @@ curl -fsS "$HEALTH_URL" >/dev/null 2>&1 || { log "ERROR: app never became health
 # --- 5. Run only the prod-csp smoke -------------------------------------------------------------------
 log "Running the prod-csp Playwright smoke…"
 E2E_STATUS=0
-( cd frontend && CI=1 run_node npm run e2e -- prod-csp.spec.ts ) || E2E_STATUS=$?
+( cd frontend && CI=1 PW_PROD_CSP=1 run_node npm run e2e -- --grep @prod-csp ) || E2E_STATUS=$?
 
 cleanup
 trap - EXIT

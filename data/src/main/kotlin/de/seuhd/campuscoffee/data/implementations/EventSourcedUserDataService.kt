@@ -1,5 +1,4 @@
 package de.seuhd.campuscoffee.data.implementations
-import de.seuhd.campuscoffee.data.implementations.UserDataServiceImpl
 import de.seuhd.campuscoffee.data.persistence.events.EventSourcedWriter
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService

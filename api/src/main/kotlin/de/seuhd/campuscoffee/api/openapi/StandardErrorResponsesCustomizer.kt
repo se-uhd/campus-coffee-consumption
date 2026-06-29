@@ -50,7 +50,7 @@ class StandardErrorResponsesCustomizer : OperationCustomizer {
 
     private companion object {
         // the error codes the API can return; over-documenting (e.g. a 404 on an endpoint without a path id)
-        // is the accepted OpenAPI convention, signalling "may occur", and is preferable to documenting only 200
+        // is the accepted OpenAPI convention, signaling "may occur", and is preferable to documenting only 200
         private val STANDARD_ERRORS =
             listOf(
                 "400" to "The request is malformed or violates a validation rule.",
