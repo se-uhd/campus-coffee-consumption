@@ -1,6 +1,9 @@
-# Dependabot has no mise ecosystem, so this checks the mise-managed tools (the JDK, Gradle, gcloud, and
-# python pinned in mise.toml): each week it runs `mise outdated` and opens (or updates) an issue when a
-# tool is behind. It only notifies; bump the pins in mise.toml by hand.
+# Dependabot has no mise ecosystem, so this checks the mise-managed tools (the JDK, Gradle, gcloud, node,
+# and python pinned in mise.toml). Each week it runs `mise outdated` and files (or updates) an issue ONLY
+# when a tool's pin must be bumped by hand, i.e. the current pin no longer covers the newest release. A tool
+# whose newer version is already within its pin (a Node patch under the `24` major pin, or anything under
+# `latest`) needs only `mise install`, not a repo edit, so it is deliberately NOT reported; those were the
+# weekly false positives. It only notifies; bump the pins in mise.toml by hand (Node only to the next LTS).
 name: mise outdated
 
 on:
@@ -22,36 +25,55 @@ jobs:
         with:
           install: false # only mise itself is needed; `mise outdated` does not need the tools installed
 
-      - name: Report outdated tools as an issue
+      - name: Report actionable pin bumps as an issue
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # capture the exit code explicitly: a failing `mise outdated` (network error, regression in a
-          # newer mise) must fail the workflow visibly instead of being mistaken for "all up to date"
+          # Capture the JSON report and the exit code explicitly: an unparseable result together with a
+          # nonzero exit is a real failure (a network error, or a regression in a newer mise) and must fail
+          # the workflow visibly instead of being mistaken for "nothing to bump". A nonzero exit WITH valid
+          # JSON is normal (it just means some tool is behind), so it is not treated as an error.
           set +e
-          report="$(mise outdated)"
+          report_json="$(mise outdated --json 2>/dev/null)"
           status=$?
           set -e
-          if [ "$status" -ne 0 ] && [ -z "$report" ]; then
-            echo "::error::mise outdated failed with exit code $status and produced no report."
-            exit 1
+          if ! printf '%s' "$report_json" | jq -e . >/dev/null 2>&1; then
+            if [ "$status" -ne 0 ]; then
+              echo "::error::mise outdated failed (exit $status) and produced no valid JSON."
+              exit 1
+            fi
+            report_json='{}'
           fi
-          if [ -z "$report" ]; then
-            echo "All mise tools are up to date."
+
+          # Keep only the entries whose pin must change by hand. mise sets `bump` to the version the
+          # mise.toml pin should move to when the current pin no longer covers the newest release; a null
+          # `bump` means the newer version is already within the pin (so `mise install` picks it up with no
+          # repo edit), which is not actionable and is not reported.
+          actionable="$(printf '%s' "$report_json" | jq -c '[to_entries[].value | select(.bump != null)]')"
+          count="$(printf '%s' "$actionable" | jq 'length')"
+          existing="$(gh issue list --label mise-outdated --state open --json number --jq '.[0].number // empty')"
+
+          if [ "$count" -eq 0 ]; then
+            echo "No mise pin needs bumping; any outdated tools are within their pins (mise install handles them)."
+            if [ -n "$existing" ]; then
+              gh issue close "$existing" --comment "Closed automatically: no mise pin needs bumping. The outdated tools are within their current pins (a Node patch under the 24 major, or latest), so mise install picks them up with no repo change. This reopens only when a pin must change by hand."
+              echo "Closed stale issue #$existing"
+            fi
             exit 0
           fi
-          echo "Outdated tools:"
-          echo "$report"
+
+          echo "Actionable pin bumps:"
+          printf '%s' "$actionable" | jq -r '.[] | "  \(.name): \(.requested) -> \(.bump) (latest \(.latest))"'
 
           gh label create mise-outdated --color FBCA04 \
             --description "Outdated mise-managed tools" --force
 
-          body="$(printf '`mise outdated` reports tools behind their latest versions:\n\n```\n%s\n```\n\nBump the pins in `mise.toml`, then run `mise install`. This issue is refreshed weekly.' "$report")"
+          table="$(printf '%s' "$actionable" | jq -r '.[] | "\(.name)\t\(.requested)\t\(.latest)\t\(.bump)"')"
+          body="$(printf 'A mise-managed tool pin in `mise.toml` no longer covers the latest release and must be bumped by hand. Updates that stay within a pin are handled by `mise install` and are not listed here:\n\n```\ntool\tpinned\tlatest\tbump-to\n%s\n```\n\nBump the listed pin(s) in `mise.toml` (Node only to the next LTS, updating `@types/node` and the `engines.node` floor with it), then run `mise install`. This issue is refreshed weekly and closes automatically once no pin needs changing.' "$table")"
 
-          existing="$(gh issue list --label mise-outdated --state open --json number --jq '.[0].number // empty')"
           if [ -n "$existing" ]; then
             gh issue edit "$existing" --body "$body"
             echo "Updated issue #$existing"
           else
-            gh issue create --title "mise: outdated tools" --label mise-outdated --body "$body"
+            gh issue create --title "mise: a tool pin needs bumping" --label mise-outdated --body "$body"
           fi
