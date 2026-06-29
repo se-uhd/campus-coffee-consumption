@@ -7,10 +7,16 @@
 # `qodana scan --project-dir frontend` (needs the Qodana CLI and Docker).
 version: "1.0"
 
-# The free JS Community linter, which bundles the JavaScript/TypeScript inspections. Pinned to a release
-# tag (not :latest) so a new linter version cannot silently change the findings on an unrelated commit;
-# bump it deliberately, like the JVM linter pin and the other tool pins in the repository.
+# The JS/TS linter, which bundles the JavaScript/TypeScript and Angular inspections. Unlike the backend's
+# qodana-jvm-community, this release linter requires a Qodana Cloud connection, so the workflow runs it only
+# when QODANA_TOKEN is set. Pinned to a release tag (not :latest) so a new linter version cannot silently
+# change the findings on an unrelated commit; bump it deliberately, like the other tool pins.
 linter: jetbrains/qodana-js:2026.1
+
+# Install the SPA's dependencies before the scan so the linter resolves @angular/*, the ESLint package, and
+# the app's own pipes/directives/components. Without this, qodana-js inspects an unbootstrapped project and
+# reports hundreds of false "unresolved pipe" / "not standalone" / "install the eslint package" problems.
+bootstrap: npm ci
 
 # Use the broad `recommended` profile (mirrors the IDE's own default inspection profile), matching the
 # backend scan, rather than the narrower `starter` subset.
@@ -35,3 +41,19 @@ exclude:
       - .angular
       - out-tsc
       - src/theme-colors.scss
+  # The profile page's QR image is fetched as an authenticated blob (the QR endpoint needs the
+  # X-Capability-Token header, so it cannot be a plain static src) and shown via an object URL.
+  # NgOptimizedImage's `ngSrc` rejects blob:/object URLs (NG02952), so the directive genuinely cannot apply
+  # here; the static header logo IS migrated to NgOptimizedImage. Scope this to the one file with the
+  # unavoidable object-URL image rather than disabling the inspection everywhere.
+  - name: AngularNgOptimizedImage
+    paths:
+      - src/app/pages/profile/profile.component.ts
+  # `provideAnimationsAsync` (and the synchronous `provideAnimations`) were both deprecated in Angular 20.2
+  # in favor of the template-level `animate.enter`/`animate.leave` API (intended removal in v23). Angular
+  # Material still relies on an animations provider, so there is no drop-in provider replacement yet; the
+  # migration to the new API is a separate, non-trivial task. Scope this to the one config file that holds
+  # the provider rather than disabling the deprecation check everywhere, until that migration lands.
+  - name: JSDeprecatedSymbols
+    paths:
+      - src/app/app.config.ts

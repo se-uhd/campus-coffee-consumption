@@ -314,7 +314,9 @@ import { Role, UserDto } from '../../models';
                 </ng-container>
 
                 <tr mat-header-row *matHeaderRowDef="columns"></tr>
-                <tr mat-row *matRowDef="let row; columns: columns"></tr>
+                <ng-template matRowDef [matRowDefColumns]="columns">
+                  <tr mat-row></tr>
+                </ng-template>
               </table>
             </div>
             <mat-paginator [pageSize]="10" [pageSizeOptions]="[10, 25, 50]"></mat-paginator>

@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { ADMIN, loginAsAdmin } from './helpers';
+import { ADMIN, loginAsAdmin, signInAsAdmin } from './helpers';
 
 /**
  * Authentication and routing: an unauthenticated visit to the root redirects to the login page, and a
@@ -18,10 +18,7 @@ test.describe('auth and routing', () => {
   test('signing in as jane_doe lands on the admin dashboard with the selected-user view', async ({
     page
   }) => {
-    await page.goto('/admin/login');
-    await page.getByLabel('Login name').fill(ADMIN.loginName);
-    await page.getByLabel('Password').fill(ADMIN.password);
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await signInAsAdmin(page);
 
     await expect(page).toHaveURL(/\/admin$/);
     // the landing mirrors the user page: a user selector, the big count, and the recent-activity block

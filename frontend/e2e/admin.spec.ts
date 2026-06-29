@@ -6,7 +6,7 @@ import {
   deleteUsers,
   ensureAtLeastUsers,
   loginAsAdmin,
-  pinPrice,
+  openKittyPageAsAdmin,
   resetFixtures
 } from './helpers';
 
@@ -97,10 +97,7 @@ test.describe('admin flow', () => {
   });
 
   test('recording a user deposit increases the kitty balance', async ({ page }) => {
-    // pin the price so the exact kitty figures cannot be perturbed by a leftover price from a previous run
-    await pinPrice(api, await adminToken(api), 50);
-    await loginAsAdmin(page);
-    await page.goto('/admin/kitty');
+    await openKittyPageAsAdmin(page, api);
 
     const balanceCard = page.locator('mat-card', {
       has: page.getByRole('heading', { name: 'Kitty balance' })

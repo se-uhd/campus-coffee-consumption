@@ -46,11 +46,12 @@ jobs:
         # qodana.sarif.baseline is committed (see qodana.yaml), uncomment to count only NEW problems:
         # with:
         #   args: --baseline,qodana.sarif.baseline
-        env:
-          # Optional. The Community linter needs no license, so the scan runs without this. Setting the
-          # QODANA_TOKEN repository secret (a Qodana Cloud project token) additionally uploads results to
-          # Qodana Cloud and enables its server-side quality gate; the PR comment and SARIF work without it.
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+        #
+        # Intentionally no QODANA_TOKEN here: the free qodana-jvm-community linter runs without a Qodana Cloud
+        # connection, so this job needs no token. A Qodana Cloud project supports only one linter, and the
+        # frontend job's project is bound to qodana-js; passing the token here would make this JVM scan upload
+        # to that JS project and fail ("one linter per project"). The SARIF and the failThreshold gate work
+        # fully without it. (To put the backend in Cloud too, create a SEPARATE jvm project + token.)
 
       # No code-scanning upload: this is a private repo without GitHub Advanced Security, so
       # github/codeql-action/upload-sarif cannot push to the Security tab (it 403s with "Resource not
@@ -79,6 +80,16 @@ jobs:
       pull-requests: write # post the inspection summary as a PR comment (when triggered by a PR)
       checks: write        # publish findings as check-run annotations (used on push, where there is no PR)
       actions: read        # let the action read this workflow run for its status report (telemetry)
+    # The release qodana-js linter requires a Qodana Cloud connection (since 2023.2). QODANA_TOKEN is the token
+    # of the Qodana Cloud project bound to qodana-js that backs this frontend scan, stored as the repo secret
+    # QODANA_TOKEN_279625217 (Qodana Cloud names project tokens QODANA_TOKEN_<projectId>). The scan steps gate
+    # on it: with the secret present the JS/TS scan runs; if it is ever unset they skip cleanly (no failing
+    # scan, no missing-SARIF warning), and the frontend stays covered by the eslint/stylelint frontendLint gate
+    # in build.yml. The backend qodana job stays tokenless on qodana-jvm-community: a Cloud project takes only
+    # one linter, so the JVM and JS scans never share a project.
+    env:
+      QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_279625217 }}
+      QODANA_ENDPOINT: https://qodana.cloud
     steps:
       - uses: actions/checkout@v7
         with:
@@ -88,12 +99,11 @@ jobs:
           persist-credentials: false # no step pushes back to the repository
 
       - name: Qodana Scan (frontend)
+        # Run the JS/TS scan only when the QODANA_TOKEN secret is set; without it the qodana-js linter cannot
+        # connect to Qodana Cloud, so skip the step rather than fail with no SARIF. With the token present
+        # this is a blocking gate (frontend/qodana.yaml sets failThreshold: 0), so any new problem fails CI.
+        if: ${{ env.QODANA_TOKEN != '' }}
         uses: JetBrains/qodana-action@v2026.1.3
-        # The JS/TS linter (unlike the JVM Community linter) requires a Qodana Cloud token, so without the
-        # QODANA_TOKEN secret this scan cannot run. Allow the step to fail so it never blocks CI: the backend
-        # `qodana` job and the eslint/stylelint `frontendLint` gate (in build.yml) still cover the frontend.
-        # To make this a real gate, set the QODANA_TOKEN repository secret and drop this continue-on-error.
-        continue-on-error: true
         with:
           # Scan only the Angular SPA; its frontend/qodana.yaml selects the JS linter and sets
           # failThreshold: 0, so this job fails on any problem above the baseline. (Space-separated args;
@@ -104,16 +114,11 @@ jobs:
           results-dir: ${{ runner.temp }}/qodana-frontend/results
           cache-dir: ${{ runner.temp }}/qodana-frontend/cache
           artifact-name: qodana-report-frontend # distinct from the backend job's default report artifact
-        env:
-          # Optional. The Community linter needs no license, so the scan runs without this. Setting the
-          # QODANA_TOKEN repository secret additionally uploads results to Qodana Cloud and enables its
-          # server-side quality gate; the PR comment and SARIF work without it.
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
 
       - name: Upload frontend Qodana SARIF as an artifact
         # Distinct artifact name from the backend job's `qodana-sarif` so the two uploads do not collide.
-        # `if: always()` so a run that fails the threshold still yields the file.
-        if: always()
+        # Upload whenever the scan ran (the token is set), including a run that fails the threshold.
+        if: ${{ always() && env.QODANA_TOKEN != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: qodana-sarif-frontend

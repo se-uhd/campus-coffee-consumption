@@ -309,17 +309,13 @@ export class ProfileComponent implements OnInit {
   }
 
   /**
-   * Loads the user list and resolves the shared admin selection: records the admin's own id (from
-   * `/api/users/me`) as the shared default, then takes the selection from the URL's `user` param (the
-   * source of truth, the admin's own account when it is absent), so a deep link or a refresh on
+   * Loads the user list and resolves the shared admin selection from the URL (see
+   * {@link AdminSelectionService.loadUsersAndSelection}), so a deep link or a refresh on
    * `/admin/profile?user=<id>` lands on that user.
    */
   private async initAdminSelection(): Promise<void> {
     try {
-      this.users.set(await this.userService.list());
-      const me = await this.userService.me();
-      this.selection.setOwnUserId(me.id ?? '');
-      this.selectedId.set(this.selection.selectFromParam(this.route.snapshot.queryParamMap.get('user')));
+      await this.selection.loadUsersAndSelection(this.userService, this.route, this.users, this.selectedId);
     } catch {
       // a failed user-list load leaves the selector empty; `load()` still surfaces a retryable error
     }

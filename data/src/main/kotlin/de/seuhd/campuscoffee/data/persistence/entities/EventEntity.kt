@@ -1,6 +1,5 @@
 package de.seuhd.campuscoffee.data.persistence.entities
 
-import de.seuhd.campuscoffee.data.persistence.entities.PersistableEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType

@@ -43,12 +43,12 @@ function balance(userId: string, count: number, balanceCents: number): UserBalan
 
 describe('AdminUserService', () => {
   let service: AdminUserService;
-  let userList: Mock<() => Promise<UserDto[]>>;
-  let overview: Mock<() => Promise<UserBalanceDto[]>>;
+  let userList: Mock;
+  let overview: Mock;
 
   beforeEach(() => {
-    userList = vi.fn<() => Promise<UserDto[]>>();
-    overview = vi.fn<() => Promise<UserBalanceDto[]>>();
+    userList = vi.fn();
+    overview = vi.fn();
     TestBed.configureTestingModule({
       providers: [
         AdminUserService,

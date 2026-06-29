@@ -1,6 +1,6 @@
 import { APIRequestContext } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { adminToken, apiContext, loginAsAdmin, pinPrice, resetFixtures } from './helpers';
+import { apiContext, loginAsAdmin, openKittyPageAsAdmin, resetFixtures } from './helpers';
 
 /**
  * Validation and error states: a required field left empty shows a mat-error and keeps submit disabled, a
@@ -68,10 +68,7 @@ test.describe('validation and error states', () => {
   test('an overdrawing kitty adjustment surfaces a 409 error rather than succeeding', async ({ page }) => {
     // this test alone needs a known baseline (an empty kitty), so the reset is scoped here, not shared
     await resetFixtures(api);
-    // pin the price so the exact kitty figure cannot be perturbed by a leftover price from a previous run
-    await pinPrice(api, await adminToken(api), 50);
-    await loginAsAdmin(page);
-    await page.goto('/admin/kitty');
+    await openKittyPageAsAdmin(page, api);
 
     const balanceCard = page.locator('mat-card', {
       has: page.getByRole('heading', { name: 'Kitty balance' })

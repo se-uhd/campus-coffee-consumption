@@ -257,7 +257,7 @@ export class CoffeeLandingComponent implements OnInit {
       .get()
       .then((profile) => this.loginName.set(profile.loginName))
       .catch(() => undefined);
-    this.reload();
+    void this.reload();
   }
 
   /** Loads the authoritative summary (and its first activity page); surfaces a retryable error on failure. */

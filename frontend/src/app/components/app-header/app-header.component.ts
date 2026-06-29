@@ -1,4 +1,5 @@
 import { Component, input, ChangeDetectionStrategy } from '@angular/core';
+import { NgOptimizedImage } from '@angular/common';
 import { QueryParamsHandling, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -13,7 +14,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
  */
 @Component({
   selector: 'cc-app-header',
-  imports: [RouterLink, MatIconModule, MatButtonModule, MatTooltipModule],
+  imports: [RouterLink, MatIconModule, MatButtonModule, MatTooltipModule, NgOptimizedImage],
   template: `
     <header class="cc-header">
       <span class="cc-header-leading">
@@ -34,7 +35,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
             [queryParamsHandling]="queryParamsHandling()"
             aria-label="Home"
           >
-            <img src="/se-uhd-logo.png" alt="SE@UHD Software Engineering" />
+            <img ngSrc="/se-uhd-logo.png" width="2048" height="838" alt="SE@UHD Software Engineering" />
           </a>
         }
       </span>

@@ -1,7 +1,6 @@
 package de.seuhd.campuscoffee.api.security
 
 import de.seuhd.campuscoffee.api.exceptions.ErrorResponse
-import de.seuhd.campuscoffee.api.security.JsonAuthenticationEntryPoint
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.assertj.core.api.Assertions.assertThat
