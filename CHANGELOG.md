@@ -7,6 +7,28 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-29
+
+### Added
+
+- A "Copy coffee link" action on the admin users page, between the active toggle and the rotate-link button,
+  that copies the user's capability URL to the clipboard (with a confirmation snackbar). A Playwright e2e test
+  asserts the copied clipboard value.
+
+### Fixed
+
+- The admin users table no longer truncates a column header (the "Cups" header lost a character at some
+  widths) or appends a stray ellipsis after a role chip. The column widths were rebalanced for the new
+  action and the table's min-width raised so a narrow window scrolls horizontally rather than compressing a
+  column below its content, and the per-row action controls are now spaced evenly.
+
+### Changed
+
+- Raised the frontend production initial-bundle budget warning from 500 kB to 650 kB. The 500 kB default was
+  below the Angular + Material framework baseline (the app's over-the-wire transfer is ~130 kB gzipped and
+  every route plus the login crypto library is already lazy-loaded), so the warning fired on a healthy
+  bundle. The 2 MB hard-error ceiling is unchanged.
+
 ## [0.7.0] - 2026-06-29
 
 ### Changed
@@ -879,6 +901,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.8.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.8.0
 [0.7.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.7.0
 [0.6.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.6.1
 [0.6.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.6.0

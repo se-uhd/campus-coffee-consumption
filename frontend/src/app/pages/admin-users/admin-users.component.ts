@@ -38,8 +38,8 @@ import { Role, UserDto } from '../../models';
  * Users page: the user-management hub. It pairs an "Add a user" form with a paginated users overview table
  * (login name, full name, role, cup count, and signed balance). The table's leading column is a "View
  * profile" jump that opens the admin profile page for the user (carrying their id as the `user` query
- * param); the trailing actions column carries the active/deactivate toggle, a rotate-link action, a QR
- * download, and a delete. Two bulk actions sit in the Users card header (right-aligned with the "Users"
+ * param); the trailing actions column carries the active/deactivate toggle, a copy-coffee-link action, a
+ * rotate-link action, a QR download, and a delete. Two bulk actions sit in the Users card header (right-aligned with the "Users"
  * heading): a ZIP of every active user's QR code, and a printable PDF grid of the same codes labeled by
  * login name.
  *
@@ -287,6 +287,14 @@ import { Role, UserDto } from '../../models';
                     ></mat-slide-toggle>
                     <button
                       mat-icon-button
+                      (click)="copyLink(row.user)"
+                      aria-label="Copy coffee link"
+                      matTooltip="Copy coffee link"
+                    >
+                      <mat-icon>content_copy</mat-icon>
+                    </button>
+                    <button
+                      mat-icon-button
                       (click)="rotate(row.user)"
                       aria-label="Rotate link"
                       matTooltip="Rotate coffee link"
@@ -340,9 +348,12 @@ import { Role, UserDto } from '../../models';
 
       /* Fixed layout with percentage columns (summing to 100%), matching the activity table: the widths are
          honored exactly, the table fills its card and scrolls below the min-width, and the columns no longer
-         re-measure (and shift) when "Load more" appends rows. */
+         re-measure (and shift) when "Load more" appends rows. The min-width is the point below which the table
+         scrolls horizontally instead of compressing; it is sized so every column still fits its content there
+         (notably the "Balance"/"Cups" headers and the action cluster), so a narrow window scrolls rather than
+         truncating a header. */
       table.mat-mdc-table {
-        min-width: 600px;
+        min-width: 720px;
         table-layout: fixed;
       }
 
@@ -351,23 +362,34 @@ import { Role, UserDto } from '../../models';
       }
 
       .mat-column-name {
-        width: 21%;
+        width: 20%;
       }
 
       .mat-column-role {
-        width: 15%;
+        width: 13%;
       }
 
+      /* The role cell holds a fixed, short chip ("User"/"Admin") that must never be truncated. Material's
+         data-table cell defaults to overflow:hidden + text-overflow:ellipsis, which renders a stray "…" after
+         the chip the moment the column is too narrow to fit it; override that here so the chip never clips. */
+      td.mat-column-role {
+        overflow: visible;
+        text-overflow: clip;
+      }
+
+      /* The numeric "Cups" header is right-aligned and short, but at 9% the column was a couple of px too
+         narrow for the label plus its cell padding, so Material clipped it to "Cup…". Give it enough width
+         that the header (the widest thing in the column) always fits. */
       .mat-column-count {
-        width: 10%;
+        width: 11%;
       }
 
       .mat-column-balance {
-        width: 14%;
+        width: 13%;
       }
 
       .mat-column-actions {
-        width: 32%;
+        width: 35%;
       }
 
       /* The actions column holds fixed-size controls (a toggle and icon buttons), not text, so it must never
@@ -384,9 +406,17 @@ import { Role, UserDto } from '../../models';
         vertical-align: middle;
       }
 
-      /* Match the admin-expenses row-action cluster: a small, consistent gap between the per-row buttons. */
-      .col-actions :is(mat-slide-toggle, button) + :is(mat-slide-toggle, button) {
-        margin-left: 4px;
+      /* A small, even visual gap across the whole action cluster. The icon buttons carry ~8px of internal
+         padding around their glyph but the slide-toggle does not, so a single uniform margin makes the
+         toggle->first-button gap read tighter than the button->button gaps. Compensate: the buttons sit
+         tight (their padding supplies the visible gap) while the toggle gets a little breathing room, so
+         every gap looks the same. */
+      .col-actions button + button {
+        margin-left: 2px;
+      }
+
+      .col-actions mat-slide-toggle + button {
+        margin-left: 10px;
       }
 
       /* The leading "View profile" column holds a single icon button; keep its content tight against the name
@@ -528,6 +558,21 @@ export class AdminUsersComponent {
       await this.adminUserService.reload();
     } catch (error) {
       this.notifications.error(error, 'Could not change the user.');
+    }
+  }
+
+  /** Copies a user's capability link (their coffee link) to the clipboard. */
+  async copyLink(user: UserDto): Promise<void> {
+    const link = user.capabilityUrl;
+    if (!link) {
+      this.notifications.error(null, 'This user has no coffee link to copy.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(link);
+      this.notifications.success('Coffee link copied.');
+    } catch (error) {
+      this.notifications.error(error, 'Could not copy the coffee link.');
     }
   }
 

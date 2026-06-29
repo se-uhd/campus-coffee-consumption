@@ -196,6 +196,34 @@ test.describe('admin flow', () => {
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe('coffee-qr-codes.zip');
   });
+
+  test('the Users page "Copy coffee link" button copies the user capability URL to the clipboard', async ({
+    page,
+    context
+  }) => {
+    // clipboard-read is gated behind a permission in Chromium; grant it so the test can read back the copy
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await loginAsAdmin(page);
+    await page.goto('/admin/users');
+
+    const usersCard = page.locator('mat-card', {
+      has: page.getByRole('heading', { name: 'Users' })
+    });
+    const row = usersCard.getByRole('row').filter({ hasText: 'maxmustermann' }).first();
+
+    // the exact link the button is expected to copy, read straight from the API (the session cookie set by
+    // loginAsAdmin authenticates page.request), so the assertion pins the real capability URL, not a pattern
+    const linkResponse = await page.request.get('/api/users/filter?login_name=maxmustermann');
+    expect(linkResponse.ok()).toBeTruthy();
+    const expectedUrl = ((await linkResponse.json()) as { capabilityUrl: string }).capabilityUrl;
+    expect(expectedUrl).toContain('/login/');
+
+    await row.getByRole('button', { name: 'Copy coffee link' }).click();
+    await expect(page.getByText('Coffee link copied.')).toBeVisible();
+
+    const clipboard = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboard).toBe(expectedUrl);
+  });
 });
 
 /**
