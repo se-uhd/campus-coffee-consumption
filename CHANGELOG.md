@@ -7,6 +7,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-29
+
 ### Changed
 
 - Split the Playwright e2e: a fast no-coverage run is the per-push/PR gate (`scripts/run-e2e.sh`, the
@@ -57,6 +59,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   canceled", "grays", "normalized"), introduced acronyms on first use in the docs (for example "single-page
   application (SPA)"), and refreshed the frontend README to match the current Vitest/Playwright tooling,
   routes, and vocabulary.
+- The weekly `mise-outdated` workflow files an issue only when a tool pin must actually be bumped by hand
+  (mise's `bump` field is non-null), instead of nagging on patch updates already within a floating pin (a
+  Node patch under the `24` major, anything under `latest`); it auto-closes the issue when nothing is
+  actionable.
 
 ### Fixed
 
@@ -102,6 +108,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   version and server URL), so `gradle build` fails when the spec falls out of sync with the API. A new
   `gradle :application:refreshOpenApiSpec` task regenerates the spec and the DTOs in one command, replacing
   the manual `curl` refresh, and the committed spec no longer carries a release-coupled version.
+- Qodana (JetBrains code-quality) scanning as a blocking CI gate for both linters: the backend via the free
+  `qodana-jvm-community` linter (tokenless) and the frontend via `qodana-js` (through a Qodana Cloud project
+  token), bootstrapped with `npm ci` so it resolves the Angular project instead of reporting hundreds of
+  false unresolved-symbol problems. The findings it surfaced are fixed (the ignored navigate and reload
+  promises voided, the redundant `Mock` generics and an unused const removed, the static header logo
+  migrated to `NgOptimizedImage`, duplicated code refactored into shared helpers); two cases that cannot be
+  fixed today are narrowly scoped with a documented reason (the QR image's `ngSrc` on a blob URL, and the
+  `provideAnimationsAsync` deprecation Angular Material still requires).
 
 ## [0.6.1] - 2026-06-26
 
@@ -865,6 +879,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.7.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.7.0
 [0.6.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.6.1
 [0.6.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.6.0
 [0.5.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.5.1
