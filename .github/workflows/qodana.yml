@@ -46,11 +46,12 @@ jobs:
         # qodana.sarif.baseline is committed (see qodana.yaml), uncomment to count only NEW problems:
         # with:
         #   args: --baseline,qodana.sarif.baseline
-        env:
-          # Optional. The Community linter needs no license, so the scan runs without this. Setting the
-          # QODANA_TOKEN repository secret (a Qodana Cloud project token) additionally uploads results to
-          # Qodana Cloud and enables its server-side quality gate; the PR comment and SARIF work without it.
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+        #
+        # Intentionally no QODANA_TOKEN here: the free qodana-jvm-community linter runs without a Qodana Cloud
+        # connection, so this job needs no token. A Qodana Cloud project supports only one linter, and the
+        # frontend job's project is bound to qodana-js; passing the token here would make this JVM scan upload
+        # to that JS project and fail ("one linter per project"). The SARIF and the failThreshold gate work
+        # fully without it. (To put the backend in Cloud too, create a SEPARATE jvm project + token.)
 
       # No code-scanning upload: this is a private repo without GitHub Advanced Security, so
       # github/codeql-action/upload-sarif cannot push to the Security tab (it 403s with "Resource not
