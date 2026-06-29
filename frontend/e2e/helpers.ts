@@ -76,6 +76,20 @@ async function encryptCredentials(
 }
 
 /**
+ * Fills and submits the admin sign-in form with the fixture admin's credentials (the four form steps,
+ * with no post-login assertion). Use this directly only when a test asserts the post-sign-in landing
+ * itself; otherwise prefer {@link loginAsAdmin}, which also waits for the dashboard to render.
+ *
+ * @param page the Playwright page
+ */
+export async function signInAsAdmin(page: Page): Promise<void> {
+  await page.goto('/admin/login');
+  await page.getByLabel('Login name').fill(ADMIN.loginName);
+  await page.getByLabel('Password').fill(ADMIN.password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+}
+
+/**
  * Signs in as the fixture admin through the real login page and waits for the admin landing to render.
  * The landing mirrors the user landing for the selected user, so it settles on the user selector and
  * the "Recent activity" block rather than the users overview table (which now lives on `/admin/users`).
@@ -83,12 +97,23 @@ async function encryptCredentials(
  * @param page the Playwright page
  */
 export async function loginAsAdmin(page: Page): Promise<void> {
-  await page.goto('/admin/login');
-  await page.getByLabel('Login name').fill(ADMIN.loginName);
-  await page.getByLabel('Password').fill(ADMIN.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await signInAsAdmin(page);
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole('heading', { name: 'Recent activity' })).toBeVisible();
+}
+
+/**
+ * Shared kitty-test preamble: pins the price to 50 cents (so an exact kitty figure cannot be perturbed by
+ * a leftover price from a previous run), signs in as the fixture admin, and opens the kitty page. A test
+ * that needs an empty kitty resets the fixtures itself, before calling this.
+ *
+ * @param page the Playwright page
+ * @param api a Playwright request context bound to the app base URL, used to pin the price
+ */
+export async function openKittyPageAsAdmin(page: Page, api: APIRequestContext): Promise<void> {
+  await pinPrice(api, await adminToken(api), 50);
+  await loginAsAdmin(page);
+  await page.goto('/admin/kitty');
 }
 
 /** Builds a request context bound to the app base URL for direct API calls in helpers/tests. */

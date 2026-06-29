@@ -1,6 +1,5 @@
 package de.seuhd.campuscoffee.api.configuration
 
-import de.seuhd.campuscoffee.api.configuration.JwtProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test

@@ -320,14 +320,7 @@ export class AdminExpensesComponent implements OnInit {
     this.loading.set(true);
     this.loadError.set('');
     try {
-      this.users.set(await this.userService.list());
-      // resolve the admin's own account as the shared default so a direct visit to this page (with no prior
-      // selection) still defaults to the admin's own account rather than the first user
-      const me = await this.userService.me();
-      this.selection.setOwnUserId(me.id ?? '');
-      // take the selection from the URL's `user` param (the source of truth, the admin's own account
-      // when it is absent), so a deep link or a refresh on `/admin/expenses?user=<id>` lands on that user
-      this.selectedId.set(this.selection.selectFromParam(this.route.snapshot.queryParamMap.get('user')));
+      await this.selection.loadUsersAndSelection(this.userService, this.route, this.users, this.selectedId);
       await this.loadPurchases();
     } catch {
       this.loadError.set('Could not load the expenses.');

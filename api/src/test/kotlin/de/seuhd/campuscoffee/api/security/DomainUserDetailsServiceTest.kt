@@ -1,6 +1,5 @@
 package de.seuhd.campuscoffee.api.security
 
-import de.seuhd.campuscoffee.api.security.DomainUserDetailsService
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User

@@ -1,4 +1,7 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, WritableSignal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
+import { UserDto } from '../models';
+import { UserService } from './user.service';
 
 /**
  * Holds the user the admin is currently viewing, shared across the admin subpages (the landing, expenses,
@@ -77,5 +80,30 @@ export class AdminSelectionService {
   /** Whether the current selection is the admin's own account (so the "back" affordance can be hidden). */
   isOwnAccountSelected(): boolean {
     return this.selectedUserId() === this.ownId;
+  }
+
+  /**
+   * Bootstraps an admin page's user selector in one step: loads the full user list into [users], records
+   * the signed-in admin's own id (from `/api/users/me`) as the shared default, and resolves [selectedId]
+   * from the URL's `user` query param (the admin's own account when it is absent). Shared by the admin
+   * pages that host the selector (the expenses and profile pages) so the load-and-resolve sequence lives
+   * in one place. The user service and the route are passed in rather than injected, so this selection
+   * mirror keeps no HTTP or routing dependency of its own; the calling page owns the two signals written.
+   *
+   * @param userService the user API used to load the list and resolve the admin's own account
+   * @param route the active route whose `user` query param is the selection's source of truth
+   * @param users the page's user-list signal, set to the loaded users
+   * @param selectedId the page's selected-user-id signal, set to the resolved selection
+   */
+  async loadUsersAndSelection(
+    userService: UserService,
+    route: ActivatedRoute,
+    users: WritableSignal<UserDto[]>,
+    selectedId: WritableSignal<string>
+  ): Promise<void> {
+    users.set(await userService.list());
+    const me = await userService.me();
+    this.setOwnUserId(me.id ?? '');
+    selectedId.set(this.selectFromParam(route.snapshot.queryParamMap.get('user')));
   }
 }
