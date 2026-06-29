@@ -12,7 +12,7 @@ mapstruct = "1.6.3"
 # kotlin-logging: idiomatic Kotlin logging over SLF4J. Log calls take a lambda (built only when the level
 # is enabled) and the logger derives its name from the enclosing class.
 kotlin-logging = "8.0.4"
-cucumber = "7.34.3"
+cucumber = "7.34.4"
 archunit = "1.4.2"
 # ZXing for backend QR-code generation (the user capability URL codes); not in the Boot BOM.
 zxing = "3.5.4"
@@ -42,7 +42,7 @@ detekt = "2.0.0-alpha.5"
 # `_jdk17` variant is the current JDK 17+ baseline build.
 bucket4j = "8.19.0"
 # Apache Commons CSV writes the admin activity export (RFC 4180 quoting/escaping); Apache-2.0, not in the BOM.
-commons-csv = "1.12.0"
+commons-csv = "1.14.1"
 
 [libraries]
 # BOM-managed (version omitted on purpose)
