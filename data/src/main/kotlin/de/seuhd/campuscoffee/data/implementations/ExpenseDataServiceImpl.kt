@@ -14,7 +14,7 @@ import java.util.UUID
  * the domain service layer). Expenses have no unique key, so no constraint mappings are declared; the
  * split-sum invariant is validated in the domain service and backed by a database CHECK.
  */
-@Service
+@Service(ExpenseDataServiceImpl.BEAN_NAME)
 class ExpenseDataServiceImpl(
     repository: ExpenseRepository,
     entityMapper: ExpenseEntityMapper,
@@ -29,4 +29,13 @@ class ExpenseDataServiceImpl(
     ExpenseDataService {
     override fun getAllByBuyer(userId: UUID): List<Expense> =
         repository.findByBuyerId(userId).map { mapper.fromEntity(it) }
+
+    companion object {
+        /**
+         * Spring bean name of this relational adapter. The event-sourcing decorator qualifies on it to wrap
+         * this bean. Without the qualifier, Spring would select the `@Primary` decorator as its own
+         * [ExpenseDataService] delegate.
+         */
+        const val BEAN_NAME = "expenseDataServiceImpl"
+    }
 }

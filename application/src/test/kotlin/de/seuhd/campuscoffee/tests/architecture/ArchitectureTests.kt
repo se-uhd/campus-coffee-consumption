@@ -87,28 +87,20 @@ class ArchitectureTests {
                 .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
                 .importPackages("de.seuhd.campuscoffee")
 
-        // The five EventSourced* data-service decorators are the one allowed exception: each must inject the
-        // concrete relational *DataServiceImpl it wraps, because injecting the port would resolve to the
-        // @Primary decorator itself and self-loop. The exemption also covers their synthetic users (the
-        // lambda classes the Kotlin compiler generates for the delegating calls). This exemption is blanket (the
-        // whole decorator is removed from the source set), so it is broader than that single delegate edge: a
-        // decorator injecting another data-module adapter *Impl directly would not be caught here, nor by the
-        // layer rule (same module). Accepted trade-off; today each decorator injects only its *DataServiceImpl
-        // delegate. @Configuration classes are
-        // exempt because composing the beans is their whole job. Everything else depends on the port, not the
-        // impl. The target is restricted to our own *Impl classes so a Kotlin-runtime *Impl (e.g. a lambda's
-        // FunctionReferenceImpl supertype) is not mistaken for a layering violation. The SOURCE set also
-        // excludes *Impl-named classes (haveSimpleNameNotEndingWith("Impl")): each relational *DataServiceImpl /
-        // *ServiceImpl extends a base *Impl (CrudDataServiceImpl / CrudServiceImpl), an inheritance edge that
-        // would otherwise trip the rule. The trade-off is that one *Impl depending on another is not checked;
-        // acceptable because the adapters are the leaves of the dependency graph and nothing does so today.
-        val isEventSourcedDecorator =
-            object : DescribedPredicate<JavaClass>("an EventSourced* data-service decorator or its users") {
-                override fun test(javaClass: JavaClass): Boolean {
-                    val name = javaClass.name.substringAfterLast('.')
-                    return name.startsWith("EventSourced") && name.contains("DataService")
-                }
-            }
+        // Everything depends on the port, not the impl, the EventSourced* data-service decorators included.
+        // Each decorator injects its relational delegate as the port (e.g. UserDataService) and pins it to the
+        // relational bean with @Qualifier(<Impl>.BEAN_NAME), instead of injecting the concrete
+        // *DataServiceImpl as it once did. BEAN_NAME is a const val, so the qualifier inlines to a String
+        // literal in the decorator's bytecode and leaves no type reference to the *Impl; the decorators are
+        // therefore ordinary subjects of this rule, with no exemption. (The qualifier is what stops Spring
+        // from resolving the port to the @Primary decorator itself and self-looping.) @Configuration classes
+        // are exempt because composing the beans is their whole job. The target is restricted to our own
+        // *Impl classes so a Kotlin-runtime *Impl (e.g. a lambda's FunctionReferenceImpl supertype) is not
+        // mistaken for a layering violation. The SOURCE set also excludes *Impl-named classes
+        // (haveSimpleNameNotEndingWith("Impl")): each relational *DataServiceImpl / *ServiceImpl extends a base
+        // *Impl (CrudDataServiceImpl / CrudServiceImpl), an inheritance edge that would otherwise trip the rule.
+        // The trade-off is that one *Impl depending on another is not checked; acceptable because the adapters
+        // are the leaves of the dependency graph and nothing does so today.
         val isOwnImplementation =
             object : DescribedPredicate<JavaClass>("a campus-coffee class whose simple name ends with 'Impl'") {
                 override fun test(javaClass: JavaClass): Boolean =
@@ -120,7 +112,6 @@ class ArchitectureTests {
             .haveSimpleNameNotEndingWith("Impl")
             .and()
             .areNotAnnotatedWith(Configuration::class.java)
-            .and(DescribedPredicate.not(isEventSourcedDecorator))
             .should()
             .dependOnClassesThat(isOwnImplementation)
             .check(productionClasses)

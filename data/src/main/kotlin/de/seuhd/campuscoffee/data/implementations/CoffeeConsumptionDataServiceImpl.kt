@@ -16,7 +16,7 @@ import java.util.UUID
  * review data service: persistence only (business logic lives in the domain service layer), with the
  * one-per-user uniqueness reported as a [de.seuhd.campuscoffee.domain.exceptions.DuplicationException].
  */
-@Service
+@Service(CoffeeConsumptionDataServiceImpl.BEAN_NAME)
 class CoffeeConsumptionDataServiceImpl(
     repository: CoffeeConsumptionRepository,
     entityMapper: CoffeeConsumptionEntityMapper,
@@ -43,4 +43,13 @@ class CoffeeConsumptionDataServiceImpl(
      */
     override fun getByUserId(userId: UUID): CoffeeConsumption =
         findByFieldOrThrow({ repository.findByUserId(userId) }, "user_id", userId.toString())
+
+    companion object {
+        /**
+         * Spring bean name of this relational adapter. The event-sourcing decorator qualifies on it to wrap
+         * this bean. Without the qualifier, Spring would select the `@Primary` decorator as its own
+         * [CoffeeConsumptionDataService] delegate.
+         */
+        const val BEAN_NAME = "coffeeConsumptionDataServiceImpl"
+    }
 }

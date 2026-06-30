@@ -2,6 +2,7 @@ package de.seuhd.campuscoffee.data.implementations
 import de.seuhd.campuscoffee.data.persistence.events.EventSourcedWriter
 import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -9,13 +10,15 @@ import java.util.UUID
 
 /**
  * Event sourcing payment data adapter, the only persistence path. A Decorator around the relational
- * [PaymentDataServiceImpl] (both adapters for the same `PaymentDataService` port, so it is `@Primary`),
- * delegating reads and `getAllByUser` and writing each deposit and kitty adjustment event-first.
+ * [PaymentDataServiceImpl] (both adapters for the same `PaymentDataService` port, so it is `@Primary`). The
+ * `delegate` is typed against the port and pinned to the relational bean with
+ * `@Qualifier(PaymentDataServiceImpl.BEAN_NAME)`, so the wrapper shares only the interface with the wrappee.
+ * It delegates reads and `getAllByUser` and writes each deposit and kitty adjustment event-first.
  */
 @Service
 @Primary
 class EventSourcedPaymentDataService(
-    private val delegate: PaymentDataServiceImpl,
+    @param:Qualifier(PaymentDataServiceImpl.BEAN_NAME) private val delegate: PaymentDataService,
     private val writer: EventSourcedWriter
 ) : PaymentDataService by delegate {
     @Transactional

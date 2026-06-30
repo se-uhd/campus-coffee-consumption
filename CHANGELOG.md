@@ -7,6 +7,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-06-30
+
+### Changed
+
+- Type the five event-sourcing decorators' `delegate` against the domain port (e.g. `UserDataService`)
+  instead of the concrete relational `*DataServiceImpl`, so a decorator and the adapter it wraps share only
+  the interface, the relationship the Decorator pattern relies on. Each relational adapter declares an
+  explicit `@Service(BEAN_NAME)` bean name (a `const val` on its companion), and the decorator pins its
+  delegate to that bean with `@param:Qualifier(<Impl>.BEAN_NAME)`. Injecting the bare port would otherwise
+  resolve to the `@Primary` decorator itself and self-loop; the qualifier breaks that. Because `BEAN_NAME` is
+  a compile-time constant, the qualifier inlines to a string literal and leaves no bytecode reference to the
+  `*Impl`, so the `production code depends on ports, never on Impl types` ArchUnit rule no longer needs its
+  decorator exemption (now removed, which also tightens the rule). Wiring and behavior are unchanged.
+
 ## [0.8.1] - 2026-06-29
 
 ### Fixed
@@ -911,6 +925,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.8.2]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.8.2
 [0.8.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.8.1
 [0.8.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.8.0
 [0.7.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.7.0

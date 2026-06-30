@@ -16,7 +16,7 @@ import java.util.UUID
  * unique constraint, mapped to a [de.seuhd.campuscoffee.domain.exceptions.DuplicationException] so a racing
  * double-create surfaces as a domain exception, not a raw Spring `DataIntegrityViolationException`.
  */
-@Service
+@Service(CoffeePriceDataServiceImpl.BEAN_NAME)
 class CoffeePriceDataServiceImpl(
     repository: CoffeePriceRepository,
     entityMapper: CoffeePriceEntityMapper,
@@ -36,4 +36,13 @@ class CoffeePriceDataServiceImpl(
     ),
     CoffeePriceDataService {
     override fun findCurrent(): CoffeePrice? = repository.findAll().firstOrNull()?.let { mapper.fromEntity(it) }
+
+    companion object {
+        /**
+         * Spring bean name of this relational adapter. The event-sourcing decorator qualifies on it to wrap
+         * this bean. Without the qualifier, Spring would select the `@Primary` decorator as its own
+         * [CoffeePriceDataService] delegate.
+         */
+        const val BEAN_NAME = "coffeePriceDataServiceImpl"
+    }
 }

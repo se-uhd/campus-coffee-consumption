@@ -13,7 +13,7 @@ import java.util.UUID
  * Data-layer adapter implementing the payment data service port. Persistence only (business logic lives in
  * the domain service layer). Payments have no unique key, so no constraint mappings are declared.
  */
-@Service
+@Service(PaymentDataServiceImpl.BEAN_NAME)
 class PaymentDataServiceImpl(
     repository: PaymentRepository,
     entityMapper: PaymentEntityMapper,
@@ -28,4 +28,13 @@ class PaymentDataServiceImpl(
     PaymentDataService {
     override fun getAllByUser(userId: UUID): List<Payment> =
         repository.findByUserId(userId).map { mapper.fromEntity(it) }
+
+    companion object {
+        /**
+         * Spring bean name of this relational adapter. The event-sourcing decorator qualifies on it to wrap
+         * this bean. Without the qualifier, Spring would select the `@Primary` decorator as its own
+         * [PaymentDataService] delegate.
+         */
+        const val BEAN_NAME = "paymentDataServiceImpl"
+    }
 }

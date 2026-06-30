@@ -2,6 +2,7 @@ package de.seuhd.campuscoffee.data.implementations
 import de.seuhd.campuscoffee.data.persistence.events.EventSourcedWriter
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -10,14 +11,16 @@ import java.util.UUID
 /**
  * Event sourcing coffee-consumption data adapter, the only persistence path. A copy of
  * [EventSourcedUserDataService]: a Decorator around the relational [CoffeeConsumptionDataServiceImpl] (both
- * adapters for the same `CoffeeConsumptionDataService` port, so it is `@Primary`), delegating reads and
- * `getByUserId` and writing each `+1`/`-1`/override event-first. Every mutation is recorded as a
- * full-state event and projected into the read table in one transaction.
+ * adapters for the same `CoffeeConsumptionDataService` port, so it is `@Primary`). The `delegate` is typed
+ * against the port and pinned to the relational bean with
+ * `@Qualifier(CoffeeConsumptionDataServiceImpl.BEAN_NAME)`, so the wrapper shares only the interface with
+ * the wrappee. It delegates reads and `getByUserId` and writes each `+1`/`-1`/override event-first. Every
+ * mutation is recorded as a full-state event and projected into the read table in one transaction.
  */
 @Service
 @Primary
 class EventSourcedCoffeeConsumptionDataService(
-    private val delegate: CoffeeConsumptionDataServiceImpl,
+    @param:Qualifier(CoffeeConsumptionDataServiceImpl.BEAN_NAME) private val delegate: CoffeeConsumptionDataService,
     private val writer: EventSourcedWriter
 ) : CoffeeConsumptionDataService by delegate {
     @Transactional
