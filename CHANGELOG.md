@@ -7,6 +7,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-01
+
 ### Added
 
 - A per-user profile setting to show a cup-stats card (cups today, this week, and since the first cup) on the
@@ -959,6 +961,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.9.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.0
 [0.8.2]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.8.2
 [0.8.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.8.1
 [0.8.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.8.0
