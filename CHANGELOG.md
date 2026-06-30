@@ -9,6 +9,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Name the local PostgreSQL container `campus-coffee-db` instead of the generic `db` (the `docker run`
+  quick-start and the Compose `db` service's `container_name`), so it no longer clashes with another
+  project's `db` container. The Compose service name stays `db` (it is internal to the Compose network and
+  already namespaced by the project), so `DB_HOST=db` and `depends_on` are unchanged.
 - Read the prod Cloud SQL instance connection name from a `CLOUD_SQL_INSTANCE` environment variable instead
   of hard-coding it in `application.yaml`, so the deployment target is configured per environment (set it in
   `deploy.prod.env`; see `deploy.env.example`). The prod profile fails fast if it is unset.

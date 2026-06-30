@@ -278,7 +278,7 @@ its `META-INF/services` provider; they are covered by `gradle :detekt-rules:test
 ### Start PostgreSQL Database
 
 ```shell
-docker run -d --name db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:18-alpine
+docker run -d --name campus-coffee-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:18-alpine
 ```
 
 ### Run Application (dev profile)
