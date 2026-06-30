@@ -118,7 +118,7 @@ export async function openKittyPageAsAdmin(page: Page, api: APIRequestContext): 
 
 /** Builds a request context bound to the app base URL for direct API calls in helpers/tests. */
 export async function apiContext(): Promise<APIRequestContext> {
-  return request.newContext({ baseURL: 'http://localhost:8080' });
+  return request.newContext({ baseURL: 'http://localhost:8081' });
 }
 
 /**

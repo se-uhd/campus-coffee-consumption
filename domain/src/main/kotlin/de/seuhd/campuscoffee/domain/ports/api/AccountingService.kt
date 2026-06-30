@@ -19,14 +19,19 @@ interface AccountingService {
      * whether the most recent coffee is still cancellable, and the first page of the unified activity
      * (newest first). Readable by the user themselves or an admin.
      *
-     * The summary is the user-serving view, so its activity never carries the kitty-funded portion of an
+     * By default this is the user-serving view, so its activity never carries the kitty-funded portion of an
      * admin split purchase: a user's purchases read as 100% private, and the kitty split is not leaked to
-     * them even when an admin recorded the split against them.
+     * them even when an admin recorded the split against them. The admin landing (which views any user by id)
+     * passes [includeKittyPortion] = true so its activity matches the kitty-inclusive admin per-user feed it
+     * pages with; a user's own summary always uses the default (private) view. The running balance is the
+     * private-only balance regardless, so this flag only governs the displayed split detail.
      *
      * @param userId      the user whose summary to read
      * @param activityLimit the number of activity entries on the first page
      * @param activityOffset the number of newest entries to skip
      * @param actingUser  the authenticated user attempting the read
+     * @param includeKittyPortion whether each activity entry keeps the kitty-funded portion of a split expense
+     *   (the admin per-user view); false strips it for the user-serving view
      * @throws ForbiddenException if [actingUser] is neither that user nor an admin
      * @throws NotFoundException if no user exists for [userId]
      */
@@ -34,7 +39,8 @@ interface AccountingService {
         userId: UUID,
         activityLimit: Int,
         activityOffset: Int,
-        actingUser: User
+        actingUser: User,
+        includeKittyPortion: Boolean = false
     ): UserSummary
 
     /**

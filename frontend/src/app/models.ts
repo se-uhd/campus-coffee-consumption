@@ -48,6 +48,9 @@ import { ActivityEntryDto } from './api/model/activityEntryDto';
 /** A user's role (`'USER' | 'ADMIN'`). */
 export type Role = UserDto.RoleEnum;
 
+/** A user's landing-panel preference (`'BALANCE' | 'CUPS'`): the money panel or the cup-stats panel. */
+export type SummaryPanel = UserDto.SummaryPanelEnum;
+
 /**
  * The kind of an activity-feed row. The first four appear in a user's activity feed; the kitty-funded ones
  * (plus `DEPOSIT`) appear in the admin-only kitty history; `PRICE_CHANGE` appears only in the admin global

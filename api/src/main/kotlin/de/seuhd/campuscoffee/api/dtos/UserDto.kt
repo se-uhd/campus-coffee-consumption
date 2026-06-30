@@ -2,6 +2,7 @@ package de.seuhd.campuscoffee.api.dtos
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import de.seuhd.campuscoffee.domain.model.Role
+import de.seuhd.campuscoffee.domain.model.SummaryPanel
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Pattern
@@ -57,6 +58,9 @@ data class UserDto(
     val password: String? = null,
     val role: Role? = null,
     val active: Boolean? = null,
+    // the user's own landing-panel preference (BALANCE / CUPS). Nullable accept-or-keep (omitted keeps the
+    // stored value); a read always carries it. Preserved on an admin save; the user edits it on their profile.
+    val summaryPanel: SummaryPanel? = null,
     // server-assigned "your coffee link"; present in responses and ignored by the mapper on input
     val capabilityUrl: String? = null
 ) : Dto<UUID>

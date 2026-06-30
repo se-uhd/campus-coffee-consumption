@@ -18,7 +18,7 @@
 # Env knobs:
 #   JACOCO_AGENT_JAR   absolute path to org.jacoco.agent-<ver>-runtime.jar (required in CI; auto-detected
 #                      locally if unset).
-#   APP_PORT           the port the jar listens on (default 8080; the Playwright baseURL is :8080).
+#   APP_PORT           the port the jar listens on (default 8081, the dev profile's port; the Playwright baseURL is :8081).
 #   SKIP_BUILD         if "1", skip the SPA+jar build and reuse the existing application/build/libs jar
 #                      (useful when iterating; the jar must already be source-mapped + agent-launchable).
 set -euo pipefail
@@ -26,7 +26,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
-APP_PORT="${APP_PORT:-8080}"
+APP_PORT="${APP_PORT:-8081}"
 EXEC_OUT="${ROOT}/coverage/build/jacoco/e2e.exec"
 JAR="${ROOT}/application/build/libs/application.jar"
 HEALTH_URL="http://localhost:${APP_PORT}/actuator/health"

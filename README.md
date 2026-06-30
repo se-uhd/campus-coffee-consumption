@@ -83,10 +83,12 @@ Run the backend in the `dev` profile (loads the seeded fixtures on first start):
 gradle :application:bootRun --args='--spring.profiles.active=dev'
 ```
 
-`bootRun` serves the full app (the bundled SPA plus the API) at `http://localhost:8080` (the first run builds
-the Angular SPA); the API is under `/api`, with Swagger UI at `http://localhost:8080/api/swagger-ui.html`.
+`bootRun` serves the full app (the bundled SPA plus the API) at `http://localhost:8081` (the first run builds
+the Angular SPA); the API is under `/api`, with Swagger UI at `http://localhost:8081/api/swagger-ui.html`.
+(The dev profile listens on `:8081` to avoid colliding with another app on the conventional `:8080`; override
+with `SERVER_PORT`.)
 
-For frontend development, run the Angular dev server (it proxies `/api` to the backend on `:8080`, so the
+For frontend development, run the Angular dev server (it proxies `/api` to the backend on `:8081`, so the
 browser still sees a single origin and no Cross-Origin Resource Sharing (CORS) is needed):
 
 ```shell
@@ -109,7 +111,7 @@ repeatable), each with a coffee consumption at zero. The credentials live in
 | `lisa_lee`      | USER  | `Lk8jH4gF6dS2aP0oI9uY7tR3eW1qZ5xCvBnM2mN8bVlk` |
 | `olivia_lee`    | USER  | `Ty6rE2wQ8aS4dF0gH6jK1lZ3xC9vB5nMqWeR7tY1uIty` |
 
-A user's capability link is `http://localhost:8080/login/<token>`, and users authenticate **only** with
+A user's capability link is `http://localhost:8081/login/<token>`, and users authenticate **only** with
 that link (they have no password). The admin `jane_doe` is different: she logs in with a **password** at
 `POST /api/auth/token` (the JWT login), **not** with the capability token in the table above. The fixture
 admin password is **`aaaMbnPdFYDqkOpS3fVA2xyz`** (also in `TestFixtures.kt`). The dev `DevController` (`GET/PUT/DELETE /api/dev/data`) reports the counts, reloads the

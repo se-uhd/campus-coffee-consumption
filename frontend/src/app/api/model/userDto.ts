@@ -23,6 +23,7 @@ export interface UserDto {
     password?: string | null;
     role?: UserDto.RoleEnum | null;
     active?: boolean | null;
+    summaryPanel?: UserDto.SummaryPanelEnum | null;
     capabilityUrl?: string | null;
 }
 export namespace UserDto {
@@ -31,6 +32,11 @@ export namespace UserDto {
         Admin: 'ADMIN'
     } as const;
     export type RoleEnum = typeof RoleEnum[keyof typeof RoleEnum];
+    export const SummaryPanelEnum = {
+        Balance: 'BALANCE',
+        Cups: 'CUPS'
+    } as const;
+    export type SummaryPanelEnum = typeof SummaryPanelEnum[keyof typeof SummaryPanelEnum];
 }
 
 

@@ -10,8 +10,8 @@ import org.springframework.context.annotation.Profile
  * origin: a missing value (the deploy forgot to set `CAMPUS_COFFEE_APP_BASE_URL`), a plain-http value, or a
  * loopback/bare-hostname value (`https://localhost`, `https://127.0.0.1`, `https://app`) would print dead or
  * token-leaking links on the wall QR codes. This mirrors the fail-fast that `JwtProperties` does for the
- * signing secret. It is `@Profile("prod")`, so local dev and the tests (which use `http://localhost:8080`)
- * are unaffected.
+ * signing secret. It is `@Profile("prod")`, so local dev (`http://localhost:8081`) and the tests
+ * (`http://localhost:8080`) are unaffected.
  *
  * @property appProperties the application URL properties whose base URL is validated
  */

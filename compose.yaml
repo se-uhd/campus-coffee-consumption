@@ -24,6 +24,9 @@ services:
       # name, so run it as: DB_HOST=db docker compose up
       - SPRING_DATASOURCE_URL=jdbc:postgresql://${DB_HOST:-localhost}:5432/postgres
       - SPRING_PROFILES_ACTIVE=dev
+      # The dev profile defaults to :8081 for direct local dev (gradle bootRun); pin this container back to
+      # :8080 to match the port mapping above and the image healthcheck (and the Cloud Run platform port).
+      - SERVER_PORT=8080
       # Event sourcing is the only persistence mode; this opt-in flag rebuilds the read tables from the log.
       - CAMPUS_COFFEE_EVENTS_TO_DATA_ON_STARTUP=${CAMPUS_COFFEE_EVENTS_TO_DATA_ON_STARTUP:-false}
 

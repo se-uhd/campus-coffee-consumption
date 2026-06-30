@@ -5,6 +5,7 @@ import de.seuhd.campuscoffee.api.dtos.PublicKeyDto
 import de.seuhd.campuscoffee.api.dtos.TokenRequestDto
 import de.seuhd.campuscoffee.api.dtos.UserDto
 import de.seuhd.campuscoffee.domain.model.Role
+import de.seuhd.campuscoffee.domain.model.SummaryPanel
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
@@ -130,7 +131,8 @@ class AuthorizationSystemTests : AbstractSystemTest() {
                         loginName = user,
                         emailAddress = "new.email@example.com",
                         firstName = "New",
-                        lastName = "Name"
+                        lastName = "Name",
+                        summaryPanel = SummaryPanel.BALANCE
                     )
                 ).withUser(user)
                 .exchange()

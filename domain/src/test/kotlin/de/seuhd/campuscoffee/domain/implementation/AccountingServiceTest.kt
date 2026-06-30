@@ -7,6 +7,7 @@ import de.seuhd.campuscoffee.domain.model.CancellableIncrement
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.CoffeePrice
 import de.seuhd.campuscoffee.domain.model.Role
+import de.seuhd.campuscoffee.domain.model.SummaryPanel
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
@@ -22,7 +23,11 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.UUID
 
 /**
@@ -39,6 +44,11 @@ class AccountingServiceTest {
     private val coffeeConsumptionService: CoffeeConsumptionService = mock()
     private val userDataService: UserDataService = mock()
 
+    // A fixed "now": Thursday 2026-01-15 12:00 UTC, which is 13:00 in Europe/Berlin (CET, the test zone). So
+    // the local day starts at 2026-01-14T23:00Z and the local week (Monday 2026-01-12) at 2026-01-11T23:00Z.
+    private val clock: Clock = Clock.fixed(Instant.parse("2026-01-15T12:00:00Z"), ZoneOffset.UTC)
+    private val summaryProperties = SummaryProperties(ZoneId.of("Europe/Berlin"))
+
     private val service =
         AccountingServiceImpl(
             activityDataService,
@@ -46,7 +56,9 @@ class AccountingServiceTest {
             coffeePriceService,
             coffeeConsumptionDataService,
             coffeeConsumptionService,
-            userDataService
+            userDataService,
+            clock,
+            summaryProperties
         )
 
     private val userId: UUID = UUID(0L, 1L)
@@ -74,17 +86,40 @@ class AccountingServiceTest {
 
     private fun entry(
         type: ActivityEntryType,
-        amountCents: Long,
-        runningBalanceCents: Long
+        amountCents: Long = 0,
+        runningBalanceCents: Long = 0,
+        createdAt: LocalDateTime = LocalDateTime.now(),
+        delta: Int? = null
     ) = ActivityEntry(
         type = type,
         id = UUID.fromString("00000000-0000-0000-0000-000000000001"),
-        createdAt = LocalDateTime.now(),
+        createdAt = createdAt,
         createdBy = "max",
         note = null,
         amountCents = amountCents,
-        runningBalanceCents = runningBalanceCents
+        runningBalanceCents = runningBalanceCents,
+        delta = delta
     )
+
+    /** A consumption activity entry at UTC time [at] with the given signed [delta] (negative for an undo). */
+    private fun consumption(
+        at: String,
+        delta: Int,
+        type: ActivityEntryType = ActivityEntryType.CONSUMPTION
+    ) = entry(type = type, createdAt = LocalDateTime.parse(at), delta = delta)
+
+    /** Stubs the data ports a `userSummary` read needs, with [activity] as the user's full oldest-first walk. */
+    private fun stubSummary(
+        activity: List<ActivityEntry>,
+        count: Int
+    ) {
+        whenever(userDataService.getById(userId)).thenReturn(user)
+        whenever(activityDataService.userActivity(userId, "max")).thenReturn(activity)
+        whenever(coffeeConsumptionDataService.getByUserId(userId))
+            .thenReturn(CoffeeConsumption(user = user, count = count))
+        whenever(coffeePriceService.getCurrent()).thenReturn(CoffeePrice(amountCents = 50))
+        whenever(balanceDataService.kittyBalanceCents()).thenReturn(0L)
+    }
 
     @Test
     fun `userSummary composes the count, price, balance, kitty, and activity for the owner`() {
@@ -133,6 +168,73 @@ class AccountingServiceTest {
         whenever(userDataService.getById(userId)).thenReturn(user)
 
         assertThrows<ForbiddenException> { service.userSummary(userId, 10, 0, stranger) }
+    }
+
+    @Test
+    fun `userSummary computes cups today and this week and the first-cup time`() {
+        val activity =
+            listOf(
+                consumption("2026-01-05T10:00:00", 1), // an earlier week: the first cup, outside both windows
+                consumption("2026-01-13T10:00:00", 1), // Tuesday: this week but not today
+                consumption("2026-01-15T08:00:00", 1) // today
+            )
+        stubSummary(activity, count = 3)
+
+        val summary = service.userSummary(userId, 10, 0, user)
+
+        assertThat(summary.firstCupAt).isEqualTo(LocalDateTime.parse("2026-01-05T10:00:00"))
+        assertThat(summary.cupsToday).isEqualTo(1)
+        assertThat(summary.cupsThisWeek).isEqualTo(2)
+        assertThat(summary.count).isEqualTo(3)
+    }
+
+    @Test
+    fun `userSummary reports no cups for a user with none`() {
+        stubSummary(emptyList(), count = 0)
+
+        val summary = service.userSummary(userId, 10, 0, user)
+
+        assertThat(summary.firstCupAt).isNull()
+        assertThat(summary.cupsToday).isEqualTo(0)
+        assertThat(summary.cupsThisWeek).isEqualTo(0)
+    }
+
+    @Test
+    fun `userSummary nets a same-day undo against the cup in cups today and this week`() {
+        val activity =
+            listOf(
+                consumption("2026-01-15T08:00:00", 1),
+                consumption("2026-01-15T09:00:00", -1, ActivityEntryType.CONSUMPTION_CANCEL)
+            )
+        stubSummary(activity, count = 0)
+
+        val summary = service.userSummary(userId, 10, 0, user)
+
+        assertThat(summary.cupsToday).isEqualTo(0)
+        assertThat(summary.cupsThisWeek).isEqualTo(0)
+        assertThat(summary.firstCupAt).isEqualTo(LocalDateTime.parse("2026-01-15T08:00:00"))
+    }
+
+    @Test
+    fun `userSummary clamps a same-day admin down-correction to zero cups today`() {
+        // an admin lowering the count today shows as a negative-delta CONSUMPTION; cups today must not go below 0
+        val activity = listOf(consumption("2026-01-15T08:00:00", -5))
+        stubSummary(activity, count = 0)
+
+        val summary = service.userSummary(userId, 10, 0, user)
+
+        assertThat(summary.cupsToday).isEqualTo(0)
+        assertThat(summary.firstCupAt).isNull()
+    }
+
+    @Test
+    fun `userSummary returns the chosen panel and defaults a null choice to balance`() {
+        stubSummary(emptyList(), count = 0)
+        assertThat(service.userSummary(userId, 10, 0, user).summaryPanel).isEqualTo(SummaryPanel.BALANCE)
+
+        val cupsUser = user.copy(summaryPanel = SummaryPanel.CUPS)
+        whenever(userDataService.getById(userId)).thenReturn(cupsUser)
+        assertThat(service.userSummary(userId, 10, 0, cupsUser).summaryPanel).isEqualTo(SummaryPanel.CUPS)
     }
 
     @Test

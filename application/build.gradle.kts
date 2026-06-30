@@ -232,7 +232,7 @@ tasks.named<BootJar>("bootJar") {
 // `bootRun` serves static resources straight off the classpath; unlike `bootJar` it does NOT bundle the
 // SPA, so a plain `gradle :application:bootRun` would serve only the API and 404 every SPA route (e.g. the
 // root returns the JSON "No endpoint found for '/index.html'"). Build the SPA and place it on bootRun's
-// classpath under `static/`, so the dev run serves the full app on :8080 exactly like the jar.
+// classpath under `static/`, so the dev run serves the full app on :8081 exactly like the jar.
 //
 // Wired to `bootRun` ONLY, never to processResources/classes, so a bare `gradle test` (which triggers
 // processResources) still skips the npm build and stays fast. It honors `-PskipFrontendBuild` the same way

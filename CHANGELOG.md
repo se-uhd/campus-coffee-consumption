@@ -7,15 +7,39 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- A per-user profile setting to show a cup-stats card (cups today, this week, and since the first cup) on the
+  landing in place of the balance/kitty card. Settable by the user or an admin, persisted on the user, and
+  applied to both the user's own landing and an admin viewing them. Cup windows use a configurable time zone
+  (`campus-coffee.summary.time-zone`, default `Europe/Berlin`). See
+  `doc/2026-06-30_balance-vs-cups-landing-panel.md`.
+- Admin parity on the landing: the admin landing is the same component as the user landing and shows the
+  selected user's count (`+1`), balances, activity, undo, and bean-purchase form, plus admin-only count tools
+  (`-1` and an absolute correction). New endpoints `GET /api/users/{id}/summary` and
+  `POST /api/users/{id}/consumption/cancel`. See `doc/2026-06-30_unified-landing-and-admin-parity.md`.
+- Sortable column headers (Name, Role, Cups, Balance) on the admin users table, cycling
+  unsorted/ascending/descending and ordering the whole user set globally before the client-side paginator
+  slices it.
+
 ### Changed
 
-- Name the local PostgreSQL container `campus-coffee-db` instead of the generic `db` (the `docker run`
-  quick-start and the Compose `db` service's `container_name`), so it no longer clashes with another
-  project's `db` container. The Compose service name stays `db` (it is internal to the Compose network and
-  already namespaced by the project), so `DB_HOST=db` and `depends_on` are unchanged.
-- Read the prod Cloud SQL instance connection name from a `CLOUD_SQL_INSTANCE` environment variable instead
-  of hard-coding it in `application.yaml`, so the deployment target is configured per environment (set it in
-  `deploy.prod.env`; see `deploy.env.example`). The prod profile fails fast if it is unset.
+- An admin may undo a user's most recent coffee on their behalf (previously owner-only). Recorded as the
+  admin, it is valued like the admin `-1` step, not as the user's own exact-price undo.
+- Serve the local dev backend on `:8081` instead of `:8080` to avoid colliding with another app on `:8080`.
+  The frontend proxy, Playwright config, and e2e scripts target `:8081`. Docker Compose and prod stay on
+  `:8080`.
+- Name the local PostgreSQL container `campus-coffee-db` instead of `db` to avoid clashing with other
+  projects. The Compose service name stays `db`, so `DB_HOST=db` is unchanged.
+- Read the prod Cloud SQL instance from a `CLOUD_SQL_INSTANCE` environment variable instead of hard-coding it
+  in `application.yaml` (set it in `deploy.prod.env`; see `deploy.env.example`). The prod profile fails fast
+  if it is unset.
+
+### Fixed
+
+- The SPA's admin user-update actions now send the user id in the request body, which `PUT /api/users/{id}`
+  requires. The admin users-table Active toggle and the admin profile edit, which omitted it, were failing
+  with a 400.
 
 ## [0.8.2] - 2026-06-30
 

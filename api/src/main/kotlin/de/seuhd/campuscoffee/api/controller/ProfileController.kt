@@ -58,14 +58,15 @@ class ProfileController(
         @Valid dto: ProfileUpdateDto
     ): ResponseEntity<UserDto> {
         val current = currentUserProvider.currentUser()
-        // a user may edit only first name, last name, and email; everything else (id, login name, password,
-        // role, active) is kept from the current user, so a profile edit can change nothing beyond the three
-        // the @NotNull bean-validation on the DTO guarantees these are present before the handler runs
+        // a user may edit their first name, last name, email, and landing-panel preference; everything else
+        // (id, login name, password, role, active) is kept from the current user. All four edited fields are
+        // @NotNull-validated on the DTO, so they are present before the handler runs.
         val toUpdate =
             current.copy(
                 firstName = requireNotNull(dto.firstName),
                 lastName = requireNotNull(dto.lastName),
                 emailAddress = requireNotNull(dto.emailAddress),
+                summaryPanel = requireNotNull(dto.summaryPanel),
                 password = null
             )
         return ResponseEntity.ok(withCapabilityUrl(userService.update(toUpdate, current)))

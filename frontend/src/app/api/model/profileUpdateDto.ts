@@ -16,5 +16,14 @@ export interface ProfileUpdateDto {
     firstName: string;
     lastName: string;
     emailAddress: string;
+    summaryPanel: ProfileUpdateDto.SummaryPanelEnum;
 }
+export namespace ProfileUpdateDto {
+    export const SummaryPanelEnum = {
+        Balance: 'BALANCE',
+        Cups: 'CUPS'
+    } as const;
+    export type SummaryPanelEnum = typeof SummaryPanelEnum[keyof typeof SummaryPanelEnum];
+}
+
 

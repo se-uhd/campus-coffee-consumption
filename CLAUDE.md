@@ -287,16 +287,19 @@ docker run -d --name campus-coffee-db -e POSTGRES_USER=postgres -e POSTGRES_PASS
 gradle :application:bootRun --args='--spring.profiles.active=dev'
 ```
 
-`bootRun` serves the **full app on `http://localhost:8080`**, the SPA included: the `stageFrontendForBootRun`
+`bootRun` serves the **full app on `http://localhost:8081`**, the SPA included: the `stageFrontendForBootRun`
 task (in `application/build.gradle.kts`) builds the Angular SPA and stages it under `static/` on bootRun's
 classpath, so the root URL serves `index.html` and not the API's 404, exactly like the packaged jar. The
 first run after a frontend change pays the Angular production build (cached afterward, so a backend-only
 restart is fast and a bare `gradle test` never triggers the npm build). For **live frontend reload**, prefer
 the Angular dev server (`cd frontend && npm start`), which serves on its own port and proxies `/api` to the
-backend on `:8080`.
+backend on `:8081`.
 
 The `dev` profile:
-- Enables Swagger UI at `http://localhost:8080/api/swagger-ui.html` and API docs at `http://localhost:8080/api/api-docs`.
+- Serves on **`:8081`** (not the conventional `:8080`) so a local run does not collide with another app on
+  `:8080`; set via `server.port: ${SERVER_PORT:8081}` in the dev block of `application.yaml` (override with
+  `SERVER_PORT`). The Docker Compose container pins `SERVER_PORT=8080`, and prod listens on `:8080`.
+- Enables Swagger UI at `http://localhost:8081/api/swagger-ui.html` and API docs at `http://localhost:8081/api/api-docs`.
 - Loads the fixture dataset on startup (`campus-coffee.fixtures.load-on-startup: true`, when the database
   has no users yet): one admin and four users with deterministic capability tokens, each with a coffee
   consumption at zero, so the app comes up with the seeded ids and demo-able coffee links ready.
@@ -318,15 +321,15 @@ The `dev` profile:
 
 ### Run frontend and backend separately (live frontend reload)
 
-`bootRun` above serves one self-contained app on `:8080` (API + the bundled SPA), which is the simplest way
+`bootRun` above serves one self-contained app on `:8081` (API + the bundled SPA), which is the simplest way
 to run the whole thing, but it rebuilds the SPA whenever the frontend sources change and has no hot reload.
-For **active frontend development**, run the two halves separately: the Spring Boot backend on `:8080` and
+For **active frontend development**, run the two halves separately: the Spring Boot backend on `:8081` and
 the **Angular dev server** (`ng serve`) on `:4200` with hot module reload. The dev server proxies every
-`/api` request to the backend (`frontend/src/proxy.conf.json` → `target: http://localhost:8080`), so the SPA
+`/api` request to the backend (`frontend/src/proxy.conf.json` → `target: http://localhost:8081`), so the SPA
 and the API still look same-origin to the browser and no Cross-Origin Resource Sharing (CORS) config is needed.
 
 1. Start PostgreSQL (see above) if it is not already running.
-2. Start the **backend** on `:8080`. You do not need the bundled SPA in this mode, so skip the (now
+2. Start the **backend** on `:8081`. You do not need the bundled SPA in this mode, so skip the (now
    redundant) frontend build for a faster, lighter start:
 
    ```shell
@@ -335,14 +338,14 @@ and the API still look same-origin to the browser and no Cross-Origin Resource S
 
    (`-PskipFrontendBuild` makes `stageFrontendForBootRun` stage only whatever is already in
    `frontend/dist`, so the backend comes up serving the API; the SPA you actually use is the dev server's.
-   Drop the flag if you also want the bundled SPA on `:8080` as a fallback.)
-3. In a second terminal, start the **Angular dev server** (proxying `/api` to `:8080`):
+   Drop the flag if you also want the bundled SPA on `:8081` as a fallback.)
+3. In a second terminal, start the **Angular dev server** (proxying `/api` to `:8081`):
 
    ```shell
    cd frontend && mise exec -- npm start
    ```
 
-4. Open the SPA at **`http://localhost:4200`** (not `:8080`). Edits to `frontend/src/**` hot-reload in the
+4. Open the SPA at **`http://localhost:4200`** (not `:8081`). Edits to `frontend/src/**` hot-reload in the
    browser; the backend keeps running untouched. This is the loop to use for any UI work.
 
 This is the same two-process split used in production-style deployments where the static SPA is served by a
@@ -444,7 +447,7 @@ gradle :domain:test --tests "CoffeeConsumptionServiceTest.decrementing a count a
     does not pay the source-mapped build and the V8/monocart teardown. Both jobs cache Playwright's browser
     binaries; the core `build` job is unchanged. (`playwright.config.ts` has a `webServer` block with
     `reuseExistingServer: true`, so it reuses the script-launched app in CI and an already-running app
-    locally, starting one only when `:8080` is free.)
+    locally, starting one only when `:8081` is free.)
 
 ### Frontend
 
@@ -452,10 +455,10 @@ The Angular 22 SPA (TypeScript 6, Angular Material 22, on Node 24 via mise) live
 built by Gradle (a Node-Gradle task runs `npm ci` + `npm run build`; `frontend/dist/frontend/browser/` is
 then bundled into the jar's `static/` resources by `bootJar` and staged onto the classpath by
 `stageFrontendForBootRun` for `bootRun`), so both `gradle build` (one self-contained jar) and
-`gradle :application:bootRun` serve the full app, SPA included, on `:8080`. The frontend build is wired into
-`bootJar`/`bootRun` only, never into `processResources`/`classes`, so a bare `gradle test` does not trigger
-the npm build. For **live frontend reload** run the Angular dev server instead, which proxies `/api` to the
-backend on `:8080`:
+`gradle :application:bootRun` serve the full app, SPA included, on `:8081` (the dev profile's port). The
+frontend build is wired into `bootJar`/`bootRun` only, never into `processResources`/`classes`, so a bare
+`gradle test` does not trigger the npm build. For **live frontend reload** run the Angular dev server
+instead, which proxies `/api` to the backend on `:8081`:
 
 ```shell
 cd frontend && npm start
@@ -483,7 +486,7 @@ refresh; the committed spec no longer carries a release-coupled version).
 
 **Frontend tests and coverage** (run via mise's Node): `npm test` (Vitest unit tests), `npm run
 test:coverage` (the same with a coverage report under `frontend/coverage/`), `npm run e2e` (Playwright
-against an already-running app on `:8080`, the suite in `frontend/e2e/`), and `PW_COVERAGE=1 npm run e2e`
+against an already-running app on `:8081`, the suite in `frontend/e2e/`), and `PW_COVERAGE=1 npm run e2e`
 (the e2e with browser V8 coverage written to `frontend/coverage-e2e/`). See **Code Coverage and Mutation
 Testing** for how the e2e also feeds the backend JaCoCo gate.
 
@@ -742,7 +745,7 @@ follows the W3C "Good Practices for Capability URLs" finding (see
 
 ## REST API Endpoints
 
-Base URL: `http://localhost:8080/api`. JSON only. The `/api` base is applied centrally by `ApiWebConfig`;
+Base URL: `http://localhost:8081/api` (the dev profile's port). JSON only. The `/api` base is applied centrally by `ApiWebConfig`;
 controllers map paths relative to the resource.
 
 ### User self-service (auth: `X-Capability-Token` header; principal = the token's user)

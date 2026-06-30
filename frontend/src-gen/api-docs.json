@@ -1441,6 +1441,85 @@
         }
       }
     },
+    "/api/users/{userId}/consumption/cancel" : {
+      "post" : {
+        "tags" : [ "User consumption (admin)" ],
+        "summary" : "Undo a user's most recent coffee within the grace period (admin).",
+        "operationId" : "cancel",
+        "parameters" : [ {
+          "name" : "userId",
+          "in" : "path",
+          "description" : "Unique identifier of the user.",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConsumptionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/users/{id}/link/rotate" : {
       "post" : {
         "tags" : [ "Users" ],
@@ -1830,7 +1909,7 @@
       "post" : {
         "tags" : [ "Consumption" ],
         "summary" : "Undo the authenticated user's most recent coffee (within the grace period).",
-        "operationId" : "cancel",
+        "operationId" : "cancel_1",
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -1982,6 +2061,104 @@
         "responses" : {
           "200" : {
             "description" : "OK"
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{userId}/summary" : {
+      "get" : {
+        "tags" : [ "Admin accounting" ],
+        "summary" : "Get a user's landing summary (admin).",
+        "operationId" : "userSummary",
+        "parameters" : [ {
+          "name" : "userId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "exclusiveMinimum" : 0,
+            "maximum" : 100
+          }
+        }, {
+          "name" : "offset",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 1000000,
+            "minimum" : 0
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserSummaryDto"
+                }
+              }
+            }
           },
           "400" : {
             "description" : "The request is malformed or violates a validation rule.",
@@ -3479,6 +3656,10 @@
           "active" : {
             "type" : [ "boolean", "null" ]
           },
+          "summaryPanel" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "BALANCE", "CUPS" ]
+          },
           "capabilityUrl" : {
             "type" : [ "string", "null" ]
           }
@@ -3504,9 +3685,13 @@
             "format" : "email",
             "maxLength" : 254,
             "minLength" : 0
+          },
+          "summaryPanel" : {
+            "type" : "string",
+            "enum" : [ "BALANCE", "CUPS" ]
           }
         },
-        "required" : [ "emailAddress", "firstName", "lastName" ]
+        "required" : [ "emailAddress", "firstName", "lastName", "summaryPanel" ]
       },
       "PriceUpdateDto" : {
         "type" : "object",
@@ -3720,6 +3905,22 @@
           "cancellable" : {
             "type" : "boolean"
           },
+          "summaryPanel" : {
+            "type" : "string",
+            "enum" : [ "BALANCE", "CUPS" ]
+          },
+          "firstCupAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time"
+          },
+          "cupsThisWeek" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "cupsToday" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "activity" : {
             "type" : "array",
             "items" : {
@@ -3727,7 +3928,7 @@
             }
           }
         },
-        "required" : [ "activity", "balanceCents", "cancellable", "count", "kittyBalanceCents", "priceCents" ]
+        "required" : [ "activity", "balanceCents", "cancellable", "count", "cupsThisWeek", "cupsToday", "kittyBalanceCents", "priceCents", "summaryPanel" ]
       },
       "TokenRequestDto" : {
         "type" : "object",

@@ -18,6 +18,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { ProfileService } from '../../services/profile.service';
 import { UserService } from '../../services/user.service';
 import { CapabilityTokenService } from '../../services/capability-token.service';
@@ -31,8 +32,9 @@ import { UserDto } from '../../models';
  * The authenticated user's own profile, shared by a user (reached via `/login/:token/profile`, served
  * through `/api/profile`) and an admin (reached via `/admin/profile`, served through `/api/users/me`). Edits the
  * name and email, shows the capability link ("your coffee link") with the sharing-risk note, and offers the
- * QR download. The QR is fetched as a blob so the auth header is attached, then shown via an object URL,
- * which is revoked on destroy to avoid a leak.
+ * QR download. It also edits the landing-panel preference (Balance / Cups) for the subject user, on both the
+ * user's own profile and an admin viewing any user. The QR is fetched as a blob so the auth header is
+ * attached, then shown via an object URL, which is revoked on destroy to avoid a leak.
  */
 @Component({
   selector: 'cc-profile',
@@ -46,6 +48,7 @@ import { UserDto } from '../../models';
     MatTooltipModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
+    MatButtonToggleModule,
     AppHeaderComponent,
     UserSelectComponent
   ],
@@ -102,6 +105,20 @@ import { UserDto } from '../../models';
               <dd>{{ profile.lastName }}</dd>
               <dt class="muted">Email</dt>
               <dd class="break-word">{{ profile.emailAddress }}</dd>
+              <!-- Read-only mirror of the edit-mode control: a disabled (grayed-out) copy of the Balance / Cups
+                   toggle, sitting in the value column so the row aligns with the fields above. Edit via the pencil. -->
+              <dt class="muted">Landing panel</dt>
+              <dd>
+                <mat-button-toggle-group
+                  class="cc-panel-toggle"
+                  [value]="profile.summaryPanel ?? 'BALANCE'"
+                  disabled
+                  aria-label="Landing panel"
+                >
+                  <mat-button-toggle value="BALANCE">Balance</mat-button-toggle>
+                  <mat-button-toggle value="CUPS">Cups</mat-button-toggle>
+                </mat-button-toggle-group>
+              </dd>
             </dl>
           } @else {
             <form #form="ngForm">
@@ -146,6 +163,18 @@ import { UserDto } from '../../models';
                   <mat-error>Enter a valid email address.</mat-error>
                 }
               </mat-form-field>
+              <div class="cc-panel-pref">
+                <span class="muted cc-panel-label">Landing panel</span>
+                <mat-button-toggle-group
+                  class="cc-panel-toggle"
+                  name="summaryPanel"
+                  [(ngModel)]="profile.summaryPanel"
+                  aria-label="Landing panel"
+                >
+                  <mat-button-toggle value="BALANCE">Balance</mat-button-toggle>
+                  <mat-button-toggle value="CUPS">Cups</mat-button-toggle>
+                </mat-button-toggle-group>
+              </div>
               <div class="row">
                 <button mat-flat-button color="primary" (click)="save()" [disabled]="form.invalid || busy()">
                   @if (busy()) {
@@ -223,8 +252,9 @@ import { UserDto } from '../../models';
       .cc-details {
         display: grid;
         grid-template-columns: auto 1fr;
-        gap: 4px 16px;
+        gap: 12px 16px;
         margin: 0;
+        align-items: center;
       }
 
       .cc-details dt {
@@ -233,6 +263,51 @@ import { UserDto } from '../../models';
 
       .cc-details dd {
         margin: 0;
+        /* let the value cell shrink below its content's intrinsic width so the wide toggle does not steal the
+           label column on a narrow phone (which made "First name" wrap to two lines). */
+        min-width: 0;
+      }
+
+      /* The landing-panel preference: its label sits above the Balance/Cups toggle, with the same vertical
+         rhythm the mat-form-fields above it use, so the edit form reads as one stack. align-items keeps the
+         toggle at its own width instead of stretching it across the card (which made "Cups" lopsidedly wide). */
+      .cc-panel-pref {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .cc-panel-label {
+        font-size: 0.75rem;
+      }
+
+      /* A compact, balanced pair: a fixed group width split into two equal halves, so Balance and Cups are the
+         same size (the selected toggle's check indicator no longer makes one side wider). It shrinks to fit on
+         a narrow phone. The read-only copy carries the same class and renders grayed out via the disabled
+         attribute. */
+      .cc-panel-toggle {
+        width: 18rem;
+        max-width: 100%;
+      }
+
+      .cc-panel-toggle mat-button-toggle {
+        flex: 1 1 0;
+        /* allow each half to shrink past its label's intrinsic width so the group can narrow on small screens */
+        min-width: 0;
+      }
+
+      /* The read-only copy (inside the details grid, always disabled) gets two token overrides the editable copy
+         must not: a shorter height so its row keeps the same vertical rhythm as the text rows above it (the full
+         48px control inflated the Email -> Landing panel gap), and disabled label colors lifted back to legible
+         ink (this grayed toggle is the only on-screen representation of the saved choice, so the default ~38%
+         disabled text fails WCAG contrast). The grayed fill is kept, so it still reads as read-only. The editable
+         copy in the edit form is untouched, keeping its 48px tap target and normal colors. */
+      .cc-details .cc-panel-toggle {
+        --mat-button-toggle-height: 34px;
+        --mat-button-toggle-disabled-selected-state-text-color: var(--cc-ink);
+        --mat-button-toggle-disabled-state-text-color: var(--cc-ink-muted);
       }
     `
   ]
@@ -416,17 +491,21 @@ export class ProfileComponent implements OnInit {
           // values: echoing the loaded snapshot would silently revert a role or active-state change a
           // concurrent admin committed between this page load and this save (last-write-wins on stale data)
           await this.userService.update(this.profile.id!, {
+            id: this.profile.id,
             loginName: this.profile.loginName!,
             firstName: this.profile.firstName!,
             lastName: this.profile.lastName!,
             emailAddress: this.profile.emailAddress!,
             role: null,
-            active: null
+            active: null,
+            summaryPanel: this.profile.summaryPanel ?? 'BALANCE'
           })
         : await this.profileService.update({
             firstName: this.profile.firstName!,
             lastName: this.profile.lastName!,
-            emailAddress: this.profile.emailAddress!
+            emailAddress: this.profile.emailAddress!,
+            // the user's chosen landing panel (the toggle); default to BALANCE if the loaded profile lacks it
+            summaryPanel: this.profile.summaryPanel ?? 'BALANCE'
           });
       // the admin PUT response may omit `capabilityUrl` (it is assembled, not a stored field), which would
       // blank the "Coffee link"; keep the one already loaded when the response does not carry it

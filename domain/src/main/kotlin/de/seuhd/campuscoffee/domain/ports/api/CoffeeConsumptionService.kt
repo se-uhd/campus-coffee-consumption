@@ -104,14 +104,17 @@ interface CoffeeConsumptionService : CrudService<CoffeeConsumption, UUID> {
     ): List<ConsumptionChange>
 
     /**
-     * Undoes the calling user's most recent coffee within the grace period (only the owner may do this;
-     * an admin uses [setTotal] instead). It reverts the most recent un-canceled own increment, crediting
-     * exactly the price it was charged at, so undoing nets to zero.
+     * Undoes the user's most recent coffee within the grace period (the owner, or an admin on their behalf).
+     * It reverts the most recent un-canceled own increment of [userId] (the candidate is resolved by the
+     * owner's login, so an admin undo reverts the user's own cup, not the admin's). An owner undo is recorded
+     * as the user and credited at exactly the price the cup was charged at, so it nets to zero; an admin undo
+     * is recorded as the admin and valued like the admin `-1` step (the as-of price, which equals the
+     * increment price within the short grace window).
      *
-     * @param userId     the id of the user undoing a coffee (must be [actingUser])
-     * @param actingUser the authenticated user
+     * @param userId     the id of the user whose most recent coffee is undone
+     * @param actingUser the authenticated user (that user, or an admin)
      * @return the updated consumption
-     * @throws ForbiddenException if [actingUser] is not the owner, or is deactivated
+     * @throws ForbiddenException if [actingUser] is neither that user nor an admin, or is a deactivated non-admin
      * @throws ConflictException if there is no recent coffee to undo or the grace period has passed
      * @throws ConcurrentUpdateException if a concurrent change won the optimistic-locking race
      */

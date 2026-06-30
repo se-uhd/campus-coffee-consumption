@@ -10,9 +10,11 @@ import de.seuhd.campuscoffee.api.dtos.PaymentDto
 import de.seuhd.campuscoffee.api.dtos.PriceChangeDto
 import de.seuhd.campuscoffee.api.dtos.PriceDto
 import de.seuhd.campuscoffee.api.dtos.PriceUpdateDto
+import de.seuhd.campuscoffee.api.dtos.ProfileUpdateDto
 import de.seuhd.campuscoffee.api.dtos.UserBalanceDto
 import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.domain.model.ActivityEntryType
+import de.seuhd.campuscoffee.domain.model.SummaryPanel
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
@@ -81,6 +83,39 @@ class AccountingSystemTests : AbstractSystemTest() {
             .body(AdjustmentRequestDto(amountCents = amountCents, note = "float"))
             .withAdmin()
             .exchange()
+
+    @Test
+    fun `choosing the cups panel persists and the summary reports it with the cup stats`() {
+        // the user switches their landing panel to the cup-stats view via their profile
+        val status =
+            client()
+                .put()
+                .uri("/api/profile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(
+                    ProfileUpdateDto(
+                        firstName = "Max",
+                        lastName = "Mustermann",
+                        emailAddress = "max-cups@example.com",
+                        summaryPanel = SummaryPanel.CUPS
+                    )
+                ).withUser(user)
+                .exchange()
+                .statusCode()
+        assertThat(status).isEqualTo(200)
+
+        // two coffees, recorded now, so they fall in today's (and this week's) window
+        setPrice(50)
+        addCoffee()
+        addCoffee()
+
+        val summary = userSummary()
+
+        assertThat(summary.summaryPanel).isEqualTo(SummaryPanel.CUPS)
+        assertThat(summary.cupsToday).isEqualTo(2)
+        assertThat(summary.cupsThisWeek).isEqualTo(2)
+        assertThat(summary.firstCupAt).isNotNull()
+    }
 
     @Test
     fun `each coffee is valued at the price in effect when it was consumed`() {

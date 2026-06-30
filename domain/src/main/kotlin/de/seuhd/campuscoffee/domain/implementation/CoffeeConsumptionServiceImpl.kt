@@ -111,20 +111,20 @@ class CoffeeConsumptionServiceImpl(
         userId: UUID,
         actingUser: User
     ): CoffeeConsumption {
-        // a cancel must be recorded by the owner, so its event is attributed to the user and the activity
-        // credits it at the original increment's price; an admin corrects a count with setTotal instead
-        if (actingUser.persistedId != userId) {
-            throw ForbiddenException("Only the owner may undo their own coffee; an admin adjusts the count instead.")
-        }
-        if (actingUser.active != true) {
-            throw ForbiddenException("A deactivated user is read-only and cannot undo a coffee.")
-        }
+        // Self-or-admin: the owner undoes their own recent coffee, and an admin may undo on a user's behalf
+        // (a deactivated non-admin stays read-only). The candidate is always the OWNER's most recent own
+        // increment (resolved by the owner's login, as in cancellableIncrement), so an admin undo reverts the
+        // user's own cup. Attribution follows the actor: an owner undo is recorded as the user and credited at
+        // the original increment's price (a CONSUMPTION_CANCEL); an admin undo is recorded as the admin and the
+        // reducer values it like the admin -1 step (see doc/2026-06-30_unified-landing-and-admin-parity.md).
+        requireMaySelfMutate(userId, actingUser)
         // invariant: the grace/candidate gate here and the activity credit (which re-walks the user's
         // increments LIFO) derive the same chosen increment from the same stack rules, so they must stay
         // rule-identical. The count <= 0 recheck below plus the @Version-guarded write prevent a double-undo
         // even though this candidate read is not serialized with the write.
+        val ownerLogin = userDataService.getById(userId).loginName
         val candidate =
-            activityDataService.lastCancellableIncrement(userId, actingUser.loginName)
+            activityDataService.lastCancellableIncrement(userId, ownerLogin)
                 ?: throw ConflictException("There is no recent coffee to undo.")
         if (candidate.createdAt.isBefore(graceCutoff())) {
             throw ConflictException(

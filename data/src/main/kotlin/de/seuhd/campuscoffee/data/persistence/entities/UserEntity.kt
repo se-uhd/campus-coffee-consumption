@@ -1,6 +1,7 @@
 package de.seuhd.campuscoffee.data.persistence.entities
 
 import de.seuhd.campuscoffee.domain.model.Role
+import de.seuhd.campuscoffee.domain.model.SummaryPanel
 import jakarta.persistence.Column
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
@@ -35,6 +36,10 @@ class UserEntity : Entity() {
 
     @field:Column(name = "active")
     var active: Boolean? = null
+
+    @field:Enumerated(EnumType.STRING)
+    @field:Column(name = "summary_panel")
+    var summaryPanel: SummaryPanel? = null
 
     @field:Column(name = CAPABILITY_TOKEN_COLUMN)
     var capabilityToken: String? = null

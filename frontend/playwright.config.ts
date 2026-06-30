@@ -3,10 +3,10 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Playwright end-to-end configuration for the CampusCoffeeConsumption SPA.
  *
- * The tests run against the app at http://localhost:8080 (the Spring Boot jar serving the bundled Angular
- * SPA plus the /api backend, dev profile). The `webServer` block below reuses an already-running app (the
- * CI-launched one or a local instance) and starts `bootRun` only when nothing is serving :8080. Run with
- * `npx playwright test`.
+ * The tests run against the app at http://localhost:8081 (the Spring Boot jar serving the bundled Angular
+ * SPA plus the /api backend, dev profile, which serves on :8081). The `webServer` block below reuses an
+ * already-running app (the CI-launched one or a local instance) and starts `bootRun` only when nothing is
+ * serving :8081. Run with `npx playwright test`.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -18,13 +18,13 @@ export default defineConfig({
   // Finalizes the browser (V8) coverage the per-test fixture in e2e/fixtures.ts stages; a no-op unless
   // PW_COVERAGE=1 (the e2e:coverage script / CI e2e job). See e2e/coverage.global-teardown.ts.
   globalTeardown: './e2e/coverage.global-teardown.ts',
-  // Local convenience: if nothing is already serving :8080, start the app; otherwise reuse the running
+  // Local convenience: if nothing is already serving :8081, start the app; otherwise reuse the running
   // instance. reuseExistingServer is true in CI too, because the run-e2e scripts pre-launch the app there
   // (the coverage run under the JaCoCo agent, which a Playwright-managed server cannot express), so letting
-  // Playwright start its own server would double-bind :8080.
+  // Playwright start its own server would double-bind :8081.
   webServer: {
     command: 'cd .. && mise exec -- gradle :application:bootRun --args="--spring.profiles.active=dev"',
-    url: 'http://localhost:8080/actuator/health',
+    url: 'http://localhost:8081/actuator/health',
     reuseExistingServer: true,
     timeout: 180_000
   },
@@ -38,7 +38,7 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 10_000 },
   use: {
-    baseURL: 'http://localhost:8080',
+    baseURL: 'http://localhost:8081',
     trace: 'on-first-retry',
     actionTimeout: 10_000,
     navigationTimeout: 15_000

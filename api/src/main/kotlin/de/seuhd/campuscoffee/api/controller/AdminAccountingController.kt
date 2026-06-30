@@ -2,6 +2,7 @@ package de.seuhd.campuscoffee.api.controller
 
 import de.seuhd.campuscoffee.api.dtos.ActivityEntryDto
 import de.seuhd.campuscoffee.api.dtos.UserBalanceDto
+import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.api.mapper.AccountingDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
 import de.seuhd.campuscoffee.domain.ports.api.AccountingService
@@ -46,6 +47,35 @@ class AdminAccountingController(
     }
 
     /**
+     * Returns a given user's landing summary (count, price, balance, kitty balance, whether the latest
+     * coffee is cancellable, and the first page of their activity), the admin-by-id analogue of the
+     * self-service `GET /summary`. It drives the admin landing for the selected user. The activity keeps the
+     * kitty-funded portion of a split purchase (the admin per-user view), matching `GET /{userId}/activity`.
+     *
+     * @param userId the user whose summary to read
+     * @param page   the validated paging window for the embedded first page of activity
+     */
+    @Operation(summary = "Get a user's landing summary (admin).")
+    @GetMapping("/{userId}/summary")
+    fun userSummary(
+        @PathVariable userId: UUID,
+        @Valid @ParameterObject page: PageQuery
+    ): ResponseEntity<UserSummaryDto> {
+        val admin = currentUserProvider.currentUser()
+        return ResponseEntity.ok(
+            accountingDtoMapper.toSummaryDto(
+                accountingService.userSummary(
+                    userId,
+                    page.limitOr(SUMMARY_LIMIT),
+                    page.offset,
+                    admin,
+                    includeKittyPortion = true
+                )
+            )
+        )
+    }
+
+    /**
      * Returns a page of the given user's activity feed (coffees, purchases, and deposits, newest first).
      *
      * @param userId the user whose activity to read
@@ -76,5 +106,8 @@ class AdminAccountingController(
     private companion object {
         /** The default page size for the admin user-activity read when the caller supplies no limit. */
         private const val DEFAULT_LIMIT = 20
+
+        /** The default first-page size for the admin landing summary's embedded activity (matches self-service). */
+        private const val SUMMARY_LIMIT = 10
     }
 }

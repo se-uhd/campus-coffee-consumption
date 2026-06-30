@@ -72,6 +72,24 @@ class AdminConsumptionController(
     }
 
     /**
+     * Undoes the most recent coffee of the user with [userId] if it is still within the grace period (an
+     * admin acting on the user's behalf), and returns the refreshed total and recent changes. Nothing to
+     * undo or the grace period passed yields 409.
+     *
+     * @param userId the id of the user whose most recent coffee to undo
+     */
+    @Operation(summary = "Undo a user's most recent coffee within the grace period (admin).")
+    @PostMapping("/cancel")
+    fun cancel(
+        @Parameter(description = "Unique identifier of the user.", required = true)
+        @PathVariable userId: UUID
+    ): ResponseEntity<ConsumptionDto> {
+        val actingUser = currentUserProvider.currentUser()
+        val updated = coffeeConsumptionService.cancel(userId, actingUser)
+        return ResponseEntity.ok(consumptionDtoMapper.toDto(updated.count, recentChanges(userId, actingUser)))
+    }
+
+    /**
      * Overrides the count of the user with [userId] to an explicit value (an admin correction; any
      * non-negative total). An optional note documents the reason.
      *

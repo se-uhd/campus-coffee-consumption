@@ -10,14 +10,14 @@
 #   - Node on PATH (run via `mise exec --`), Playwright's chromium installed (`npx playwright install`).
 #
 # Env knobs:
-#   APP_PORT     the port the jar listens on (default 8080; the Playwright baseURL is :8080).
+#   APP_PORT     the port the jar listens on (default 8081, the dev profile's port; the Playwright baseURL is :8081).
 #   SKIP_BUILD   if "1", skip the SPA+jar build and reuse the existing application/build/libs jar.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
-APP_PORT="${APP_PORT:-8080}"
+APP_PORT="${APP_PORT:-8081}"
 JAR="${ROOT}/application/build/libs/application.jar"
 HEALTH_URL="http://localhost:${APP_PORT}/actuator/health"
 LOG="${ROOT}/application/build/e2e-app.log"

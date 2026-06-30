@@ -20,6 +20,10 @@ import java.util.UUID
  *   way *in* with the same "not given" meaning the password fields use: a partial update DTO omits them,
  *   and the service then keeps the stored value (or defaults `role` to [Role.USER] / `active` to `true` on
  *   create). A user read back from the store always carries both.
+ * - [summaryPanel] is the user's own display preference for the second card on their landing: [SummaryPanel.BALANCE]
+ *   (the money) or [SummaryPanel.CUPS] (coffee stats). It follows the same nullable accept-or-keep pattern
+ *   (omitted keeps the stored value, defaults to [SummaryPanel.BALANCE] on create); a user read back from the
+ *   store always carries it.
  */
 data class User(
     override val id: UUID? = null,
@@ -31,6 +35,7 @@ data class User(
     val lastName: String,
     val role: Role? = null,
     val active: Boolean? = null,
+    val summaryPanel: SummaryPanel? = null,
     val capabilityToken: String? = null,
     val passwordHash: String? = null,
     val password: String? = null

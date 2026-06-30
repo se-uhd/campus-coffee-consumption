@@ -8,6 +8,7 @@ import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.Expense
 import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.Role
+import de.seuhd.campuscoffee.domain.model.SummaryPanel
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
@@ -184,6 +185,48 @@ class UserServiceTest {
         assertThat(created.role).isEqualTo(Role.USER)
         assertThat(created.active).isTrue()
         assertThat(created.passwordHash).isNull()
+    }
+
+    @Test
+    fun `create defaults the summary panel to the balance panel`() {
+        whenever(capabilityTokenGenerator.newToken()).thenReturn("NEW-TOKEN")
+        whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+        whenever(coffeeConsumptionService.createForUser(any())).thenReturn(mock<CoffeeConsumption>())
+
+        val toCreate =
+            User(
+                loginName = "nopanel",
+                emailAddress = "nopanel@se.de",
+                firstName = "No",
+                lastName = "Panel",
+                summaryPanel = null
+            )
+        val created = service.create(toCreate, admin)
+
+        assertThat(created.summaryPanel).isEqualTo(SummaryPanel.BALANCE)
+    }
+
+    @Test
+    fun `update by a user sets their own summary panel`() {
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
+        whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+
+        val attempted = storedUser.copy(summaryPanel = SummaryPanel.CUPS)
+        val updated = service.update(attempted, storedUser)
+
+        assertThat(updated.summaryPanel).isEqualTo(SummaryPanel.CUPS)
+    }
+
+    @Test
+    fun `update omitting the summary panel keeps the stored value`() {
+        whenever(userDataService.getById(userId)).thenReturn(storedUser.copy(summaryPanel = SummaryPanel.CUPS))
+        whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+
+        val attempted = storedUser.copy(summaryPanel = null, firstName = "Maximilian")
+        val updated = service.update(attempted, storedUser)
+
+        assertThat(updated.summaryPanel).isEqualTo(SummaryPanel.CUPS)
+        assertThat(updated.firstName).isEqualTo("Maximilian")
     }
 
     @Test

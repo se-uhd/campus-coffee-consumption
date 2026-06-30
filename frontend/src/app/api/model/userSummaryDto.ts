@@ -16,6 +16,18 @@ export interface UserSummaryDto {
     balanceCents: number;
     kittyBalanceCents: number;
     cancellable: boolean;
+    summaryPanel: UserSummaryDto.SummaryPanelEnum;
+    firstCupAt?: string | null;
+    cupsThisWeek: number;
+    cupsToday: number;
     activity: Array<ActivityEntryDto>;
 }
+export namespace UserSummaryDto {
+    export const SummaryPanelEnum = {
+        Balance: 'BALANCE',
+        Cups: 'CUPS'
+    } as const;
+    export type SummaryPanelEnum = typeof SummaryPanelEnum[keyof typeof SummaryPanelEnum];
+}
+
 

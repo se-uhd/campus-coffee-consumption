@@ -9,14 +9,15 @@
 #   - Node on PATH (run via `mise exec --`), Playwright's chromium installed (`npx playwright install`).
 #
 # Env knobs:
-#   APP_PORT    the port the jar listens on (default 8080; the Playwright baseURL is :8080).
+#   APP_PORT    the port the jar listens on (default 8081, matching the Playwright baseURL; passed to the prod
+#               jar via --server.port since the prod profile itself does not default to :8081).
 #   SKIP_BUILD  if "1", reuse the existing application/build/libs jar instead of rebuilding it.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
-APP_PORT="${APP_PORT:-8080}"
+APP_PORT="${APP_PORT:-8081}"
 JAR="${ROOT}/application/build/libs/application.jar"
 HEALTH_URL="http://localhost:${APP_PORT}/actuator/health"
 LOG="${ROOT}/application/build/prod-csp-app.log"

@@ -52,6 +52,9 @@ campus-coffee:
     initial-cents: ${CAMPUS_COFFEE_PRICE_INITIAL_CENTS:50}
   consumption:
     cancel-grace-period: ${CAMPUS_COFFEE_CANCEL_GRACE_PERIOD:5m}
+  summary:
+    # the time zone whose calendar defines the landing "cups today" / "this week" windows (SummaryProperties)
+    time-zone: ${CAMPUS_COFFEE_SUMMARY_TIME_ZONE:Europe/Berlin}
 
 ---
 spring:
@@ -66,6 +69,12 @@ spring:
     error:
       include-message: always
       include-binding-errors: always
+server:
+  # Local dev serves on :8081 so it does not collide with another app on the conventional :8080. Overridable
+  # via SERVER_PORT: the Docker Compose container pins SERVER_PORT=8080 to match its port mapping and the image
+  # healthcheck. The system tests use a random port (WebEnvironment.RANDOM_PORT) and ignore this; prod listens
+  # on the platform port (:8080).
+  port: ${SERVER_PORT:8081}
 logging:
   # A rolling file log is a dev convenience; prod logs go to stdout (captured by the platform).
   file:
@@ -87,6 +96,10 @@ springdoc:
     enabled: true
     path: /api/swagger-ui.html
 campus-coffee:
+  app:
+    # Capability URLs and QR codes point at the dev port (tracking SERVER_PORT, default :8081), so a scanned
+    # link resolves to the running dev app. An explicit CAMPUS_COFFEE_APP_BASE_URL still overrides it.
+    base-url: ${CAMPUS_COFFEE_APP_BASE_URL:http://localhost:${SERVER_PORT:8081}}
   jwt:
     # Dev-only insecure fallback so a local run needs no JWT_SECRET; every other profile must supply one.
     secret: ${JWT_SECRET:dev-only-insecure-jwt-secret-change-me-in-production}

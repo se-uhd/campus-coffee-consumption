@@ -30,8 +30,9 @@ export const routes: Routes = [
     path: 'admin',
     title: 'Dashboard (SE@UHD)',
     canActivate: [adminGuard],
+    // the admin landing reuses the user landing component in admin mode (a selected user via the dropdown)
     loadComponent: () =>
-      import('./pages/admin-landing/admin-landing.component').then((m) => m.AdminLandingComponent)
+      import('./pages/coffee-landing/coffee-landing.component').then((m) => m.CoffeeLandingComponent)
   },
   {
     path: 'admin/users',

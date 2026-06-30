@@ -20,6 +20,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
+import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -47,6 +48,11 @@ import { Role, UserDto } from '../../models';
  * populated), and the table tracks rows by user id so paging or reloading reuses the existing row DOM
  * instead of recreating each row's slide-toggle (which is what made the toggles visibly animate on into
  * their state). The component runs OnPush: its mutable view state is held in signals.
+ *
+ * The Name, Role, Cups, and Balance headers are sortable (click to cycle unsorted -> ascending -> descending,
+ * Angular Material's default). Because pagination is client-side, the data source sorts the whole user set
+ * before the paginator slices it, so the order is global across every page, not just the visible one; a sort
+ * change resets to the first page. The unsorted state is the load default (login name ascending).
  */
 @Component({
   selector: 'cc-admin-users',
@@ -61,6 +67,7 @@ import { Role, UserDto } from '../../models';
     MatSlideToggleModule,
     MatTableModule,
     MatPaginatorModule,
+    MatSortModule,
     MatTooltipModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
@@ -220,7 +227,14 @@ import { Role, UserDto } from '../../models';
           </div>
           @if (hasRows()) {
             <div class="table-scroll">
-              <table mat-table [dataSource]="dataSource" [trackBy]="trackById" class="cc-users-table">
+              <table
+                mat-table
+                matSort
+                (matSortChange)="onSortChange()"
+                [dataSource]="dataSource"
+                [trackBy]="trackById"
+                class="cc-users-table"
+              >
                 <caption class="cc-visually-hidden">
                   Users with their role, cup count, balance, and per-user actions.
                 </caption>
@@ -244,7 +258,7 @@ import { Role, UserDto } from '../../models';
                 </ng-container>
 
                 <ng-container matColumnDef="name">
-                  <th mat-header-cell *matHeaderCellDef>Name</th>
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
                   <td mat-cell *matCellDef="let row" [class.cc-inactive]="!row.active">
                     <div>{{ row.loginName }}</div>
                     <div class="muted">{{ row.fullName }}</div>
@@ -252,7 +266,7 @@ import { Role, UserDto } from '../../models';
                 </ng-container>
 
                 <ng-container matColumnDef="role">
-                  <th mat-header-cell *matHeaderCellDef>Role</th>
+                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Role</th>
                   <td mat-cell *matCellDef="let row">
                     @if (row.role === 'ADMIN') {
                       <span class="cc-chip">Admin</span>
@@ -263,12 +277,28 @@ import { Role, UserDto } from '../../models';
                 </ng-container>
 
                 <ng-container matColumnDef="count">
-                  <th mat-header-cell *matHeaderCellDef class="col-numeric">Cups</th>
+                  <th
+                    mat-header-cell
+                    *matHeaderCellDef
+                    mat-sort-header
+                    arrowPosition="before"
+                    class="col-numeric"
+                  >
+                    Cups
+                  </th>
                   <td mat-cell *matCellDef="let row" class="col-numeric">{{ row.count }}</td>
                 </ng-container>
 
                 <ng-container matColumnDef="balance">
-                  <th mat-header-cell *matHeaderCellDef class="col-numeric">Balance</th>
+                  <th
+                    mat-header-cell
+                    *matHeaderCellDef
+                    mat-sort-header
+                    arrowPosition="before"
+                    class="col-numeric"
+                  >
+                    Balance
+                  </th>
                   <td mat-cell *matCellDef="let row" class="col-numeric" [class.warn]="row.balanceCents < 0">
                     {{ row.balanceCents | euros: true }}
                   </td>
@@ -480,6 +510,10 @@ export class AdminUsersComponent {
   // soon as it appears (a static `@ViewChild` read in `ngAfterViewInit` would miss it while still loading).
   private readonly paginator = viewChild(MatPaginator);
 
+  // Queried reactively for the same reason as the paginator (the table is inside the `@if`): the sort
+  // directive appears only once the table renders, and an effect wires it onto the data source then.
+  private readonly sort = viewChild(MatSort);
+
   constructor(
     private readonly userService: UserService,
     private readonly adminUserService: AdminUserService,
@@ -492,6 +526,25 @@ export class AdminUsersComponent {
     // before the constructor's parameter properties are set).
     this.loadError = this.adminUserService.loadError;
     this.hasRows = computed(() => (this.adminUserService.rows()?.length ?? 0) > 0);
+    // Sort each column by the value behind it. Two ids differ from their row property and must be remapped:
+    // 'name' sorts by the login name (the table's primary identifier and its default order), lower-cased so
+    // the sort is case-insensitive, and 'balance' sorts by balanceCents. 'count' and 'role' already match
+    // their row property, but are handled explicitly so the accessor is exhaustive over the sortable columns
+    // (and 'count' returns a number, so it sorts numerically rather than as text).
+    this.dataSource.sortingDataAccessor = (row, id) => {
+      switch (id) {
+        case 'name':
+          return row.loginName.toLowerCase();
+        case 'role':
+          return row.role;
+        case 'count':
+          return row.count;
+        case 'balance':
+          return row.balanceCents;
+        default:
+          return '';
+      }
+    };
     // The resolver guarantees rows are present before the component is created, so seed the table
     // synchronously for a populated first frame; the effect below keeps it in sync with later reloads.
     this.dataSource.data = this.adminUserService.rows() ?? [];
@@ -504,6 +557,21 @@ export class AdminUsersComponent {
         this.dataSource.paginator = paginator;
       }
     });
+    effect(() => {
+      const sort = this.sort();
+      if (sort) {
+        this.dataSource.sort = sort;
+      }
+    });
+  }
+
+  /**
+   * Resets the table to the first page whenever the sort changes, so the new global order is read from its
+   * start rather than leaving the admin stranded on a now-meaningless page index. The data source sorts the
+   * whole row set before the paginator slices it, so the ordering is global across all pages, never per page.
+   */
+  onSortChange(): void {
+    this.paginator()?.firstPage();
   }
 
   /** The mat-table track key: the stable per-user id, so a page change reuses rows instead of recreating them. */
@@ -570,8 +638,10 @@ export class AdminUsersComponent {
   async toggleActive(user: UserDto): Promise<void> {
     try {
       // change only `active`; null out `role` so a concurrent role change is not reverted by the stale
-      // snapshot, and send the required identity fields the backend pins to the stored values anyway
+      // snapshot, and send the required identity fields the backend pins to the stored values anyway. The
+      // body must echo the path id: PUT /api/users/{id} rejects a body whose id does not match the path.
       await this.userService.update(user.id!, {
+        id: user.id,
         loginName: user.loginName,
         firstName: user.firstName,
         lastName: user.lastName,

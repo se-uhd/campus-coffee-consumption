@@ -204,6 +204,7 @@ class CoffeeConsumptionServiceTest {
 
     @Test
     fun `cancel by the owner within the grace period decrements the count by one`() {
+        whenever(userDataService.getById(userId)).thenReturn(user)
         whenever(activityDataService.lastCancellableIncrement(userId, "max"))
             .thenReturn(CancellableIncrement(createdAt = now(), priceCents = 50))
         whenever(dataService.getByUserId(userId)).thenReturn(consumption(3))
@@ -215,8 +216,25 @@ class CoffeeConsumptionServiceTest {
     }
 
     @Test
-    fun `cancel by an admin throws ForbiddenException`() {
-        assertThrows<ForbiddenException> { service.cancel(userId, admin) }
+    fun `cancel by an admin within the grace period decrements the user's count by one`() {
+        // the candidate is resolved by the OWNER's login ("max"), not the acting admin's, so an admin undo
+        // reverts the user's own recent coffee
+        whenever(userDataService.getById(userId)).thenReturn(user)
+        whenever(activityDataService.lastCancellableIncrement(userId, "max"))
+            .thenReturn(CancellableIncrement(createdAt = now(), priceCents = 50))
+        whenever(dataService.getByUserId(userId)).thenReturn(consumption(3))
+        whenever(dataService.upsert(any())).thenAnswer { it.arguments[0] as CoffeeConsumption }
+
+        val result = service.cancel(userId, admin)
+
+        assertThat(result.count).isEqualTo(2)
+    }
+
+    @Test
+    fun `cancel by a non-owner non-admin throws ForbiddenException`() {
+        val other = user.copy(id = UUID(0L, 7L), loginName = "other")
+
+        assertThrows<ForbiddenException> { service.cancel(userId, other) }
         verify(dataService, never()).upsert(any())
     }
 
@@ -230,6 +248,7 @@ class CoffeeConsumptionServiceTest {
 
     @Test
     fun `cancel with no recent coffee to undo throws ConflictException`() {
+        whenever(userDataService.getById(userId)).thenReturn(user)
         whenever(activityDataService.lastCancellableIncrement(userId, "max")).thenReturn(null)
 
         assertThrows<ConflictException> { service.cancel(userId, user) }
@@ -238,6 +257,7 @@ class CoffeeConsumptionServiceTest {
 
     @Test
     fun `cancel of a coffee whose grace period has passed throws ConflictException`() {
+        whenever(userDataService.getById(userId)).thenReturn(user)
         whenever(activityDataService.lastCancellableIncrement(userId, "max"))
             .thenReturn(CancellableIncrement(createdAt = now().minusHours(1), priceCents = 50))
 

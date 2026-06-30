@@ -9,7 +9,7 @@ and counts.
 
 ```shell
 npm ci
-npm start   # dev server on http://localhost:4200, proxying /api to http://localhost:8080
+npm start   # dev server on http://localhost:4200, proxying /api to http://localhost:8081
 ```
 
 The dev server's `src/proxy.conf.json` forwards `/api` to the backend, so the browser sees a single origin
@@ -30,7 +30,7 @@ serves the SPA and the API from one origin.
 
 ```shell
 npm test       # Vitest unit tests (headless), through the Angular unit-test builder
-npm run e2e    # Playwright end-to-end tests against the app on http://localhost:8080
+npm run e2e    # Playwright end-to-end tests against the app on http://localhost:8081
 ```
 
 ## Structure

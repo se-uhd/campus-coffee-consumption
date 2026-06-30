@@ -119,4 +119,36 @@ test.describe('user flow', () => {
     await expect(page.getByText('Could not load your profile. Your link may be invalid.')).toBeHidden();
     await expect(page.locator('img.cc-qr-img')).toBeVisible();
   });
+
+  test('the profile "Cups" panel preference swaps the landing balance card for the cup-stats card', async ({
+    page
+  }) => {
+    // record a coffee so the cup-stats panel has something to show
+    await page.goto(USER_URL);
+    await page.getByRole('button', { name: 'Add a coffee' }).click();
+    await expect(page.locator('.cc-count-card .display')).toHaveText('1');
+
+    // switch the landing panel to Cups on the profile (the preference is a mat-button-toggle group)
+    await page.goto(`${USER_URL}/profile`);
+    await page.getByRole('button', { name: 'Edit your details' }).click();
+    await page.locator('mat-button-toggle').filter({ hasText: 'Cups' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Profile saved.')).toBeVisible();
+
+    // the landing now shows the cup-stats panel (Today / since the first cup) and not the money panel
+    await page.goto(USER_URL);
+    const summary = page.locator('cc-balance-summary');
+    await expect(summary.getByText('Today')).toBeVisible();
+    await expect(summary.getByText(/^Since /)).toBeVisible();
+    await expect(page.getByText('Personal balance')).toBeHidden();
+
+    // switching back to Balance restores the money panel
+    await page.goto(`${USER_URL}/profile`);
+    await page.getByRole('button', { name: 'Edit your details' }).click();
+    await page.locator('mat-button-toggle').filter({ hasText: 'Balance' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Profile saved.')).toBeVisible();
+    await page.goto(USER_URL);
+    await expect(page.getByText('Personal balance')).toBeVisible();
+  });
 });

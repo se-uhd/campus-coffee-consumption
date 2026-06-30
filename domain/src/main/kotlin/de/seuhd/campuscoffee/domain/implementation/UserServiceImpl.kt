@@ -5,6 +5,7 @@ import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.MissingFieldException
 import de.seuhd.campuscoffee.domain.model.Role
+import de.seuhd.campuscoffee.domain.model.SummaryPanel
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
@@ -98,13 +99,30 @@ class UserServiceImpl(
                 // same address: two accounts for one human would split their coffee balance and kitty history
                 emailAddress = domainObject.emailAddress.trim().lowercase(),
                 role = role,
-                active = domainObject.active ?: existing?.active ?: true,
+                // active and the landing-panel preference are accept-or-keep, defaulting to active / the balance panel
+                active = keepOrDefault(domainObject.active, existing?.active, true),
+                summaryPanel = keepOrDefault(domainObject.summaryPanel, existing?.summaryPanel, SummaryPanel.BALANCE),
                 capabilityToken = capabilityToken,
                 passwordHash = passwordHash,
                 password = null
             )
         )
     }
+
+    /**
+     * Resolves an accept-or-keep field: the [incoming] value when the update supplies it, else the [stored]
+     * value, else [default] (used on a create). [default] is evaluated eagerly, so pass only a cheap,
+     * side-effect-free fallback.
+     *
+     * @param incoming the value from the update request, or null when omitted
+     * @param stored   the value already persisted, or null when there is no existing record
+     * @param default  the fallback used on a create with no incoming value
+     */
+    private fun <T> keepOrDefault(
+        incoming: T?,
+        stored: T?,
+        default: T
+    ): T = incoming ?: stored ?: default
 
     override fun getByLoginName(loginName: String): User = userDataService.getByLoginName(loginName)
 

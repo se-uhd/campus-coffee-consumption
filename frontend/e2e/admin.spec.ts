@@ -7,7 +7,9 @@ import {
   ensureAtLeastUsers,
   loginAsAdmin,
   openKittyPageAsAdmin,
-  resetFixtures
+  pinPrice,
+  resetFixtures,
+  USER_TOKENS
 } from './helpers';
 
 /**
@@ -72,6 +74,90 @@ test.describe('admin flow', () => {
       expect(await usersCard.getByRole('row').count()).toBeGreaterThan(1);
     } finally {
       await deleteUsers(api, token, seeded);
+    }
+  });
+
+  // Proves the column-header sort is GLOBAL (across the whole user set), not per visible page, and exercises
+  // both the three-state cycle and the reset-to-first-page: a user seeded onto a later page with the highest
+  // cup count surfaces to the very first row once the table is sorted by Cups descending (from page two, which
+  // the sort resets back to page one), and leaves page one again when a third click clears the sort.
+  test('the users table sorts globally by a column header across pages', async ({ page }) => {
+    const token = await adminToken(api);
+    // a user whose login name ('zzz_*') sorts last, so in the default login-name order it sits on a later
+    // page, given a distinctly high cup count so it is the global maximum the sort must surface
+    const top = await api.post('/api/users', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: {
+        loginName: 'zzz_sort_top',
+        emailAddress: 'zzz_sort_top@example.com',
+        firstName: 'Zelda',
+        lastName: 'Zenith',
+        role: 'USER'
+      }
+    });
+    expect(top.ok(), `seeding the high-count user should succeed, got ${top.status()}`).toBeTruthy();
+    const topId = ((await top.json()) as { id: string }).id;
+    const topCups = 999;
+    // seed enough other users that a second page exists, so the high-count user starts off page one
+    const seeded = await ensureAtLeastUsers(api, token, 13);
+
+    try {
+      // set the high-count user's count to the global maximum via the admin count-correction
+      const correction = await api.put(`/api/users/${topId}/consumption`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { total: topCups }
+      });
+      expect(correction.ok(), `the count correction should succeed, got ${correction.status()}`).toBeTruthy();
+
+      await loginAsAdmin(page);
+      await page.goto('/admin/users');
+
+      const usersCard = page.locator('mat-card', {
+        has: page.getByRole('heading', { name: 'Users' })
+      });
+      const firstRow = usersCard.locator('tr.mat-mdc-row').first();
+      const cupsHeader = usersCard.locator('th.mat-column-count');
+      const rangeLabel = usersCard.locator('.mat-mdc-paginator-range-label');
+      // the paginator's first-page range starts at row 1 ("1 - 10 of ...", the separator a non-digit); a later
+      // page (e.g. "11 - 13 of ...") does not, so this regex distinguishes page one from any other page
+      const firstPageRange = /^\s*1\s+\D/;
+
+      // no column is sorted yet, and the default order is login name ascending, so the high-count user (login
+      // 'zzz_sort_top') sorts last and is not on page one
+      await expect(firstRow).toBeVisible();
+      await expect(cupsHeader).toHaveAttribute('aria-sort', 'none');
+      await expect(firstRow).not.toContainText('zzz_sort_top');
+
+      // move off page one first, so the sort's reset-to-first-page is observable
+      await usersCard.getByRole('button', { name: 'Next page' }).click();
+      await expect(rangeLabel).not.toHaveText(firstPageRange);
+
+      // first click sorts ascending and resets the view back to page one
+      await cupsHeader.click();
+      await expect(cupsHeader).toHaveAttribute('aria-sort', 'ascending');
+      await expect(rangeLabel).toHaveText(firstPageRange);
+
+      // second click sorts descending: the global maximum (seeded onto a later page) is now the first row of
+      // page one, so the sort spans the whole user set, not just the visible page
+      await cupsHeader.click();
+      await expect(cupsHeader).toHaveAttribute('aria-sort', 'descending');
+      await expect(firstRow).toContainText('zzz_sort_top');
+      await expect(firstRow).toContainText(String(topCups));
+
+      // third click clears the sort (the unsorted state): the header reports no sort, the default login-name
+      // order returns, and the high-count user leaves page one again
+      await cupsHeader.click();
+      await expect(cupsHeader).toHaveAttribute('aria-sort', 'none');
+      await expect(firstRow).not.toContainText('zzz_sort_top');
+    } finally {
+      // zero the count so the high-count user has no financial footprint and deletes cleanly, then tear down
+      await api
+        .put(`/api/users/${topId}/consumption`, {
+          headers: { Authorization: `Bearer ${token}` },
+          data: { total: 0 }
+        })
+        .catch(() => undefined);
+      await deleteUsers(api, token, [topId, ...seeded]);
     }
   });
 
@@ -223,6 +309,84 @@ test.describe('admin flow', () => {
 
     const clipboard = await page.evaluate(() => navigator.clipboard.readText());
     expect(clipboard).toBe(expectedUrl);
+  });
+
+  // The admin landing reuses the user landing for the selected user, so the admin sees the same view the user
+  // sees of their own account (here: the user's own recent coffee with its undo affordance) and can record a
+  // simple bean purchase on their behalf, the same expense action the user has on their own landing. The
+  // admin-cancel correctness itself is covered deterministically in CoffeeConsumptionServiceTest.
+  test('the admin landing shows the selected user a parity view and records an expense for them', async ({
+    page
+  }) => {
+    // pin the price so the balance figure is exact
+    await pinPrice(api, await adminToken(api), 50);
+    // the selected user self-scans a coffee, so it is within the grace period and shows as cancellable
+    const scan = await api.post('/api/consumption', {
+      headers: { 'X-Capability-Token': USER_TOKENS.maxmustermann }
+    });
+    expect(scan.ok(), `seeding a self-scanned coffee should succeed, got ${scan.status()}`).toBeTruthy();
+
+    await loginAsAdmin(page);
+    // view the user who has the recent coffee (the parity point: the admin acts on another user's account)
+    await page.getByRole('combobox', { name: 'User' }).click();
+    await page.getByRole('option', { name: /maxmustermann/ }).click();
+    await expect(page).toHaveURL(/\/admin\?user=[0-9a-f-]+$/);
+
+    // the admin sees the user's own recent coffee exactly as the user would: count 1, balance -0.50, and the
+    // same grace-period "Undo last cup" affordance the user has (the new admin-side cancel parity)
+    await expect(page.locator('.cc-count-card .display')).toHaveText('1');
+    const balance = page.locator('.cc-amount').first();
+    await expect(balance).toHaveText(/-0\.50 €/);
+    await expect(page.getByRole('button', { name: 'Undo last cup' })).toBeVisible();
+
+    // the admin records a simple bean purchase for the user; it shows in their activity as a +4.20 € credit
+    await page.getByRole('button', { name: 'Toggle expense form' }).click();
+    await page.getByLabel('Weight (grams)').fill('250');
+    await page.getByLabel('Amount (€)').fill('4.20');
+    await page.getByRole('button', { name: 'Save expense' }).click();
+    await expect(page.getByText('Expense recorded.')).toBeVisible();
+
+    const activity = page.locator('mat-card', {
+      has: page.getByRole('heading', { name: 'Recent activity' })
+    });
+    const expenseRow = activity.locator('.cc-entry').filter({ hasText: 'Expense' }).first();
+    await expect(expenseRow.locator('.amount')).toHaveText(/\+4\.20 €/);
+  });
+
+  // The landing-panel preference is on the shared profile, so an admin can set it for any user from
+  // /admin/profile; the selected user's landing then honors the choice in the admin's own view too.
+  test('an admin sets a user landing panel to Cups from the admin profile', async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto('/admin/profile');
+    await page.getByRole('combobox', { name: 'User' }).click();
+    await page.getByRole('option', { name: /maxmustermann/ }).click();
+    await expect(page).toHaveURL(/\/admin\/profile\?user=[0-9a-f-]+$/);
+    const userId = new URL(page.url()).searchParams.get('user');
+
+    // the panel control is on the admin profile (not user-only): edit, switch to Cups, save
+    await page.getByRole('button', { name: 'Edit your details' }).click();
+    await page.locator('mat-button-toggle').filter({ hasText: 'Cups' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Profile saved.')).toBeVisible();
+
+    // that user's landing (the admin's own view of them) now renders the cup-stats panel, not the money panel
+    await page.goto(`/admin?user=${userId}`);
+    const summary = page.locator('cc-balance-summary');
+    await expect(summary.getByText('No cups yet')).toBeVisible();
+    await expect(page.getByText('Personal balance')).toBeHidden();
+  });
+
+  // Regression guard: the Active switch issues PUT /api/users/{id}, whose body must echo the path id or the
+  // backend rejects it (400). A success snackbar (not "Could not change the user.") proves the id is sent.
+  test('an admin deactivates a user from the users table', async ({ page }) => {
+    await loginAsAdmin(page);
+    await page.goto('/admin/users');
+    const usersCard = page.locator('mat-card', {
+      has: page.getByRole('heading', { name: 'Users' })
+    });
+    const maxRow = usersCard.getByRole('row').filter({ hasText: 'maxmustermann' });
+    await maxRow.getByRole('switch', { name: 'Active' }).click();
+    await expect(page.getByText('User deactivated.')).toBeVisible();
   });
 });
 
