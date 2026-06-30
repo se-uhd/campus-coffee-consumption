@@ -340,11 +340,10 @@ decorators. Drop their tests, feature files, and the XML-removal config if no lo
 - **dev:** local Postgres (`jdbc:postgresql://localhost:5432/postgres`), Swagger on, fixtures on (seed one
   admin + a few members with deterministic capability tokens via the seeded id generator for repeatable demos).
 - **prod (concrete: Cloud SQL instance already provisioned, retrieved & re-verified via `gcloud` on
-  2026-06-19).** A provisioned Cloud SQL instance,
-  **POSTGRES_18**, tier
-  `db-g1-small` (ZONAL, backups on), public IP `REDACTED`, `sslMode=ENCRYPTED_ONLY`; the default
-  database `postgres` and built-in `postgres` user exist. **Connection name:**
-  `${CLOUD_SQL_INSTANCE}`.
+  2026-06-19).** A provisioned Cloud SQL instance, **POSTGRES_18**, tier
+  `db-g1-small` (ZONAL, backups on), `sslMode=ENCRYPTED_ONLY`; the default
+  database `postgres` and built-in `postgres` user exist. **Connection name:** supplied per deployment via
+  the `CLOUD_SQL_INSTANCE` environment variable (`project:region:instance`).
   - Connect with the **Cloud SQL Java connector** (add `com.google.cloud.sql:postgres-socket-factory`); it
     does TLS + IAM auth itself, so no authorized-networks / client-cert setup despite `ENCRYPTED_ONLY`. The
     prod profile bakes in the non-secret connection details; only the DB password, `JWT_SECRET`, and
@@ -376,7 +375,7 @@ decorators. Drop their tests, feature files, and the XML-removal config if no lo
             include: health, metrics
     ```
   - **Cloud Run deploy:** attach the instance with
-    `--add-cloudsql-instances ${CLOUD_SQL_INSTANCE}` and grant the runtime service
+    `--add-cloudsql-instances "$CLOUD_SQL_INSTANCE"` and grant the runtime service
     account the **Cloud SQL Client** role; inject `DB_PASSWORD`, `JWT_SECRET`, and the `BOOTSTRAP_ADMIN_*`
     values from Secret Manager. (Optional: create a dedicated `campus_coffee_consumption` database instead
     of reusing `postgres` via `gcloud sql databases create`.)

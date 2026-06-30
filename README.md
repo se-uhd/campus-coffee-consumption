@@ -210,8 +210,8 @@ the acceptance tests. The frontend uses **Vitest** for unit tests (`cd frontend 
 The whole app ships as **one Cloud Run image**: the Angular SPA is bundled into the backend's `static/`
 resources, so the browser loads the app and calls `/api` under one origin (no CORS in prod).
 
-The prod profile connects to a **Cloud SQL for PostgreSQL 18** instance
-(`${CLOUD_SQL_INSTANCE}`, project `se-uhd`) via the **Cloud SQL Java connector**,
+The prod profile connects to a **Cloud SQL for PostgreSQL 18** instance (its connection name supplied per
+deployment via the `CLOUD_SQL_INSTANCE` environment variable) via the **Cloud SQL Java connector**,
 which does TLS and IAM auth itself (no authorized-networks or client-cert setup). The non-secret connection
 details are baked into the prod profile; the DB password, `JWT_SECRET`, the login-encryption private key
 (`LOGIN_PRIVATE_KEY_PEM`), and the bootstrap-admin credentials are supplied as environment variables.

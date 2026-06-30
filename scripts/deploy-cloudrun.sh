@@ -21,7 +21,8 @@
 #   gcloud config set project <your-project-id>
 #   gcloud config set run/region <region>            # e.g. europe-west3
 #   gcloud services enable run.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com sqladmin.googleapis.com
-#   # A Cloud SQL Postgres instance named in application.yaml's prod datasource URL. The prod profile connects
+#   # A Cloud SQL Postgres instance whose connection name you set as CLOUD_SQL_INSTANCE in deploy.prod.env.
+#   # The prod profile connects
 #   # through the Cloud SQL socket factory (Admin API + IAM), so no --add-cloudsql-instances mount is needed.
 #   # Grant the Cloud Run runtime service account BOTH:
 #   #   roles/cloudsql.client                (connect through the socket factory)
@@ -46,6 +47,7 @@ login_key() {
 }
 
 db_username="$(val DB_USERNAME)"
+cloud_sql_instance="$(val CLOUD_SQL_INSTANCE)"
 base_url="$(val CAMPUS_COFFEE_APP_BASE_URL)"
 admin_login="$(val BOOTSTRAP_ADMIN_LOGIN)"
 admin_email="$(val BOOTSTRAP_ADMIN_EMAIL)"
@@ -85,6 +87,7 @@ secrets+=",BOOTSTRAP_ADMIN_PASSWORD=bootstrap-admin-password:latest"
 
 env_vars="SPRING_PROFILES_ACTIVE=prod"
 env_vars+=",DB_USERNAME=${db_username}"
+env_vars+=",CLOUD_SQL_INSTANCE=${cloud_sql_instance}"
 env_vars+=",CAMPUS_COFFEE_APP_BASE_URL=${base_url}"
 env_vars+=",BOOTSTRAP_ADMIN_LOGIN=${admin_login}"
 env_vars+=",BOOTSTRAP_ADMIN_EMAIL=${admin_email}"

@@ -7,6 +7,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Read the prod Cloud SQL instance connection name from a `CLOUD_SQL_INSTANCE` environment variable instead
+  of hard-coding it in `application.yaml`, so the deployment target is configured per environment (set it in
+  `deploy.prod.env`; see `deploy.env.example`). The prod profile fails fast if it is unset.
+
 ## [0.8.2] - 2026-06-30
 
 ### Changed

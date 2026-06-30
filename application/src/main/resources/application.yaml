@@ -112,7 +112,8 @@ spring:
   datasource:
     # Cloud SQL via the Java connector (TLS + IAM done by the socket factory; no authorized-networks setup).
     # The named socket factory ships in the com.google.cloud.sql:postgres-socket-factory runtime dependency
-    # (declared in application/build.gradle.kts).
+    # (declared in application/build.gradle.kts). The instance connection name (project:region:instance) is
+    # supplied per deployment via CLOUD_SQL_INSTANCE; prod fails fast if it is unset.
     url: "jdbc:postgresql:///postgres?cloudSqlInstance=${CLOUD_SQL_INSTANCE}&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
     # Least privilege: the app (and Flyway, which shares this connection) runs as a dedicated non-superuser
     # role that owns only this schema, not the Cloud SQL master `postgres` user. Provision it once with
