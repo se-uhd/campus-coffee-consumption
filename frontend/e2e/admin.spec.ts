@@ -334,11 +334,14 @@ test.describe('admin flow', () => {
     await expect(page).toHaveURL(/\/admin\?user=[0-9a-f-]+$/);
 
     // the admin sees the user's own recent coffee exactly as the user would: count 1, balance -0.50, and the
-    // same grace-period "Undo last cup" affordance the user has (the new admin-side cancel parity)
-    await expect(page.locator('.cc-count-card .display')).toHaveText('1');
-    const balance = page.locator('.cc-amount').first();
-    await expect(balance).toHaveText(/-0\.50 €/);
-    await expect(page.getByRole('button', { name: 'Undo last cup' })).toBeVisible();
+    // same grace-period "Undo last cup" affordance the user has (the new admin-side cancel parity). Read the
+    // three together under toPass so the assertion settles on one consistent load of the selected user rather
+    // than catching a mid-flight update on a slow CI runner.
+    await expect(async () => {
+      await expect(page.locator('.cc-count-card .display')).toHaveText('1', { timeout: 2000 });
+      await expect(page.locator('.cc-amount').first()).toHaveText(/-0\.50 €/, { timeout: 2000 });
+      await expect(page.getByRole('button', { name: 'Undo last cup' })).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 20000 });
 
     // the admin records a simple bean purchase for the user; it shows in their activity as a +4.20 € credit
     await recordExpenseInActivity(page, '250', '4.20');

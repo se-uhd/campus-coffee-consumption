@@ -420,6 +420,8 @@ export class CoffeeLandingComponent implements OnInit {
   readonly selectedId = signal('');
   /** The user whose data is currently loaded, to skip a redundant reload on a repeated `user` param. */
   private loadedId = '';
+  /** Monotonic per-load token; a subject load applies its result only if it is still the newest load. */
+  private loadGeneration = 0;
   /** Whether the count-correction form is open (admin mode only). */
   readonly editMode = signal(false);
   newTotal = 0;
@@ -559,16 +561,21 @@ export class CoffeeLandingComponent implements OnInit {
     if (!id) {
       return;
     }
+    // Take a monotonic token for this load. If a newer load (a more recent selection) has started by the time
+    // this one resolves, discard this result so a slower earlier load cannot overwrite the newer user's
+    // summary. The plain `id !== selectedId()` check is not enough: the selection can flip away and back
+    // (a transient bare-URL emission during the switch), leaving `selectedId` equal to this load's `id` again
+    // while a newer load is already in flight. That let a stale summary land last and produced the split state
+    // an admin saw on a slow load (the count from one user, the balance from another).
+    const generation = ++this.loadGeneration;
     this.error.set('');
     const summary = await this.accountingService.userSummary(id, ACTIVITY_PAGE_SIZE + 1, 0);
-    if (id !== this.selectedId()) {
+    if (generation !== this.loadGeneration) {
       return;
     }
-    // Record the loaded user only once its summary is actually applied, not at request time. Otherwise a load
-    // that is later discarded as stale would still leave `loadedId` pointing at a user whose data never
-    // reached the screen, and `applySelectionFromUrl`'s "already loaded" skip would then wrongly skip
-    // re-loading that user, stranding the landing on the previously shown account (the count-0 race an admin
-    // hit picking a user right after sign-in, before the initial summary settled).
+    // Record the loaded user only once its summary is actually applied, not at request time, so a discarded
+    // load never leaves `loadedId` pointing at a user whose data never reached the screen (which would make
+    // `applySelectionFromUrl`'s "already loaded" skip strand the landing on the previously shown account).
     this.loadedId = id;
     this.applySummary(summary, true);
   }
