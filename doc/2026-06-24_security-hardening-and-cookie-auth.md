@@ -27,11 +27,19 @@ On a successful login the token endpoint now sets the JWT in a cookie with these
 - **Path=/**, with a lifetime matching the token TTL.
 
 The resource server reads the bearer token from **either** the cookie **or** the `Authorization: Bearer`
-header, via `CookieOrHeaderBearerTokenResolver`. The header takes precedence when both are present. This lets
-two flows coexist on one resource server:
+header, via `CookieOrHeaderBearerTokenResolver`. The header takes precedence when both are present, and a
+request that presents an explicit user capability token (`X-Capability-Token`) is resolved as that user
+rather than from the ambient cookie, so the cookie cannot override the caller's explicit user credential.
+This lets two flows coexist on one resource server:
 
 - the **browser SPA** authenticates with the cookie (it sends no token header and stores no token);
 - **programmatic API clients and the system/e2e tests** authenticate with the `Authorization` header.
+
+Ignoring the cookie when a capability token is present closes a real gap. The browser attaches the
+`SameSite=Strict` admin cookie to every same-site request, so an admin who opens a user's capability URL in
+their own signed-in browser would otherwise send both credentials, and the cookie's JWT (authenticated after
+the capability filter) would attribute the user's action to the admin. The explicit token wins, so the
+action is attributed to the user. This is guarded by an `AuthorizationSystemTests` case.
 
 The SPA keeps only a non-sensitive marker in `localStorage` so the admin guard knows a session is active
 across reloads. That marker is not a credential (it carries no token), so reading it gains an attacker
