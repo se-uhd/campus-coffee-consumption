@@ -77,6 +77,8 @@ price + add/undo) is unchanged in both modes; only the second card swaps.
   (the self `PUT /api/profile` and the admin `PUT /api/users/{id}`; the admin body sends the `id` so it
   matches the path). Both copies of the group share a `cc-panel-toggle` width rule (a fixed group width split
   into two equal halves) so the pair stays compact and balanced rather than stretching across the card.
+  *(Superseded by the 2026-07-01 update below: the toggle is now a single live switch in the read-only details
+  that saves on its own, and the pencil's edit mode covers only name/email.)*
 
 ## Tests
 
@@ -89,3 +91,34 @@ plus the cup stats. Playwright e2e covers both audiences: a user toggles the pan
 the landing swaps, and an admin sets a user's panel from `/admin/profile` and that user's admin-viewed landing
 swaps. A separate e2e deactivates a user from the admin users table, guarding the admin update path that
 `PUT /api/users/{id}` requires the body id on (the same path the admin panel save uses).
+
+## Update (2026-07-01): the landing-panel toggle is a live switch
+
+The panel control moved out of the pencil's edit mode. Instead of the two-copy design above (a disabled
+read-only mirror plus an enabled copy inside the edit form, saved by `save()`), the read-only "Your details"
+view carries a single **live** Balance / Cups switch, labeled **"Show"**, as a row in the details grid so its
+label lines up with the field labels and its toggle starts at the value column. The pencil's "Edit your
+details" mode is limited to the actual user details (first name, last name, email) and no longer carries the
+panel toggle. The switch is hidden while editing. This matches what the pencil's tooltip already implied and
+removes the awkwardness of opening the name/email editor just to change which card the landing shows.
+
+Flipping the switch **saves on its own**: `onPanelChange` calls the same `PUT /api/profile` (user) or
+`PUT /api/users/{id}` (admin) through a shared `persistProfile(profile, fields)` helper, then confirms with a
+message naming what the landing now shows ("Now showing coffee stats on the landing page." / "Now showing the
+balance on the landing page."). These details make it safe:
+
+- **It re-sends the shown profile's name/email unchanged with the new panel.** The switch appears only in the
+  read-only view, so those fields are the last-saved values, and the flip only moves the panel.
+- **The in-flight save is pinned to the profile object captured at entry.** The admin's user-select dropdown
+  stays enabled, so a switch mid-request would otherwise let one user's stale response repaint another's
+  view. Both the success and the failure branch bail unless `this.profile` is still that captured object,
+  mirroring the id-guards the sibling `CoffeeLandingComponent` already enforces.
+- **A flip and a name/email save cannot overlap.** The switch is hidden while editing, so they sit on separate
+  screens, and they also share the `busy` flag, which blocks a name/email save from starting while a flip is
+  still in flight (both issue a full-profile PUT, so overlapping them could clobber values).
+
+The toggle binds one-way with `[ngModel]` + `(ngModelChange)` (not `[value]` + `(change)`): because
+`MatButtonToggleGroup` is a `ControlValueAccessor`, an `[ngModel]`-controlled group repaints its selection
+when the on-failure revert writes the previous value back, which a plain `[value]` group would not. The
+accessible name is `aria-label="Show landing panel"` so it contains the visible word "Show" (WCAG 2.5.3).
+Backend, DTOs, and the persisted `summaryPanel` are unchanged. Only the frontend interaction changes.

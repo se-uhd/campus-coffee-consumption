@@ -368,11 +368,11 @@ test.describe('admin flow', () => {
     await expect(page).toHaveURL(/\/admin\/profile\?user=[0-9a-f-]+$/);
     const userId = new URL(page.url()).searchParams.get('user');
 
-    // the panel control is on the admin profile (not user-only): edit, switch to Cups, save
-    await page.getByRole('button', { name: 'Edit your details' }).click();
-    await page.locator('mat-button-toggle').filter({ hasText: 'Cups' }).click();
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByText('Profile saved.')).toBeVisible();
+    // the panel control is a live switch on the admin profile (not user-only): flip it to Cups, no edit mode
+    const cups = page.locator('mat-button-toggle').filter({ hasText: 'Cups' });
+    await cups.click();
+    await expect(page.getByText('Now showing coffee stats on the landing page.')).toBeVisible();
+    await expect(cups).toHaveClass(/mat-button-toggle-checked/);
 
     // that user's landing (the admin's own view of them) now renders the cup-stats panel, not the money panel
     await page.goto(`/admin?user=${userId}`);

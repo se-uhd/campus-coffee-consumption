@@ -114,12 +114,12 @@ test.describe('user flow', () => {
     await page.getByRole('button', { name: 'Add a coffee' }).click();
     await expect(page.locator('.cc-count-card .display')).toHaveText('1');
 
-    // switch the landing panel to Cups on the profile (the preference is a mat-button-toggle group)
+    // the landing-panel preference is a live switch on the profile: flip it directly, no edit mode needed
     await page.goto(`${USER_URL}/profile`);
-    await page.getByRole('button', { name: 'Edit your details' }).click();
-    await page.locator('mat-button-toggle').filter({ hasText: 'Cups' }).click();
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByText('Profile saved.')).toBeVisible();
+    const cups = page.locator('mat-button-toggle').filter({ hasText: 'Cups' });
+    await cups.click();
+    await expect(page.getByText('Now showing coffee stats on the landing page.')).toBeVisible();
+    await expect(cups).toHaveClass(/mat-button-toggle-checked/);
 
     // the landing now shows the cup-stats panel (Today / since the first cup) and not the money panel
     await page.goto(USER_URL);
@@ -128,13 +128,32 @@ test.describe('user flow', () => {
     await expect(summary.getByText(/^Since /)).toBeVisible();
     await expect(page.getByText('Personal balance')).toBeHidden();
 
-    // switching back to Balance restores the money panel
+    // switching back to Balance restores the money panel (re-open the profile: the switch lives only there)
     await page.goto(`${USER_URL}/profile`);
-    await page.getByRole('button', { name: 'Edit your details' }).click();
-    await page.locator('mat-button-toggle').filter({ hasText: 'Balance' }).click();
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByText('Profile saved.')).toBeVisible();
+    const balance = page.locator('mat-button-toggle').filter({ hasText: 'Balance' });
+    await balance.click();
+    await expect(page.getByText('Now showing the balance on the landing page.')).toBeVisible();
+    await expect(balance).toHaveClass(/mat-button-toggle-checked/);
     await page.goto(USER_URL);
     await expect(page.getByText('Personal balance')).toBeVisible();
+  });
+
+  test('editing the profile details saves the new name, and Cancel reverts the field', async ({ page }) => {
+    await page.goto(`${USER_URL}/profile`);
+
+    // the pencil now scopes edit mode to the user details (name/email). Change the first name and save
+    await page.getByRole('button', { name: 'Edit your details' }).click();
+    const firstName = page.getByRole('textbox', { name: 'First name' });
+    await firstName.fill('Maximilian');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Profile saved.')).toBeVisible();
+    await expect(page.getByText('Maximilian')).toBeVisible();
+
+    // a second edit followed by Cancel discards the change and leaves the saved value intact
+    await page.getByRole('button', { name: 'Edit your details' }).click();
+    await firstName.fill('Discarded');
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByText('Maximilian')).toBeVisible();
+    await expect(page.getByText('Discarded')).toBeHidden();
   });
 });

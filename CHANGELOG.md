@@ -7,6 +7,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The profile's landing-panel preference (whether the landing shows the balance or the coffee stats) is now a
+  live "Show" switch in the read-only details, saved the moment you flip it and confirmed with a message
+  naming what the landing now shows. It no longer lives inside the name/email editor: the pencil's edit mode
+  covers just the user details (first name, last name, email), matching its "Edit your details" label.
+
 ## [0.9.1] - 2026-07-01
 
 ### Fixed

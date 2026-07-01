@@ -26,7 +26,7 @@ import { NotificationService } from '../../services/notification.service';
 import { AdminSelectionService } from '../../services/admin-selection.service';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { UserSelectComponent } from '../../components/user-select/user-select.component';
-import { UserDto } from '../../models';
+import { SummaryPanel, UserDto } from '../../models';
 
 /**
  * The authenticated user's own profile, shared by a user (reached via `/login/:token/profile`, served
@@ -105,15 +105,19 @@ import { UserDto } from '../../models';
               <dd>{{ profile.lastName }}</dd>
               <dt class="muted">Email</dt>
               <dd class="break-word">{{ profile.emailAddress }}</dd>
-              <!-- Read-only mirror of the edit-mode control: a disabled (grayed-out) copy of the Balance / Cups
-                   toggle, sitting in the value column so the row aligns with the fields above. Edit via the pencil. -->
-              <dt class="muted">Landing panel</dt>
+              <!-- The landing-panel preference sits in the details grid so its "Show" label lines up with the
+                   field labels and its toggle starts at the value column. It is a live switch (saved on flip
+                   via onPanelChange), shown here in the read-only details; the pencil's edit mode is name/email
+                   only, so this row is hidden while editing (a flip and a name save then cannot overlap). -->
+              <dt class="muted">Show</dt>
               <dd>
                 <mat-button-toggle-group
                   class="cc-panel-toggle"
-                  [value]="profile.summaryPanel ?? 'BALANCE'"
-                  disabled
-                  aria-label="Landing panel"
+                  [ngModel]="profile.summaryPanel ?? 'BALANCE'"
+                  (ngModelChange)="onPanelChange($event)"
+                  [ngModelOptions]="{ standalone: true }"
+                  [disabled]="busy()"
+                  aria-label="Show landing panel"
                 >
                   <mat-button-toggle value="BALANCE">Balance</mat-button-toggle>
                   <mat-button-toggle value="CUPS">Cups</mat-button-toggle>
@@ -163,18 +167,6 @@ import { UserDto } from '../../models';
                   <mat-error>Enter a valid email address.</mat-error>
                 }
               </mat-form-field>
-              <div class="cc-panel-pref">
-                <span class="muted cc-panel-label">Landing panel</span>
-                <mat-button-toggle-group
-                  class="cc-panel-toggle"
-                  name="summaryPanel"
-                  [(ngModel)]="profile.summaryPanel"
-                  aria-label="Landing panel"
-                >
-                  <mat-button-toggle value="BALANCE">Balance</mat-button-toggle>
-                  <mat-button-toggle value="CUPS">Cups</mat-button-toggle>
-                </mat-button-toggle-group>
-              </div>
               <div class="row">
                 <button mat-flat-button color="primary" (click)="save()" [disabled]="form.invalid || busy()">
                   @if (busy()) {
@@ -263,30 +255,21 @@ import { UserDto } from '../../models';
 
       .cc-details dd {
         margin: 0;
-        /* let the value cell shrink below its content's intrinsic width so the wide toggle does not steal the
-           label column on a narrow phone (which made "First name" wrap to two lines). */
+        /* let the value cell shrink below its content's intrinsic width so a long value (e.g. the email) wraps
+           instead of stealing the label column on a narrow phone. */
         min-width: 0;
       }
 
-      /* The landing-panel preference: its label sits above the Balance/Cups toggle, with the same vertical
-         rhythm the mat-form-fields above it use, so the edit form reads as one stack. align-items keeps the
-         toggle at its own width instead of stretching it across the card (which made "Cups" lopsidedly wide). */
-      .cc-panel-pref {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-        margin-bottom: 16px;
-      }
-
-      .cc-panel-label {
-        font-size: 0.75rem;
+      /* The Show row's toggle: a shorter control so the row keeps the same vertical rhythm as the text rows
+         above it (the full 48px height would inflate the Email -> Show gap). align-items on the grid keeps the
+         toggle at its own width instead of stretching it across the value column (which made "Cups" wide). */
+      .cc-details .cc-panel-toggle {
+        --mat-button-toggle-height: 36px;
       }
 
       /* A compact, balanced pair: a fixed group width split into two equal halves, so Balance and Cups are the
          same size (the selected toggle's check indicator no longer makes one side wider). It shrinks to fit on
-         a narrow phone. The read-only copy carries the same class and renders grayed out via the disabled
-         attribute. */
+         a narrow phone. */
       .cc-panel-toggle {
         width: 18rem;
         max-width: 100%;
@@ -296,18 +279,6 @@ import { UserDto } from '../../models';
         flex: 1 1 0;
         /* allow each half to shrink past its label's intrinsic width so the group can narrow on small screens */
         min-width: 0;
-      }
-
-      /* The read-only copy (inside the details grid, always disabled) gets two token overrides the editable copy
-         must not: a shorter height so its row keeps the same vertical rhythm as the text rows above it (the full
-         48px control inflated the Email -> Landing panel gap), and disabled label colors lifted back to legible
-         ink (this grayed toggle is the only on-screen representation of the saved choice, so the default ~38%
-         disabled text fails WCAG contrast). The grayed fill is kept, so it still reads as read-only. The editable
-         copy in the edit form is untouched, keeping its 48px tap target and normal colors. */
-      .cc-details .cc-panel-toggle {
-        --mat-button-toggle-height: 34px;
-        --mat-button-toggle-disabled-selected-state-text-color: var(--cc-ink);
-        --mat-button-toggle-disabled-state-text-color: var(--cc-ink-muted);
       }
     `
   ]
@@ -467,10 +438,19 @@ export class ProfileComponent implements OnInit {
     this.editing.set(true);
   }
 
-  /** Reverts the edited fields to the loaded values and leaves edit mode without saving. */
+  /**
+   * Reverts the edited name/email to the loaded values and leaves edit mode without saving. Only those fields
+   * are editable here (the landing-panel switch lives in the read-only view and saves on its own), so the
+   * revert is scoped to them.
+   */
   cancelEdit(): void {
     if (this.profile && this.loadedProfile) {
-      this.profile = { ...this.profile, ...this.loadedProfile };
+      this.profile = {
+        ...this.profile,
+        firstName: this.loadedProfile.firstName,
+        lastName: this.loadedProfile.lastName,
+        emailAddress: this.loadedProfile.emailAddress
+      };
     }
     this.editing.set(false);
   }
@@ -486,27 +466,12 @@ export class ProfileComponent implements OnInit {
     }
     this.busy.set(true);
     try {
-      const updated = this.adminMode
-        ? // send only the editable profile fields, with role/active nulled so the backend keeps the stored
-          // values: echoing the loaded snapshot would silently revert a role or active-state change a
-          // concurrent admin committed between this page load and this save (last-write-wins on stale data)
-          await this.userService.update(this.profile.id!, {
-            id: this.profile.id,
-            loginName: this.profile.loginName!,
-            firstName: this.profile.firstName!,
-            lastName: this.profile.lastName!,
-            emailAddress: this.profile.emailAddress!,
-            role: null,
-            active: null,
-            summaryPanel: this.profile.summaryPanel ?? 'BALANCE'
-          })
-        : await this.profileService.update({
-            firstName: this.profile.firstName!,
-            lastName: this.profile.lastName!,
-            emailAddress: this.profile.emailAddress!,
-            // the user's chosen landing panel (the toggle); default to BALANCE if the loaded profile lacks it
-            summaryPanel: this.profile.summaryPanel ?? 'BALANCE'
-          });
+      const updated = await this.persistProfile(this.profile, {
+        firstName: this.profile.firstName!,
+        lastName: this.profile.lastName!,
+        emailAddress: this.profile.emailAddress!,
+        summaryPanel: this.profile.summaryPanel ?? 'BALANCE'
+      });
       // the admin PUT response may omit `capabilityUrl` (it is assembled, not a stored field), which would
       // blank the "Coffee link"; keep the one already loaded when the response does not carry it
       this.profile = { ...updated, capabilityUrl: updated.capabilityUrl ?? this.profile.capabilityUrl };
@@ -516,6 +481,89 @@ export class ProfileComponent implements OnInit {
       this.notifications.success('Profile saved.');
     } catch (error) {
       this.notifications.error(error, 'Could not save your profile.');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /**
+   * Persists a profile's editable fields (name, email, and landing panel) through the right endpoint for the
+   * mode. It takes the profile object explicitly rather than reading `this.profile`, so an in-flight save
+   * stays pinned to the user it started on even if the admin switches the selection mid-request. The admin
+   * branch nulls `role`/`active` so the backend keeps the stored values (echoing a loaded snapshot could
+   * revert a role or active-state change a concurrent admin committed), and sends the path `id` in the body so
+   * it matches the URL.
+   *
+   * @param p the profile whose `id`/`loginName` identify the target user
+   * @param fields the editable values to persist
+   * @return the updated user as returned by the backend
+   */
+  private persistProfile(
+    p: UserDto,
+    fields: { firstName: string; lastName: string; emailAddress: string; summaryPanel: SummaryPanel }
+  ): Promise<UserDto> {
+    return this.adminMode
+      ? this.userService.update(p.id!, {
+          id: p.id,
+          loginName: p.loginName!,
+          firstName: fields.firstName,
+          lastName: fields.lastName,
+          emailAddress: fields.emailAddress,
+          role: null,
+          active: null,
+          summaryPanel: fields.summaryPanel
+        })
+      : this.profileService.update({
+          firstName: fields.firstName,
+          lastName: fields.lastName,
+          emailAddress: fields.emailAddress,
+          summaryPanel: fields.summaryPanel
+        });
+  }
+
+  /**
+   * Saves the landing-panel preference on its own when the Balance/Cups switch in the read-only details is
+   * flipped, without going through the name/email edit mode. The switch is shown only in that read-only view,
+   * so the current profile already holds the last-saved name/email, which the flip re-sends unchanged with the
+   * new panel (the endpoint takes the whole profile). The optimistic value and the on-failure revert are
+   * written to the profile captured at entry and applied only while it is still the shown profile, so a user
+   * switch mid-request cannot repaint or toast over the newly-selected user.
+   *
+   * The flip shares the {@link busy} flag with {@link save}: the switch is hidden while editing, so the two
+   * sit on separate screens, and the shared flag also blocks a name/email save from starting while a flip is
+   * still in flight (both issue a full-profile PUT, so overlapping them could clobber each other's values).
+   *
+   * @param panel the panel the user selected (`BALANCE` or `CUPS`)
+   */
+  async onPanelChange(panel: SummaryPanel): Promise<void> {
+    const target = this.profile;
+    // share `busy` with save(): a flip and a name/email save must not run at once (both PUT the whole profile)
+    if (!target || this.busy()) {
+      return;
+    }
+    const previous = target.summaryPanel ?? 'BALANCE';
+    if (panel === previous) {
+      return;
+    }
+    target.summaryPanel = panel;
+    this.busy.set(true);
+    try {
+      await this.persistProfile(target, {
+        firstName: target.firstName!,
+        lastName: target.lastName!,
+        emailAddress: target.emailAddress!,
+        summaryPanel: panel
+      });
+      if (this.profile === target) {
+        const shown = panel === 'CUPS' ? 'coffee stats' : 'the balance';
+        this.notifications.success(`Now showing ${shown} on the landing page.`);
+      }
+    } catch (error) {
+      if (this.profile === target) {
+        target.summaryPanel = previous;
+        this.cdr.markForCheck();
+        this.notifications.error(error, 'Could not update the landing page.');
+      }
     } finally {
       this.busy.set(false);
     }

@@ -137,7 +137,7 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `POST /consumption/cancel`: undo the most recent coffee within the grace period (nothing to undo, or past the grace period, returns 409 Conflict).
 - `GET  /activity?limit=20&offset=0`: own unified activity feed (coffees, purchases, deposits) with a running balance.
 - `POST /expenses` `{ "weightGrams": N, "amountCents": N, "note"?: "…" }`: record an own bean purchase (booked 100% to the user).
-- `GET  /profile`, `PUT /profile`: view and edit own name and email (the response includes the capability URL).
+- `GET  /profile`, `PUT /profile`: view and edit own name, email, and landing-panel preference (the response includes the capability URL).
 - `GET  /profile/qr.png`: own QR code (high-resolution PNG).
 
 **Admin (auth: JWT, `ROLE_ADMIN`):**
