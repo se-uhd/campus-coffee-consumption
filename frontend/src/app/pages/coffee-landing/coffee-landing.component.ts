@@ -559,12 +559,17 @@ export class CoffeeLandingComponent implements OnInit {
     if (!id) {
       return;
     }
-    this.loadedId = id;
     this.error.set('');
     const summary = await this.accountingService.userSummary(id, ACTIVITY_PAGE_SIZE + 1, 0);
     if (id !== this.selectedId()) {
       return;
     }
+    // Record the loaded user only once its summary is actually applied, not at request time. Otherwise a load
+    // that is later discarded as stale would still leave `loadedId` pointing at a user whose data never
+    // reached the screen, and `applySelectionFromUrl`'s "already loaded" skip would then wrongly skip
+    // re-loading that user, stranding the landing on the previously shown account (the count-0 race an admin
+    // hit picking a user right after sign-in, before the initial summary settled).
+    this.loadedId = id;
     this.applySummary(summary, true);
   }
 
