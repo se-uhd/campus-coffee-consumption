@@ -9,6 +9,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A request carrying both the admin session cookie and a user capability token is now attributed to the
+  capability token's user, not the admin. An explicit `X-Capability-Token` takes precedence over the ambient
+  session cookie the browser attaches to every same-site request (an explicit `Authorization: Bearer` header
+  still wins). This stops an admin who opens a user's capability URL in their own signed-in browser from
+  having the user's actions attributed to their own account.
+- Re-enabled the admin-landing parity end-to-end test. Its flakiness was that same precedence bug in the
+  test's seeding (the self-scanned coffee, sent while the admin cookie was also present, was attributed to
+  the admin, so the viewed user's real count stayed zero).
 - The admin landing no longer drops a user picked from the dropdown while the page is still loading (for
   example right after sign-in, before the admin's own summary has finished loading), which left the previous
   user's figures on screen with no reload to correct them. The `user` query param is always applied now.

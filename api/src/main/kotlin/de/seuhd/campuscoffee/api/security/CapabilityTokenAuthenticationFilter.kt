@@ -50,8 +50,13 @@ class CapabilityTokenAuthenticationFilter(
         filterChain.doFilter(request, response)
     }
 
-    private companion object {
-        private const val CAPABILITY_TOKEN_HEADER = "X-Capability-Token"
+    companion object {
+        /**
+         * The request header carrying a user's secret capability token. The single source of truth for the
+         * name, also read by [CookieOrHeaderBearerTokenResolver] so a request that presents this header is
+         * treated as its user and the ambient admin session cookie does not override it.
+         */
+        const val CAPABILITY_TOKEN_HEADER = "X-Capability-Token"
         private const val ROLE_USER = "ROLE_USER"
     }
 }

@@ -1,6 +1,7 @@
 package de.seuhd.campuscoffee.tests.system
 
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
+import de.seuhd.campuscoffee.api.configuration.AuthCookieProperties
 import de.seuhd.campuscoffee.api.dtos.PublicKeyDto
 import de.seuhd.campuscoffee.api.dtos.TokenRequestDto
 import de.seuhd.campuscoffee.api.dtos.UserDto
@@ -19,6 +20,7 @@ import de.seuhd.campuscoffee.tests.SystemTestUtils.tokenErrorFor
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withUser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.client.returnResult
@@ -29,6 +31,9 @@ import org.springframework.test.web.servlet.client.returnResult
  */
 class AuthorizationSystemTests : AbstractSystemTest() {
     private val user = "maxmustermann"
+
+    @Autowired
+    private lateinit var authCookieProperties: AuthCookieProperties
 
     // Creates a second active admin (with a known password) so the seeded admin can be deactivated without
     // tripping the last-active-admin guard. Returns the created admin (used as the acting user that
@@ -354,6 +359,33 @@ class AuthorizationSystemTests : AbstractSystemTest() {
                 .statusCode()
 
         assertThat(status).isEqualTo(403)
+    }
+
+    @Test
+    fun `a request with both the admin session cookie and a capability token acts as the token's user`() {
+        // An admin who opens a user's capability URL in their own logged-in browser sends both credentials.
+        // The browser attaches the SameSite admin session cookie automatically, and the SPA adds the
+        // X-Capability-Token header for the user call. The explicit capability token is the intended
+        // credential, so the ambient cookie must not override it. The coffee is attributed to the user, not
+        // the admin.
+        val admin = seededUser("jane_doe")
+        val max = seededUser(user)
+        val (login, password) = TestFixtures.rawCredentialsFor(Role.ADMIN)
+        val adminJwt = jwtFor(login, password)
+
+        val status =
+            client()
+                .post()
+                .uri("/api/consumption")
+                .header(HttpHeaders.COOKIE, "${authCookieProperties.name}=$adminJwt")
+                .withUser(user)
+                .exchange()
+                .statusCode()
+
+        assertThat(status).isEqualTo(200)
+        // the coffee is attributed to the capability user, not the admin whose cookie was also present
+        assertThat(coffeeConsumptionService.getByUserId(max.persistedId, admin).count).isEqualTo(1)
+        assertThat(coffeeConsumptionService.getByUserId(admin.persistedId, admin).count).isEqualTo(0)
     }
 
     @Test

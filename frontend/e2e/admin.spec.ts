@@ -319,14 +319,16 @@ test.describe('admin flow', () => {
   test('the admin landing shows the selected user a parity view and records an expense for them', async ({
     page
   }) => {
-    // Skipped only under GitHub Actions: loading the selected user's summary on the admin landing is flaky on
-    // the headless CI chromium (it can strand on the admin's own account), yet it passes locally (this test
-    // runs green repeatedly in the local Playwright harness and in a standalone-browser reproduction) and in
-    // production. Three SPA robustness fixes for it have landed (the load-guard, recording `loadedId` only on
-    // apply, and a monotonic load-generation token). A deterministic reactive rewrite of the landing's summary
-    // load, together with a headless-CI reproduction, is the follow-up; the money parity itself is covered
-    // deterministically by AccountingSystemTests.
-    test.skip(!!process.env.GITHUB_ACTIONS, 'admin-landing per-user summary load is flaky on headless CI');
+    // Previously skipped under GitHub Actions as "flaky on headless CI". The real cause was not the frontend
+    // but the setup below: `adminToken(api)` leaves the admin session cookie on the shared `api` request
+    // context, so the self-scan (which also sends maxmustermann's capability token) presented both
+    // credentials, and the backend attributed the coffee to the admin, not maxmustermann. maxmustermann's
+    // real count stayed 0. The landing then correctly showed 0 on the slower CI timing (failing the count-1
+    // assertion here) while the faster local timing caught the admin's own-account load transient and
+    // passed for the wrong reason. The backend now makes an explicit capability token take precedence over
+    // the ambient admin cookie (see AuthorizationSystemTests), so the coffee is attributed to maxmustermann
+    // and this parity view is correct and deterministic. The money parity itself is also covered by
+    // AccountingSystemTests.
 
     // pin the price so the balance figure is exact
     await pinPrice(api, await adminToken(api), 50);
