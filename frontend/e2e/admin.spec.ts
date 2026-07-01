@@ -8,6 +8,7 @@ import {
   loginAsAdmin,
   openKittyPageAsAdmin,
   pinPrice,
+  recordExpenseInActivity,
   resetFixtures,
   USER_TOKENS
 } from './helpers';
@@ -340,17 +341,7 @@ test.describe('admin flow', () => {
     await expect(page.getByRole('button', { name: 'Undo last cup' })).toBeVisible();
 
     // the admin records a simple bean purchase for the user; it shows in their activity as a +4.20 € credit
-    await page.getByRole('button', { name: 'Toggle expense form' }).click();
-    await page.getByLabel('Weight (grams)').fill('250');
-    await page.getByLabel('Amount (€)').fill('4.20');
-    await page.getByRole('button', { name: 'Save expense' }).click();
-    await expect(page.getByText('Expense recorded.')).toBeVisible();
-
-    const activity = page.locator('mat-card', {
-      has: page.getByRole('heading', { name: 'Recent activity' })
-    });
-    const expenseRow = activity.locator('.cc-entry').filter({ hasText: 'Expense' }).first();
-    await expect(expenseRow.locator('.amount')).toHaveText(/\+4\.20 €/);
+    await recordExpenseInActivity(page, '250', '4.20');
   });
 
   // The landing-panel preference is on the shared profile, so an admin can set it for any user from

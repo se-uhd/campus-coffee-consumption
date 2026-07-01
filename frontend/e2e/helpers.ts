@@ -103,6 +103,29 @@ export async function loginAsAdmin(page: Page): Promise<void> {
 }
 
 /**
+ * Records a bean purchase through the collapsible expense form on the landing and asserts it appears in
+ * Recent activity as a signed positive credit. Shared by the user landing and the admin landing, which
+ * record an expense through the same form.
+ *
+ * @param page the Playwright page, on a landing that shows the expense form
+ * @param weightGrams the bean weight to enter, in grams
+ * @param euros the amount to enter, in euros (e.g. "4.20"), also the expected credit shown in the activity
+ */
+export async function recordExpenseInActivity(page: Page, weightGrams: string, euros: string): Promise<void> {
+  await page.getByRole('button', { name: 'Toggle expense form' }).click();
+  await page.getByLabel('Weight (grams)').fill(weightGrams);
+  await page.getByLabel('Amount (€)').fill(euros);
+  await page.getByRole('button', { name: 'Save expense' }).click();
+  await expect(page.getByText('Expense recorded.')).toBeVisible();
+
+  const activity = page.locator('mat-card', {
+    has: page.getByRole('heading', { name: 'Recent activity' })
+  });
+  const expenseRow = activity.locator('.cc-entry').filter({ hasText: 'Expense' }).first();
+  await expect(expenseRow.locator('.amount')).toHaveText(new RegExp(`\\+${euros.replace('.', '\\.')} €`));
+}
+
+/**
  * Shared kitty-test preamble: pins the price to 50 cents (so an exact kitty figure cannot be perturbed by
  * a leftover price from a previous run), signs in as the fixture admin, and opens the kitty page. A test
  * that needs an empty kitty resets the fixtures itself, before calling this.

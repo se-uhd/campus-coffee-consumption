@@ -7,6 +7,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The admin landing no longer drops a user picked from the dropdown while the page is still loading (for
+  example right after sign-in, before the admin's own summary has finished loading), which left the previous
+  user's figures on screen with no reload to correct them. The `user` query param is always applied now.
+
 ## [0.9.0] - 2026-07-01
 
 ### Added
@@ -211,7 +217,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- An admin **Activity** page (`/admin/activity`) that lists every activity across all members, the kitty, and
+- An admin **Activity** page (`/admin/actif/vity`) that lists every activity across all members, the kitty, and
   the price in one paginated table: coffees, cancels, admin count corrections, private and kitty expenses,
   deposits, kitty adjustments, and price changes. Each row shows the member it concerns (the subject) and who
   performed it (the actor); the two differ on an admin correction. Each row has separate member-balance and

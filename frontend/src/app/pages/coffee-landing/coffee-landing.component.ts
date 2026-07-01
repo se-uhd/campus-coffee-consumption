@@ -483,9 +483,13 @@ export class CoffeeLandingComponent implements OnInit {
     if (this.adminMode) {
       // The URL is the source of truth for the selected user: follow the `user` query param (so the browser
       // Back/Forward buttons, which change it, re-select and reload). The first emission's load already ran
-      // in `reload`; the `loadedId` guard in `applySelectionFromUrl` skips loading the same user twice.
+      // in `reload`; the `loadedId` guard in `applySelectionFromUrl` skips loading the same user twice, and
+      // `loadSubject` discards a stale slower load. A selection made while the initial load is still in flight
+      // must NOT be dropped: guarding on `this.loading()` here silently lost a rapid user switch (e.g. picking
+      // a user right after sign-in, before the admin's own summary had finished loading), leaving the previous
+      // user's data on screen with no reload to correct it.
       this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-        if (this.loading() || this.loadError()) {
+        if (this.loadError()) {
           return;
         }
         void this.applySelectionFromUrl(params.get('user'));

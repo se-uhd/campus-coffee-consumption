@@ -1,6 +1,6 @@
 import { APIRequestContext } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { USER_TOKENS, apiContext, resetFixtures } from './helpers';
+import { USER_TOKENS, apiContext, recordExpenseInActivity, resetFixtures } from './helpers';
 
 const MAX = USER_TOKENS.maxmustermann;
 const USER_URL = `/login/${MAX}`;
@@ -65,22 +65,8 @@ test.describe('user flow', () => {
     await page.goto(USER_URL);
     await expect(page.getByText('Signed in as maxmustermann')).toBeVisible();
 
-    // open the collapsible expense form (the toggle's accessible name is its aria-label)
-    await page.getByRole('button', { name: 'Toggle expense form' }).click();
-    await page.getByLabel('Weight (grams)').fill('250');
-    await page.getByLabel('Amount (€)').fill('4.20');
-    await page.getByRole('button', { name: 'Save expense' }).click();
-
-    // the success snackbar confirms the save
-    await expect(page.getByText('Expense recorded.')).toBeVisible();
-
-    // Recent activity shows the private expense as a signed positive credit of +4.20 €
-    const activity = page.locator('mat-card', {
-      has: page.getByRole('heading', { name: 'Recent activity' })
-    });
-    const expenseRow = activity.locator('.cc-entry').filter({ hasText: 'Expense' }).first();
-    await expect(expenseRow).toBeVisible();
-    await expect(expenseRow.locator('.amount')).toHaveText(/\+4\.20 €/);
+    // record a bean purchase and confirm it shows in Recent activity as a +4.20 € credit
+    await recordExpenseInActivity(page, '250', '4.20');
   });
 
   test('the profile icon opens the Profile subpage with a back arrow and centered title', async ({
