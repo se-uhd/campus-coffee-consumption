@@ -38,8 +38,9 @@ internal class EventReducer(
             LoggedEntityType.EXPENSE -> expense(event)
             LoggedEntityType.PAYMENT -> payment(event)
             LoggedEntityType.COFFEE_PRICE -> priceChange(event)
-            // a User event never reaches an activity stream; listed (not `else`) so a new type forces a decision
-            LoggedEntityType.USER -> null
+            // a User, bean, or rating event never reaches an activity stream (a bean/rating carries no
+            // money); listed (not `else`) so a new type forces a decision
+            LoggedEntityType.USER, LoggedEntityType.COFFEE_BEAN, LoggedEntityType.COFFEE_RATING -> null
         }
 
     private fun consumption(event: EventEntity): EventProjection? {

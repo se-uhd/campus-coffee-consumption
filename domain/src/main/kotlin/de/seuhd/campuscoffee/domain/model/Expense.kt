@@ -4,9 +4,13 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 /**
- * Immutable expense domain model: a recorded purchase of coffee beans for the group. It references the
- * [buyer] (flattened to a user id in the event body, the way a consumption references its user) and carries
- * the bean [weightGrams] and the total [amountCents] paid, in euro cents.
+ * Immutable expense domain model: a recorded group outlay. It references the [buyer] (flattened to a user id
+ * in the event body, the way a consumption references its user) and carries the total [amountCents] paid, in
+ * euro cents.
+ *
+ * An expense has an [expenseType]: a [ExpenseType.BEANS] purchase links a [bean] and carries a
+ * [weightGrams], while an [ExpenseType.OTHER] outlay has neither (both null). The domain service enforces
+ * these type rules before the upsert.
  *
  * The total is split into a [privateAmountCents] portion (paid from the buyer's own pocket, which credits
  * the buyer's balance) and a [kittyAmountCents] portion (paid from the communal kitty, which draws the
@@ -19,7 +23,9 @@ data class Expense(
     val createdAt: LocalDateTime? = null,
     val updatedAt: LocalDateTime? = null,
     val buyer: User,
-    val weightGrams: Int,
+    val expenseType: ExpenseType = ExpenseType.BEANS,
+    val bean: CoffeeBean? = null,
+    val weightGrams: Int? = null,
     val amountCents: Int,
     val privateAmountCents: Int,
     val kittyAmountCents: Int,

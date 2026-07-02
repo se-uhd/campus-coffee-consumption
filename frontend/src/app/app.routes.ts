@@ -22,6 +22,12 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/profile/profile.component').then((m) => m.ProfileComponent)
   },
   {
+    path: 'login/:token/ratings',
+    title: 'Ratings (SE@UHD)',
+    loadComponent: () =>
+      import('./pages/bean-ratings/bean-ratings.component').then((m) => m.BeanRatingsComponent)
+  },
+  {
     path: 'admin/login',
     title: 'Sign in (SE@UHD)',
     loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent)
@@ -69,6 +75,13 @@ export const routes: Routes = [
     canActivate: [adminGuard],
     loadComponent: () =>
       import('./pages/admin-activity/admin-activity.component').then((m) => m.AdminActivityComponent)
+  },
+  {
+    path: 'admin/ratings',
+    title: 'Ratings (SE@UHD)',
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./pages/bean-ratings/bean-ratings.component').then((m) => m.BeanRatingsComponent)
   },
   {
     path: 'admin/profile',

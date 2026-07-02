@@ -1,7 +1,9 @@
 package de.seuhd.campuscoffee.data.persistence.entities
 
+import de.seuhd.campuscoffee.domain.model.CoffeeBean
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.CoffeePrice
+import de.seuhd.campuscoffee.domain.model.CoffeeRating
 import de.seuhd.campuscoffee.domain.model.DomainModel
 import de.seuhd.campuscoffee.domain.model.Expense
 import de.seuhd.campuscoffee.domain.model.Payment
@@ -35,7 +37,9 @@ enum class LoggedEntityType(
     COFFEE_CONSUMPTION("CoffeeConsumption", CoffeeConsumption::class),
     COFFEE_PRICE("CoffeePrice", CoffeePrice::class),
     EXPENSE("Expense", Expense::class),
-    PAYMENT("Payment", Payment::class)
+    PAYMENT("Payment", Payment::class),
+    COFFEE_BEAN("CoffeeBean", CoffeeBean::class),
+    COFFEE_RATING("CoffeeRating", CoffeeRating::class)
     ;
 
     companion object {

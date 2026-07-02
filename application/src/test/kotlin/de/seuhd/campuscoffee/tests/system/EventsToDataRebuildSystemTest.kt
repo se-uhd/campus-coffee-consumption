@@ -112,8 +112,14 @@ class EventsToDataRebuildSystemTest {
             .post()
             .uri("/api/expenses")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(mapOf("weightGrams" to 1000, "amountCents" to 900))
-            .withUser(user)
+            .body(
+                mapOf(
+                    "expenseType" to "BEANS",
+                    "beanName" to "rebuild beans",
+                    "weightGrams" to 1000,
+                    "amountCents" to 900
+                )
+            ).withUser(user)
             .exchange()
         client()
             .post()

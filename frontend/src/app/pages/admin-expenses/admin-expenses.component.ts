@@ -17,6 +17,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -24,6 +26,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { UserService } from '../../services/user.service';
 import { ExpenseService } from '../../services/expense.service';
+import { BeanService } from '../../services/bean.service';
 import { NotificationService } from '../../services/notification.service';
 import { AdminSelectionService } from '../../services/admin-selection.service';
 import { EurosPipe } from '../../pipes/euros.pipe';
@@ -32,7 +35,7 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
 import { UserSelectComponent } from '../../components/user-select/user-select.component';
 import { EuroAmountDirective } from '../../directives/euro-amount.directive';
-import { AdminExpenseRequest, ExpenseDto, UserDto } from '../../models';
+import { AdminExpenseRequest, CoffeeBeanDto, ExpenseDto, ExpenseType, UserDto } from '../../models';
 import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../util/money';
 
 /**
@@ -53,6 +56,8 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
     MatListModule,
     MatFormFieldModule,
     MatInputModule,
+    MatAutocompleteModule,
+    MatButtonToggleModule,
     MatTooltipModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
@@ -97,22 +102,48 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
         <mat-card class="card">
           <h2>{{ editingId() ? 'Correct a purchase' : 'Record a purchase' }}</h2>
           <form #form="ngForm">
-            <mat-form-field class="full-width">
-              <mat-label>Weight (grams)</mat-label>
-              <input
-                matInput
-                type="number"
-                min="0"
-                step="1"
-                name="weight"
-                #weightModel="ngModel"
-                [(ngModel)]="weightGrams"
-                required
-              />
-              @if (weightModel.invalid && weightModel.touched) {
-                <mat-error>Enter the weight in grams.</mat-error>
-              }
-            </mat-form-field>
+            <mat-button-toggle-group
+              class="cc-expense-type"
+              name="expenseType"
+              [(ngModel)]="expenseType"
+              aria-label="Expense type"
+            >
+              <mat-button-toggle [value]="expenseTypes.Beans">Beans</mat-button-toggle>
+              <mat-button-toggle [value]="expenseTypes.Other">Other</mat-button-toggle>
+            </mat-button-toggle-group>
+            @if (expenseType === expenseTypes.Beans) {
+              <mat-form-field class="full-width">
+                <mat-label>Beans</mat-label>
+                <input
+                  matInput
+                  name="beanName"
+                  [(ngModel)]="beanName"
+                  [matAutocomplete]="beanAuto"
+                  required
+                />
+                <mat-autocomplete #beanAuto="matAutocomplete">
+                  @for (bean of filteredBeans(); track bean.id) {
+                    <mat-option [value]="bean.name">{{ bean.name }}</mat-option>
+                  }
+                </mat-autocomplete>
+              </mat-form-field>
+              <mat-form-field class="full-width">
+                <mat-label>Weight (grams)</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="0"
+                  step="1"
+                  name="weight"
+                  #weightModel="ngModel"
+                  [(ngModel)]="weightGrams"
+                  required
+                />
+                @if (weightModel.invalid && weightModel.touched) {
+                  <mat-error>Enter the weight in grams.</mat-error>
+                }
+              </mat-form-field>
+            }
             <mat-form-field class="full-width">
               <mat-label>Total amount (€)</mat-label>
               <input
@@ -206,7 +237,12 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
             @for (expense of purchases(); track expense.id) {
               <mat-list-item lines="3">
                 <span matListItemTitle>
-                  {{ expense.amountCents | euros }} · {{ expense.weightGrams }} g
+                  {{ expense.amountCents | euros }}
+                  @if (expense.expenseType === expenseTypes.Beans) {
+                    · {{ expense.beanName }} · {{ expense.weightGrams }} g
+                  } @else {
+                    · other
+                  }
                 </span>
                 <span matListItemLine class="muted">
                   private {{ expense.privateAmountCents | euros }} · kitty
@@ -254,14 +290,27 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
         align-items: center;
         gap: 4px;
       }
+
+      .cc-expense-type {
+        margin-bottom: 12px;
+      }
     `
   ]
 })
 export class AdminExpensesComponent implements OnInit {
+  /** Exposes the expense-type values to the template. */
+  readonly expenseTypes = ExpenseType;
+
   readonly users = signal<UserDto[]>([]);
   readonly selectedId = signal('');
   /** The user whose purchases are currently loaded, used to skip a redundant reload on a repeated param. */
   private loadedId = '';
+  /** Whether this outlay is a bean purchase (BEANS, with a bean and weight) or another outlay (OTHER). */
+  expenseType: ExpenseType = ExpenseType.Beans;
+  /** The bean name for a BEANS outlay (an existing name or a new one). */
+  beanName = '';
+  /** The selectable beans for the bean-name autocomplete. */
+  readonly beanOptions = signal<CoffeeBeanDto[]>([]);
   weightGrams: number | null = null;
   amountEuros = '';
   privateEuros = '';
@@ -279,6 +328,7 @@ export class AdminExpensesComponent implements OnInit {
   constructor(
     private readonly userService: UserService,
     private readonly expenseService: ExpenseService,
+    private readonly beanService: BeanService,
     private readonly notifications: NotificationService,
     private readonly dialog: MatDialog,
     private readonly router: Router,
@@ -286,6 +336,13 @@ export class AdminExpensesComponent implements OnInit {
     private readonly cdr: ChangeDetectorRef,
     readonly selection: AdminSelectionService
   ) {}
+
+  /** The selectable beans whose name contains the current bean-name input (case-insensitive). */
+  filteredBeans(): CoffeeBeanDto[] {
+    const query = this.beanName.trim().toLowerCase();
+    const beans = this.beanOptions();
+    return query ? beans.filter((bean) => bean.name.toLowerCase().includes(query)) : beans;
+  }
 
   /** The validation message for the total amount (e.g. the ambiguous comma+point case), or null. */
   amountError(): string | null {
@@ -303,6 +360,8 @@ export class AdminExpensesComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    // the bean-name autocomplete options (a best-effort read that never blocks the page)
+    this.loadBeans();
     await this.reload();
     // The URL is the source of truth for the selected user: follow the `user` query param (so the
     // browser Back/Forward buttons, which change it, re-select and reload the user's purchases). Skip the
@@ -422,36 +481,65 @@ export class AdminExpensesComponent implements OnInit {
 
   /** Validates and assembles the request body, or sets an error and returns null. */
   private buildRequest(): AdminExpenseRequest | null {
-    const weightGrams = this.weightGrams;
+    const beans = this.expenseType === ExpenseType.Beans;
     const amountCents = toCents(this.amountEuros);
     const privateAmountCents = toCents(this.privateEuros);
     const kittyAmountCents = toCents(this.kittyEuros);
-    if (
-      weightGrams == null ||
-      weightGrams < 0 ||
-      !Number.isInteger(weightGrams) ||
-      amountCents == null ||
-      privateAmountCents == null ||
-      kittyAmountCents == null
-    ) {
-      this.error.set('Enter a whole-gram weight, a total, and both shares.');
+    if (amountCents == null || privateAmountCents == null || kittyAmountCents == null) {
+      this.error.set('Enter a total and both shares.');
       return null;
+    }
+    let weightGrams: number | undefined;
+    let beanName: string | undefined;
+    if (beans) {
+      if (
+        !this.beanName.trim() ||
+        this.weightGrams == null ||
+        this.weightGrams < 0 ||
+        !Number.isInteger(this.weightGrams)
+      ) {
+        this.error.set('Enter the beans and a whole-gram weight.');
+        return null;
+      }
+      weightGrams = this.weightGrams;
+      beanName = this.beanName.trim();
     }
     if (privateAmountCents + kittyAmountCents !== amountCents) {
       this.error.set('The private and kitty shares must sum to the total.');
       return null;
     }
-    return { weightGrams, amountCents, privateAmountCents, kittyAmountCents, note: this.note || undefined };
+    return {
+      expenseType: this.expenseType,
+      beanName,
+      weightGrams,
+      amountCents,
+      privateAmountCents,
+      kittyAmountCents,
+      note: this.note || undefined
+    };
   }
 
   /** Loads a purchase into the form for correction; the euro inputs are populated without float math. */
   edit(expense: ExpenseDto): void {
     this.editingId.set(expense.id);
-    this.weightGrams = expense.weightGrams;
+    this.expenseType = expense.expenseType;
+    this.beanName = expense.beanName ?? '';
+    this.weightGrams = expense.weightGrams ?? null;
     this.amountEuros = centsToEuroString(expense.amountCents);
     this.privateEuros = centsToEuroString(expense.privateAmountCents);
     this.kittyEuros = centsToEuroString(expense.kittyAmountCents);
     this.note = expense.note ?? '';
+  }
+
+  /** Loads the selectable beans for the autocomplete (best effort). */
+  private loadBeans(): void {
+    this.beanService
+      .listSelectable()
+      .then((beans) => {
+        this.beanOptions.set(beans);
+        this.cdr.markForCheck();
+      })
+      .catch(() => undefined);
   }
 
   /** Deletes a purchase by id, gated behind a confirmation. */
@@ -495,6 +583,8 @@ export class AdminExpensesComponent implements OnInit {
 
   private resetForm(): void {
     this.editingId.set(null);
+    this.expenseType = ExpenseType.Beans;
+    this.beanName = '';
     this.weightGrams = null;
     this.amountEuros = '';
     this.privateEuros = '';

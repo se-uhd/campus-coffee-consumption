@@ -4,6 +4,7 @@ import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
 import de.seuhd.campuscoffee.domain.model.Expense
+import de.seuhd.campuscoffee.domain.model.ExpenseType
 import de.seuhd.campuscoffee.domain.model.User
 import java.util.UUID
 
@@ -17,28 +18,35 @@ import java.util.UUID
  */
 interface ExpenseService {
     /**
-     * Records a purchase the calling user made with their own money (100% private to themselves).
+     * Records an outlay the calling user made with their own money (100% private to themselves).
      *
-     * @param weightGrams the bean weight in grams (non-negative)
+     * @param expenseType whether this is a bean purchase ([ExpenseType.BEANS]) or another outlay ([ExpenseType.OTHER])
+     * @param beanName    the bean name for a `BEANS` outlay (resolved or created); null for `OTHER`
+     * @param weightGrams the bean weight in grams for a `BEANS` outlay; null for `OTHER`
      * @param amountCents the amount paid in euro cents (non-negative)
      * @param note        an optional free-text note
-     * @param actingUser  the user recording their own purchase
+     * @param actingUser  the user recording their own outlay
      * @return the recorded expense
      * @throws ForbiddenException if [actingUser] is deactivated (read-only)
-     * @throws ValidationException if a value is negative
+     * @throws ValidationException if a value is negative or the type/bean/weight combination is invalid
      */
+    @Suppress("LongParameterList")
     fun recordOwn(
-        weightGrams: Int,
+        expenseType: ExpenseType,
+        beanName: String?,
+        weightGrams: Int?,
         amountCents: Int,
         note: String?,
         actingUser: User
     ): Expense
 
     /**
-     * Records a purchase on behalf of a user, with an explicit kitty/private split (admin-only).
+     * Records an outlay on behalf of a user, with an explicit kitty/private split (admin-only).
      *
      * @param buyerUserId        the user credited with the private portion
-     * @param weightGrams        the bean weight in grams (non-negative)
+     * @param expenseType        whether this is a bean purchase or another outlay
+     * @param beanName           the bean name for a `BEANS` outlay (resolved or created); null for `OTHER`
+     * @param weightGrams        the bean weight in grams for a `BEANS` outlay; null for `OTHER`
      * @param amountCents        the total amount paid in euro cents (non-negative)
      * @param privateAmountCents the portion paid from the buyer's pocket (credits the buyer)
      * @param kittyAmountCents   the portion paid from the kitty (draws the kitty down)
@@ -47,12 +55,14 @@ interface ExpenseService {
      * @return the recorded expense
      * @throws ForbiddenException if [actingUser] is not an admin
      * @throws NotFoundException if no user exists for [buyerUserId]
-     * @throws ValidationException if a value is negative or the split does not sum to the total
+     * @throws ValidationException if a value is negative, the split does not sum, or the type combination is invalid
      */
     @Suppress("LongParameterList")
     fun record(
         buyerUserId: UUID,
-        weightGrams: Int,
+        expenseType: ExpenseType,
+        beanName: String?,
+        weightGrams: Int?,
         amountCents: Int,
         privateAmountCents: Int,
         kittyAmountCents: Int,
@@ -61,11 +71,13 @@ interface ExpenseService {
     ): Expense
 
     /**
-     * Corrects a recorded purchase (admin-only): replaces its buyer, weight, amount, split, and note.
+     * Corrects a recorded outlay (admin-only): replaces its type, bean, weight, amount, split, and note.
      *
      * @param expenseId          the id of the expense to correct
      * @param buyerUserId        the user credited with the private portion
-     * @param weightGrams        the bean weight in grams (non-negative)
+     * @param expenseType        whether this is a bean purchase or another outlay
+     * @param beanName           the bean name for a `BEANS` outlay (resolved or created); null for `OTHER`
+     * @param weightGrams        the bean weight in grams for a `BEANS` outlay; null for `OTHER`
      * @param amountCents        the total amount paid in euro cents (non-negative)
      * @param privateAmountCents the portion paid from the buyer's pocket
      * @param kittyAmountCents   the portion paid from the kitty
@@ -74,13 +86,15 @@ interface ExpenseService {
      * @return the corrected expense
      * @throws ForbiddenException if [actingUser] is not an admin
      * @throws NotFoundException if no expense exists for [expenseId] or no user for [buyerUserId]
-     * @throws ValidationException if a value is negative or the split does not sum to the total
+     * @throws ValidationException if a value is negative, the split does not sum, or the type combination is invalid
      */
     @Suppress("LongParameterList")
     fun update(
         expenseId: UUID,
         buyerUserId: UUID,
-        weightGrams: Int,
+        expenseType: ExpenseType,
+        beanName: String?,
+        weightGrams: Int?,
         amountCents: Int,
         privateAmountCents: Int,
         kittyAmountCents: Int,

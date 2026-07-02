@@ -4,8 +4,10 @@ import de.seuhd.campuscoffee.configuration.FixturesProperties
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.CoffeePrice
 import de.seuhd.campuscoffee.domain.model.User
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeBeanService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeRatingService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
@@ -28,6 +30,8 @@ class FixtureStartupLoaderTest {
     private val coffeePriceService = mock<CoffeePriceService>()
     private val expenseService = mock<ExpenseService>()
     private val paymentService = mock<PaymentService>()
+    private val coffeeRatingService = mock<CoffeeRatingService>()
+    private val coffeeBeanService = mock<CoffeeBeanService>()
     private val idGenerator = mock<IdGeneratorService>()
     private val loader =
         FixtureStartupLoader(
@@ -36,6 +40,8 @@ class FixtureStartupLoaderTest {
             coffeePriceService,
             expenseService,
             paymentService,
+            coffeeRatingService,
+            coffeeBeanService,
             idGenerator,
             FixturesProperties(loadOnStartup = true, resetOnStartup = false)
         )
@@ -72,6 +78,8 @@ class FixtureStartupLoaderTest {
                 coffeePriceService,
                 expenseService,
                 paymentService,
+                coffeeRatingService,
+                coffeeBeanService,
                 idGenerator,
                 FixturesProperties(loadOnStartup = true, resetOnStartup = true)
             )

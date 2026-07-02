@@ -9,6 +9,7 @@ import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.ConsumptionChange
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeRatingService
 import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.ConsumptionHistoryDataService
@@ -38,6 +39,7 @@ class CoffeeConsumptionServiceTest {
     private val historyService: ConsumptionHistoryDataService = mock()
     private val activityDataService: ActivityDataService = mock()
     private val userDataService: UserDataService = mock()
+    private val coffeeRatingService: CoffeeRatingService = mock()
     private val changeNoteContext = ChangeNoteContext()
     private val gracePeriod: Duration = Duration.ofMinutes(5)
 
@@ -86,6 +88,7 @@ class CoffeeConsumptionServiceTest {
                 historyService,
                 activityDataService,
                 userDataService,
+                coffeeRatingService,
                 changeNoteContext,
                 ConsumptionProperties(gracePeriod)
             )

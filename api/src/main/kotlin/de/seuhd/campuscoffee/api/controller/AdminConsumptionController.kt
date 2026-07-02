@@ -3,10 +3,12 @@ package de.seuhd.campuscoffee.api.controller
 import de.seuhd.campuscoffee.api.dtos.ConsumptionDeltaDto
 import de.seuhd.campuscoffee.api.dtos.ConsumptionDto
 import de.seuhd.campuscoffee.api.dtos.ConsumptionOverrideDto
+import de.seuhd.campuscoffee.api.dtos.RatingRequestDto
 import de.seuhd.campuscoffee.api.mapper.ConsumptionDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeRatingService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -34,6 +36,7 @@ import java.util.UUID
 @RequestMapping("/users/{userId}/consumption")
 class AdminConsumptionController(
     private val coffeeConsumptionService: CoffeeConsumptionService,
+    private val coffeeRatingService: CoffeeRatingService,
     private val consumptionDtoMapper: ConsumptionDtoMapper,
     private val currentUserProvider: CurrentUserProvider
 ) {
@@ -108,6 +111,27 @@ class AdminConsumptionController(
         val actingUser = currentUserProvider.currentUser()
         val updated = coffeeConsumptionService.setTotal(userId, requireNotNull(dto.total), dto.note, actingUser)
         return ResponseEntity.ok(consumptionDtoMapper.toDto(updated.count, recentChanges(userId, actingUser)))
+    }
+
+    /**
+     * Rates the beans of the user's current cup on their behalf (an admin acting for the drinker), while it
+     * is still within the grace window, and returns the refreshed total and recent changes. Allowed only
+     * when the user has a cancellable cup (else 409); a repeat within the same window updates the one vote.
+     *
+     * @param userId the id of the user whose current cup to rate
+     * @param dto    the bean to rate and the value (one to five)
+     */
+    @Operation(summary = "Rate the beans of a user's current cup on their behalf (admin).")
+    @PutMapping("/rating")
+    fun rate(
+        @Parameter(description = "Unique identifier of the user.", required = true)
+        @PathVariable userId: UUID,
+        @RequestBody @Valid dto: RatingRequestDto
+    ): ResponseEntity<ConsumptionDto> {
+        val actingUser = currentUserProvider.currentUser()
+        coffeeRatingService.rateCurrentBean(userId, requireNotNull(dto.beanId), requireNotNull(dto.value), actingUser)
+        val count = coffeeConsumptionService.getByUserId(userId, actingUser).count
+        return ResponseEntity.ok(consumptionDtoMapper.toDto(count, recentChanges(userId, actingUser)))
     }
 
     /** Builds the composite response (current total + a page of recent changes) for the user. */

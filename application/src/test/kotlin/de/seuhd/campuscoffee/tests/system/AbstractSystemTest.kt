@@ -2,8 +2,10 @@ package de.seuhd.campuscoffee.tests.system
 
 import de.seuhd.campuscoffee.Application
 import de.seuhd.campuscoffee.domain.model.User
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeBeanService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeRatingService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
@@ -45,6 +47,12 @@ abstract class AbstractSystemTest {
     @Autowired
     protected lateinit var paymentService: PaymentService
 
+    @Autowired
+    protected lateinit var coffeeRatingService: CoffeeRatingService
+
+    @Autowired
+    protected lateinit var coffeeBeanService: CoffeeBeanService
+
     @LocalServerPort
     private var port: Int = 0
 
@@ -71,14 +79,17 @@ abstract class AbstractSystemTest {
     /** The seeded user with the given login name. */
     protected fun seededUser(loginName: String): User = seededUsers.first { it.loginName == loginName }
 
-    // Clears in foreign key order: expenses and payments reference users (RESTRICT), consumptions cascade;
-    // so clear the money children, then consumptions, then users, then the independent price.
+    // Clears in foreign key order: ratings and expenses reference beans (and users), payments reference
+    // users; so clear the money children and ratings, then consumptions, then users, then the beans the
+    // ratings and expenses referenced, and the independent price.
     private fun clearAll() {
         expenseService.clear()
         paymentService.clear()
+        coffeeRatingService.clear()
         coffeeConsumptionService.clear()
         userService.clear()
         coffeePriceService.clear()
+        coffeeBeanService.clear()
     }
 
     protected companion object {

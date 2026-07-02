@@ -1,8 +1,10 @@
 package de.seuhd.campuscoffee
 
 import de.seuhd.campuscoffee.configuration.FixturesProperties
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeBeanService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeRatingService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
@@ -30,6 +32,8 @@ class FixtureStartupLoader(
     private val coffeePriceService: CoffeePriceService,
     private val expenseService: ExpenseService,
     private val paymentService: PaymentService,
+    private val coffeeRatingService: CoffeeRatingService,
+    private val coffeeBeanService: CoffeeBeanService,
     private val idGenerator: IdGeneratorService,
     private val fixturesProperties: FixturesProperties
 ) : StartupTaskService {
@@ -66,9 +70,13 @@ class FixtureStartupLoader(
     private fun clearAll() {
         expenseService.clear()
         paymentService.clear()
+        // ratings reference beans (and users), so clear them before the beans and users
+        coffeeRatingService.clear()
         coffeeConsumptionService.clear()
         userService.clear()
         coffeePriceService.clear()
+        // beans last: expenses and ratings reference a bean, so clear the referencers first
+        coffeeBeanService.clear()
     }
 
     private companion object {

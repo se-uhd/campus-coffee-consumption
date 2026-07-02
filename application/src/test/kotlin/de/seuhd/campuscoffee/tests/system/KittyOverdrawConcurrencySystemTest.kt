@@ -1,6 +1,7 @@
 package de.seuhd.campuscoffee.tests.system
 
 import de.seuhd.campuscoffee.domain.exceptions.ConflictException
+import de.seuhd.campuscoffee.domain.model.ExpenseType
 import de.seuhd.campuscoffee.domain.model.persistedId
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -37,6 +38,8 @@ class KittyOverdrawConcurrencySystemTest : AbstractSystemTest() {
                     runCatching {
                         expenseService.record(
                             buyerUserId = buyer.persistedId,
+                            expenseType = ExpenseType.BEANS,
+                            beanName = "concurrency beans",
                             weightGrams = 100,
                             amountCents = DRAW_CENTS,
                             privateAmountCents = 0,

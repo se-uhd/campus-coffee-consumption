@@ -29,6 +29,30 @@ export class NotificationService {
     this.snackBar.open(message, 'Dismiss', { duration: 6000 });
   }
 
+  /**
+   * Shows the server's own reason for a failure when the response carries one, otherwise the `fallback`.
+   * Use this where the backend returns a specific, user-facing reason (a business-rule 4xx, such as the two
+   * distinct rating conflicts: no recent cup versus the grace window having passed) that is more helpful
+   * than a generic client-side message.
+   *
+   * @param error the caught error (typically an `HttpErrorResponse` with a `{ message }` body)
+   * @param fallback the message to show when the response carries no usable reason
+   */
+  errorWithServerReason(error: unknown, fallback: string): void {
+    this.snackBar.open(this.serverReason(error) ?? fallback, 'Dismiss', { duration: 6000 });
+  }
+
+  /** The `message` from an API error body, when present and non-blank; otherwise undefined. */
+  private serverReason(error: unknown): string | undefined {
+    if (error instanceof HttpErrorResponse) {
+      const message = (error.error as { message?: unknown } | null)?.message;
+      if (typeof message === 'string' && message.trim().length > 0) {
+        return message.trim();
+      }
+    }
+    return undefined;
+  }
+
   /** Derives a human-readable message from an HTTP error status, with a generic default. */
   private messageFor(error: unknown): string {
     if (error instanceof HttpErrorResponse) {

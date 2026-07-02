@@ -8,6 +8,7 @@ import de.seuhd.campuscoffee.api.dtos.GlobalActivityEntryDto
 import de.seuhd.campuscoffee.api.dtos.PriceUpdateDto
 import de.seuhd.campuscoffee.api.dtos.UserDto
 import de.seuhd.campuscoffee.domain.model.ActivityEntryType
+import de.seuhd.campuscoffee.domain.model.ExpenseType
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
@@ -153,6 +154,8 @@ class AdminGlobalActivitySystemTests : AbstractSystemTest() {
             .contentType(MediaType.APPLICATION_JSON)
             .body(
                 AdminExpenseDto(
+                    expenseType = ExpenseType.BEANS,
+                    beanName = "test beans",
                     weightGrams = 750,
                     amountCents = 800,
                     privateAmountCents = 0,

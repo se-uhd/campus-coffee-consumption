@@ -5,7 +5,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.3] - 2026-07-02
+
+### Added
+
+- Coffee ratings and a bean catalog. Right after adding a coffee, while it can still be undone, a user rates
+  the beans they are drinking from one to five (choosing the bean, defaulted to the most recent purchase).
+  Votes accumulate per bean over time but at most one per undo window: rating again in the same window
+  updates that vote, and undoing the cup drops it. A ratings page, sortable by name, rating, or vote count,
+  shows each bean's average, vote count, and latest rating and purchase. An admin can rename a bean or merge
+  one into another.
+- Typed expenses. An expense is now a bean purchase (`BEANS`, with a named bean and a weight) or another
+  outlay (`OTHER`, with neither). Users and admins can record either, and a bean named on a purchase enters
+  the catalog, so the beans you buy are the beans you can rate.
+
+### Changed
+
+- An expense's weight is now optional: required for a bean purchase, omitted for any other outlay.
 
 ## [0.9.2] - 2026-07-01
 
@@ -986,6 +1002,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.9.3]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.3
 [0.9.2]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.2
 [0.9.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.1
 [0.9.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.0

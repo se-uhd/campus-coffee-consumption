@@ -23,5 +23,6 @@ data class UserSummaryDto(
     val firstCupAt: LocalDateTime?,
     val cupsThisWeek: Int,
     val cupsToday: Int,
+    val ratingPrompt: CoffeeRatingPromptDto,
     val activity: List<ActivityEntryDto>
 )

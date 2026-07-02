@@ -2,6 +2,7 @@ package de.seuhd.campuscoffee.tests.system
 
 import de.seuhd.campuscoffee.api.dtos.ConsumptionDeltaDto
 import de.seuhd.campuscoffee.api.dtos.OwnExpenseDto
+import de.seuhd.campuscoffee.domain.model.ExpenseType
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
@@ -32,7 +33,16 @@ class InputValidationSystemTests : AbstractSystemTest() {
     @Test
     fun `a bean purchase above the money cap returns 400 Bad Request`() {
         // MAX_MONEY_CENTS is 1,000 EUR; one cent over the cap is refused
-        val status = postOwnExpense(OwnExpenseDto(weightGrams = 500, amountCents = 100_001, note = null))
+        val status =
+            postOwnExpense(
+                OwnExpenseDto(
+                    expenseType = ExpenseType.BEANS,
+                    beanName = "test beans",
+                    weightGrams = 500,
+                    amountCents = 100_001,
+                    note = null
+                )
+            )
 
         assertThat(status).isEqualTo(400)
     }
@@ -40,7 +50,16 @@ class InputValidationSystemTests : AbstractSystemTest() {
     @Test
     fun `a bean purchase above the weight cap returns 400 Bad Request`() {
         // MAX_WEIGHT_GRAMS is 1,000 g; one gram over the cap is refused
-        val status = postOwnExpense(OwnExpenseDto(weightGrams = 1_001, amountCents = 900, note = null))
+        val status =
+            postOwnExpense(
+                OwnExpenseDto(
+                    expenseType = ExpenseType.BEANS,
+                    beanName = "test beans",
+                    weightGrams = 1_001,
+                    amountCents = 900,
+                    note = null
+                )
+            )
 
         assertThat(status).isEqualTo(400)
     }
@@ -48,7 +67,16 @@ class InputValidationSystemTests : AbstractSystemTest() {
     @Test
     fun `a bean purchase below the minimum weight returns 400 Bad Request`() {
         // MIN_WEIGHT_GRAMS is 100 g; a lighter purchase is refused
-        val status = postOwnExpense(OwnExpenseDto(weightGrams = 50, amountCents = 900, note = null))
+        val status =
+            postOwnExpense(
+                OwnExpenseDto(
+                    expenseType = ExpenseType.BEANS,
+                    beanName = "test beans",
+                    weightGrams = 50,
+                    amountCents = 900,
+                    note = null
+                )
+            )
 
         assertThat(status).isEqualTo(400)
     }

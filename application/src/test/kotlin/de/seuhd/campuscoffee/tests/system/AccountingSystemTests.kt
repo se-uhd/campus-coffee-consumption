@@ -14,6 +14,7 @@ import de.seuhd.campuscoffee.api.dtos.ProfileUpdateDto
 import de.seuhd.campuscoffee.api.dtos.UserBalanceDto
 import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.domain.model.ActivityEntryType
+import de.seuhd.campuscoffee.domain.model.ExpenseType
 import de.seuhd.campuscoffee.domain.model.SummaryPanel
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
@@ -177,8 +178,15 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .post()
                 .uri("/api/expenses")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(OwnExpenseDto(weightGrams = 1000, amountCents = 900, note = "beans"))
-                .withUser(user)
+                .body(
+                    OwnExpenseDto(
+                        expenseType = ExpenseType.BEANS,
+                        beanName = "test beans",
+                        weightGrams = 1000,
+                        amountCents = 900,
+                        note = "beans"
+                    )
+                ).withUser(user)
                 .exchange()
                 .returnResult<UserSummaryDto>()
                 .responseBody!!
@@ -211,6 +219,8 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
+                        expenseType = ExpenseType.BEANS,
+                        beanName = "test beans",
                         weightGrams = 1000,
                         amountCents = 900,
                         privateAmountCents = 400,
@@ -283,6 +293,8 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
+                        expenseType = ExpenseType.BEANS,
+                        beanName = "test beans",
                         weightGrams = 1000,
                         amountCents = 900,
                         privateAmountCents = 400,
@@ -302,6 +314,8 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
+                        expenseType = ExpenseType.BEANS,
+                        beanName = "test beans",
                         weightGrams = 800,
                         amountCents = 1000,
                         privateAmountCents = 700,
@@ -327,6 +341,8 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
+                        expenseType = ExpenseType.BEANS,
+                        beanName = "test beans",
                         weightGrams = 1000,
                         amountCents = 900,
                         privateAmountCents = 400,
@@ -348,6 +364,8 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
+                        expenseType = ExpenseType.BEANS,
+                        beanName = "test beans",
                         weightGrams = 1000,
                         amountCents = 900,
                         privateAmountCents = 400,
@@ -372,6 +390,8 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
+                        expenseType = ExpenseType.BEANS,
+                        beanName = "test beans",
                         weightGrams = 500,
                         amountCents = 300,
                         privateAmountCents = 300,
@@ -389,6 +409,8 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
+                        expenseType = ExpenseType.BEANS,
+                        beanName = "test beans",
                         weightGrams = 1000,
                         amountCents = 900,
                         privateAmountCents = 400,
@@ -434,8 +456,15 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .post()
                 .uri("/api/expenses")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(OwnExpenseDto(weightGrams = 1000, amountCents = 0, note = "beans"))
-                .withUser(user)
+                .body(
+                    OwnExpenseDto(
+                        expenseType = ExpenseType.BEANS,
+                        beanName = "test beans",
+                        weightGrams = 1000,
+                        amountCents = 0,
+                        note = "beans"
+                    )
+                ).withUser(user)
                 .exchange()
                 .statusCode()
         assertThat(status).isEqualTo(400)
@@ -458,6 +487,8 @@ class AccountingSystemTests : AbstractSystemTest() {
             .contentType(MediaType.APPLICATION_JSON)
             .body(
                 AdminExpenseDto(
+                    expenseType = ExpenseType.BEANS,
+                    beanName = "test beans",
                     weightGrams = 1000,
                     amountCents = 900,
                     privateAmountCents = 0,
@@ -504,6 +535,8 @@ class AccountingSystemTests : AbstractSystemTest() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(
                     AdminExpenseDto(
+                        expenseType = ExpenseType.BEANS,
+                        beanName = "test beans",
                         weightGrams = 1000,
                         amountCents = 900,
                         privateAmountCents = 400,

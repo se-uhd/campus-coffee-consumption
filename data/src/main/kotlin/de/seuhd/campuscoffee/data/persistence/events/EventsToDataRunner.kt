@@ -1,7 +1,9 @@
 package de.seuhd.campuscoffee.data.persistence.events
 import de.seuhd.campuscoffee.data.persistence.projection.BalanceProjectionMaintainer
+import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeBeanRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeConsumptionRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeePriceRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeRatingRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.EventRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.ExpenseRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.PaymentRepository
@@ -33,7 +35,9 @@ class EventsToDataRunner(
     private val coffeeConsumptionRepository: CoffeeConsumptionRepository,
     private val coffeePriceRepository: CoffeePriceRepository,
     private val expenseRepository: ExpenseRepository,
-    private val paymentRepository: PaymentRepository
+    private val paymentRepository: PaymentRepository,
+    private val coffeeRatingRepository: CoffeeRatingRepository,
+    private val coffeeBeanRepository: CoffeeBeanRepository
 ) : StartupTaskService {
     override val order = ORDER
 
@@ -73,17 +77,20 @@ class EventsToDataRunner(
 
     /**
      * Empties the read tables in foreign key order: the balance projections first, then the children that
-     * reference users (consumptions, expenses, payments) before users; the price is independent and is
-     * cleared too. Clearing the balance projections here, rather than relying on the `user_balance` cascade
-     * from the user delete, keeps the kitty_balance row from going stale during the replay.
+     * reference users (ratings, consumptions, expenses, payments) before users, then the beans that the
+     * ratings and expenses reference, and the independent price. Clearing the balance projections here,
+     * rather than relying on the `user_balance` cascade from the user delete, keeps the kitty_balance row
+     * from going stale during the replay.
      */
     private fun clearReadTables() {
         balanceProjection.clear()
+        coffeeRatingRepository.deleteAllInBatch()
         coffeeConsumptionRepository.deleteAllInBatch()
         expenseRepository.deleteAllInBatch()
         paymentRepository.deleteAllInBatch()
         userRepository.deleteAllInBatch()
         coffeePriceRepository.deleteAllInBatch()
+        coffeeBeanRepository.deleteAllInBatch()
     }
 
     companion object {

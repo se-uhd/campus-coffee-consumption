@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.api.controller
 
+import de.seuhd.campuscoffee.api.dtos.RatingRequestDto
 import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.api.mapper.AccountingDtoMapper
 import de.seuhd.campuscoffee.api.security.CurrentUserProvider
@@ -7,11 +8,15 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.AccountingService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeRatingService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 
 /**
@@ -30,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 @RequestMapping("/consumption")
 class ConsumptionController(
     private val coffeeConsumptionService: CoffeeConsumptionService,
+    private val coffeeRatingService: CoffeeRatingService,
     private val accountingService: AccountingService,
     private val accountingDtoMapper: AccountingDtoMapper,
     private val currentUserProvider: CurrentUserProvider
@@ -52,6 +58,28 @@ class ConsumptionController(
     fun cancel(): ResponseEntity<UserSummaryDto> {
         val user = currentUserProvider.currentUser()
         coffeeConsumptionService.cancel(user.persistedId, user)
+        return ResponseEntity.ok(summary(user))
+    }
+
+    /**
+     * Sets or updates the authenticated user's rating for the current cup window on the given bean, and
+     * returns the refreshed summary. Allowed only while the user has a cancellable cup within grace (else
+     * 409); a repeat call within the same window updates the one vote.
+     *
+     * @param dto the bean to rate and the value (one to five)
+     */
+    @Operation(summary = "Rate the beans of the authenticated user's current coffee (one to five).")
+    @PutMapping("/rating")
+    fun rate(
+        @RequestBody @Valid dto: RatingRequestDto
+    ): ResponseEntity<UserSummaryDto> {
+        val user = currentUserProvider.currentUser()
+        coffeeRatingService.rateCurrentBean(
+            user.persistedId,
+            requireNotNull(dto.beanId),
+            requireNotNull(dto.value),
+            user
+        )
         return ResponseEntity.ok(summary(user))
     }
 

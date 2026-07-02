@@ -1,16 +1,19 @@
 package de.seuhd.campuscoffee
 
 import de.seuhd.campuscoffee.configuration.FixturesProperties
+import de.seuhd.campuscoffee.domain.model.CoffeeBean
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.Expense
 import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeBeanService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.data.CoffeeRatingDataService
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
@@ -39,6 +42,8 @@ class DevDemoDataLoaderTest {
     private val coffeePriceService = mock<CoffeePriceService>()
     private val expenseService = mock<ExpenseService>()
     private val paymentService = mock<PaymentService>()
+    private val coffeeBeanService = mock<CoffeeBeanService>()
+    private val coffeeRatingDataService = mock<CoffeeRatingDataService>()
 
     // the default loader has demo seeding enabled (the production default); the gate is exercised separately
     private val loader =
@@ -48,6 +53,8 @@ class DevDemoDataLoaderTest {
             coffeePriceService,
             expenseService,
             paymentService,
+            coffeeBeanService,
+            coffeeRatingDataService,
             FixturesProperties(demoDataOnStartup = true)
         )
 
@@ -83,9 +90,12 @@ class DevDemoDataLoaderTest {
         }
         whenever(coffeeConsumptionService.createForUser(any())).thenReturn(mock<CoffeeConsumption>())
         whenever(coffeeConsumptionService.applyDelta(any(), eq(1), any())).thenReturn(mock<CoffeeConsumption>())
-        whenever(expenseService.recordOwn(any(), any(), any(), any())).thenReturn(mock<Expense>())
+        whenever(expenseService.recordOwn(any(), any(), any(), any(), any(), any())).thenReturn(mock<Expense>())
         whenever(paymentService.recordDeposit(any(), any(), any(), any())).thenReturn(mock<Payment>())
         whenever(paymentService.adjustKitty(any(), any(), any())).thenReturn(mock<Payment>())
+        // the rating seeding resolves each bean by name (returning a persisted bean) and casts a vote
+        whenever(coffeeBeanService.resolveOrCreate(any()))
+            .thenReturn(CoffeeBean(id = UUID.randomUUID(), name = "demo bean"))
     }
 
     @Test
@@ -113,7 +123,7 @@ class DevDemoDataLoaderTest {
 
         // the demo specs add coffees, own bean purchases, and user deposits, so each seed path runs
         verify(coffeeConsumptionService, atLeastOnce()).applyDelta(any(), eq(1), any())
-        verify(expenseService, atLeastOnce()).recordOwn(any(), any(), any(), any())
+        verify(expenseService, atLeastOnce()).recordOwn(any(), any(), any(), any(), any(), any())
         verify(paymentService, atLeastOnce()).recordDeposit(any(), any(), any(), any())
         // exactly one initial kitty float, recorded against the resolved fixture admin
         verify(paymentService, times(1)).adjustKitty(any(), any(), eq(admin))
@@ -172,6 +182,8 @@ class DevDemoDataLoaderTest {
                 coffeePriceService,
                 expenseService,
                 paymentService,
+                coffeeBeanService,
+                coffeeRatingDataService,
                 FixturesProperties(demoDataOnStartup = false)
             )
 
@@ -183,7 +195,9 @@ class DevDemoDataLoaderTest {
             coffeeConsumptionService,
             coffeePriceService,
             expenseService,
-            paymentService
+            paymentService,
+            coffeeBeanService,
+            coffeeRatingDataService
         )
     }
 

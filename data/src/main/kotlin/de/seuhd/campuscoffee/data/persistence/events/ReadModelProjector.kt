@@ -1,6 +1,8 @@
 package de.seuhd.campuscoffee.data.persistence.events
+import de.seuhd.campuscoffee.data.mapper.CoffeeBeanEntityMapper
 import de.seuhd.campuscoffee.data.mapper.CoffeeConsumptionEntityMapper
 import de.seuhd.campuscoffee.data.mapper.CoffeePriceEntityMapper
+import de.seuhd.campuscoffee.data.mapper.CoffeeRatingEntityMapper
 import de.seuhd.campuscoffee.data.mapper.EntityMapper
 import de.seuhd.campuscoffee.data.mapper.ExpenseEntityMapper
 import de.seuhd.campuscoffee.data.mapper.PaymentEntityMapper
@@ -8,14 +10,17 @@ import de.seuhd.campuscoffee.data.mapper.UserEntityMapper
 import de.seuhd.campuscoffee.data.persistence.ConstraintMapping
 import de.seuhd.campuscoffee.data.persistence.EventJsonMapper
 import de.seuhd.campuscoffee.data.persistence.entities.ChangeType
+import de.seuhd.campuscoffee.data.persistence.entities.CoffeeBeanEntity
 import de.seuhd.campuscoffee.data.persistence.entities.CoffeeConsumptionEntity
 import de.seuhd.campuscoffee.data.persistence.entities.CoffeePriceEntity
 import de.seuhd.campuscoffee.data.persistence.entities.Entity
 import de.seuhd.campuscoffee.data.persistence.entities.EventEntity
 import de.seuhd.campuscoffee.data.persistence.entities.LoggedEntityType
 import de.seuhd.campuscoffee.data.persistence.entities.UserEntity
+import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeBeanRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeConsumptionRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeePriceRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeRatingRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.ExpenseRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.PaymentRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.UserRepository
@@ -23,10 +28,13 @@ import de.seuhd.campuscoffee.domain.exceptions.ConcurrentUpdateException
 import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
 import de.seuhd.campuscoffee.domain.exceptions.DuplicationException
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
+import de.seuhd.campuscoffee.domain.model.CoffeeBean
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.CoffeePrice
+import de.seuhd.campuscoffee.domain.model.CoffeeRating
 import de.seuhd.campuscoffee.domain.model.DomainModel
 import de.seuhd.campuscoffee.domain.model.Expense
+import de.seuhd.campuscoffee.domain.model.ExpenseType
 import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.User
 import org.springframework.dao.DataIntegrityViolationException
@@ -66,11 +74,15 @@ class ReadModelProjector(
     private val coffeePriceRepository: CoffeePriceRepository,
     private val expenseRepository: ExpenseRepository,
     private val paymentRepository: PaymentRepository,
+    private val coffeeBeanRepository: CoffeeBeanRepository,
     private val userMapper: UserEntityMapper,
     private val coffeeConsumptionMapper: CoffeeConsumptionEntityMapper,
     private val coffeePriceMapper: CoffeePriceEntityMapper,
     private val expenseMapper: ExpenseEntityMapper,
-    private val paymentMapper: PaymentEntityMapper
+    private val paymentMapper: PaymentEntityMapper,
+    private val coffeeBeanMapper: CoffeeBeanEntityMapper,
+    private val coffeeRatingRepository: CoffeeRatingRepository,
+    private val coffeeRatingMapper: CoffeeRatingEntityMapper
 ) {
     /**
      * Applies a stored event to the read tables, unwrapping its fields, which are always populated.
@@ -117,6 +129,10 @@ class ReadModelProjector(
             insertRow(expenseRepository, expenseMapper.toEntity(reconstructExpense(body)), body)
         LoggedEntityType.PAYMENT ->
             insertRow(paymentRepository, paymentMapper.toEntity(reconstructPayment(body)), body)
+        LoggedEntityType.COFFEE_BEAN ->
+            insertRow(coffeeBeanRepository, coffeeBeanMapper.toEntity(convert(body, CoffeeBean::class)), body)
+        LoggedEntityType.COFFEE_RATING ->
+            insertRow(coffeeRatingRepository, coffeeRatingMapper.toEntity(reconstructRating(body)), body)
     }
 
     /** Updates the existing read model row for the event's type from the body. */
@@ -146,6 +162,22 @@ class ReadModelProjector(
             updateRow(expenseRepository, expenseMapper, reconstructExpense(body), body, Expense::class.java)
         LoggedEntityType.PAYMENT ->
             updateRow(paymentRepository, paymentMapper, reconstructPayment(body), body, Payment::class.java)
+        LoggedEntityType.COFFEE_BEAN ->
+            updateRow(
+                coffeeBeanRepository,
+                coffeeBeanMapper,
+                convert(body, CoffeeBean::class),
+                body,
+                CoffeeBean::class.java
+            )
+        LoggedEntityType.COFFEE_RATING ->
+            updateRow(
+                coffeeRatingRepository,
+                coffeeRatingMapper,
+                reconstructRating(body),
+                body,
+                CoffeeRating::class.java
+            )
     }
 
     /** Removes the read model row identified by the body's id for the event's type. */
@@ -160,6 +192,8 @@ class ReadModelProjector(
             LoggedEntityType.COFFEE_PRICE -> deleteRow(coffeePriceRepository, id)
             LoggedEntityType.EXPENSE -> deleteRow(expenseRepository, id)
             LoggedEntityType.PAYMENT -> deleteRow(paymentRepository, id)
+            LoggedEntityType.COFFEE_BEAN -> deleteRow(coffeeBeanRepository, id)
+            LoggedEntityType.COFFEE_RATING -> deleteRow(coffeeRatingRepository, id)
         }
     }
 
@@ -187,7 +221,11 @@ class ReadModelProjector(
         )
     }
 
-    /** Rebuilds an [Expense] from its flattened body, resolving the buyer id against the read model. */
+    /**
+     * Rebuilds an [Expense] from its flattened body, resolving the buyer id (and, for a bean purchase, the
+     * bean id) against the read model. A legacy event body predating expense typing carries no `expenseType`
+     * or `beanId`, so it defaults to [ExpenseType.BEANS] with no bean (the migration derives the bean).
+     */
     private fun reconstructExpense(body: Map<String, Any?>): Expense {
         val payload = convert(body, ExpenseEventPayload::class)
         return Expense(
@@ -195,6 +233,8 @@ class ReadModelProjector(
             createdAt = payload.createdAt,
             updatedAt = payload.updatedAt,
             buyer = requireUser(payload.buyerUserId),
+            expenseType = payload.expenseType ?: ExpenseType.BEANS,
+            bean = payload.beanId?.let { requireBean(it) },
             weightGrams = payload.weightGrams,
             amountCents = payload.amountCents,
             privateAmountCents = payload.privateAmountCents,
@@ -216,10 +256,29 @@ class ReadModelProjector(
         )
     }
 
+    /** Rebuilds a [CoffeeRating] from its flattened body, resolving the user and bean ids against the read model. */
+    private fun reconstructRating(body: Map<String, Any?>): CoffeeRating {
+        val payload = convert(body, CoffeeRatingEventPayload::class)
+        return CoffeeRating(
+            id = payload.id,
+            createdAt = payload.createdAt,
+            updatedAt = payload.updatedAt,
+            user = requireUser(payload.userId),
+            bean = requireBean(payload.beanId),
+            value = payload.value
+        )
+    }
+
     /** Resolves a user id against the already-projected user read model, failing if the user is missing. */
     private fun requireUser(userId: UUID): User =
         userMapper.fromEntity(
             userRepository.findByIdOrNull(userId) ?: throw NotFoundException(User::class.java, userId)
+        )
+
+    /** Resolves a bean id against the already-projected bean read model, failing if the bean is missing. */
+    private fun requireBean(beanId: UUID): CoffeeBean =
+        coffeeBeanMapper.fromEntity(
+            coffeeBeanRepository.findByIdOrNull(beanId) ?: throw NotFoundException(CoffeeBean::class.java, beanId)
         )
 
     /** Saves a new row, writing the id and both timestamps from the body and stopping the `@PrePersist` callback. */
@@ -346,17 +405,33 @@ class ReadModelProjector(
         val count: Int
     )
 
-    /** The flattened payload of an expense event (its buyer is stored as an id). */
+    /**
+     * The flattened payload of an expense event (its buyer and bean are stored as ids). A legacy body
+     * predating expense typing carries no `expenseType` or `beanId`, so both are nullable and default at
+     * reconstruction; `weightGrams` is nullable (a non-bean outlay has none).
+     */
     private data class ExpenseEventPayload(
         val id: UUID,
         val createdAt: LocalDateTime,
         val updatedAt: LocalDateTime,
         val buyerUserId: UUID,
-        val weightGrams: Int,
+        val expenseType: ExpenseType?,
+        val beanId: UUID?,
+        val weightGrams: Int?,
         val amountCents: Int,
         val privateAmountCents: Int,
         val kittyAmountCents: Int,
         val note: String?
+    )
+
+    /** The flattened payload of a coffee-rating event (its user and bean are stored as ids). */
+    private data class CoffeeRatingEventPayload(
+        val id: UUID,
+        val createdAt: LocalDateTime,
+        val updatedAt: LocalDateTime,
+        val userId: UUID,
+        val beanId: UUID,
+        val value: Int
     )
 
     /** The flattened payload of a payment event (its user is stored as a nullable id). */
@@ -385,7 +460,9 @@ class ReadModelProjector(
                 CoffeeConsumptionEntity.USER_UNIQUE_CONSTRAINT to
                     DuplicationRule(CoffeeConsumption::class.java, "user_id") { "user ${it["userId"]}" },
                 CoffeePriceEntity.SINGLETON_UNIQUE_CONSTRAINT to
-                    DuplicationRule(CoffeePrice::class.java, CoffeePriceEntity.SINGLETON_COLUMN) { "the coffee price" }
+                    DuplicationRule(CoffeePrice::class.java, CoffeePriceEntity.SINGLETON_COLUMN) { "the coffee price" },
+                CoffeeBeanEntity.NAME_UNIQUE_CONSTRAINT to
+                    DuplicationRule(CoffeeBean::class.java, CoffeeBeanEntity.NAME_COLUMN) { "${it["name"]}" }
             ).mapKeys { it.key.lowercase() }
     }
 }

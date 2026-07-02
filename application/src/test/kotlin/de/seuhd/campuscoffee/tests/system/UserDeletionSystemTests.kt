@@ -79,6 +79,8 @@ class UserDeletionSystemTests : AbstractSystemTest() {
             .contentType(MediaType.APPLICATION_JSON)
             .body(
                 mapOf(
+                    "expenseType" to "BEANS",
+                    "beanName" to "deletion beans",
                     "weightGrams" to 1000,
                     "amountCents" to 900,
                     "privateAmountCents" to 900,

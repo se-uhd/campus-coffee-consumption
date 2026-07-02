@@ -1,6 +1,8 @@
 package de.seuhd.campuscoffee.data.persistence.events
 import de.seuhd.campuscoffee.data.persistence.projection.BalanceDataServiceImpl
+import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeBeanRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeePriceRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeRatingRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.ExpenseRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.PaymentRepository
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
@@ -31,6 +33,12 @@ class EventsToDataRunnerTest : AbstractEventSourcingDataIntegrationTest() {
     @Autowired
     private lateinit var paymentRepository: PaymentRepository
 
+    @Autowired
+    private lateinit var coffeeRatingRepository: CoffeeRatingRepository
+
+    @Autowired
+    private lateinit var coffeeBeanRepository: CoffeeBeanRepository
+
     private fun runner(): EventsToDataRunner =
         EventsToDataRunner(
             eventRepository,
@@ -40,7 +48,9 @@ class EventsToDataRunnerTest : AbstractEventSourcingDataIntegrationTest() {
             coffeeConsumptionRepository,
             coffeePriceRepository,
             expenseRepository,
-            paymentRepository
+            paymentRepository,
+            coffeeRatingRepository,
+            coffeeBeanRepository
         )
 
     @Test

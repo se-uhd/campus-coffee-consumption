@@ -1,14 +1,18 @@
 package de.seuhd.campuscoffee
 
 import de.seuhd.campuscoffee.configuration.FixturesProperties
+import de.seuhd.campuscoffee.domain.model.CoffeeRating
+import de.seuhd.campuscoffee.domain.model.ExpenseType
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeBeanService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.data.CoffeeRatingDataService
 import de.seuhd.campuscoffee.domain.ports.system.StartupTaskService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.context.annotation.Profile
@@ -53,6 +57,8 @@ class DevDemoDataLoader(
     private val coffeePriceService: CoffeePriceService,
     private val expenseService: ExpenseService,
     private val paymentService: PaymentService,
+    private val coffeeBeanService: CoffeeBeanService,
+    private val coffeeRatingDataService: CoffeeRatingDataService,
     private val fixturesProperties: FixturesProperties
 ) : StartupTaskService {
     override val order = ORDER
@@ -116,8 +122,15 @@ class DevDemoDataLoader(
                 coffeeConsumptionService.applyDelta(user.persistedId, 1, user)
                 coffeeTotal++
             }
-            spec.ownExpenses.forEach { (weightGrams, amountCents) ->
-                expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", user)
+            spec.ownExpenses.forEachIndexed { i, (weightGrams, amountCents) ->
+                expenseService.recordOwn(
+                    expenseType = ExpenseType.BEANS,
+                    beanName = DEMO_BEAN_NAMES[i % DEMO_BEAN_NAMES.size],
+                    weightGrams = weightGrams,
+                    amountCents = amountCents,
+                    note = "demo bean purchase",
+                    actingUser = user
+                )
                 expenseTotal++
             }
             spec.depositCents?.let { amount ->
@@ -144,6 +157,9 @@ class DevDemoDataLoader(
         // a price change and an admin count correction so the admin global activity feed shows a PRICE_CHANGE
         // row and an admin-override consumption row (every activity type appears on a fresh dev start)
         seedPriceChangeAndCorrection(admin)
+        // ratings across the bean catalog from several active users, so the ratings page comes up populated
+        // with varied averages and vote counts on a fresh dev start
+        seedRatings()
         // an extra active user with no history at all, to demo the empty activity/change-log state
         createUser(EMPTY_DEMO_USER)
         log.info {
@@ -171,6 +187,25 @@ class DevDemoDataLoader(
     }
 
     /**
+     * Seeds a spread of coffee ratings across the demo bean catalog from several active users, so the
+     * ratings page is populated on a fresh dev start. These are seeded straight through the rating data
+     * service (an event-sourced write), not the self-service rating path: the request-time path only accepts
+     * a vote while the rater's own most recent `+1` is still cancellable, but the demo cups are recorded as
+     * the `SYSTEM` actor (like all seeded events), so they are not owner increments and there is no cup to
+     * rate. Seeding the votes directly mirrors how the rest of the demo history is laid down. The bean is
+     * resolved (or created) by name, so a bean that no purchase happened to create still gets a rating row.
+     * The votes are chosen to give each bean two votes with differing averages.
+     */
+    private fun seedRatings() {
+        RATING_PLAN.forEach { (login, beanIndex, value) ->
+            val user = userService.getByLoginName(login)
+            val bean = coffeeBeanService.resolveOrCreate(DEMO_BEAN_NAMES[beanIndex])
+            coffeeRatingDataService.upsert(CoffeeRating(user = user, bean = bean, value = value))
+        }
+        log.info { "Seeded ${RATING_PLAN.size} demo ratings across the bean catalog." }
+    }
+
+    /**
      * Seeds a varied coffee, own-bean-purchase, and deposit history onto an existing, active [user].
      * The volume varies with [index] so consecutive users do not get identical rows: a handful of cups, one
      * to three own purchases, and one or two deposits, all attributed to the user (the deposits acted by
@@ -192,7 +227,14 @@ class DevDemoDataLoader(
         repeat(1 + index % MAX_EXTRA_OWN_EXPENSES) { purchase ->
             val weightGrams = BASE_EXPENSE_GRAMS + (index + purchase) * EXPENSE_GRAMS_STEP
             val amountCents = BASE_EXPENSE_CENTS + (index + purchase) * EXPENSE_CENTS_STEP
-            expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", user)
+            expenseService.recordOwn(
+                expenseType = ExpenseType.BEANS,
+                beanName = DEMO_BEAN_NAMES[(index + purchase) % DEMO_BEAN_NAMES.size],
+                weightGrams = weightGrams,
+                amountCents = amountCents,
+                note = "demo bean purchase",
+                actingUser = user
+            )
         }
         repeat(1 + index % MAX_EXTRA_DEPOSITS) { deposit ->
             val amountCents = BASE_DEPOSIT_CENTS + (index + deposit) * DEPOSIT_CENTS_STEP
@@ -239,8 +281,15 @@ class DevDemoDataLoader(
         repeat(PRIMARY_DEMO_COFFEES) {
             coffeeConsumptionService.applyDelta(user.persistedId, 1, user)
         }
-        PRIMARY_DEMO_OWN_EXPENSES.forEach { (weightGrams, amountCents) ->
-            expenseService.recordOwn(weightGrams, amountCents, "demo bean purchase", user)
+        PRIMARY_DEMO_OWN_EXPENSES.forEachIndexed { i, (weightGrams, amountCents) ->
+            expenseService.recordOwn(
+                expenseType = ExpenseType.BEANS,
+                beanName = DEMO_BEAN_NAMES[i % DEMO_BEAN_NAMES.size],
+                weightGrams = weightGrams,
+                amountCents = amountCents,
+                note = "demo bean purchase",
+                actingUser = user
+            )
         }
         paymentService.recordDeposit(user.persistedId, PRIMARY_DEMO_DEPOSIT_CENTS, "demo deposit", admin)
         log.info { "Seeded the primary demo user ($PRIMARY_DEMO_LOGIN) with a full demo activity." }
@@ -262,9 +311,11 @@ class DevDemoDataLoader(
      */
     private fun seedPrimaryDemoUserAdminExpenses(admin: User) {
         val user = userService.getByLoginName(PRIMARY_DEMO_LOGIN)
-        ADMIN_EXPENSE_VARIANTS.forEach { variant ->
+        ADMIN_EXPENSE_VARIANTS.forEachIndexed { i, variant ->
             expenseService.record(
                 buyerUserId = user.persistedId,
+                expenseType = ExpenseType.BEANS,
+                beanName = DEMO_BEAN_NAMES[i % DEMO_BEAN_NAMES.size],
                 weightGrams = variant.weightGrams,
                 amountCents = variant.totalCents,
                 privateAmountCents = variant.privateCents,
@@ -363,6 +414,34 @@ class DevDemoDataLoader(
                     kittyCents = 600,
                     note = "demo split bean purchase"
                 )
+            )
+
+        // demo bean names, rotated across the seeded bean purchases so the catalog and the ratings view
+        // come up populated with several beans (each accumulating a few purchases and, later, ratings)
+        private val DEMO_BEAN_NAMES =
+            listOf(
+                "Ethiopia Yirgacheffe",
+                "Colombia Supremo",
+                "Brazil Santos",
+                "Guatemala Antigua",
+                "Sumatra Mandheling"
+            )
+
+        // the demo ratings: (rater login, index into DEMO_BEAN_NAMES, value 1..5). Every rater is an active
+        // fixture user, and the values are chosen so each of the five beans gets two votes with a differing
+        // average, so the ratings page shows a realistic spread on a fresh dev start.
+        private val RATING_PLAN =
+            listOf(
+                Triple(PRIMARY_DEMO_LOGIN, 0, 5),
+                Triple(PRIMARY_DEMO_LOGIN, 1, 4),
+                Triple(ADMIN_LOGIN, 0, 4),
+                Triple(ADMIN_LOGIN, 2, 5),
+                Triple("student2023", 1, 3),
+                Triple("student2023", 3, 4),
+                Triple("lisa_lee", 2, 4),
+                Triple("lisa_lee", 4, 5),
+                Triple("olivia_lee", 3, 3),
+                Triple("olivia_lee", 4, 4)
             )
 
         // the remaining existing fixture users (the admin and the fixture users other than the primary

@@ -2,6 +2,7 @@ package de.seuhd.campuscoffee.data.persistence
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
+import de.seuhd.campuscoffee.domain.model.CoffeeRating
 import de.seuhd.campuscoffee.domain.model.Expense
 import de.seuhd.campuscoffee.domain.model.Payment
 import de.seuhd.campuscoffee.domain.model.User
@@ -51,6 +52,7 @@ object EventJsonMapper {
                     .addSerializer(CoffeeConsumption::class.java, CoffeeConsumptionEventSerializer())
                     .addSerializer(Expense::class.java, ExpenseEventSerializer())
                     .addSerializer(Payment::class.java, PaymentEventSerializer())
+                    .addSerializer(CoffeeRating::class.java, CoffeeRatingEventSerializer())
             ).addMixIn(User::class.java, UserSecretsMixin::class.java)
             .build()
 
@@ -93,8 +95,12 @@ object EventJsonMapper {
             gen.writeEntityHeader(value.id, value.createdAt, value.updatedAt)
             gen.writeName("buyerUserId")
             gen.writePOJO(value.buyer.id)
+            gen.writeName("expenseType")
+            gen.writePOJO(value.expenseType)
+            gen.writeName("beanId")
+            gen.writePOJO(value.bean?.id)
             gen.writeName("weightGrams")
-            gen.writeNumber(value.weightGrams)
+            gen.writePOJO(value.weightGrams)
             gen.writeName("amountCents")
             gen.writeNumber(value.amountCents)
             gen.writeName("privateAmountCents")
@@ -103,6 +109,27 @@ object EventJsonMapper {
             gen.writeNumber(value.kittyAmountCents)
             gen.writeName("note")
             gen.writePOJO(value.note)
+            gen.writeEndObject()
+        }
+    }
+
+    /**
+     * Serializes a [CoffeeRating] with its user and bean flattened to ids (`userId`, `beanId`). The projector
+     * resolves both against the already-projected read models when it applies the event.
+     */
+    private class CoffeeRatingEventSerializer : ValueSerializer<CoffeeRating>() {
+        override fun serialize(
+            value: CoffeeRating,
+            gen: JsonGenerator,
+            ctxt: SerializationContext
+        ) {
+            gen.writeEntityHeader(value.id, value.createdAt, value.updatedAt)
+            gen.writeName("userId")
+            gen.writePOJO(value.user.id)
+            gen.writeName("beanId")
+            gen.writePOJO(value.bean.id)
+            gen.writeName("value")
+            gen.writeNumber(value.value)
             gen.writeEndObject()
         }
     }

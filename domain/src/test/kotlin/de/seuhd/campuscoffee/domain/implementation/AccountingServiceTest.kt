@@ -6,11 +6,13 @@ import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.model.CancellableIncrement
 import de.seuhd.campuscoffee.domain.model.CoffeeConsumption
 import de.seuhd.campuscoffee.domain.model.CoffeePrice
+import de.seuhd.campuscoffee.domain.model.CoffeeRatingPrompt
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.SummaryPanel
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeRatingService
 import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
@@ -19,6 +21,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
@@ -42,6 +45,7 @@ class AccountingServiceTest {
     private val coffeePriceService: CoffeePriceService = mock()
     private val coffeeConsumptionDataService: CoffeeConsumptionDataService = mock()
     private val coffeeConsumptionService: CoffeeConsumptionService = mock()
+    private val coffeeRatingService: CoffeeRatingService = mock()
     private val userDataService: UserDataService = mock()
 
     // A fixed "now": Thursday 2026-01-15 12:00 UTC, which is 13:00 in Europe/Berlin (CET, the test zone). So
@@ -56,10 +60,17 @@ class AccountingServiceTest {
             coffeePriceService,
             coffeeConsumptionDataService,
             coffeeConsumptionService,
+            coffeeRatingService,
             userDataService,
             clock,
             summaryProperties
         )
+
+    init {
+        // the summary always embeds the rating prompt; a fixed no-op prompt keeps these balance/cup tests focused
+        whenever(coffeeRatingService.promptFor(any(), anyOrNull()))
+            .thenReturn(CoffeeRatingPrompt(canRate = false, defaultBeanId = null, value = null))
+    }
 
     private val userId: UUID = UUID(0L, 1L)
 

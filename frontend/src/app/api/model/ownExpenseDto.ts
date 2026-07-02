@@ -10,8 +10,18 @@
 
 
 export interface OwnExpenseDto { 
-    weightGrams: number;
+    expenseType: OwnExpenseDto.ExpenseTypeEnum;
+    beanName?: string | null;
+    weightGrams?: number | null;
     amountCents: number;
     note?: string | null;
 }
+export namespace OwnExpenseDto {
+    export const ExpenseTypeEnum = {
+        Beans: 'BEANS',
+        Other: 'OTHER'
+    } as const;
+    export type ExpenseTypeEnum = typeof ExpenseTypeEnum[keyof typeof ExpenseTypeEnum];
+}
+
 

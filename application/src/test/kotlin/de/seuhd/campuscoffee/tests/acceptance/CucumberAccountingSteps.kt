@@ -59,8 +59,14 @@ class CucumberAccountingSteps(
             .post()
             .uri("/api/expenses")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(mapOf("weightGrams" to 1000, "amountCents" to amountCents))
-            .withUser(user)
+            .body(
+                mapOf(
+                    "expenseType" to "BEANS",
+                    "beanName" to "cucumber beans",
+                    "weightGrams" to 1000,
+                    "amountCents" to amountCents
+                )
+            ).withUser(user)
             .exchange()
             .returnResult<ByteArray>()
     }

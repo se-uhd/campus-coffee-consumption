@@ -10,10 +10,20 @@
 
 
 export interface AdminExpenseDto { 
-    weightGrams: number;
+    expenseType: AdminExpenseDto.ExpenseTypeEnum;
+    beanName?: string | null;
+    weightGrams?: number | null;
     amountCents: number;
     privateAmountCents: number;
     kittyAmountCents: number;
     note?: string | null;
 }
+export namespace AdminExpenseDto {
+    export const ExpenseTypeEnum = {
+        Beans: 'BEANS',
+        Other: 'OTHER'
+    } as const;
+    export type ExpenseTypeEnum = typeof ExpenseTypeEnum[keyof typeof ExpenseTypeEnum];
+}
+
 

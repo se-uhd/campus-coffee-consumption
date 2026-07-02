@@ -1,14 +1,18 @@
 package de.seuhd.campuscoffee.data.persistence.events
+import de.seuhd.campuscoffee.data.mapper.CoffeeBeanEntityMapper
 import de.seuhd.campuscoffee.data.mapper.CoffeeConsumptionEntityMapper
 import de.seuhd.campuscoffee.data.mapper.CoffeePriceEntityMapper
+import de.seuhd.campuscoffee.data.mapper.CoffeeRatingEntityMapper
 import de.seuhd.campuscoffee.data.mapper.ExpenseEntityMapper
 import de.seuhd.campuscoffee.data.mapper.PaymentEntityMapper
 import de.seuhd.campuscoffee.data.mapper.UserEntityMapper
 import de.seuhd.campuscoffee.data.persistence.entities.ChangeType
 import de.seuhd.campuscoffee.data.persistence.entities.CoffeeConsumptionEntity
 import de.seuhd.campuscoffee.data.persistence.entities.UserEntity
+import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeBeanRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeConsumptionRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.CoffeePriceRepository
+import de.seuhd.campuscoffee.data.persistence.repositories.CoffeeRatingRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.ExpenseRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.PaymentRepository
 import de.seuhd.campuscoffee.data.persistence.repositories.UserRepository
@@ -46,6 +50,10 @@ class ReadModelProjectorExceptionMappingTest {
     private val coffeePriceMapper = mock<CoffeePriceEntityMapper>()
     private val expenseMapper = mock<ExpenseEntityMapper>()
     private val paymentMapper = mock<PaymentEntityMapper>()
+    private val coffeeBeanRepository = mock<CoffeeBeanRepository>()
+    private val coffeeBeanMapper = mock<CoffeeBeanEntityMapper>()
+    private val coffeeRatingRepository = mock<CoffeeRatingRepository>()
+    private val coffeeRatingMapper = mock<CoffeeRatingEntityMapper>()
 
     private val projector =
         ReadModelProjector(
@@ -54,11 +62,15 @@ class ReadModelProjectorExceptionMappingTest {
             coffeePriceRepository,
             expenseRepository,
             paymentRepository,
+            coffeeBeanRepository,
             userMapper,
             coffeeConsumptionMapper,
             coffeePriceMapper,
             expenseMapper,
-            paymentMapper
+            paymentMapper,
+            coffeeBeanMapper,
+            coffeeRatingRepository,
+            coffeeRatingMapper
         )
 
     private fun integrityViolation(constraintName: String?): DataIntegrityViolationException {

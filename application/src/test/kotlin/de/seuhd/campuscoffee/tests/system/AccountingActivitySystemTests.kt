@@ -9,6 +9,7 @@ import de.seuhd.campuscoffee.api.dtos.ExpenseDto
 import de.seuhd.campuscoffee.api.dtos.KittyDto
 import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
 import de.seuhd.campuscoffee.domain.model.ActivityEntryType
+import de.seuhd.campuscoffee.domain.model.ExpenseType
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.statusCode
@@ -42,6 +43,8 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
         .contentType(MediaType.APPLICATION_JSON)
         .body(
             AdminExpenseDto(
+                expenseType = ExpenseType.BEANS,
+                beanName = "test beans",
                 weightGrams = 1000,
                 amountCents = amountCents,
                 privateAmountCents = privateAmountCents,
@@ -183,6 +186,8 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
             .contentType(MediaType.APPLICATION_JSON)
             .body(
                 AdminExpenseDto(
+                    expenseType = ExpenseType.BEANS,
+                    beanName = "test beans",
                     weightGrams = 800,
                     amountCents = 1000,
                     privateAmountCents = 700,
@@ -291,8 +296,14 @@ class AccountingActivitySystemTests : AbstractSystemTest() {
             .post()
             .uri("/api/expenses")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(mapOf("weightGrams" to 500, "amountCents" to 300))
-            .withUser(user)
+            .body(
+                mapOf(
+                    "expenseType" to "BEANS",
+                    "beanName" to "test beans",
+                    "weightGrams" to 500,
+                    "amountCents" to 300
+                )
+            ).withUser(user)
             .exchange()
         adminExpense(amountCents = 900, privateAmountCents = 400, kittyAmountCents = 500)
         client()

@@ -3,6 +3,7 @@ package de.seuhd.campuscoffee.tests.system
 import de.seuhd.campuscoffee.api.dtos.DepositRequestDto
 import de.seuhd.campuscoffee.api.dtos.OwnExpenseDto
 import de.seuhd.campuscoffee.api.dtos.PriceUpdateDto
+import de.seuhd.campuscoffee.domain.model.ExpenseType
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.withAdmin
@@ -81,8 +82,15 @@ class AccountingEventLogSystemTests : AbstractSystemTest() {
             .post()
             .uri("/api/expenses")
             .contentType(MediaType.APPLICATION_JSON)
-            .body(OwnExpenseDto(weightGrams = 1000, amountCents = 900, note = "beans"))
-            .withUser(user)
+            .body(
+                OwnExpenseDto(
+                    expenseType = ExpenseType.BEANS,
+                    beanName = "test beans",
+                    weightGrams = 1000,
+                    amountCents = 900,
+                    note = "beans"
+                )
+            ).withUser(user)
             .exchange()
 
         val expenseEvents = eventsOf("Expense")

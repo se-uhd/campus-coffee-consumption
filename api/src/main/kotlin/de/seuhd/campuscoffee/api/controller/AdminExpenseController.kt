@@ -68,7 +68,9 @@ class AdminExpenseController(
         val expense =
             expenseService.record(
                 buyerUserId = userId,
-                weightGrams = requireNotNull(dto.weightGrams),
+                expenseType = requireNotNull(dto.expenseType),
+                beanName = dto.beanName,
+                weightGrams = dto.weightGrams,
                 amountCents = requireNotNull(dto.amountCents),
                 privateAmountCents = requireNotNull(dto.privateAmountCents),
                 kittyAmountCents = requireNotNull(dto.kittyAmountCents),
@@ -97,7 +99,9 @@ class AdminExpenseController(
             expenseService.update(
                 expenseId = expenseId,
                 buyerUserId = userId,
-                weightGrams = requireNotNull(dto.weightGrams),
+                expenseType = requireNotNull(dto.expenseType),
+                beanName = dto.beanName,
+                weightGrams = dto.weightGrams,
                 amountCents = requireNotNull(dto.amountCents),
                 privateAmountCents = requireNotNull(dto.privateAmountCents),
                 kittyAmountCents = requireNotNull(dto.kittyAmountCents),

@@ -12,6 +12,15 @@ const ADMIN_PREFIXES = ['/api/users', '/api/price', '/api/kitty'];
 const USER_PREFIXES = ['/api/summary', '/api/activity', '/api/consumption', '/api/expenses', '/api/profile'];
 
 /**
+ * The bean catalog is dual-audience: a user reads the selectable beans and the ratings (capability token),
+ * while an admin also renames and merges beans (JWT cookie). Only the user reads (GET `/api/beans*`) take the
+ * capability token; the admin writes (PUT/POST) fall through to the cookie, so an admin write is never
+ * misattributed to a lingering capability token.
+ */
+const isUserBeanRead = (method: string, url: string): boolean =>
+  method === 'GET' && url.startsWith('/api/beans');
+
+/**
  * Guards the admin 401 redirect so a burst of concurrent 401s (e.g. the parallel reloads a landing page
  * fires) does not log out and navigate to `/admin/login` more than once. Set on the first 401, reset once
  * the navigation settles (and, defensively, on the next successful (non-401) admin response), so the flag
@@ -22,12 +31,14 @@ let redirectingToAdminLogin = false;
 /**
  * Attaches the right credential per audience, by URL prefix.
  *
- * Precedence: the admin prefixes are matched first, then the user prefixes. This matters because the
- * admin's user-scoped paths (`/api/users/{id}/activity`, `/api/users/{id}/expenses`) start with `/api/users`
- * and must take the JWT, not the capability token, even though "activity"/"expenses" also name user
- * endpoints. There is no genuinely dual-audience path: users never call `/api/price` or `/api/kitty`
- * (their price and kitty balance arrive in `/api/summary`). Anything else (`/api/auth/token`, the SPA
- * routes) is left credential-free.
+ * Precedence: the admin prefixes are matched first, then the user reads and prefixes. This matters because
+ * the admin's user-scoped paths (`/api/users/{id}/activity`, `/api/users/{id}/expenses`) start with
+ * `/api/users` and must take the JWT, not the capability token, even though "activity"/"expenses" also name
+ * user endpoints. The one dual-audience path is the bean catalog (see [isUserBeanRead]): a user GETs the
+ * catalog and ratings with the capability token, while an admin also renames and merges beans with the JWT
+ * cookie, so only the user GETs take the token. Users never call `/api/price` or `/api/kitty` (their price
+ * and kitty balance arrive in `/api/summary`). Anything else (`/api/auth/token`, the SPA routes) is left
+ * credential-free.
  *
  * On a 401 the stale credential is cleared, per audience: an admin request drops the JWT and returns to the
  * admin login form (guarded so concurrent 401s redirect only once); a user request drops the now-invalid
@@ -62,7 +73,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => error);
       })
     );
-  } else if (USER_PREFIXES.some((prefix) => req.url.startsWith(prefix))) {
+  } else if (
+    isUserBeanRead(req.method, req.url) ||
+    USER_PREFIXES.some((prefix) => req.url.startsWith(prefix))
+  ) {
     const token = capability.token;
     if (token) {
       return next(req.clone({ setHeaders: { 'X-Capability-Token': token } })).pipe(

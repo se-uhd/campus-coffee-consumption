@@ -18,6 +18,9 @@
     "name" : "Consumption",
     "description" : "Adding and undoing a user's own coffees (X-Capability-Token)."
   }, {
+    "name" : "Beans",
+    "description" : "The coffee-bean catalog: the selectable list and admin rename/merge."
+  }, {
     "name" : "Profile",
     "description" : "The authenticated user's own profile and capability link."
   }, {
@@ -423,6 +426,95 @@
             "application/json" : {
               "schema" : {
                 "$ref" : "#/components/schemas/ConsumptionDeltaDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConsumptionDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{userId}/consumption/rating" : {
+      "put" : {
+        "tags" : [ "User consumption (admin)" ],
+        "summary" : "Rate the beans of a user's current cup on their behalf (admin).",
+        "operationId" : "rate",
+        "parameters" : [ {
+          "name" : "userId",
+          "in" : "path",
+          "description" : "Unique identifier of the user.",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RatingRequestDto"
               }
             }
           },
@@ -1122,6 +1214,173 @@
         "responses" : {
           "200" : {
             "description" : "OK"
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/consumption/rating" : {
+      "put" : {
+        "tags" : [ "Consumption" ],
+        "summary" : "Rate the beans of the authenticated user's current coffee (one to five).",
+        "operationId" : "rate_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RatingRequestDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserSummaryDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/beans/{id}" : {
+      "put" : {
+        "tags" : [ "Beans" ],
+        "summary" : "Rename a coffee bean (admin only).",
+        "operationId" : "rename",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BeanRenameDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CoffeeBeanDto"
+                }
+              }
+            }
           },
           "400" : {
             "description" : "The request is malformed or violates a validation rule.",
@@ -1917,6 +2176,94 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/UserSummaryDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/beans/{id}/merge" : {
+      "post" : {
+        "tags" : [ "Beans" ],
+        "summary" : "Merge a coffee bean into another (admin only).",
+        "operationId" : "merge",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BeanMergeDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CoffeeBeanDto"
                 }
               }
             }
@@ -3306,6 +3653,150 @@
         }
       }
     },
+    "/api/beans" : {
+      "get" : {
+        "tags" : [ "Beans" ],
+        "summary" : "List the selectable coffee beans.",
+        "operationId" : "list_1",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CoffeeBeanDto"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/beans/ratings" : {
+      "get" : {
+        "tags" : [ "Beans" ],
+        "summary" : "List the bean ratings.",
+        "operationId" : "ratings",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/CoffeeBeanRatingsDto"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/public-key" : {
       "get" : {
         "tags" : [ "Authentication" ],
@@ -3474,8 +3965,17 @@
       "AdminExpenseDto" : {
         "type" : "object",
         "properties" : {
+          "expenseType" : {
+            "type" : "string",
+            "enum" : [ "BEANS", "OTHER" ]
+          },
+          "beanName" : {
+            "type" : [ "string", "null" ],
+            "maxLength" : 200,
+            "minLength" : 0
+          },
           "weightGrams" : {
-            "type" : "integer",
+            "type" : [ "integer", "null" ],
             "format" : "int32",
             "maximum" : 1000,
             "minimum" : 100
@@ -3504,7 +4004,7 @@
             "minLength" : 0
           }
         },
-        "required" : [ "amountCents", "kittyAmountCents", "privateAmountCents", "weightGrams" ]
+        "required" : [ "amountCents", "expenseType", "kittyAmountCents", "privateAmountCents" ]
       },
       "ExpenseDto" : {
         "type" : "object",
@@ -3520,8 +4020,19 @@
           "buyerLoginName" : {
             "type" : "string"
           },
+          "expenseType" : {
+            "type" : "string",
+            "enum" : [ "BEANS", "OTHER" ]
+          },
+          "beanId" : {
+            "type" : [ "string", "null" ],
+            "format" : "uuid"
+          },
+          "beanName" : {
+            "type" : [ "string", "null" ]
+          },
           "weightGrams" : {
-            "type" : "integer",
+            "type" : [ "integer", "null" ],
             "format" : "int32"
           },
           "amountCents" : {
@@ -3544,7 +4055,7 @@
             "format" : "date-time"
           }
         },
-        "required" : [ "amountCents", "buyerLoginName", "buyerUserId", "id", "kittyAmountCents", "privateAmountCents", "weightGrams" ]
+        "required" : [ "amountCents", "buyerLoginName", "buyerUserId", "expenseType", "id", "kittyAmountCents", "privateAmountCents" ]
       },
       "ConsumptionOverrideDto" : {
         "type" : "object",
@@ -3603,6 +4114,22 @@
           }
         },
         "required" : [ "changes", "total" ]
+      },
+      "RatingRequestDto" : {
+        "type" : "object",
+        "properties" : {
+          "beanId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "value" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 5,
+            "minimum" : 1
+          }
+        },
+        "required" : [ "beanId", "value" ]
       },
       "UserDto" : {
         "type" : "object",
@@ -3729,6 +4256,152 @@
         },
         "required" : [ "consumptions", "users" ]
       },
+      "ActivityEntryDto" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string",
+            "enum" : [ "CONSUMPTION", "CONSUMPTION_CANCEL", "PRIVATE_EXPENSE", "DEPOSIT", "KITTY_EXPENSE", "KITTY_ADJUSTMENT", "PRICE_CHANGE" ]
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "createdBy" : {
+            "type" : "string"
+          },
+          "note" : {
+            "type" : [ "string", "null" ]
+          },
+          "amountCents" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "runningBalanceCents" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "count" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
+          },
+          "delta" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
+          },
+          "weightGrams" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
+          },
+          "privateAmountCents" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64"
+          },
+          "kittyAmountCents" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int64"
+          }
+        },
+        "required" : [ "amountCents", "createdAt", "createdBy", "id", "runningBalanceCents", "type" ]
+      },
+      "CoffeeRatingPromptDto" : {
+        "type" : "object",
+        "properties" : {
+          "canRate" : {
+            "type" : "boolean"
+          },
+          "defaultBeanId" : {
+            "type" : [ "string", "null" ],
+            "format" : "uuid"
+          },
+          "value" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
+          }
+        },
+        "required" : [ "canRate" ]
+      },
+      "UserSummaryDto" : {
+        "type" : "object",
+        "properties" : {
+          "count" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "priceCents" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "balanceCents" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "kittyBalanceCents" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "cancellable" : {
+            "type" : "boolean"
+          },
+          "summaryPanel" : {
+            "type" : "string",
+            "enum" : [ "BALANCE", "CUPS" ]
+          },
+          "firstCupAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time"
+          },
+          "cupsThisWeek" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "cupsToday" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ratingPrompt" : {
+            "$ref" : "#/components/schemas/CoffeeRatingPromptDto"
+          },
+          "activity" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ActivityEntryDto"
+            }
+          }
+        },
+        "required" : [ "activity", "balanceCents", "cancellable", "count", "cupsThisWeek", "cupsToday", "kittyBalanceCents", "priceCents", "ratingPrompt", "summaryPanel" ]
+      },
+      "BeanRenameDto" : {
+        "type" : "object",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "name" ]
+      },
+      "CoffeeBeanDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "active" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "active", "id", "name" ]
+      },
       "ConsumptionDeltaDto" : {
         "type" : "object",
         "description" : "The single-step delta to apply (+1 or -1).",
@@ -3811,8 +4484,17 @@
       "OwnExpenseDto" : {
         "type" : "object",
         "properties" : {
+          "expenseType" : {
+            "type" : "string",
+            "enum" : [ "BEANS", "OTHER" ]
+          },
+          "beanName" : {
+            "type" : [ "string", "null" ],
+            "maxLength" : 200,
+            "minLength" : 0
+          },
           "weightGrams" : {
-            "type" : "integer",
+            "type" : [ "integer", "null" ],
             "format" : "int32",
             "maximum" : 1000,
             "minimum" : 100
@@ -3829,106 +4511,17 @@
             "minLength" : 0
           }
         },
-        "required" : [ "amountCents", "weightGrams" ]
+        "required" : [ "amountCents", "expenseType" ]
       },
-      "ActivityEntryDto" : {
+      "BeanMergeDto" : {
         "type" : "object",
         "properties" : {
-          "type" : {
-            "type" : "string",
-            "enum" : [ "CONSUMPTION", "CONSUMPTION_CANCEL", "PRIVATE_EXPENSE", "DEPOSIT", "KITTY_EXPENSE", "KITTY_ADJUSTMENT", "PRICE_CHANGE" ]
-          },
-          "id" : {
+          "targetBeanId" : {
             "type" : "string",
             "format" : "uuid"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "createdBy" : {
-            "type" : "string"
-          },
-          "note" : {
-            "type" : [ "string", "null" ]
-          },
-          "amountCents" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "runningBalanceCents" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "count" : {
-            "type" : [ "integer", "null" ],
-            "format" : "int32"
-          },
-          "delta" : {
-            "type" : [ "integer", "null" ],
-            "format" : "int32"
-          },
-          "weightGrams" : {
-            "type" : [ "integer", "null" ],
-            "format" : "int32"
-          },
-          "privateAmountCents" : {
-            "type" : [ "integer", "null" ],
-            "format" : "int64"
-          },
-          "kittyAmountCents" : {
-            "type" : [ "integer", "null" ],
-            "format" : "int64"
           }
         },
-        "required" : [ "amountCents", "createdAt", "createdBy", "id", "runningBalanceCents", "type" ]
-      },
-      "UserSummaryDto" : {
-        "type" : "object",
-        "properties" : {
-          "count" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "priceCents" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "balanceCents" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "kittyBalanceCents" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "cancellable" : {
-            "type" : "boolean"
-          },
-          "summaryPanel" : {
-            "type" : "string",
-            "enum" : [ "BALANCE", "CUPS" ]
-          },
-          "firstCupAt" : {
-            "type" : [ "string", "null" ],
-            "format" : "date-time"
-          },
-          "cupsThisWeek" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "cupsToday" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "activity" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/ActivityEntryDto"
-            }
-          }
-        },
-        "required" : [ "activity", "balanceCents", "cancellable", "count", "cupsThisWeek", "cupsToday", "kittyBalanceCents", "priceCents", "summaryPanel" ]
+        "required" : [ "targetBeanId" ]
       },
       "TokenRequestDto" : {
         "type" : "object",
@@ -4083,6 +4676,35 @@
           }
         },
         "required" : [ "balanceCents", "entries" ]
+      },
+      "CoffeeBeanRatingsDto" : {
+        "type" : "object",
+        "properties" : {
+          "beanId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "averageValue" : {
+            "type" : [ "number", "null" ],
+            "format" : "double"
+          },
+          "voteCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "latestRatingAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time"
+          },
+          "latestPurchaseAt" : {
+            "type" : [ "string", "null" ],
+            "format" : "date-time"
+          }
+        },
+        "required" : [ "beanId", "name", "voteCount" ]
       },
       "PublicKeyDto" : {
         "type" : "object",

@@ -29,11 +29,15 @@ export type { ExpenseDto } from './api/model/expenseDto';
 export type { PaymentDto } from './api/model/paymentDto';
 export type { KittyDto } from './api/model/kittyDto';
 export type { UserBalanceDto } from './api/model/userBalanceDto';
+export type { CoffeeBeanDto } from './api/model/coffeeBeanDto';
+export type { CoffeeBeanRatingsDto } from './api/model/coffeeBeanRatingsDto';
+export type { CoffeeRatingPromptDto } from './api/model/coffeeRatingPromptDto';
 
 // --- Generated request DTOs, re-exported under the names the components already use --------------
 // The spec names these `*Dto`; the frontend calls them `*Request`. The aliases keep both stable.
 export type { OwnExpenseDto as OwnExpenseRequest } from './api/model/ownExpenseDto';
 export type { AdminExpenseDto as AdminExpenseRequest } from './api/model/adminExpenseDto';
+export type { RatingRequestDto as RatingRequest } from './api/model/ratingRequestDto';
 export type { PriceUpdateDto as PriceUpdateRequest } from './api/model/priceUpdateDto';
 export type { DepositRequestDto as DepositRequest } from './api/model/depositRequestDto';
 export type { AdjustmentRequestDto as AdjustmentRequest } from './api/model/adjustmentRequestDto';
@@ -44,9 +48,16 @@ export type { ProfileUpdateDto as ProfileUpdateRequest } from './api/model/profi
 // `ActivityEntryDto.TypeEnum`); re-export the value-union types under the bare names the code uses.
 import { UserDto } from './api/model/userDto';
 import { ActivityEntryDto } from './api/model/activityEntryDto';
+import { OwnExpenseDto } from './api/model/ownExpenseDto';
 
 /** A user's role (`'USER' | 'ADMIN'`). */
 export type Role = UserDto.RoleEnum;
+
+/** An expense's type (`'BEANS' | 'OTHER'`): a bean purchase or any other outlay. */
+export type ExpenseType = OwnExpenseDto.ExpenseTypeEnum;
+
+/** The expense-type values, so components can set `'BEANS'` / `'OTHER'` by name. */
+export const ExpenseType = OwnExpenseDto.ExpenseTypeEnum;
 
 /** A user's landing-panel preference (`'BALANCE' | 'CUPS'`): the money panel or the cup-stats panel. */
 export type SummaryPanel = UserDto.SummaryPanelEnum;

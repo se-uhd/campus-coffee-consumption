@@ -3,9 +3,12 @@ package de.seuhd.campuscoffee.domain.implementation
 import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
+import de.seuhd.campuscoffee.domain.model.CoffeeBean
 import de.seuhd.campuscoffee.domain.model.Expense
+import de.seuhd.campuscoffee.domain.model.ExpenseType
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeBeanService
 import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
 import de.seuhd.campuscoffee.domain.ports.data.BalanceLockService
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
@@ -24,14 +27,17 @@ import java.util.UUID
 /**
  * Unit tests for ExpenseServiceImpl, mocking the data ports. The invariants under test: a user's own
  * purchase is always booked 100% private to themselves, a split or attribution by anyone but an admin is
- * forbidden, and the private and kitty portions must sum to the total with no negative values.
+ * forbidden, the private and kitty portions must sum to the total with no negative values, and the
+ * BEANS/OTHER type rules (a bean purchase names beans and has a weight; a non-bean outlay has neither).
  */
 class ExpenseServiceTest {
     private val expenseDataService: ExpenseDataService = mock()
     private val userDataService: UserDataService = mock()
+    private val coffeeBeanService: CoffeeBeanService = mock()
     private val balanceDataService: BalanceDataService = mock()
     private val balanceLock: BalanceLockService = mock()
-    private val service = ExpenseServiceImpl(expenseDataService, userDataService, balanceDataService, balanceLock)
+    private val service =
+        ExpenseServiceImpl(expenseDataService, userDataService, coffeeBeanService, balanceDataService, balanceLock)
 
     private val userId: UUID = UUID(0L, 1L)
     private val buyerId: UUID = UUID(0L, 2L)
@@ -58,21 +64,89 @@ class ExpenseServiceTest {
         )
     private val buyer = user.copy(id = buyerId, loginName = "buyer")
 
+    /** Stubs the bean resolver to return a bean, for the paths that reach the upsert. */
+    private fun stubBeanResolution() {
+        whenever(coffeeBeanService.resolveOrCreate(any()))
+            .thenReturn(CoffeeBean(id = UUID(0L, 7L), name = "beans"))
+    }
+
     @Test
     fun `recordOwn books the user's purchase fully private to themselves`() {
+        stubBeanResolution()
         whenever(expenseDataService.upsert(any())).thenAnswer { it.arguments[0] as Expense }
 
-        val expense = service.recordOwn(weightGrams = 1000, amountCents = 900, note = "beans", actingUser = user)
+        val expense =
+            service.recordOwn(
+                expenseType = ExpenseType.BEANS,
+                beanName = "beans",
+                weightGrams = 1000,
+                amountCents = 900,
+                note = "beans",
+                actingUser = user
+            )
 
         assertThat(expense.buyer).isEqualTo(user)
+        assertThat(expense.expenseType).isEqualTo(ExpenseType.BEANS)
         assertThat(expense.privateAmountCents).isEqualTo(900)
         assertThat(expense.kittyAmountCents).isEqualTo(0)
+    }
+
+    @Test
+    fun `recordOwn of an OTHER outlay books it private with no bean or weight`() {
+        whenever(expenseDataService.upsert(any())).thenAnswer { it.arguments[0] as Expense }
+
+        val expense =
+            service.recordOwn(
+                expenseType = ExpenseType.OTHER,
+                beanName = null,
+                weightGrams = null,
+                amountCents = 500,
+                note = "milk",
+                actingUser = user
+            )
+
+        assertThat(expense.expenseType).isEqualTo(ExpenseType.OTHER)
+        assertThat(expense.bean).isNull()
+        assertThat(expense.weightGrams).isNull()
+        assertThat(expense.privateAmountCents).isEqualTo(500)
+    }
+
+    @Test
+    fun `recordOwn of a BEANS outlay without a weight throws ValidationException`() {
+        assertThrows<ValidationException> {
+            service.recordOwn(
+                expenseType = ExpenseType.BEANS,
+                beanName = "beans",
+                weightGrams = null,
+                amountCents = 900,
+                note = null,
+                actingUser = user
+            )
+        }
+        verify(expenseDataService, never()).upsert(any())
+    }
+
+    @Test
+    fun `recordOwn of an OTHER outlay carrying a weight throws ValidationException`() {
+        assertThrows<ValidationException> {
+            service.recordOwn(
+                expenseType = ExpenseType.OTHER,
+                beanName = null,
+                weightGrams = 500,
+                amountCents = 900,
+                note = null,
+                actingUser = user
+            )
+        }
+        verify(expenseDataService, never()).upsert(any())
     }
 
     @Test
     fun `recordOwn by a deactivated user throws ForbiddenException`() {
         assertThrows<ForbiddenException> {
             service.recordOwn(
+                expenseType = ExpenseType.BEANS,
+                beanName = "beans",
                 weightGrams = 1000,
                 amountCents = 900,
                 note = null,
@@ -85,13 +159,21 @@ class ExpenseServiceTest {
     @Test
     fun `recordOwn with a negative amount throws ValidationException`() {
         assertThrows<ValidationException> {
-            service.recordOwn(weightGrams = 1000, amountCents = -1, note = null, actingUser = user)
+            service.recordOwn(
+                expenseType = ExpenseType.BEANS,
+                beanName = "beans",
+                weightGrams = 1000,
+                amountCents = -1,
+                note = null,
+                actingUser = user
+            )
         }
         verify(expenseDataService, never()).upsert(any())
     }
 
     @Test
     fun `record by an admin with a matching split stores the kitty and private portions`() {
+        stubBeanResolution()
         whenever(balanceDataService.kittyBalanceCents()).thenReturn(10000L)
         whenever(userDataService.getById(buyerId)).thenReturn(buyer)
         whenever(expenseDataService.upsert(any())).thenAnswer { it.arguments[0] as Expense }
@@ -99,6 +181,8 @@ class ExpenseServiceTest {
         val expense =
             service.record(
                 buyerUserId = buyerId,
+                expenseType = ExpenseType.BEANS,
+                beanName = "beans",
                 weightGrams = 1000,
                 amountCents = 900,
                 privateAmountCents = 400,
@@ -119,6 +203,8 @@ class ExpenseServiceTest {
         assertThrows<ConflictException> {
             service.record(
                 buyerUserId = buyerId,
+                expenseType = ExpenseType.BEANS,
+                beanName = "beans",
                 weightGrams = 1000,
                 amountCents = 900,
                 privateAmountCents = 400,
@@ -135,6 +221,8 @@ class ExpenseServiceTest {
         assertThrows<ForbiddenException> {
             service.record(
                 buyerUserId = buyerId,
+                expenseType = ExpenseType.BEANS,
+                beanName = "beans",
                 weightGrams = 1000,
                 amountCents = 900,
                 privateAmountCents = 400,
@@ -151,6 +239,8 @@ class ExpenseServiceTest {
         assertThrows<ValidationException> {
             service.record(
                 buyerUserId = buyerId,
+                expenseType = ExpenseType.BEANS,
+                beanName = "beans",
                 weightGrams = 1000,
                 amountCents = 900,
                 privateAmountCents = 400,
@@ -167,6 +257,8 @@ class ExpenseServiceTest {
         assertThrows<ValidationException> {
             service.record(
                 buyerUserId = buyerId,
+                expenseType = ExpenseType.BEANS,
+                beanName = "beans",
                 weightGrams = 1000,
                 amountCents = 900,
                 privateAmountCents = 1000,
@@ -186,6 +278,7 @@ class ExpenseServiceTest {
 
     @Test
     fun `update with the same buyer succeeds and stores the corrected amounts`() {
+        stubBeanResolution()
         val expenseId = UUID(0L, 5L)
         val existing =
             Expense(
@@ -203,6 +296,8 @@ class ExpenseServiceTest {
             service.update(
                 expenseId = expenseId,
                 buyerUserId = buyerId,
+                expenseType = ExpenseType.BEANS,
+                beanName = "beans",
                 weightGrams = 1200,
                 amountCents = 1000,
                 privateAmountCents = 700,
@@ -235,6 +330,8 @@ class ExpenseServiceTest {
                 expenseId = expenseId,
                 // a different buyer than the existing expense's buyer
                 buyerUserId = userId,
+                expenseType = ExpenseType.BEANS,
+                beanName = "beans",
                 weightGrams = 1000,
                 amountCents = 900,
                 privateAmountCents = 400,
@@ -267,6 +364,8 @@ class ExpenseServiceTest {
             service.update(
                 expenseId = expenseId,
                 buyerUserId = buyerId,
+                expenseType = ExpenseType.BEANS,
+                beanName = "beans",
                 weightGrams = 1000,
                 amountCents = 1100,
                 privateAmountCents = 100,
@@ -280,12 +379,15 @@ class ExpenseServiceTest {
 
     @Test
     fun `record acquires the kitty lock before reading the kitty balance`() {
+        stubBeanResolution()
         whenever(balanceDataService.kittyBalanceCents()).thenReturn(10000L)
         whenever(userDataService.getById(buyerId)).thenReturn(buyer)
         whenever(expenseDataService.upsert(any())).thenAnswer { it.arguments[0] as Expense }
 
         service.record(
             buyerUserId = buyerId,
+            expenseType = ExpenseType.BEANS,
+            beanName = "beans",
             weightGrams = 1000,
             amountCents = 900,
             privateAmountCents = 400,
@@ -302,6 +404,7 @@ class ExpenseServiceTest {
 
     @Test
     fun `update acquires the kitty lock before reading the kitty balance`() {
+        stubBeanResolution()
         val expenseId = UUID(0L, 5L)
         val existing =
             Expense(
@@ -319,6 +422,8 @@ class ExpenseServiceTest {
         service.update(
             expenseId = expenseId,
             buyerUserId = buyerId,
+            expenseType = ExpenseType.BEANS,
+            beanName = "beans",
             weightGrams = 1000,
             amountCents = 900,
             privateAmountCents = 400,

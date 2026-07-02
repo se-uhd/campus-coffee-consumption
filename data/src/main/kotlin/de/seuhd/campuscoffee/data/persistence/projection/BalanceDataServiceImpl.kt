@@ -70,8 +70,13 @@ class BalanceDataServiceImpl(
                 LoggedEntityType.COFFEE_CONSUMPTION -> bodyUserId(event, "userId")
                 LoggedEntityType.EXPENSE -> bodyUserId(event, "buyerUserId")
                 LoggedEntityType.PAYMENT -> bodyUserId(event, "userId")
-                // a user or price write moves no balance (a price change is valued as-of, never retroactively)
-                LoggedEntityType.USER, LoggedEntityType.COFFEE_PRICE -> null
+                // a user, price, bean, or rating write moves no balance (a price change is valued as-of,
+                // never retroactively; a bean/rating carries no money)
+                LoggedEntityType.USER,
+                LoggedEntityType.COFFEE_PRICE,
+                LoggedEntityType.COFFEE_BEAN,
+                LoggedEntityType.COFFEE_RATING
+                -> null
             }
         val touchesKitty = type == LoggedEntityType.EXPENSE || type == LoggedEntityType.PAYMENT
         // acquire in the fixed global order (kitty before user) so concurrent writes cannot deadlock

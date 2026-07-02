@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { CoffeeRatingPromptDto } from './coffeeRatingPromptDto';
 import { ActivityEntryDto } from './activityEntryDto';
 
 
@@ -20,6 +21,7 @@ export interface UserSummaryDto {
     firstCupAt?: string | null;
     cupsThisWeek: number;
     cupsToday: number;
+    ratingPrompt: CoffeeRatingPromptDto;
     activity: Array<ActivityEntryDto>;
 }
 export namespace UserSummaryDto {

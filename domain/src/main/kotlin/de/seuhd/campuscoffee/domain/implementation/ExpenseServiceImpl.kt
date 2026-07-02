@@ -3,10 +3,13 @@ package de.seuhd.campuscoffee.domain.implementation
 import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.ValidationException
+import de.seuhd.campuscoffee.domain.model.CoffeeBean
 import de.seuhd.campuscoffee.domain.model.Expense
+import de.seuhd.campuscoffee.domain.model.ExpenseType
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeBeanService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
 import de.seuhd.campuscoffee.domain.ports.data.BalanceLockService
@@ -27,12 +30,16 @@ import java.util.UUID
 class ExpenseServiceImpl(
     private val expenseDataService: ExpenseDataService,
     private val userDataService: UserDataService,
+    private val coffeeBeanService: CoffeeBeanService,
     private val balanceDataService: BalanceDataService,
     private val balanceLock: BalanceLockService
 ) : ExpenseService {
     @Transactional
+    @Suppress("LongParameterList")
     override fun recordOwn(
-        weightGrams: Int,
+        expenseType: ExpenseType,
+        beanName: String?,
+        weightGrams: Int?,
         amountCents: Int,
         note: String?,
         actingUser: User
@@ -40,11 +47,14 @@ class ExpenseServiceImpl(
         if (actingUser.active != true) {
             throw ForbiddenException("A deactivated user is read-only and cannot record a purchase.")
         }
-        validateAmounts(weightGrams, amountCents, amountCents, 0)
+        validateType(expenseType, beanName, weightGrams)
+        validateAmounts(amountCents, amountCents, 0)
         // a user's own purchase is always 100% from their own pocket
         return expenseDataService.upsert(
             Expense(
                 buyer = actingUser,
+                expenseType = expenseType,
+                bean = resolveBean(expenseType, beanName),
                 weightGrams = weightGrams,
                 amountCents = amountCents,
                 privateAmountCents = amountCents,
@@ -58,7 +68,9 @@ class ExpenseServiceImpl(
     @Suppress("LongParameterList")
     override fun record(
         buyerUserId: UUID,
-        weightGrams: Int,
+        expenseType: ExpenseType,
+        beanName: String?,
+        weightGrams: Int?,
         amountCents: Int,
         privateAmountCents: Int,
         kittyAmountCents: Int,
@@ -66,7 +78,8 @@ class ExpenseServiceImpl(
         actingUser: User
     ): Expense {
         requireAdmin(actingUser)
-        validateAmounts(weightGrams, amountCents, privateAmountCents, kittyAmountCents)
+        validateType(expenseType, beanName, weightGrams)
+        validateAmounts(amountCents, privateAmountCents, kittyAmountCents)
         balanceLock.lockKitty()
         if (kittyBalanceCents() - kittyAmountCents < 0) {
             throw ConflictException("This expense's kitty portion would make the kitty balance negative.")
@@ -75,6 +88,8 @@ class ExpenseServiceImpl(
         return expenseDataService.upsert(
             Expense(
                 buyer = buyer,
+                expenseType = expenseType,
+                bean = resolveBean(expenseType, beanName),
                 weightGrams = weightGrams,
                 amountCents = amountCents,
                 privateAmountCents = privateAmountCents,
@@ -89,7 +104,9 @@ class ExpenseServiceImpl(
     override fun update(
         expenseId: UUID,
         buyerUserId: UUID,
-        weightGrams: Int,
+        expenseType: ExpenseType,
+        beanName: String?,
+        weightGrams: Int?,
         amountCents: Int,
         privateAmountCents: Int,
         kittyAmountCents: Int,
@@ -97,7 +114,8 @@ class ExpenseServiceImpl(
         actingUser: User
     ): Expense {
         requireAdmin(actingUser)
-        validateAmounts(weightGrams, amountCents, privateAmountCents, kittyAmountCents)
+        validateType(expenseType, beanName, weightGrams)
+        validateAmounts(amountCents, privateAmountCents, kittyAmountCents)
         val existing = expenseDataService.getById(expenseId)
         // the buyer cannot be changed: the user activity keys on the buyer, so reassigning would leave the
         // old buyer credited and double-credit the new one. To move an expense, delete it and record a new one.
@@ -111,6 +129,8 @@ class ExpenseServiceImpl(
         }
         return expenseDataService.upsert(
             existing.copy(
+                expenseType = expenseType,
+                bean = resolveBean(expenseType, beanName),
                 weightGrams = weightGrams,
                 amountCents = amountCents,
                 privateAmountCents = privateAmountCents,
@@ -145,20 +165,59 @@ class ExpenseServiceImpl(
     /** The current kitty balance in cents, read O(1) from the maintained projection (held under the lock). */
     private fun kittyBalanceCents(): Long = balanceDataService.kittyBalanceCents()
 
-    /** Validates that nothing is negative and the private and kitty portions sum to the total. */
+    /** Validates that no amount is negative and the private and kitty portions sum to the total. */
     private fun validateAmounts(
-        weightGrams: Int,
         amountCents: Int,
         privateAmountCents: Int,
         kittyAmountCents: Int
     ) {
-        if (listOf(weightGrams, amountCents, privateAmountCents, kittyAmountCents).any { it < 0 }) {
-            throw ValidationException("Weight and amounts cannot be negative.")
+        if (listOf(amountCents, privateAmountCents, kittyAmountCents).any { it < 0 }) {
+            throw ValidationException("Amounts cannot be negative.")
         }
         if (privateAmountCents + kittyAmountCents != amountCents) {
             throw ValidationException("The private and kitty portions must sum to the total amount.")
         }
     }
+
+    /**
+     * Validates the type combination: a `BEANS` outlay must carry a non-blank bean name and a positive
+     * weight, while an `OTHER` outlay must carry neither.
+     */
+    @Suppress("ThrowsCount") // each branch is a distinct, user-facing validation message
+    private fun validateType(
+        expenseType: ExpenseType,
+        beanName: String?,
+        weightGrams: Int?
+    ) {
+        when (expenseType) {
+            ExpenseType.BEANS -> {
+                if (beanName.isNullOrBlank()) {
+                    throw ValidationException("A bean purchase must name the beans.")
+                }
+                if (weightGrams == null || weightGrams <= 0) {
+                    throw ValidationException("A bean purchase must have a positive weight.")
+                }
+            }
+            ExpenseType.OTHER -> {
+                if (!beanName.isNullOrBlank()) {
+                    throw ValidationException("A non-bean outlay must not name a bean.")
+                }
+                if (weightGrams != null) {
+                    throw ValidationException("A non-bean outlay must not have a weight.")
+                }
+            }
+        }
+    }
+
+    /** Resolves (or creates) the bean for a `BEANS` outlay; an `OTHER` outlay has no bean. */
+    private fun resolveBean(
+        expenseType: ExpenseType,
+        beanName: String?
+    ): CoffeeBean? =
+        when (expenseType) {
+            ExpenseType.BEANS -> coffeeBeanService.resolveOrCreate(requireNotNull(beanName))
+            ExpenseType.OTHER -> null
+        }
 
     /** Requires [actingUser] to be an admin, else 403. */
     private fun requireAdmin(actingUser: User) {

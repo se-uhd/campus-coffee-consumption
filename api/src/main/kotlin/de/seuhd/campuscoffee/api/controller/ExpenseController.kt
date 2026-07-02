@@ -43,7 +43,9 @@ class ExpenseController(
     ): ResponseEntity<UserSummaryDto> {
         val user = currentUserProvider.currentUser()
         expenseService.recordOwn(
-            weightGrams = requireNotNull(dto.weightGrams),
+            expenseType = requireNotNull(dto.expenseType),
+            beanName = dto.beanName,
+            weightGrams = dto.weightGrams,
             amountCents = requireNotNull(dto.amountCents),
             note = dto.note,
             actingUser = user

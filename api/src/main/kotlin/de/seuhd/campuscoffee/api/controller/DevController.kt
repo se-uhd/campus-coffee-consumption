@@ -1,8 +1,10 @@
 package de.seuhd.campuscoffee.api.controller
 
 import de.seuhd.campuscoffee.api.dtos.DevSummaryDto
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeBeanService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeRatingService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
@@ -31,6 +33,8 @@ class DevController(
     private val coffeePriceService: CoffeePriceService,
     private val expenseService: ExpenseService,
     private val paymentService: PaymentService,
+    private val coffeeRatingService: CoffeeRatingService,
+    private val coffeeBeanService: CoffeeBeanService,
     private val idGenerator: IdGeneratorService
 ) {
     /** Reports the current number of users and coffee consumptions. */
@@ -65,8 +69,12 @@ class DevController(
     private fun clearAll() {
         expenseService.clear()
         paymentService.clear()
+        // ratings reference beans (and users), so clear them before the beans and users
+        coffeeRatingService.clear()
         coffeeConsumptionService.clear()
         userService.clear()
         coffeePriceService.clear()
+        // beans last: expenses and ratings reference a bean, so clear the referencers first
+        coffeeBeanService.clear()
     }
 }

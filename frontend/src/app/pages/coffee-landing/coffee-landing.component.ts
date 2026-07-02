@@ -16,12 +16,16 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
 import { CapabilityTokenService } from '../../services/capability-token.service';
 import { SummaryService } from '../../services/summary.service';
+import { BeanService } from '../../services/bean.service';
 import { ProfileService } from '../../services/profile.service';
 import { UserService } from '../../services/user.service';
 import { ConsumptionService } from '../../services/consumption.service';
@@ -38,6 +42,8 @@ import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import {
   ActivityEntryDto,
   AdminExpenseRequest,
+  CoffeeBeanDto,
+  ExpenseType,
   OwnExpenseRequest,
   UserDto,
   UserSummaryDto
@@ -75,6 +81,9 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
     MatIconModule,
     MatFormFieldModule,
     MatInputModule,
+    MatAutocompleteModule,
+    MatButtonToggleModule,
+    MatSelectModule,
     MatTooltipModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
@@ -99,6 +108,15 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
           matTooltip="Activity"
         >
           <mat-icon>receipt_long</mat-icon>
+        </a>
+        <a
+          mat-icon-button
+          routerLink="/admin/ratings"
+          queryParamsHandling="preserve"
+          aria-label="Ratings"
+          matTooltip="Ratings"
+        >
+          <mat-icon>leaderboard</mat-icon>
         </a>
         <a
           mat-icon-button
@@ -140,6 +158,14 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
           <mat-icon>logout</mat-icon>
         </button>
       } @else {
+        <a
+          mat-icon-button
+          [routerLink]="['/login', token, 'ratings']"
+          aria-label="Ratings"
+          matTooltip="Ratings"
+        >
+          <mat-icon>leaderboard</mat-icon>
+        </a>
         <a
           mat-icon-button
           [routerLink]="['/login', token, 'profile']"
@@ -235,6 +261,44 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
                 </button>
               </div>
             }
+            @if (s?.ratingPrompt?.canRate) {
+              <div class="cc-rating-card">
+                <span class="cc-rating-label">Rate these beans</span>
+                <mat-form-field class="cc-rating-bean" subscriptSizing="dynamic" appearance="outline">
+                  <mat-label>Beans</mat-label>
+                  <mat-select [(ngModel)]="ratingBeanId" name="ratingBean" [disabled]="busy()">
+                    @for (bean of beanOptions(); track bean.id) {
+                      <mat-option [value]="bean.id">{{ bean.name }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <div class="cc-rating-beans" role="group" aria-label="Rating (one to five)">
+                  @for (position of ratingPositions; track position) {
+                    <button
+                      mat-icon-button
+                      type="button"
+                      (click)="rate(position)"
+                      [disabled]="busy() || !ratingBeanId"
+                      [attr.aria-label]="position + ' out of 5'"
+                      [attr.aria-pressed]="(s?.ratingPrompt?.value ?? 0) >= position"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        class="cc-bean-svg"
+                        [class.cc-bean-filled]="(s?.ratingPrompt?.value ?? 0) >= position"
+                        aria-hidden="true"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          clip-rule="evenodd"
+                          d="M12 2.5c3.9 0 6.5 4.6 6.5 9.5s-2.6 9.5-6.5 9.5S5.5 16.9 5.5 12 8.1 2.5 12 2.5Zm0 2.3c-1.7 2.5-1.7 12.4 0 14.9 1.7-2.5 1.7-12.4 0-14.9Z"
+                        />
+                      </svg>
+                    </button>
+                  }
+                </div>
+              </div>
+            }
             @if (adminMode && editMode()) {
               <p class="muted cc-edit-hint">Set the user's total coffee count.</p>
               <form #correctionForm="ngForm" class="form-row cc-edit-total">
@@ -288,30 +352,56 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
         >
           <p class="muted cc-expense-intro">
             @if (adminMode) {
-              Record a bean purchase for this user; the full amount credits their balance. Use the Expenses
-              page to record a kitty-funded purchase or to correct one.
+              Record a bean purchase (or another outlay) for this user; the full amount credits their balance.
+              Use the Expenses page to record a kitty-funded purchase or to correct one.
             } @else {
-              Bought coffee beans for the group? Record it here; the full amount credits your balance. Only an
-              admin can correct or delete a purchase, or record a kitty-funded one.
+              Bought beans (or paid for something else) for the group? Record it here; the full amount credits
+              your balance. Only an admin can correct or delete an expense, or record a kitty-funded one.
             }
           </p>
           <form #expenseForm="ngForm">
-            <mat-form-field class="full-width">
-              <mat-label>Weight (grams)</mat-label>
-              <input
-                matInput
-                type="number"
-                min="0"
-                step="1"
-                name="weight"
-                #weightModel="ngModel"
-                [(ngModel)]="expenseWeightGrams"
-                required
-              />
-              @if (weightModel.invalid && weightModel.touched) {
-                <mat-error>Enter the weight in whole grams.</mat-error>
-              }
-            </mat-form-field>
+            <mat-button-toggle-group
+              class="cc-expense-type"
+              name="expenseType"
+              [(ngModel)]="expenseType"
+              aria-label="Expense type"
+            >
+              <mat-button-toggle [value]="expenseTypes.Beans">Beans</mat-button-toggle>
+              <mat-button-toggle [value]="expenseTypes.Other">Other</mat-button-toggle>
+            </mat-button-toggle-group>
+            @if (expenseType === expenseTypes.Beans) {
+              <mat-form-field class="full-width">
+                <mat-label>Beans</mat-label>
+                <input
+                  matInput
+                  name="beanName"
+                  [(ngModel)]="beanName"
+                  [matAutocomplete]="beanAuto"
+                  required
+                />
+                <mat-autocomplete #beanAuto="matAutocomplete">
+                  @for (bean of filteredBeans(); track bean.id) {
+                    <mat-option [value]="bean.name">{{ bean.name }}</mat-option>
+                  }
+                </mat-autocomplete>
+              </mat-form-field>
+              <mat-form-field class="full-width">
+                <mat-label>Weight (grams)</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="0"
+                  step="1"
+                  name="weight"
+                  #weightModel="ngModel"
+                  [(ngModel)]="expenseWeightGrams"
+                  required
+                />
+                @if (weightModel.invalid && weightModel.touched) {
+                  <mat-error>Enter the weight in whole grams.</mat-error>
+                }
+              </mat-form-field>
+            }
             <mat-form-field class="full-width">
               <mat-label>Amount (€)</mat-label>
               <input
@@ -390,6 +480,60 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
         align-items: center;
         justify-content: center;
       }
+
+      .cc-expense-type {
+        margin-bottom: 12px;
+      }
+
+      .cc-rating-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        margin-top: 20px;
+        padding: 14px 18px 10px;
+        border: 1px solid rgba(200, 16, 46, 0.2);
+        border-radius: 16px;
+        background: rgba(200, 16, 46, 0.05);
+      }
+
+      .cc-rating-label {
+        color: var(--cc-ink);
+        font-weight: 600;
+      }
+
+      .cc-rating-bean {
+        width: 240px;
+      }
+
+      /* neutralize the global in-card field rhythm here so the flex gap centers the dropdown evenly between
+         the label and the bean scale (the global rule adds a 12px bottom margin that skews it lower) */
+      .cc-rating-card mat-form-field {
+        margin-bottom: 0;
+      }
+
+      /* the icon buttons are ~40px tall around a 26px bean, so their intrinsic top padding pushes the visible
+         scale down; pull the row up to cancel it, so the dropdown sits evenly between the label and the scale */
+      .cc-rating-beans {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        margin-top: -8px;
+      }
+
+      /* block, so the button's flex centers the bean instead of the icon sitting a few px below the button's
+         optical center (an inline SVG rides the text baseline) */
+      .cc-bean-svg {
+        display: block;
+        width: 26px;
+        height: 26px;
+        fill: rgba(0, 0, 0, 0.26);
+        transition: fill 0.15s ease;
+      }
+
+      .cc-bean-svg.cc-bean-filled {
+        fill: var(--cc-primary, #c8102e);
+      }
     `
   ]
 })
@@ -430,9 +574,22 @@ export class CoffeeLandingComponent implements OnInit {
   readonly error = signal('');
 
   readonly showExpense = signal(false);
+  /** Exposes the expense-type values to the template. */
+  readonly expenseTypes = ExpenseType;
+  /** Whether the expense being recorded is a bean purchase (BEANS) or another outlay (OTHER). */
+  expenseType: ExpenseType = ExpenseType.Beans;
+  /** The bean name for a BEANS expense (an existing name or a new one). */
+  beanName = '';
   expenseWeightGrams: number | null = null;
   expenseAmountEuros = '';
   expenseNote = '';
+
+  /** The selectable beans for the expense autocomplete and the rating dropdown. */
+  readonly beanOptions = signal<CoffeeBeanDto[]>([]);
+  /** The five rating positions, one filled/empty bean icon each. */
+  readonly ratingPositions = [1, 2, 3, 4, 5];
+  /** The bean the user is rating (defaults to the prompt's suggested bean). */
+  ratingBeanId = '';
 
   private readonly destroyRef = inject(DestroyRef);
 
@@ -442,6 +599,7 @@ export class CoffeeLandingComponent implements OnInit {
     private readonly auth: AuthService,
     private readonly capability: CapabilityTokenService,
     private readonly summaryService: SummaryService,
+    private readonly beanService: BeanService,
     private readonly profileService: ProfileService,
     private readonly userService: UserService,
     private readonly consumptionService: ConsumptionService,
@@ -455,6 +613,13 @@ export class CoffeeLandingComponent implements OnInit {
   /** The validation message for the expense amount (e.g. the ambiguous comma+point case), or null. */
   amountError(): string | null {
     return euroInputError(this.expenseAmountEuros, '4.20');
+  }
+
+  /** The selectable beans whose name contains the current bean-name input (case-insensitive). */
+  filteredBeans(): CoffeeBeanDto[] {
+    const query = this.beanName.trim().toLowerCase();
+    const beans = this.beanOptions();
+    return query ? beans.filter((bean) => bean.name.toLowerCase().includes(query)) : beans;
   }
 
   /**
@@ -481,6 +646,9 @@ export class CoffeeLandingComponent implements OnInit {
         .then((profile) => this.loginName.set(profile.loginName))
         .catch(() => undefined);
     }
+    // the bean options for the expense autocomplete and the rating dropdown (best effort, never blocks);
+    // this runs after the capability token is registered so the user-mode read is authenticated
+    this.loadBeans();
     await this.reload();
     if (this.adminMode) {
       // The URL is the source of truth for the selected user: follow the `user` query param (so the browser
@@ -765,22 +933,29 @@ export class CoffeeLandingComponent implements OnInit {
     }
   }
 
-  /** Records a bean purchase: the user's own (100% private) in user mode, or for the selected user (admin). */
+  /** Records an expense: the user's own (100% private) in user mode, or for the selected user (admin). */
   async recordExpense(): Promise<void> {
     if (this.busy()) {
       return;
     }
+    const beans = this.expenseType === ExpenseType.Beans;
     const amountCents = toCents(this.expenseAmountEuros);
-    if (
-      this.expenseWeightGrams == null ||
-      this.expenseWeightGrams < 0 ||
-      !Number.isInteger(this.expenseWeightGrams) ||
-      amountCents == null ||
-      amountCents < 0
-    ) {
-      this.notifications.error(null, 'Enter a whole-gram weight and a valid amount.');
+    if (amountCents == null || amountCents < 0) {
+      this.notifications.error(null, 'Enter a valid amount.');
       return;
     }
+    if (
+      beans &&
+      (!this.beanName.trim() ||
+        this.expenseWeightGrams == null ||
+        this.expenseWeightGrams < 0 ||
+        !Number.isInteger(this.expenseWeightGrams))
+    ) {
+      this.notifications.error(null, 'Enter the beans and a whole-gram weight.');
+      return;
+    }
+    const beanName = beans ? this.beanName.trim() : undefined;
+    const weightGrams = beans ? this.expenseWeightGrams! : undefined;
     this.busy.set(true);
     const id = this.selectedId();
     try {
@@ -788,7 +963,9 @@ export class CoffeeLandingComponent implements OnInit {
         // the landing form records a simple full-private purchase (the whole amount credits the user); the
         // Expenses page is where an admin records a kitty-funded split or corrects a purchase
         const request: AdminExpenseRequest = {
-          weightGrams: this.expenseWeightGrams,
+          expenseType: this.expenseType,
+          beanName,
+          weightGrams,
           amountCents,
           privateAmountCents: amountCents,
           kittyAmountCents: 0,
@@ -797,24 +974,75 @@ export class CoffeeLandingComponent implements OnInit {
         await this.mutateSelectedThenRefresh(id, () => this.expenseService.adminCreate(id, request));
       } else {
         const request: OwnExpenseRequest = {
-          weightGrams: this.expenseWeightGrams,
+          expenseType: this.expenseType,
+          beanName,
+          weightGrams,
           amountCents,
           note: this.expenseNote || undefined
         };
         this.applySummary(await this.summaryService.recordExpense(request));
       }
+      this.expenseType = ExpenseType.Beans;
+      this.beanName = '';
       this.expenseWeightGrams = null;
       this.expenseAmountEuros = '';
       this.expenseNote = '';
+      // a new bean name may have created a bean; refresh the options so it appears in the dropdowns
+      this.loadBeans();
       // the ngModel resets above are non-DOM writes, so mark this OnPush view for check to clear the fields
       this.cdr.markForCheck();
       this.showExpense.set(false);
       this.notifications.success('Expense recorded.');
     } catch (error) {
-      this.notifications.error(error, 'Could not record the purchase.');
+      this.notifications.error(error, 'Could not record the expense.');
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /**
+   * Rates the beans of the user's current cup (user mode only), then reconciles to the refreshed summary. A
+   * late rating (the grace window passed) surfaces as an error and reloads, matching the Undo affordance.
+   *
+   * @param value the rating value, one to five
+   */
+  async rate(value: number): Promise<void> {
+    if (this.busy() || !this.ratingBeanId) {
+      return;
+    }
+    // whether this window already has a vote, captured before the write, so the toast reflects add vs update
+    const alreadyRated = this.summary()?.ratingPrompt?.value != null;
+    this.busy.set(true);
+    try {
+      if (this.adminMode) {
+        // an admin rates the viewed user's current cup on their behalf, then the summary is re-read
+        const id = this.selectedId();
+        await this.mutateSelectedThenRefresh(id, () =>
+          this.consumptionService.rateForUser(id, this.ratingBeanId, value)
+        );
+      } else {
+        this.applySummary(await this.summaryService.rateCoffee(this.ratingBeanId, value));
+      }
+      this.notifications.success(alreadyRated ? 'Rating updated.' : 'Thanks for rating!');
+    } catch (error) {
+      // surface the server's specific reason (no recent cup vs the grace window having passed) rather than a
+      // generic message; fall back only if the response carries none
+      this.notifications.errorWithServerReason(error, 'That coffee can no longer be rated.');
+      await this.reload();
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Loads the selectable beans for the expense autocomplete and the rating dropdown (best effort). */
+  private loadBeans(): void {
+    this.beanService
+      .listSelectable()
+      .then((beans) => {
+        this.beanOptions.set(beans);
+        this.cdr.markForCheck();
+      })
+      .catch(() => undefined);
   }
 
   /** Signs the admin out and returns to login. */
@@ -858,6 +1086,9 @@ export class CoffeeLandingComponent implements OnInit {
   private applySummary(summary: UserSummaryDto, peeked = false): void {
     this.summary.set(summary);
     this.displayCount.set(summary.count);
+    // preselect the rating dropdown to the prompt's suggested bean (the current vote's bean, else the most
+    // recently purchased); a rating refresh returns the voted bean, so the selection stays in step
+    this.ratingBeanId = summary.ratingPrompt?.defaultBeanId ?? '';
     // keep the absolute-correction field in step with the count so opening Edit after a +/- does not pre-fill
     // a stale total that, if Set without retyping, would silently revert the change
     this.newTotal = summary.count;

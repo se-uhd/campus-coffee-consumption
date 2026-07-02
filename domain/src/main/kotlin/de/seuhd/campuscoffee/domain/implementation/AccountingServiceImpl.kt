@@ -10,6 +10,7 @@ import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.AccountingService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeRatingService
 import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
@@ -36,6 +37,7 @@ class AccountingServiceImpl(
     private val coffeePriceService: CoffeePriceService,
     private val coffeeConsumptionDataService: CoffeeConsumptionDataService,
     private val coffeeConsumptionService: CoffeeConsumptionService,
+    private val coffeeRatingService: CoffeeRatingService,
     private val userDataService: UserDataService,
     private val clock: Clock,
     private val summaryProperties: SummaryProperties
@@ -54,6 +56,11 @@ class AccountingServiceImpl(
         val fullActivity = activityDataService.userActivity(userId, user.loginName)
         val count = coffeeConsumptionDataService.getByUserId(userId).count
         val cupStats = cupStats(fullActivity)
+        // only offer undo/rating when there is actually a coffee to remove (a stale stack entry could
+        // otherwise mark a zero count cancellable); reuse this increment for the rating prompt so it does
+        // not re-walk the log
+        val cancellableIncrement =
+            if (count > 0) coffeeConsumptionService.cancellableIncrement(userId, actingUser) else null
         return UserSummary(
             count = count,
             priceCents = coffeePriceService.getCurrent().amountCents,
@@ -61,15 +68,14 @@ class AccountingServiceImpl(
             // the kitty balance is a single maintained number, so reading it never replays the global money
             // stream the way every user landing load used to
             kittyBalanceCents = balanceDataService.kittyBalanceCents(),
-            // only offer undo when there is actually a coffee to remove (a stale stack entry could otherwise
-            // mark a zero count cancellable)
-            cancellable = count > 0 && coffeeConsumptionService.cancellableIncrement(userId, actingUser) != null,
+            cancellable = cancellableIncrement != null,
             // the subject's own panel preference (defaults to the balance panel); the cup-stat fields below are
             // computed regardless so the landing can render either panel without a second read
             summaryPanel = user.summaryPanel ?: SummaryPanel.BALANCE,
             firstCupAt = cupStats.firstCupAt,
             cupsThisWeek = cupStats.cupsThisWeek,
             cupsToday = cupStats.cupsToday,
+            ratingPrompt = coffeeRatingService.promptFor(userId, cancellableIncrement),
             // default (user-serving) view strips the kitty split so it never reaches a user; the admin
             // per-user view keeps it so the landing's first page matches its kitty-inclusive paged feed
             activity =

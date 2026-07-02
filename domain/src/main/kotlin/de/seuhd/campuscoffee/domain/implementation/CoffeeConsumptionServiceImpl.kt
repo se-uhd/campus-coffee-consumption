@@ -11,6 +11,7 @@ import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.api.CoffeeRatingService
 import de.seuhd.campuscoffee.domain.ports.data.ActivityDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.ConsumptionHistoryDataService
@@ -37,6 +38,7 @@ class CoffeeConsumptionServiceImpl(
     private val consumptionHistoryDataService: ConsumptionHistoryDataService,
     private val activityDataService: ActivityDataService,
     private val userDataService: UserDataService,
+    private val coffeeRatingService: CoffeeRatingService,
     private val changeNoteContext: ChangeNoteContext,
     // the cancel grace period, bound from campus-coffee.consumption.cancel-grace-period (default 5m); the
     // typed holder lives in the domain because the rule is enforced here and the domain cannot depend on api
@@ -135,7 +137,10 @@ class CoffeeConsumptionServiceImpl(
         if (current.count <= 0) {
             throw ConflictException("There is no coffee to undo.")
         }
-        return coffeeConsumptionDataService.upsert(current.copy(count = current.count - 1))
+        val undone = coffeeConsumptionDataService.upsert(current.copy(count = current.count - 1))
+        // the cup was not consumed, so drop the vote (if any) cast in its window; votes from earlier cups stay
+        coffeeRatingService.clearVoteInWindow(userId, candidate.createdAt)
+        return undone
     }
 
     override fun cancellableIncrement(

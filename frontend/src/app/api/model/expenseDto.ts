@@ -13,11 +13,22 @@ export interface ExpenseDto {
     id: string;
     buyerUserId: string;
     buyerLoginName: string;
-    weightGrams: number;
+    expenseType: ExpenseDto.ExpenseTypeEnum;
+    beanId?: string | null;
+    beanName?: string | null;
+    weightGrams?: number | null;
     amountCents: number;
     privateAmountCents: number;
     kittyAmountCents: number;
     note?: string | null;
     createdAt?: string | null;
 }
+export namespace ExpenseDto {
+    export const ExpenseTypeEnum = {
+        Beans: 'BEANS',
+        Other: 'OTHER'
+    } as const;
+    export type ExpenseTypeEnum = typeof ExpenseTypeEnum[keyof typeof ExpenseTypeEnum];
+}
+
 

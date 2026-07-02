@@ -8,7 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 
 /**
  * MapStruct mapper from an [Expense] domain object to its response DTO (one-way), flattening the buyer to
- * their id and login name.
+ * their id and login name and the bean (when present) to its id and name.
  */
 @Mapper(componentModel = "spring")
 @ConditionalOnMissingBean // prevent IntelliJ warning about duplicate beans
@@ -20,6 +20,8 @@ interface ExpenseDtoMapper {
      */
     @Mapping(target = "buyerUserId", source = "buyer.id")
     @Mapping(target = "buyerLoginName", source = "buyer.loginName")
+    @Mapping(target = "beanId", source = "bean.id")
+    @Mapping(target = "beanName", source = "bean.name")
     fun toDto(expense: Expense): ExpenseDto
 
     /**

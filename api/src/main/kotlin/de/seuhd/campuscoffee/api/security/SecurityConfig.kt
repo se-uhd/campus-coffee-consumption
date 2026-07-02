@@ -96,6 +96,11 @@ class SecurityConfig {
                 authorize("/api/price", hasRole("ADMIN"))
                 authorize("/api/price/**", hasRole("ADMIN"))
                 authorize("/api/kitty/**", hasRole("ADMIN"))
+                // The bean catalog: any authenticated caller reads it (the rating dropdown and the expense
+                // bean autocomplete); renaming and merging a bean are admin-only. The GET rule must precede
+                // the admin rule so a capability-token user (ROLE_USER) can still read the selectable beans.
+                authorize(org.springframework.http.HttpMethod.GET, "/api/beans/**", authenticated)
+                authorize("/api/beans/**", hasRole("ADMIN"))
                 // User management and the per-user admin views are admin-only (JWT, ROLE_ADMIN).
                 authorize("/api/users/**", hasRole("ADMIN"))
                 // No anonymous access to any other API endpoint.
