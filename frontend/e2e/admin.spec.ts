@@ -230,7 +230,10 @@ test.describe('admin flow', () => {
     const purchasesCard = page.locator('mat-card', {
       has: page.getByRole('heading', { name: "This user's purchases" })
     });
-    const recorded = purchasesCard.locator('mat-list-item').filter({ hasText: '6.00 € · Espresso Beans · 500 g' }).first();
+    const recorded = purchasesCard
+      .locator('mat-list-item')
+      .filter({ hasText: '6.00 € · Espresso Beans · 500 g' })
+      .first();
     await expect(recorded).toBeVisible();
 
     // delete it: a confirm dialog appears, then the entry is gone
@@ -240,7 +243,9 @@ test.describe('admin flow', () => {
     await dialog.getByRole('button', { name: 'Delete' }).click();
 
     await expect(page.getByText('Purchase deleted.')).toBeVisible();
-    await expect(purchasesCard.locator('mat-list-item').filter({ hasText: '6.00 € · Espresso Beans · 500 g' })).toHaveCount(0);
+    await expect(
+      purchasesCard.locator('mat-list-item').filter({ hasText: '6.00 € · Espresso Beans · 500 g' })
+    ).toHaveCount(0);
   });
 
   // documented separately: the kitty/private split saves and shows when the kitty has funds for it
@@ -267,7 +272,10 @@ test.describe('admin flow', () => {
     const purchasesCard = page.locator('mat-card', {
       has: page.getByRole('heading', { name: "This user's purchases" })
     });
-    const row = purchasesCard.locator('mat-list-item').filter({ hasText: '5.00 € · Espresso Beans · 250 g' }).first();
+    const row = purchasesCard
+      .locator('mat-list-item')
+      .filter({ hasText: '5.00 € · Espresso Beans · 250 g' })
+      .first();
     await expect(row).toBeVisible();
     await expect(row).toContainText('private 3.00 €');
     await expect(row).toContainText('kitty 2.00 €');
