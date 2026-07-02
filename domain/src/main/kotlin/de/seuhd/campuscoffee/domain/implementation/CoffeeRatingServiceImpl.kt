@@ -47,7 +47,7 @@ class CoffeeRatingServiceImpl(
         actingUser: User
     ): CoffeeRating {
         requireMayRate(userId, actingUser)
-        if (value < MIN_RATING || value > MAX_RATING) {
+        if (value !in MIN_RATING..MAX_RATING) {
             throw ValidationException("A rating must be from $MIN_RATING to $MAX_RATING.")
         }
         // Take the per-user lock BEFORE deriving the window, so this serializes with the undo path (which

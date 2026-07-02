@@ -113,6 +113,10 @@ export async function loginAsAdmin(page: Page): Promise<void> {
  */
 export async function recordExpenseInActivity(page: Page, weightGrams: string, euros: string): Promise<void> {
   await page.getByRole('button', { name: 'Toggle expense form' }).click();
+  // the default expense type is Beans, so a bean name is required; fill it (a free-text autocomplete) and
+  // close the option panel so it does not overlay the fields below
+  await page.locator('input[name="beanName"]').fill('Espresso Beans');
+  await page.keyboard.press('Escape');
   await page.getByLabel('Weight (grams)').fill(weightGrams);
   await page.getByLabel('Amount (€)').fill(euros);
   await page.getByRole('button', { name: 'Save expense' }).click();
