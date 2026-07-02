@@ -36,12 +36,14 @@ class ActivityDataServiceImpl(
         userId: UUID,
         ownerLogin: String
     ): List<ActivityEntry> {
+        val beanNames = loadBeanNames()
         val walk = EventReducer(loadPricePoints()) { if (it == userId) ownerLogin else null }
         return eventRepository
             .findUserActivity(userId.toString())
             .mapNotNull { walk.accept(it) }
+            // a rating carries a zero user effect (not null), so it passes this filter alongside money rows
             .filter { it.subjectUserId == userId && it.userEffect != null }
-            .map { it.toUserEntry() }
+            .map { it.toUserEntry(beanNames) }
     }
 
     override fun kittyHistory(): List<ActivityEntry> {
@@ -61,15 +63,17 @@ class ActivityDataServiceImpl(
         // owner test classifying a deleted user's self-scans as CONSUMPTION/CONSUMPTION_CANCEL rather than
         // misreading them as admin overrides, and lets the row carry the user's (immutable) login.
         val subjectLoginById = loadSubjectLogins()
+        val beanNames = loadBeanNames()
         val walk = EventReducer(loadPricePoints()) { subjectLoginById[it] }
         return eventRepository
             .findActivityStream()
             .mapNotNull { walk.accept(it) }
             // drop a no-op edit that moved nothing (e.g. an expense whose note or weight changed but neither
             // money portion did): it would be a meaningless row with both effect columns blank. A price change
-            // legitimately moves no balance, so it is kept.
-            .filter { it.userEffect != null || it.kittyEffect != null || it.kind == EventProjectionType.PRICE_CHANGE }
-            .map { it.toGlobalEntry(subjectLoginById) }
+            // and a rating legitimately move no balance, so they are kept (a rating carries a zero user effect).
+            .filter {
+                it.userEffect != null || it.kittyEffect != null || it.kind == EventProjectionType.PRICE_CHANGE
+            }.map { it.toGlobalEntry(subjectLoginById, beanNames) }
     }
 
     override fun lastCancellableIncrement(
@@ -113,6 +117,19 @@ class ActivityDataServiceImpl(
                 createdBy = actorOf(it)
             )
         }
+
+    /**
+     * The current name of every bean by id, read from the log's `CoffeeBean` events (ascending by append
+     * position, so a later rename overrides the create). A DELETE body carries only the id, so it is skipped
+     * and the last known name is kept. Used to label a rating row with the bean it rated.
+     */
+    private fun loadBeanNames(): Map<UUID, String> =
+        eventRepository
+            .findByEntityTypeOrderBySeqAsc(LoggedEntityType.COFFEE_BEAN.label)
+            .mapNotNull { event ->
+                val name = event.body?.get("name")?.toString() ?: return@mapNotNull null
+                uuidBody(event, "id") to name
+            }.toMap()
 
     /** Loads the price timeline once, ascending by append position. */
     private fun loadPricePoints(): List<PricePoint> =

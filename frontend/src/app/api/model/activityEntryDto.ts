@@ -22,6 +22,8 @@ export interface ActivityEntryDto {
     weightGrams?: number | null;
     privateAmountCents?: number | null;
     kittyAmountCents?: number | null;
+    beanName?: string | null;
+    ratingValue?: number | null;
 }
 export namespace ActivityEntryDto {
     export const TypeEnum = {
@@ -31,7 +33,8 @@ export namespace ActivityEntryDto {
         Deposit: 'DEPOSIT',
         KittyExpense: 'KITTY_EXPENSE',
         KittyAdjustment: 'KITTY_ADJUSTMENT',
-        PriceChange: 'PRICE_CHANGE'
+        PriceChange: 'PRICE_CHANGE',
+        Rating: 'RATING'
     } as const;
     export type TypeEnum = typeof TypeEnum[keyof typeof TypeEnum];
 }

@@ -24,5 +24,8 @@ enum class ActivityEntryType {
     KITTY_ADJUSTMENT,
 
     /** The global price per cup was changed (admin global feed only; it moves no single balance). */
-    PRICE_CHANGE
+    PRICE_CHANGE,
+
+    /** A user rated the beans of a cup (one to five); it moves no balance, so it carries no money effect. */
+    RATING
 }

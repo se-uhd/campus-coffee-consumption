@@ -5,6 +5,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Ratings now appear in the activity feeds. A user's Recent activity on the landing and the admin global
+  Activity page each show a rating as its own row, behind a new "Rating" filter, carrying the rated bean and
+  the value out of five. Hovering a rating row shows the rated bean and value; hovering an expense row shows
+  its type and the bean name or note.
+
 ## [0.9.3] - 2026-07-02
 
 ### Added

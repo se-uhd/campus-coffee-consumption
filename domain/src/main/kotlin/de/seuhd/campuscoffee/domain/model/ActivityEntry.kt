@@ -37,5 +37,7 @@ data class ActivityEntry(
     val delta: Int? = null,
     val weightGrams: Int? = null,
     val privateAmountCents: Long? = null,
-    val kittyAmountCents: Long? = null
+    val kittyAmountCents: Long? = null,
+    val beanName: String? = null,
+    val ratingValue: Int? = null
 )

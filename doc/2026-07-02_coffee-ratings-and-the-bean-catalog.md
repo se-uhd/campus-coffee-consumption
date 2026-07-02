@@ -170,11 +170,14 @@ Two new logged entities, each following the established "adding a new entity" ch
   nullable in the `ExpenseEventPayload` and is written with `writePOJO` (which tolerates null) rather than
   `writeNumber`. The projector resolves `beanId` to a bean (see the migration for legacy bodies).
 
-**Balance and activity are unaffected.** The money projections (`BalanceDataServiceImpl`) and the activity
-feeds (`ActivityDataServiceImpl`, `EventReducer`) already filter by entity type, so `CoffeeBean` and
-`CoffeeRating` events are ignored for free: they carry no money and touch no user or kitty balance. Confirm
-the admin global activity feed (`/api/users/activity`) also excludes them (bean and rating churn is not an
-audit-worthy money event); if an audit trail of renames and merges is wanted later, add it deliberately.
+**Balances are unaffected; rating rows join the activity feeds.** The money projections
+(`BalanceDataServiceImpl`) ignore `CoffeeBean` and `CoffeeRating` events, which carry no money and touch no
+user or kitty balance. The activity feeds surface a `CoffeeRating` as its own zero-money row: the `EventReducer`
+folds a rating into a `RATING` projection (the rater as subject, the bean and value for display, the running
+balance carried unchanged), and the per-user and admin global feeds include it (the kitty history does not).
+Its bean name is resolved from the log's `CoffeeBean` events (`ActivityDataServiceImpl.loadBeanNames`), the
+same way subject logins are resolved from `User` events. `CoffeeBean` rename and merge events stay out of the
+feeds (not audit-worthy money events); if a rename/merge audit trail is wanted later, add it deliberately.
 
 ### Migrations
 

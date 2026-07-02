@@ -5,6 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { EurosPipe } from '../../pipes/euros.pipe';
 import { UtcDatePipe } from '../../pipes/utc-date.pipe';
 import { ActivityEntryDto, ActivityEntryType } from '../../models';
@@ -13,7 +14,7 @@ import { activityIcon, activityLabel } from '../../util/activity-type';
 import { ActorPipe } from '../../pipes/actor.pipe';
 
 /** The client-side filter buckets for the activity list. */
-type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
+type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS' | 'RATINGS';
 
 /**
  * A reusable, presentational unified-activity list. It renders `ActivityEntryDto[]` rows with a per-type
@@ -33,6 +34,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
     MatButtonModule,
     MatButtonToggleModule,
     MatProgressSpinnerModule,
+    MatTooltipModule,
     EurosPipe,
     UtcDatePipe,
     ActorPipe
@@ -50,17 +52,21 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
         <mat-button-toggle value="COFFEES">Coffee</mat-button-toggle>
         <mat-button-toggle value="PURCHASES">Expense</mat-button-toggle>
         <mat-button-toggle value="PAYMENTS">Deposit</mat-button-toggle>
+        <mat-button-toggle value="RATINGS">Rating</mat-button-toggle>
       </mat-button-toggle-group>
     }
 
     <ul class="cc-activity">
       @for (entry of visibleEntries(); track entry.id) {
-        <li class="cc-entry">
+        <li class="cc-entry" [matTooltip]="tooltipFor(entry)" matTooltipPosition="above">
           <mat-icon class="cc-entry-icon">{{ iconFor(entry.type) }}</mat-icon>
           <div class="cc-entry-body">
             <div class="cc-activity-title">
               <span>{{ labelFor(entry.type) }}</span>
-              @if (showsExpenseTotal(entry)) {
+              @if (entry.type === 'RATING') {
+                <!-- a rating moves no money: show the value out of five instead of an amount -->
+                <span class="amount cc-rating-value">{{ entry.ratingValue }}/5</span>
+              } @else if (showsExpenseTotal(entry)) {
                 <!-- a user's split purchase: show the full purchase total, broken down below -->
                 <span class="amount">+{{ expenseTotal(entry) }}</span>
               } @else {
@@ -75,22 +81,26 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS';
                 · {{ entry.note }}
               }
             </div>
-            <div class="muted">
-              new balance {{ entry.runningBalanceCents | euros }}
-              @if (entry.count != null) {
-                · total {{ entry.count }} cups
-                @if (deltaLabel(entry); as dl) {
-                  ({{ dl }})
+            @if (entry.type !== 'RATING') {
+              <div class="muted">
+                new balance {{ entry.runningBalanceCents | euros }}
+                @if (entry.count != null) {
+                  · total {{ entry.count }} cups
+                  @if (deltaLabel(entry); as dl) {
+                    ({{ dl }})
+                  }
                 }
-              }
-              @if (entry.weightGrams != null) {
-                · {{ entry.weightGrams }} g
-              }
-              @if (hasKittySplit(entry)) {
-                · <mat-icon class="cc-split-glyph">person</mat-icon> {{ splitPrivate(entry) }} +
-                <mat-icon class="cc-split-glyph">savings</mat-icon> {{ splitKitty(entry) }}
-              }
-            </div>
+                @if (entry.weightGrams != null) {
+                  · {{ entry.weightGrams }} g
+                }
+                @if (hasKittySplit(entry)) {
+                  · <mat-icon class="cc-split-glyph">person</mat-icon> {{ splitPrivate(entry) }} +
+                  <mat-icon class="cc-split-glyph">savings</mat-icon> {{ splitKitty(entry) }}
+                }
+              </div>
+            } @else {
+              <div class="muted">{{ ratingDetail(entry) }}</div>
+            }
           </div>
         </li>
       } @empty {
@@ -282,6 +292,26 @@ export class ActivityListComponent {
     return formatEuros((entry.privateAmountCents ?? 0) + (entry.kittyAmountCents ?? 0));
   }
 
+  /** The bean a rating row rates, for the row's second line (its name, or a generic word when unresolved). */
+  ratingDetail(entry: ActivityEntryDto): string {
+    return entry.beanName ?? 'beans';
+  }
+
+  /**
+   * The hover text for a row: the rated bean and value for a rating, the type and bean/note for an expense
+   * (a bean purchase names its bean, another outlay reads "Other"), and nothing for every other row.
+   */
+  tooltipFor(entry: ActivityEntryDto): string {
+    if (entry.type === 'RATING') {
+      return `Rated ${entry.beanName ?? 'beans'} · ${entry.ratingValue}/5`;
+    }
+    if (entry.type === 'PRIVATE_EXPENSE' || entry.type === 'KITTY_EXPENSE') {
+      const kind = entry.beanName ? `Beans · ${entry.beanName}` : 'Other';
+      return entry.note ? `${kind} · ${entry.note}` : kind;
+    }
+    return '';
+  }
+
   /** Maps an entry type to its filter bucket. */
   private bucketOf(type: ActivityEntryType): ActivityFilter {
     switch (type) {
@@ -294,6 +324,8 @@ export class ActivityListComponent {
       case 'DEPOSIT':
       case 'KITTY_ADJUSTMENT':
         return 'PAYMENTS';
+      case 'RATING':
+        return 'RATINGS';
       default:
         // an unknown type belongs to no specific bucket; it surfaces only under the "All" view
         return 'ALL';

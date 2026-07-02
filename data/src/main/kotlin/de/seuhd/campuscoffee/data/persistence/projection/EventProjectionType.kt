@@ -21,5 +21,8 @@ internal enum class EventProjectionType {
     KITTY_ADJUSTMENT,
 
     /** The global price was changed (no balance effect; a display row only). */
-    PRICE_CHANGE
+    PRICE_CHANGE,
+
+    /** A user rated a cup's beans (no balance effect; a display row carrying the bean and the value). */
+    RATING
 }

@@ -1,10 +1,12 @@
 package de.seuhd.campuscoffee.tests.system
 
+import de.seuhd.campuscoffee.api.dtos.ActivityEntryDto
 import de.seuhd.campuscoffee.api.dtos.CoffeeBeanDto
 import de.seuhd.campuscoffee.api.dtos.CoffeeBeanRatingsDto
 import de.seuhd.campuscoffee.api.dtos.OwnExpenseDto
 import de.seuhd.campuscoffee.api.dtos.RatingRequestDto
 import de.seuhd.campuscoffee.api.dtos.UserSummaryDto
+import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.model.ExpenseType
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
@@ -114,6 +116,30 @@ class RatingSystemTests : AbstractSystemTest() {
         val row = ratings().first { it.beanId == beanId }
         assertThat(row.voteCount).isEqualTo(1)
         assertThat(row.averageValue).isEqualTo(5.0)
+    }
+
+    @Test
+    fun `a rating appears in the user's activity feed with its bean and value`() {
+        recordBeanPurchase("Sumatra Mandheling")
+        val beanId = beans().first { it.name == "Sumatra Mandheling" }.id
+        addCoffee()
+        rate(beanId, 4).exchange()
+
+        val activity =
+            client()
+                .get()
+                .uri("/api/activity")
+                .accept(MediaType.APPLICATION_JSON)
+                .withUser(user)
+                .exchange()
+                .returnResult<Array<ActivityEntryDto>>()
+                .responseBody!!
+                .toList()
+        val row = activity.first { it.type == ActivityEntryType.RATING }
+        assertThat(row.beanName).isEqualTo("Sumatra Mandheling")
+        assertThat(row.ratingValue).isEqualTo(4)
+        // a rating moves no money
+        assertThat(row.amountCents).isEqualTo(0)
     }
 
     @Test

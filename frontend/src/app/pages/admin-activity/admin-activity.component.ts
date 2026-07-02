@@ -26,7 +26,7 @@ import { TruncationTooltipDirective } from '../../directives/truncation-tooltip.
 const ACTIVITY_PAGE_SIZE = 25;
 
 /** The client-side filter buckets for the global activity table. */
-type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
+type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE' | 'RATINGS';
 
 /**
  * Admin global activity page: one paginated table of every change across all users, the kitty, and the
@@ -102,6 +102,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
             <mat-button-toggle value="EXPENSES">Expense</mat-button-toggle>
             <mat-button-toggle value="MONEY">Deposit</mat-button-toggle>
             <mat-button-toggle value="PRICE">Price</mat-button-toggle>
+            <mat-button-toggle value="RATINGS">Rating</mat-button-toggle>
           </mat-button-toggle-group>
 
           @if (entries().length > 0) {
@@ -166,7 +167,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE';
                       User<br />balance
                     </th>
                     <td mat-cell *matCellDef="let row" class="col-numeric cc-balance">
-                      @if (row.userEffectCents != null) {
+                      @if (row.type !== 'RATING' && row.userEffectCents != null) {
                         <div [class.warn]="row.userEffectCents < 0">
                           {{ row.userEffectCents | euros: true }}
                         </div>
@@ -431,13 +432,17 @@ export class AdminActivityComponent implements OnInit {
    * @param row the activity row
    */
   detail(row: GlobalActivityEntryDto): string | null {
+    if (row.type === 'RATING') {
+      return `${row.beanName ?? 'beans'} · ${row.ratingValue}/5`;
+    }
     if (row.count != null) {
       const delta = row.delta;
       const suffix = delta != null ? ` (${delta > 0 ? '+' : ''}${delta})` : '';
       return `${row.count} cups${suffix}`;
     }
     if (row.weightGrams != null) {
-      return `${row.weightGrams} g`;
+      // a bean purchase names its bean beside the weight; another outlay has no weight and no bean
+      return row.beanName ? `${row.beanName} · ${row.weightGrams} g` : `${row.weightGrams} g`;
     }
     if (row.priceAmountCents != null) {
       return `now ${formatEuros(row.priceAmountCents)}`;
@@ -464,6 +469,8 @@ export class AdminActivityComponent implements OnInit {
         return 'MONEY';
       case 'PRICE_CHANGE':
         return 'PRICE';
+      case 'RATING':
+        return 'RATINGS';
       default:
         return 'ALL';
     }

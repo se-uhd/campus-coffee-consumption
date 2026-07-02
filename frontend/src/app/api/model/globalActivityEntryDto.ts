@@ -28,6 +28,8 @@ export interface GlobalActivityEntryDto {
     privateAmountCents?: number | null;
     kittyAmountCents?: number | null;
     priceAmountCents?: number | null;
+    beanName?: string | null;
+    ratingValue?: number | null;
 }
 export namespace GlobalActivityEntryDto {
     export const TypeEnum = {
@@ -37,7 +39,8 @@ export namespace GlobalActivityEntryDto {
         Deposit: 'DEPOSIT',
         KittyExpense: 'KITTY_EXPENSE',
         KittyAdjustment: 'KITTY_ADJUSTMENT',
-        PriceChange: 'PRICE_CHANGE'
+        PriceChange: 'PRICE_CHANGE',
+        Rating: 'RATING'
     } as const;
     export type TypeEnum = typeof TypeEnum[keyof typeof TypeEnum];
 }

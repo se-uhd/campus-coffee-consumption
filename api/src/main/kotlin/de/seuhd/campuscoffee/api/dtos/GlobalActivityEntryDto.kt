@@ -36,5 +36,7 @@ data class GlobalActivityEntryDto(
     val weightGrams: Int? = null,
     val privateAmountCents: Long? = null,
     val kittyAmountCents: Long? = null,
-    val priceAmountCents: Int? = null
+    val priceAmountCents: Int? = null,
+    val beanName: String? = null,
+    val ratingValue: Int? = null
 )

@@ -31,6 +31,8 @@ export function activityIcon(type: ActivityEntryType): string {
       return 'payments';
     case 'PRICE_CHANGE':
       return 'sell';
+    case 'RATING':
+      return 'grade';
     default:
       return 'receipt_long';
   }
@@ -59,6 +61,8 @@ export function activityLabel(type: ActivityEntryType): string {
       return 'Kitty adjustment';
     case 'PRICE_CHANGE':
       return 'Price change';
+    case 'RATING':
+      return 'Rating';
     default:
       return 'Entry';
   }

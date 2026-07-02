@@ -4261,7 +4261,7 @@
         "properties" : {
           "type" : {
             "type" : "string",
-            "enum" : [ "CONSUMPTION", "CONSUMPTION_CANCEL", "PRIVATE_EXPENSE", "DEPOSIT", "KITTY_EXPENSE", "KITTY_ADJUSTMENT", "PRICE_CHANGE" ]
+            "enum" : [ "CONSUMPTION", "CONSUMPTION_CANCEL", "PRIVATE_EXPENSE", "DEPOSIT", "KITTY_EXPENSE", "KITTY_ADJUSTMENT", "PRICE_CHANGE", "RATING" ]
           },
           "id" : {
             "type" : "string",
@@ -4304,6 +4304,13 @@
           "kittyAmountCents" : {
             "type" : [ "integer", "null" ],
             "format" : "int64"
+          },
+          "beanName" : {
+            "type" : [ "string", "null" ]
+          },
+          "ratingValue" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
           }
         },
         "required" : [ "amountCents", "createdAt", "createdBy", "id", "runningBalanceCents", "type" ]
@@ -4575,7 +4582,7 @@
         "properties" : {
           "type" : {
             "type" : "string",
-            "enum" : [ "CONSUMPTION", "CONSUMPTION_CANCEL", "PRIVATE_EXPENSE", "DEPOSIT", "KITTY_EXPENSE", "KITTY_ADJUSTMENT", "PRICE_CHANGE" ]
+            "enum" : [ "CONSUMPTION", "CONSUMPTION_CANCEL", "PRIVATE_EXPENSE", "DEPOSIT", "KITTY_EXPENSE", "KITTY_ADJUSTMENT", "PRICE_CHANGE", "RATING" ]
           },
           "id" : {
             "type" : "string",
@@ -4638,6 +4645,13 @@
             "format" : "int64"
           },
           "priceAmountCents" : {
+            "type" : [ "integer", "null" ],
+            "format" : "int32"
+          },
+          "beanName" : {
+            "type" : [ "string", "null" ]
+          },
+          "ratingValue" : {
             "type" : [ "integer", "null" ],
             "format" : "int32"
           }

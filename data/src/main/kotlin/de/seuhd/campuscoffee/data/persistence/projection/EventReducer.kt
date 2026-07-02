@@ -38,9 +38,10 @@ internal class EventReducer(
             LoggedEntityType.EXPENSE -> expense(event)
             LoggedEntityType.PAYMENT -> payment(event)
             LoggedEntityType.COFFEE_PRICE -> priceChange(event)
-            // a User, bean, or rating event never reaches an activity stream (a bean/rating carries no
-            // money); listed (not `else`) so a new type forces a decision
-            LoggedEntityType.USER, LoggedEntityType.COFFEE_BEAN, LoggedEntityType.COFFEE_RATING -> null
+            LoggedEntityType.COFFEE_RATING -> rating(event)
+            // a User or bean event never reaches an activity stream (it carries no money and is not a user
+            // action worth showing); listed (not `else`) so a new type forces a decision
+            LoggedEntityType.USER, LoggedEntityType.COFFEE_BEAN -> null
         }
 
     private fun consumption(event: EventEntity): EventProjection? {
@@ -123,7 +124,8 @@ internal class EventReducer(
             kittyBalance = kittyBalanceAfter,
             weightGrams = intBody(event, "weightGrams"),
             privatePortion = privatePortion,
-            kittyPortion = kittyPortion
+            kittyPortion = kittyPortion,
+            beanId = optionalUuidBody(event, "beanId")
         )
     }
 
@@ -156,6 +158,25 @@ internal class EventReducer(
                 kittyBalance = kittyBalance
             )
         }
+    }
+
+    private fun rating(event: EventEntity): EventProjection? {
+        // an INSERT/UPDATE rating body carries the rater's userId; a DELETE (an undo) carries only the id, so
+        // it has no userId and is skipped. A rating moves no balance, so it carries the subject's current
+        // running balance unchanged (a zero effect) and the bean and value for display.
+        val subject = optionalUuidBody(event, "userId") ?: return null
+        val balance = userBalances[subject] ?: 0L
+        return EventProjection(
+            event = event,
+            kind = EventProjectionType.RATING,
+            subjectUserId = subject,
+            userEffect = 0L,
+            userBalance = balance,
+            kittyEffect = null,
+            kittyBalance = null,
+            beanId = optionalUuidBody(event, "beanId"),
+            ratingValue = intBody(event, "value")
+        )
     }
 
     private fun priceChange(event: EventEntity): EventProjection =

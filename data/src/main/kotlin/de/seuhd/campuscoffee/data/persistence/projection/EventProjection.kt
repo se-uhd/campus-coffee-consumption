@@ -24,14 +24,16 @@ internal data class EventProjection(
     val weightGrams: Int? = null,
     val privatePortion: Long? = null,
     val kittyPortion: Long? = null,
-    val priceAmountCents: Int? = null
+    val priceAmountCents: Int? = null,
+    val beanId: UUID? = null,
+    val ratingValue: Int? = null
 )
 
 /**
  * Maps a walked record to a user-feed entry (the user's running balance). Only reached for records with a
  * user effect on a user's own stream, so the kitty-only kinds never occur.
  */
-internal fun EventProjection.toUserEntry(): ActivityEntry =
+internal fun EventProjection.toUserEntry(beanNames: Map<UUID, String>): ActivityEntry =
     ActivityEntry(
         type =
             when (kind) {
@@ -39,6 +41,7 @@ internal fun EventProjection.toUserEntry(): ActivityEntry =
                 EventProjectionType.CONSUMPTION_CANCEL -> ActivityEntryType.CONSUMPTION_CANCEL
                 EventProjectionType.EXPENSE -> ActivityEntryType.PRIVATE_EXPENSE
                 EventProjectionType.DEPOSIT -> ActivityEntryType.DEPOSIT
+                EventProjectionType.RATING -> ActivityEntryType.RATING
                 EventProjectionType.KITTY_ADJUSTMENT, EventProjectionType.PRICE_CHANGE ->
                     error("A user activity feed never carries a $kind record.")
             },
@@ -52,7 +55,9 @@ internal fun EventProjection.toUserEntry(): ActivityEntry =
         delta = delta,
         weightGrams = weightGrams,
         privateAmountCents = privatePortion,
-        kittyAmountCents = kittyPortion
+        kittyAmountCents = kittyPortion,
+        beanName = beanId?.let { beanNames[it] },
+        ratingValue = ratingValue
     )
 
 /**
@@ -68,7 +73,8 @@ internal fun EventProjection.toKittyEntry(): ActivityEntry =
                 EventProjectionType.EXPENSE -> ActivityEntryType.KITTY_EXPENSE
                 EventProjectionType.CONSUMPTION,
                 EventProjectionType.CONSUMPTION_CANCEL,
-                EventProjectionType.PRICE_CHANGE ->
+                EventProjectionType.PRICE_CHANGE,
+                EventProjectionType.RATING ->
                     error("A kitty history never carries a $kind record.")
             },
         id = idOf(event),
@@ -89,7 +95,10 @@ internal fun EventProjection.toKittyEntry(): ActivityEntry =
  *
  * @param subjectLoginById the login of each known user by id (a subject absent from it is hard-deleted)
  */
-internal fun EventProjection.toGlobalEntry(subjectLoginById: Map<UUID, String>): GlobalActivityEntry =
+internal fun EventProjection.toGlobalEntry(
+    subjectLoginById: Map<UUID, String>,
+    beanNames: Map<UUID, String>
+): GlobalActivityEntry =
     GlobalActivityEntry(
         type =
             when (kind) {
@@ -99,6 +108,7 @@ internal fun EventProjection.toGlobalEntry(subjectLoginById: Map<UUID, String>):
                 EventProjectionType.DEPOSIT -> ActivityEntryType.DEPOSIT
                 EventProjectionType.KITTY_ADJUSTMENT -> ActivityEntryType.KITTY_ADJUSTMENT
                 EventProjectionType.PRICE_CHANGE -> ActivityEntryType.PRICE_CHANGE
+                EventProjectionType.RATING -> ActivityEntryType.RATING
             },
         id = idOf(event),
         createdAt = createdAtOf(event),
@@ -116,5 +126,7 @@ internal fun EventProjection.toGlobalEntry(subjectLoginById: Map<UUID, String>):
         weightGrams = weightGrams,
         privateAmountCents = privatePortion,
         kittyAmountCents = kittyPortion,
-        priceAmountCents = priceAmountCents
+        priceAmountCents = priceAmountCents,
+        beanName = beanId?.let { beanNames[it] },
+        ratingValue = ratingValue
     )

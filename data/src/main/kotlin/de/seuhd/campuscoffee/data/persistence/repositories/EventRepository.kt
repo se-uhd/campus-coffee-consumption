@@ -72,7 +72,8 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
             "SELECT * FROM events WHERE " +
                 "(entity_type = 'CoffeeConsumption' AND body ->> 'userId' = :userId) OR " +
                 "(entity_type = 'Expense' AND body ->> 'buyerUserId' = :userId) OR " +
-                "(entity_type = 'Payment' AND body ->> 'userId' = :userId) " +
+                "(entity_type = 'Payment' AND body ->> 'userId' = :userId) OR " +
+                "(entity_type = 'CoffeeRating' AND body ->> 'userId' = :userId) " +
                 "ORDER BY seq ASC",
         nativeQuery = true
     )
@@ -102,7 +103,8 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
     @Query(
         value =
             "SELECT * FROM events WHERE " +
-                "entity_type IN ('CoffeeConsumption', 'Expense', 'Payment', 'CoffeePrice') ORDER BY seq ASC",
+                "entity_type IN ('CoffeeConsumption', 'Expense', 'Payment', 'CoffeePrice', 'CoffeeRating') " +
+                "ORDER BY seq ASC",
         nativeQuery = true
     )
     fun findActivityStream(): List<EventEntity>
