@@ -143,6 +143,27 @@ class RatingSystemTests : AbstractSystemTest() {
     }
 
     @Test
+    fun `the global activity CSV export includes rating rows with the bean and value`() {
+        recordBeanPurchase("Yemen Mocha")
+        val beanId = beans().first { it.name == "Yemen Mocha" }.id
+        addCoffee()
+        rate(beanId, 4).exchange()
+
+        val csv =
+            client()
+                .get()
+                .uri("/api/users/activity.csv")
+                .withAdmin()
+                .exchange()
+                .returnResult<ByteArray>()
+                .responseBody!!
+                .decodeToString()
+        // the two rating columns are in the header, and the rating row carries its bean and value
+        assertThat(csv).contains("beanName,ratingValue")
+        assertThat(csv).contains("RATING").contains("Yemen Mocha")
+    }
+
+    @Test
     fun `re-rating a different bean in the same window moves the one vote and leaves both bean names intact`() {
         recordBeanPurchase("Java Jampit")
         recordBeanPurchase("Panama Geisha")

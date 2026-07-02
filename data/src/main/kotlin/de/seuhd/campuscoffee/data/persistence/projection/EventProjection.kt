@@ -22,8 +22,8 @@ internal data class EventProjection(
     val count: Int? = null,
     val delta: Int? = null,
     val weightGrams: Int? = null,
-    val privatePortion: Long? = null,
-    val kittyPortion: Long? = null,
+    val privateAmountCents: Long? = null,
+    val kittyAmountCents: Long? = null,
     val priceAmountCents: Int? = null,
     val beanId: UUID? = null,
     val ratingValue: Int? = null
@@ -54,8 +54,8 @@ internal fun EventProjection.toUserEntry(beanNames: Map<UUID, String>): Activity
         count = count,
         delta = delta,
         weightGrams = weightGrams,
-        privateAmountCents = privatePortion,
-        kittyAmountCents = kittyPortion,
+        privateAmountCents = privateAmountCents,
+        kittyAmountCents = kittyAmountCents,
         beanName = beanId?.let { beanNames[it] },
         ratingValue = ratingValue
     )
@@ -84,8 +84,8 @@ internal fun EventProjection.toKittyEntry(): ActivityEntry =
         amountCents = requireNotNull(kittyEffect),
         runningBalanceCents = requireNotNull(kittyBalance),
         weightGrams = weightGrams,
-        privateAmountCents = privatePortion,
-        kittyAmountCents = kittyPortion
+        privateAmountCents = privateAmountCents,
+        kittyAmountCents = kittyAmountCents
     )
 
 /**
@@ -124,8 +124,8 @@ internal fun EventProjection.toGlobalEntry(
         count = count,
         delta = delta,
         weightGrams = weightGrams,
-        privateAmountCents = privatePortion,
-        kittyAmountCents = kittyPortion,
+        privateAmountCents = privateAmountCents,
+        kittyAmountCents = kittyAmountCents,
         priceAmountCents = priceAmountCents,
         beanName = beanId?.let { beanNames[it] },
         ratingValue = ratingValue

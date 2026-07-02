@@ -176,8 +176,11 @@ user or kitty balance. The activity feeds surface a `CoffeeRating` as its own ze
 folds a rating into a `RATING` projection (the rater as subject, the bean and value for display, the running
 balance carried unchanged), and the per-user and admin global feeds include it (the kitty history does not).
 Its bean name is resolved from the log's `CoffeeBean` events (`ActivityDataServiceImpl.loadBeanNames`), the
-same way subject logins are resolved from `User` events. `CoffeeBean` rename and merge events stay out of the
-feeds (not audit-worthy money events); if a rename/merge audit trail is wanted later, add it deliberately.
+same way subject logins are resolved from `User` events. The global feed's CSV export (`ActivityCsvResponder`)
+carries rating rows too, with `beanName`/`ratingValue` columns and blank money cells (a rating moves no money,
+so a zero-effect cell would be a meaningless "transaction" in a money export). `CoffeeBean` rename and merge
+events stay out of the feeds (not audit-worthy money events); if a rename/merge audit trail is wanted later,
+add it deliberately.
 
 ### Migrations
 

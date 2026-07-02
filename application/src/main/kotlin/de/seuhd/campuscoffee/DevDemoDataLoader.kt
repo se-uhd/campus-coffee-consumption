@@ -202,7 +202,9 @@ class DevDemoDataLoader(
             val bean = coffeeBeanService.resolveOrCreate(DEMO_BEAN_NAMES[beanIndex])
             coffeeRatingDataService.upsert(CoffeeRating(user = user, bean = bean, value = value))
         }
-        log.info { "Seeded ${RATING_PLAN.size} demo ratings across the bean catalog." }
+        // one bean nobody has rated, so the ratings page shows the zero-vote state ("no votes")
+        coffeeBeanService.resolveOrCreate("Kenya AA")
+        log.info { "Seeded ${RATING_PLAN.size} demo ratings across the bean catalog, plus one unrated bean." }
     }
 
     /**

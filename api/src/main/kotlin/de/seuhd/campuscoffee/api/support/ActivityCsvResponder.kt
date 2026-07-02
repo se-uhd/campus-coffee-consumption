@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.api.support
 
+import de.seuhd.campuscoffee.domain.model.ActivityEntryType
 import de.seuhd.campuscoffee.domain.model.GlobalActivityEntry
 import org.apache.commons.csv.CSVFormat
 import org.springframework.http.ContentDisposition
@@ -52,19 +53,22 @@ class ActivityCsvResponder {
     }
 
     /** The CSV cell values for one entry, in [HEADERS] order; a null cell renders as an empty field. */
-    private fun row(entry: GlobalActivityEntry): List<Any?> =
-        listOf(
+    private fun row(entry: GlobalActivityEntry): List<Any?> {
+        // a rating moves no money, so its user/kitty effect and balance cells are left blank (as in the UI),
+        // rather than exporting a zero "transaction"; its bean and value go in the two trailing columns
+        val isRating = entry.type == ActivityEntryType.RATING
+        return listOf(
             // timestamp/type are machine-generated (ISO-8601, an enum name), so they need no formula guard
             entry.createdAt.atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
             entry.type.name,
-            // the free-text cells are user-controlled (a user edits their own name and writes notes), so guard
-            // them against spreadsheet formula injection; the numeric cells below are written as numbers, never
-            // as formulas
+            // the free-text cells are user-controlled (a user edits their own name, writes notes, and names
+            // beans), so guard them against spreadsheet formula injection; the numeric cells are written as
+            // numbers, never as formulas
             formulaSafe(entry.subjectLogin),
             formulaSafe(entry.subjectName),
             formulaSafe(entry.actorLogin),
-            entry.userEffectCents,
-            entry.userBalanceCents,
+            entry.userEffectCents.takeUnless { isRating },
+            entry.userBalanceCents.takeUnless { isRating },
             entry.kittyEffectCents,
             entry.kittyBalanceCents,
             entry.count,
@@ -73,8 +77,11 @@ class ActivityCsvResponder {
             entry.privateAmountCents,
             entry.kittyAmountCents,
             entry.priceAmountCents,
-            formulaSafe(entry.note)
+            formulaSafe(entry.note),
+            formulaSafe(entry.beanName),
+            entry.ratingValue
         )
+    }
 
     /**
      * Neutralizes spreadsheet formula injection in a free-text cell: a value whose first character a
@@ -124,7 +131,9 @@ class ActivityCsvResponder {
                 "privateAmountCents",
                 "kittyAmountCents",
                 "priceAmountCents",
-                "note"
+                "note",
+                "beanName",
+                "ratingValue"
             )
     }
 }

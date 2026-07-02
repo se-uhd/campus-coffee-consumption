@@ -5,7 +5,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { EurosPipe } from '../../pipes/euros.pipe';
 import { UtcDatePipe } from '../../pipes/utc-date.pipe';
 import { ActivityEntryDto, ActivityEntryType } from '../../models';
@@ -34,7 +33,6 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS' | 'RATINGS';
     MatButtonModule,
     MatButtonToggleModule,
     MatProgressSpinnerModule,
-    MatTooltipModule,
     EurosPipe,
     UtcDatePipe,
     ActorPipe
@@ -58,7 +56,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS' | 'RATINGS';
 
     <ul class="cc-activity">
       @for (entry of visibleEntries(); track entry.id) {
-        <li class="cc-entry" [matTooltip]="tooltipFor(entry)" matTooltipPosition="above">
+        <li class="cc-entry" [title]="tooltipFor(entry)">
           <mat-icon class="cc-entry-icon">{{ iconFor(entry.type) }}</mat-icon>
           <div class="cc-entry-body">
             <div class="cc-activity-title">

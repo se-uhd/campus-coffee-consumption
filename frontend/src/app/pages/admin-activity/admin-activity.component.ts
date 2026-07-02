@@ -131,7 +131,13 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE' | 'RATI
                           labelFor(row.type)
                         }}</span>
                       </span>
-                      @if (detail(row); as d) {
+                      @if (row.type === 'RATING') {
+                        <!-- bean on its own line (truncated, full name in a tooltip), the value below it -->
+                        <div class="muted cc-rating-bean" [ccTruncationTooltip]="row.beanName">
+                          {{ row.beanName }}
+                        </div>
+                        <div class="muted">{{ row.ratingValue }}/5</div>
+                      } @else if (detail(row); as d) {
                         <div class="muted">{{ d }}</div>
                       }
                     </td>
@@ -313,6 +319,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE' | 'RATI
       /* Data cells stay on one line and truncate with an ellipsis; the full value is revealed in a hover
          tooltip by the ccTruncationTooltip directive. */
       .cc-type-label,
+      .cc-rating-bean,
       .cc-subject > div,
       td.mat-column-actor {
         overflow: hidden;
@@ -432,9 +439,6 @@ export class AdminActivityComponent implements OnInit {
    * @param row the activity row
    */
   detail(row: GlobalActivityEntryDto): string | null {
-    if (row.type === 'RATING') {
-      return `${row.beanName ?? 'beans'} · ${row.ratingValue}/5`;
-    }
     if (row.count != null) {
       const delta = row.delta;
       const suffix = delta != null ? ` (${delta > 0 ? '+' : ''}${delta})` : '';

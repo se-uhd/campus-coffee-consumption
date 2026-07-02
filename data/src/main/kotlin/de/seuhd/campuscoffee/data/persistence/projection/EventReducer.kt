@@ -113,7 +113,7 @@ internal class EventReducer(
             } else {
                 null
             }
-        val (privatePortion, kittyPortion) = splitPortions(event)
+        val (privateAmountCents, kittyAmountCents) = splitPortions(event)
         return EventProjection(
             event = event,
             kind = EventProjectionType.EXPENSE,
@@ -123,8 +123,8 @@ internal class EventReducer(
             kittyEffect = if (kittyEffect != 0) kittyEffect.toLong() else null,
             kittyBalance = kittyBalanceAfter,
             weightGrams = intBody(event, "weightGrams"),
-            privatePortion = privatePortion,
-            kittyPortion = kittyPortion,
+            privateAmountCents = privateAmountCents,
+            kittyAmountCents = kittyAmountCents,
             beanId = optionalUuidBody(event, "beanId")
         )
     }
