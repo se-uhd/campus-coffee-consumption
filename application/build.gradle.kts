@@ -2,6 +2,7 @@ import com.github.gradle.node.npm.task.NpmTask
 import info.solidsoft.gradle.pitest.PitestPluginExtension
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import org.springframework.boot.gradle.tasks.run.BootRun
+import java.io.File
 
 plugins {
     id("de.seuhd.campuscoffee.java-conventions")
@@ -48,10 +49,71 @@ dependencies {
 }
 
 // --- Angular frontend build ----------------------------------------------------------------------
-// Use the mise-provided Node on PATH rather than downloading one, and run npm in the frontend project.
+// Resolve mise's shim directory (its default location, honoring the standard mise/XDG overrides). Each shim
+// is a self-contained dispatcher to the mise binary, so an ABSOLUTE path to a shim runs the pinned node/npm
+// with no PATH lookup at all (verified: it resolves the pinned node even from an empty environment).
+val miseShimsDir: String =
+    run {
+        val dataDir =
+            System.getenv("MISE_DATA_DIR")
+                ?: System.getenv("XDG_DATA_HOME")?.let { "$it/mise" }
+                ?: "${System.getProperty("user.home")}/.local/share/mise"
+        "$dataDir/shims"
+    }
+val miseNpm = File(miseShimsDir, "npm")
+val miseNpx = File(miseShimsDir, "npx")
+
+// Use the mise-provided Node rather than downloading one, and run npm in the frontend project.
+//
+// The Gradle daemon is a long-lived JVM that captures the PATH it was FIRST started with and reuses it for
+// every build. With `download = false`, node-gradle runs a bare `npm`, which the JVM resolves against THAT
+// captured PATH (setting a task's own `environment` PATH does NOT change how the JVM looks up the command).
+// So a daemon first launched outside a mise-activated environment (IntelliJ's Gradle integration, or a bare
+// `gradle`) has no node on its PATH and every frontend task dies with
+// "A problem occurred starting process 'command 'npm''", and keeps failing until that daemon is stopped.
+// Fix: point npm/npx at mise's ABSOLUTE shim path when present, so node-gradle execs a fixed binary and
+// never does a PATH lookup, independent of the daemon's PATH. On a machine without mise the shims are absent
+// and the default PATH-resolved `npm` is kept unchanged.
 node {
     download.set(false)
     nodeProjectDir.set(rootProject.layout.projectDirectory.dir("frontend"))
+    if (miseNpm.exists()) npmCommand.set(miseNpm.absolutePath)
+    if (miseNpx.exists()) npxCommand.set(miseNpx.absolutePath)
+}
+
+// The generateFrontendDtos task shells out to `bash -> npx`; bash resolves npx from its own process PATH (a
+// real PATH lookup, unlike the JVM's), so that task gets the shim dir prepended to its PATH (added below).
+val frontendExecPath: String =
+    listOf(miseShimsDir, System.getenv("PATH").orEmpty())
+        .filter { it.isNotEmpty() }
+        .joinToString(File.pathSeparator)
+
+// True when an `npm` executable exists in one of the PATH entries.
+fun npmIsResolvable(path: String): Boolean =
+    path.split(File.pathSeparator).any { dir ->
+        dir.isNotEmpty() && (File(dir, "npm").exists() || File(dir, "npm.cmd").exists())
+    }
+
+// Whether npm will actually resolve for the frontend tasks: either the mise shim is used (absolute, always
+// resolvable) or a plain `npm` is on the daemon's real PATH. Checked at execution to fail fast (below).
+val npmWillResolve: Boolean = miseNpm.exists() || npmIsResolvable(System.getenv("PATH").orEmpty())
+
+// Actionable failure shown when npm cannot be found for a frontend task, in place of the plugin's cryptic
+// "A problem occurred starting process 'command 'npm''".
+val npmMissingMessage =
+    "npm was not found for the frontend build. This project builds the Angular SPA with the mise-provided " +
+        "Node (mise.toml: node = '24').\n" +
+        "  - Install the toolchain:   mise install\n" +
+        "  - Run Gradle through mise: mise exec -- gradle <task>\n" +
+        "If you use mise and this persists, a stale Gradle daemon captured a PATH without Node: run " +
+        "'mise exec -- gradle --stop' and retry."
+
+tasks.withType<NpmTask>().configureEach {
+    doFirst {
+        if (!npmWillResolve) {
+            throw GradleException(npmMissingMessage)
+        }
+    }
 }
 
 // `npm ci` installs the locked dependencies reproducibly; cached on package.json/lock.
@@ -77,6 +139,8 @@ val generateFrontendDtos by tasks.registering(Exec::class) {
     dependsOn(frontendInstall)
     workingDir(rootProject.projectDir)
     commandLine("bash", "scripts/generate-frontend-dtos.sh")
+    // the script's npx needs node on PATH; bash resolves it from this PATH (see the node block above)
+    doFirst { environment("PATH", frontendExecPath) }
     inputs.file(rootProject.file("frontend/src-gen/api-docs.json"))
     inputs.file(rootProject.file("scripts/generate-frontend-dtos.sh"))
     outputs.dir(rootProject.file("frontend/src/app/api/model"))
