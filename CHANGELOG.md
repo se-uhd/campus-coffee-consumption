@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.6] - 2026-07-03
 
 ### Added
 
@@ -13,6 +13,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   while their balance is negative. The users table asks them to settle the debt first (record a deposit,
   which clears the balance), mirroring the existing guard that blocks deleting a user with financial history.
   A user at a zero or positive balance deactivates as before.
+
+### Fixed
+
+- The frontend Gradle build now resolves npm through mise's absolute shim path, so a Gradle daemon first
+  started outside a mise-activated shell (IntelliJ, a bare `gradle`) no longer fails every frontend task with
+  "A problem occurred starting process 'command 'npm''". When Node is genuinely missing, a clear message
+  explaining how to install it replaces that opaque error.
 
 ## [0.9.5] - 2026-07-03
 
@@ -1031,6 +1038,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.9.6]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.6
 [0.9.5]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.5
 [0.9.4]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.4
 [0.9.3]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.3
