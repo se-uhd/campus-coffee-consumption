@@ -1,4 +1,4 @@
-# CampusCoffeeConsumption
+# Campus Coffee Consumption
 
 A coffee consumption tracker for [**SE@UHD**](https://se-uhd.de/), the Software Engineering Group at Heidelberg University. Each
 user has a running coffee count, valued at a global admin-set **price per cup**, which feeds a
