@@ -4,11 +4,14 @@ A coffee consumption tracker for [**SE@UHD**](https://se-uhd.de/), the Software 
 user has a running coffee count, valued at a global admin-set **price per cup**, which feeds a
 per-user **balance** and a communal **kitty**. A user bumps their own count by scanning a **QR (Quick Response) code on
 the wall**: a secret per-user **capability link**. Scanning it opens a small mobile-first web app where
-they add a coffee, **undo** a recent one within a grace period, record their own bean purchases, and see
-their balance. Admins create and manage users, set the price, record expenses and kitty deposits, and
-correct anyone's count. Settling up records a **deposit** (real money into the kitty); there is no reset.
-Every change is recorded in an append-only **event log**, from which a **unified activity feed** (coffees,
-purchases, and deposits with a running balance) is read. Money is tracked in **euro cents**.
+they add a coffee, **undo** a recent one within a grace period, **rate** the beans they just drank (1 to 5),
+record their own bean purchases against a shared **bean catalog**, and see either their **balance** or their
+**cup stats** (a per-user landing preference). Admins create and manage users, set the price, record
+**typed** expenses (a *beans* purchase or an *other* group outlay) and kitty deposits, correct anyone's
+count, and curate the bean catalog (rename and merge beans). Settling up records a **deposit** (real money
+into the kitty); there is no reset. Every change is recorded in an append-only **event log**, from which a
+**unified activity feed** (coffees, purchases, deposits, and ratings, the money entries with a running
+balance) is read. Money is tracked in **euro cents**.
 
 The app is a Spring Boot / Kotlin backend (hexagonal architecture, event sourcing persistence) with an
 Angular 22 single-page application (SPA) frontend, derived from the CampusCoffee teaching project.
@@ -19,8 +22,10 @@ Angular 22 single-page application (SPA) frontend, derived from the CampusCoffee
   code as `https://<host>/login/{token}`; scanning it opens the SPA, which sends the token as the
   `X-Capability-Token` header on its API calls. The token never appears in an API URL path, only at the SPA
   entry point, so it stays out of API access logs. A user adds one coffee at a time, may **undo** the most
-  recent one within a short grace period, records their own bean purchases, and sees their balance, the
-  current price, the kitty balance, and a unified activity feed of their coffees, purchases, and deposits.
+  recent one within a short grace period, may **rate** the beans they just drank (a score from 1 to 5, within
+  the same window), records their own bean purchases (a catalog bean plus a weight), and sees either their
+  balance or their cup stats (their choice), the current price, the kitty balance, and a unified activity feed
+  of their coffees, purchases, deposits, and ratings.
 - **Admins** authenticate with a **JSON Web Token (JWT)** held in an httpOnly, `SameSite=Strict` session cookie, minted from a
   username-and-password login (`POST /api/auth/token`, ~10-hour work-session token, no refresh flow). The
   credentials are encrypted in the browser (a compact JSON Web Encryption (JWE) payload under the backend's published RSA public key, with
@@ -28,22 +33,25 @@ Angular 22 single-page application (SPA) frontend, derived from the CampusCoffee
   travels as plaintext, and the cookie keeps the token out of JavaScript's reach (a cross-site scripting (XSS) attack cannot steal it). An
   admin manages users (create, edit, deactivate, change
   role, view and rotate capability links, download any user's QR or all of them as a ZIP or printable PDF
-  sheet), sets the global price, records expenses
-  with a private/kitty split and kitty deposits and adjustments, corrects any user's count, and reviews
-  the kitty history and a per-user overview. There is no reset: settling up is a deposit, and a count
-  change is a correction (optionally with a note).
+  sheet), sets the global price, records **typed** expenses (a *beans* purchase against the catalog or an
+  *other* group outlay) with a private/kitty split and kitty deposits and adjustments, corrects any user's
+  count, curates the **bean catalog** (rename and merge beans), and reviews the kitty history, the bean
+  ratings, and a per-user overview. There is no reset: settling up is a deposit, and a count change is a
+  correction (optionally with a note).
 - **SPA routing.** A user's capability link `/login/{token}` opens the user landing, with the user
-  profile at `/login/{token}/profile`. The admin area is consolidated under `/admin/`: the login form at
-  `/admin/login`, the landing/dashboard at `/admin`, the users, price, expenses, kitty, and activity pages at
-  `/admin/users`, `/admin/price`, `/admin/expenses`, `/admin/kitty`, and `/admin/activity`, and the admin profile at
+  profile at `/login/{token}/profile` and the bean ratings at `/login/{token}/ratings`. The admin area is
+  consolidated under `/admin/`: the login form at `/admin/login`, the landing/dashboard at `/admin`, the
+  users, price, expenses, kitty, activity, and ratings pages at `/admin/users`, `/admin/price`,
+  `/admin/expenses`, `/admin/kitty`, `/admin/activity`, and `/admin/ratings`, and the admin profile at
   `/admin/profile`. The root path redirects to `/admin`; any unknown route shows a not-found page.
 - **Money is in euro cents and each cup is valued at the price when it was drunk.** A user's balance
   reads like a prepaid card (negative means they owe the fund), valuing each coffee at the price in effect
   when it was consumed.
-- **The event log is the source of truth.** Each change (to a count, the price, an expense, or a payment)
-  appends one full-state event; the relational tables are a read model projected from the log, and the
-  unified activity feed and balances are read straight from the event rows (each carries who made the change, when,
-  and an optional note). See `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`.
+- **The event log is the source of truth.** Each change (to a count, the price, an expense, a payment, a
+  catalog bean, or a rating) appends one full-state event; the relational tables are a read model projected
+  from the log, and the unified activity feed and balances are read straight from the event rows (each carries
+  who made the change, when, and an optional note). See
+  `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`.
 
 ## Architecture
 
@@ -132,13 +140,15 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 
 **User (auth: `X-Capability-Token`):**
 
-- `GET  /summary`: the user landing in one call (current count, balance, the current price, the kitty balance, and the first page of the unified activity feed).
+- `GET  /summary`: the user landing in one call (current count, balance, the current price, the kitty balance, the landing-panel preference with its cup stats, the rating prompt, and the first page of the unified activity feed).
 - `POST /consumption` (no body): add one coffee.
 - `POST /consumption/cancel`: undo the most recent coffee within the grace period (nothing to undo, or past the grace period, returns 409 Conflict).
-- `GET  /activity?limit=20&offset=0`: own unified activity feed (coffees, purchases, deposits) with a running balance.
-- `POST /expenses` `{ "weightGrams": N, "amountCents": N, "note"?: "…" }`: record an own bean purchase (booked 100% to the user).
+- `PUT  /consumption/rating` `{ "beanId": "…", "value": 1..5 }`: rate the bean of the most recent coffee within the grace window (a repeat updates the one vote).
+- `GET  /activity?limit=20&offset=0`: own unified activity feed (coffees, purchases, deposits, ratings) with a running balance.
+- `POST /expenses` `{ "expenseType": "BEANS" | "OTHER", "beanName"?: "…", "weightGrams"?: N, "amountCents": N, "note"?: "…" }`: record an own expense (booked 100% to the user). A `BEANS` expense names a catalog bean and a weight; an `OTHER` expense has neither.
 - `GET  /profile`, `PUT /profile`: view and edit own name, email, and landing-panel preference (the response includes the capability URL).
 - `GET  /profile/qr.png`: own QR code (high-resolution PNG).
+- `GET  /beans`, `GET /beans/ratings`: the selectable beans and the per-bean ratings table (shared with admins; any authenticated user).
 
 **Admin (auth: JWT, `ROLE_ADMIN`):**
 
@@ -147,12 +157,14 @@ All paths are under `/api`. JSON only. See Swagger for the full contract.
 - `GET /users/{id}/link`, `POST /users/{id}/link/rotate`, `GET /users/{id}/qr.png`.
 - `GET /users/qr.zip`: a streamed ZIP of every active user's QR code (one `<loginName>.png` per user).
 - `GET /users/qr.pdf`: a printable PDF grid of every active user's QR code, each labeled by login name.
+- `GET  /users/{id}/summary?limit=10&offset=0`: the per-user landing summary (the admin analogue of `/summary`).
 - `GET  /users/{id}/consumption?limit=5&offset=0`, `GET /users/{id}/activity?limit=20&offset=0`.
 - `GET /users/activity?limit=20&offset=0`: the whole-installation global activity feed (every user's coffees, purchases, and deposits, the kitty adjustments, and price changes), newest first, each row carrying the subject user, the actor, and the user and kitty running balances. Renders in the admin **Activity** page (`/admin/activity`).
 - `GET /users/activity.csv`: the same global feed as a streamed comma-separated values (CSV) download of the full dataset, with a UTF-8 byte order mark (BOM), ISO-8601 UTC timestamps, and raw integer euro cents.
-- `POST /users/{id}/consumption` `{ "delta": 1 | -1 }`.
-- `PUT  /users/{id}/consumption` `{ "total": N, "note": "…" }`: absolute count correction (`note` optional).
-- `GET/POST/PUT/DELETE /users/{id}/expenses`: list, record, correct, or delete a user's purchases with a private/kitty split (the buyer cannot be changed on a correction).
+- `POST /users/{id}/consumption` `{ "delta": 1 | -1 }`; `POST /users/{id}/consumption/cancel`: undo the user's most recent coffee within the grace period.
+- `PUT  /users/{id}/consumption` `{ "total": N, "note": "…" }`: absolute count correction (`note` optional); `PUT /users/{id}/consumption/rating` `{ "beanId", "value" }`: rate the user's current cup on their behalf.
+- `GET/POST/PUT/DELETE /users/{id}/expenses`: list, record, correct, or delete a user's typed expense (`expenseType` `BEANS`/`OTHER`, an optional `beanName` and `weightGrams`) with a private/kitty split (the buyer cannot be changed on a correction).
+- `PUT /beans/{id}` `{ "name" }`: rename a catalog bean; `POST /beans/{id}/merge` `{ "targetBeanId" }`: merge a bean into a canonical target (there is no create endpoint; beans are created by name from the expense and rating paths).
 - `GET /price`: read the current global price (admin-only; users receive it through their landing summary).
 - `PUT /price` `{ "amountCents": N }`, `GET /price/history?limit=50&offset=0`: set the global price, or view a page of its history (newest first).
 - `POST /kitty/deposit` `{ "userId", "amountCents", "note"? }`: a user pays money into the kitty.
