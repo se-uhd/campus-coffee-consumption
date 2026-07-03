@@ -405,6 +405,64 @@ test.describe('admin flow', () => {
     await maxRow.getByRole('switch', { name: 'Active' }).click();
     await expect(page.getByText('User deactivated.')).toBeVisible();
   });
+
+  // The deactivation guard: an admin cannot deactivate a user who still owes the fund. One self-scanned coffee
+  // at the pinned 50-cent price leaves maxmustermann owing 0.50 €, so the Active switch opens the "Settle the
+  // balance first" dialog and reverts instead of deactivating. A 0.50 € deposit clears the debt, after which
+  // the same switch deactivates for real. This exercises the client pre-check, the toggle revert (the switch
+  // is one-way bound, so the handler must put it back explicitly), and the settle-then-deactivate flow.
+  test('an admin cannot deactivate a user who owes the fund until the balance is settled', async ({
+    page
+  }) => {
+    const token = await adminToken(api);
+    await pinPrice(api, token, 50);
+    // resolve maxmustermann's id for the deposit that settles the debt later
+    const filter = await api.get('/api/users/filter?login_name=maxmustermann', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    expect(filter.ok(), `looking up the user should succeed, got ${filter.status()}`).toBeTruthy();
+    const maxId = ((await filter.json()) as { id: string }).id;
+    // one self-scanned coffee at 50 cents leaves the user owing 0.50 € to the fund
+    const scan = await api.post('/api/consumption', {
+      headers: { 'X-Capability-Token': USER_TOKENS.maxmustermann }
+    });
+    expect(scan.ok(), `seeding a coffee should succeed, got ${scan.status()}`).toBeTruthy();
+
+    await loginAsAdmin(page);
+    await page.goto('/admin/users');
+    const usersCard = page.locator('mat-card', {
+      has: page.getByRole('heading', { name: 'Users' })
+    });
+    const maxRow = usersCard.getByRole('row').filter({ hasText: 'maxmustermann' });
+    const activeSwitch = maxRow.getByRole('switch', { name: 'Active' });
+    // the row shows the debt and the switch starts on (the user is active)
+    await expect(maxRow).toContainText('-0.50 €');
+    await expect(activeSwitch).toHaveAttribute('aria-checked', 'true');
+
+    // flipping it off opens the settle-first dialog instead of deactivating
+    await activeSwitch.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Settle the balance first')).toBeVisible();
+    await expect(dialog).toContainText('still owes 0.50 €');
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+    // the user was not deactivated and the switch snaps back to on
+    await expect(page.getByText('User deactivated.')).toHaveCount(0);
+    await expect(activeSwitch).toHaveAttribute('aria-checked', 'true');
+
+    // settle the debt with a 0.50 € deposit, then the same switch deactivates for real
+    const deposit = await api.post('/api/kitty/deposit', {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { userId: maxId, amountCents: 50 }
+    });
+    expect(deposit.ok(), `the settling deposit should succeed, got ${deposit.status()}`).toBeTruthy();
+
+    await page.reload();
+    const settledRow = usersCard.getByRole('row').filter({ hasText: 'maxmustermann' });
+    await expect(settledRow).toContainText('0.00 €');
+    await settledRow.getByRole('switch', { name: 'Active' }).click();
+    await expect(page.getByText('User deactivated.')).toBeVisible();
+  });
 });
 
 /**

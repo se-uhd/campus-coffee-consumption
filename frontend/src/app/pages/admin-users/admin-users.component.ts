@@ -17,7 +17,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
@@ -32,6 +32,7 @@ import { NotificationService } from '../../services/notification.service';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
 import { EurosPipe } from '../../pipes/euros.pipe';
+import { formatEuros } from '../../util/money';
 import { triggerDownload } from '../../util/download';
 import { Role, UserDto } from '../../models';
 
@@ -311,7 +312,7 @@ import { Role, UserDto } from '../../models';
                   <td mat-cell *matCellDef="let row" class="col-actions">
                     <mat-slide-toggle
                       [checked]="row.active"
-                      (change)="toggleActive(row.user)"
+                      (change)="toggleActive(row, $event)"
                       aria-label="Active"
                       matTooltip="Active"
                     ></mat-slide-toggle>
@@ -634,8 +635,37 @@ export class AdminUsersComponent {
     }
   }
 
-  /** Toggles a user's active state (deactivate/reactivate). */
-  async toggleActive(user: UserDto): Promise<void> {
+  /**
+   * Toggles a user's active state (deactivate/reactivate). The slide-toggle binds one-way
+   * (`[checked]="row.active"`) and has already flipped visually by the time this runs, so any path that does
+   * not persist a new `active` value must put the control back with `toggle.source.checked = row.active`: a
+   * `reload()` cannot revert it, because the table reuses the row DOM under `trackBy` and the unchanged
+   * `row.active` never re-fires the `[checked]` binding.
+   */
+  async toggleActive(row: UserRow, toggle: MatSlideToggleChange): Promise<void> {
+    const user = row.user;
+    const deactivating = row.active === true;
+    // a user who still owes the fund cannot be deactivated until they settle up (a deposit clears the debt);
+    // guide the admin to the deposit page rather than firing a call the backend refuses with a 409
+    if (deactivating && row.balanceCents < 0) {
+      const goToDeposit = await firstValueFrom(
+        this.dialog
+          .open(ConfirmDialogComponent, {
+            data: {
+              title: 'Settle the balance first',
+              message: `${row.fullName} still owes ${formatEuros(-row.balanceCents)} to the coffee fund. Record a deposit to settle their balance before you can deactivate them.`,
+              confirmLabel: 'Go to deposit'
+            }
+          })
+          .afterClosed()
+      );
+      // nothing was persisted, so put the flipped switch back to the true (still active) state
+      toggle.source.checked = row.active;
+      if (goToDeposit) {
+        await this.router.navigate(['/admin/kitty']);
+      }
+      return;
+    }
     try {
       // change only `active`; null out `role` so a concurrent role change is not reverted by the stale
       // snapshot, and send the required identity fields the backend pins to the stored values anyway. The
@@ -647,12 +677,19 @@ export class AdminUsersComponent {
         lastName: user.lastName,
         emailAddress: user.emailAddress,
         role: null,
-        active: !(user.active === true)
+        active: !deactivating
       });
-      this.notifications.success(user.active === true ? 'User deactivated.' : 'User reactivated.');
+      this.notifications.success(deactivating ? 'User deactivated.' : 'User reactivated.');
       await this.adminUserService.reload();
     } catch (error) {
-      this.notifications.error(error, 'Could not change the user.');
+      // the update was refused (nothing persisted), so put the flipped switch back to match the stored state.
+      // Surface the backend's own reason: a 409 here is either a stale-cache debt (the client pre-check missed
+      // it) or the last-active-admin guard, and both carry a precise, user-facing message. errorWithServerReason
+      // shows whichever one fired (falling back to the generic message for any error without one), so neither is
+      // mislabeled.
+      toggle.source.checked = row.active;
+      this.notifications.errorWithServerReason(error, 'Could not change the user.');
+      await this.adminUserService.reload();
     }
   }
 

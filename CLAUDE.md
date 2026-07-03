@@ -766,7 +766,7 @@ controllers map paths relative to the resource.
 ### Admin and user management (auth: JWT, `ROLE_ADMIN`)
 
 - `GET /users`, `POST /users` (create; the server assigns the capability token and creates the consumption at 0), `GET/PUT/DELETE /users/{id}`.
-- `PUT /users/{id}` edits the profile, `role`, and `active` (deactivate/reactivate).
+- `PUT /users/{id}` edits the profile, `role`, and `active` (deactivate/reactivate). Deactivating a user who still owes the fund (a negative balance) is refused (409), so an admin settles the debt with a deposit first.
 - `DELETE /users/{id}` hard-deletes a user; refused (409) if the user has any financial history (deactivate instead).
 - `GET /users/me`: the signed-in admin's own user (the admin landing default).
 - `GET /users/filter?login_name=…`: filter users by query params (e.g. by login name).
@@ -893,7 +893,7 @@ Domain exceptions in `domain/.../exceptions/`:
 - `DuplicationException`: Duplicate unique fields (409).
 - `ValidationException`: Malformed input / business rule violation (400), e.g. a `delta` other than `±1`, a count correction below zero, or an expense whose split does not sum to its total.
 - `MissingFieldException`: Required field missing (400).
-- `ConflictException`: A well-formed request that conflicts with the resource's current state (409), e.g. a `−1` at 0, an undo with nothing to undo or past the grace period, or an operation that would drive the kitty below zero (the kitty-overdraw guard, see below).
+- `ConflictException`: A well-formed request that conflicts with the resource's current state (409), e.g. a `−1` at 0, an undo with nothing to undo or past the grace period, deactivating a user who still owes the fund (a negative balance, settled with a deposit first), or an operation that would drive the kitty below zero (the kitty-overdraw guard, see below).
 - `ConcurrentUpdateException`: Optimistic-locking conflict (409), a concurrent self-scan; the SPA retries.
 - `ForbiddenException`: Authorization failure (403), not the owner / not an admin, or a deactivated user mutating.
 - `DeletionConflictException`: Deletion blocked because other data references the entity (409), e.g. hard-deleting a user who has any financial history (a non-zero count, or any expense or deposit); the admin deactivates them instead.

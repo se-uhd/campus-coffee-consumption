@@ -3,6 +3,7 @@ package de.seuhd.campuscoffee.tests.system
 import de.seuhd.campuscoffee.api.dtos.ConsumptionDeltaDto
 import de.seuhd.campuscoffee.api.dtos.ConsumptionDto
 import de.seuhd.campuscoffee.api.dtos.ConsumptionOverrideDto
+import de.seuhd.campuscoffee.api.dtos.DepositRequestDto
 import de.seuhd.campuscoffee.api.dtos.UserDto
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
@@ -458,6 +459,75 @@ class UserAdminSystemTests : AbstractSystemTest() {
 
         assertThat(status).isEqualTo(409)
     }
+
+    @Test
+    fun `deactivating a user who owes money returns 409 Conflict`() {
+        val id = userId()
+        // one coffee at the seeded 50-cent price drives max's balance to -50: he now owes the fund
+        bookOneCoffee(id)
+
+        val status =
+            client()
+                .put()
+                .uri("/api/users/{id}", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(deactivateMaxBody(id))
+                .withAdmin()
+                .exchange()
+                .statusCode()
+
+        assertThat(status).isEqualTo(409)
+    }
+
+    @Test
+    fun `settling the debt then deactivating returns 200`() {
+        val id = userId()
+        bookOneCoffee(id)
+        // a 50-cent deposit credits max's balance back to zero, clearing the debt
+        client()
+            .post()
+            .uri("/api/kitty/deposit")
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(DepositRequestDto(userId = id, amountCents = 50, note = null))
+            .withAdmin()
+            .exchange()
+
+        val result =
+            client()
+                .put()
+                .uri("/api/users/{id}", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(deactivateMaxBody(id))
+                .withAdmin()
+                .exchange()
+                .returnResult<UserDto>()
+
+        assertThat(result.status.value()).isEqualTo(200)
+        assertThat(result.responseBody!!.active).isFalse()
+    }
+
+    /** Books one coffee for the user via an admin +1 step (valued at the current price). */
+    private fun bookOneCoffee(id: UUID) {
+        client()
+            .post()
+            .uri("/api/users/{id}/consumption", id)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(ConsumptionDeltaDto(1))
+            .withAdmin()
+            .exchange()
+    }
+
+    /** A `PUT /api/users/{id}` body that deactivates the seeded user max (echoing his stored identity). */
+    private fun deactivateMaxBody(id: UUID) =
+        mapOf(
+            "id" to id.toString(),
+            "loginName" to "maxmustermann",
+            "emailAddress" to "max.mustermann@se.uni-heidelberg.de",
+            "firstName" to "Max",
+            "lastName" to "Mustermann",
+            "role" to "USER",
+            "active" to false
+        )
 
     /** The entry names contained in a ZIP archive's bytes. */
     private fun zipEntryNames(bytes: ByteArray): List<String> {

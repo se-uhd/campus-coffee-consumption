@@ -10,6 +10,7 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.CrudDataService
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
@@ -37,7 +38,8 @@ class UserServiceImpl(
     private val coffeeConsumptionService: CoffeeConsumptionService,
     private val coffeeConsumptionDataService: CoffeeConsumptionDataService,
     private val expenseDataService: ExpenseDataService,
-    private val paymentDataService: PaymentDataService
+    private val paymentDataService: PaymentDataService,
+    private val balanceDataService: BalanceDataService
 ) : CrudServiceImpl<User, UUID>(User::class.java),
     UserService {
     override fun dataService(): CrudDataService<User, UUID> = userDataService
@@ -177,6 +179,12 @@ class UserServiceImpl(
         if (newRole != Role.ADMIN || newActive == false) {
             requireNotLastActiveAdmin(existing, "demote or deactivate")
         }
+        // refuse to deactivate a user who still owes the fund, so a debt is settled (via a deposit) before
+        // the account is closed; fires only on a genuine active -> inactive transition (never a reactivation
+        // or a no-op re-save of an already inactive user)
+        if (existing.active != false && newActive == false) {
+            requireBalanceSettledForDeactivation(targetId)
+        }
         // the login name is immutable after creation (pinned to the stored value, mirroring the capability
         // token): the append-only event log attributes each change to the actor's login name, and the activity
         // classifies an owner self-scan vs an admin step by that login, so a rename would silently break a
@@ -239,6 +247,28 @@ class UserServiceImpl(
             }
         if (!otherActiveAdmins) {
             throw ConflictException("At least one active admin must remain; you cannot $action the last one.")
+        }
+    }
+
+    /**
+     * Refuses to deactivate a user whose balance is negative (they still owe the fund), mirroring the
+     * delete-with-financial-history guard: the admin settles the debt with a deposit (which credits the user
+     * and raises their balance to zero) before the account is closed, so a debt is never stranded on a
+     * deactivated user. A settled (zero) or positive balance (the fund owes them) deactivates freely.
+     *
+     * This reads the maintained balance projection as a point-in-time check, not serialized by the balance
+     * advisory lock, exactly like the delete guard: a balance-moving write racing this exact deactivation is
+     * an accepted narrow race (its worst case is a small stranded debt the admin reactivates and settles).
+     *
+     * @param userId the user being deactivated
+     * @throws ConflictException if the user still owes the fund
+     */
+    private fun requireBalanceSettledForDeactivation(userId: UUID) {
+        if (balanceDataService.userBalanceCents(userId) < 0) {
+            throw ConflictException(
+                "This user still owes money to the coffee fund; record a deposit to settle their balance " +
+                    "before deactivating them."
+            )
         }
     }
 }

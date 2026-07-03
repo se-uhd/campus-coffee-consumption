@@ -11,6 +11,7 @@ import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.SummaryPanel
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
+import de.seuhd.campuscoffee.domain.ports.data.BalanceDataService
 import de.seuhd.campuscoffee.domain.ports.data.CoffeeConsumptionDataService
 import de.seuhd.campuscoffee.domain.ports.data.ExpenseDataService
 import de.seuhd.campuscoffee.domain.ports.data.PasswordHasherService
@@ -41,6 +42,7 @@ class UserServiceTest {
     private val coffeeConsumptionDataService: CoffeeConsumptionDataService = mock()
     private val expenseDataService: ExpenseDataService = mock()
     private val paymentDataService: PaymentDataService = mock()
+    private val balanceDataService: BalanceDataService = mock()
 
     private lateinit var service: UserServiceImpl
 
@@ -89,7 +91,8 @@ class UserServiceTest {
                 coffeeConsumptionService,
                 coffeeConsumptionDataService,
                 expenseDataService,
-                paymentDataService
+                paymentDataService,
+                balanceDataService
             )
     }
 
@@ -590,6 +593,65 @@ class UserServiceTest {
         val updated = service.update(admin.copy(active = false), admin)
 
         assertThat(updated.active).isFalse()
+    }
+
+    @Test
+    fun `update deactivating a user who owes money throws ConflictException`() {
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
+        // a negative balance means the user still owes the fund
+        whenever(balanceDataService.userBalanceCents(userId)).thenReturn(-50L)
+
+        assertThrows<ConflictException> { service.update(storedUser.copy(active = false), admin) }
+        verify(userDataService, never()).upsert(any())
+    }
+
+    @Test
+    fun `update deactivating a user with a settled balance is allowed`() {
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
+        whenever(balanceDataService.userBalanceCents(userId)).thenReturn(0L)
+        whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+
+        val updated = service.update(storedUser.copy(active = false), admin)
+
+        assertThat(updated.active).isFalse()
+    }
+
+    @Test
+    fun `update deactivating a user with a positive balance is allowed`() {
+        whenever(userDataService.getById(userId)).thenReturn(storedUser)
+        // a positive balance means the fund owes the user; there is no debt to collect
+        whenever(balanceDataService.userBalanceCents(userId)).thenReturn(50L)
+        whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+
+        val updated = service.update(storedUser.copy(active = false), admin)
+
+        assertThat(updated.active).isFalse()
+    }
+
+    @Test
+    fun `update re-saving an already inactive user who owes money does not consult the balance`() {
+        // the guard fires only on a genuine active -> inactive transition, so a re-save of an already
+        // inactive user (or any edit that leaves active false) is never blocked by a lingering debt
+        val inactive = storedUser.copy(active = false)
+        whenever(userDataService.getById(userId)).thenReturn(inactive)
+        whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+
+        val updated = service.update(inactive.copy(active = false), admin)
+
+        assertThat(updated.active).isFalse()
+        verify(balanceDataService, never()).userBalanceCents(any())
+    }
+
+    @Test
+    fun `update reactivating a user who owes money is allowed`() {
+        val inactive = storedUser.copy(active = false)
+        whenever(userDataService.getById(userId)).thenReturn(inactive)
+        whenever(userDataService.upsert(any())).thenAnswer { it.arguments[0] as User }
+
+        val updated = service.update(inactive.copy(active = true), admin)
+
+        assertThat(updated.active).isTrue()
+        verify(balanceDataService, never()).userBalanceCents(any())
     }
 
     @Test
