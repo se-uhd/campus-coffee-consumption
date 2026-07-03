@@ -644,7 +644,7 @@ export class AdminUsersComponent {
    */
   async toggleActive(row: UserRow, toggle: MatSlideToggleChange): Promise<void> {
     const user = row.user;
-    const deactivating = row.active === true;
+    const deactivating = row.active;
     // a user who still owes the fund cannot be deactivated until they settle up (a deposit clears the debt);
     // guide the admin to the deposit page rather than firing a call the backend refuses with a 409
     if (deactivating && row.balanceCents < 0) {
