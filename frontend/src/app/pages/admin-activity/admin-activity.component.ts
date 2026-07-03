@@ -133,10 +133,19 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE' | 'RATI
                       </span>
                       @if (row.type === 'RATING') {
                         <!-- bean on its own line (truncated, full name in a tooltip), the value below it -->
-                        <div class="muted cc-rating-bean" [ccTruncationTooltip]="row.beanName">
+                        <div class="muted cc-cell-trunc" [ccTruncationTooltip]="row.beanName">
                           {{ row.beanName }}
                         </div>
                         <div class="muted">{{ row.ratingValue }}/5</div>
+                      } @else if (row.type === 'PRIVATE_EXPENSE') {
+                        <!-- a bean purchase: its bean and weight; another outlay: its note and no weight -->
+                        <div
+                          class="muted cc-cell-trunc"
+                          [ccTruncationTooltip]="row.beanName ?? row.note ?? ''"
+                        >
+                          {{ row.beanName ?? row.note }}
+                        </div>
+                        <div class="muted">{{ row.weightGrams != null ? row.weightGrams + ' g' : '' }}</div>
                       } @else if (detail(row); as d) {
                         <div class="muted">{{ d }}</div>
                       }
@@ -201,13 +210,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE' | 'RATI
                   </ng-container>
 
                   <tr mat-header-row *matHeaderRowDef="columns"></tr>
-                  <tr
-                    mat-row
-                    *matRowDef="let row; columns: columns"
-                    [matTooltip]="row.note ?? ''"
-                    [matTooltipDisabled]="!row.note"
-                    matTooltipPosition="above"
-                  ></tr>
+                  <tr mat-row *matRowDef="let row; columns: columns" [title]="row.note ?? ''"></tr>
                 </table>
               </div>
             } @else {
@@ -319,7 +322,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE' | 'RATI
       /* Data cells stay on one line and truncate with an ellipsis; the full value is revealed in a hover
          tooltip by the ccTruncationTooltip directive. */
       .cc-type-label,
-      .cc-rating-bean,
+      .cc-cell-trunc,
       .cc-subject > div,
       td.mat-column-actor {
         overflow: hidden;
@@ -443,10 +446,6 @@ export class AdminActivityComponent implements OnInit {
       const delta = row.delta;
       const suffix = delta != null ? ` (${delta > 0 ? '+' : ''}${delta})` : '';
       return `${row.count} cups${suffix}`;
-    }
-    if (row.weightGrams != null) {
-      // a bean purchase names its bean beside the weight; another outlay has no weight and no bean
-      return row.beanName ? `${row.beanName} · ${row.weightGrams} g` : `${row.weightGrams} g`;
     }
     if (row.priceAmountCents != null) {
       return `now ${formatEuros(row.priceAmountCents)}`;

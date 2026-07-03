@@ -205,9 +205,9 @@ const RATING_POSITIONS = [1, 2, 3, 4, 5];
                         </svg>
                       }
                     </span>
-                    <span class="cc-average">
-                      {{ row.averageValue != null ? (row.averageValue | number: '1.1-1') : 'no votes' }}
-                    </span>
+                    @if (row.averageValue != null) {
+                      <span class="cc-average">{{ row.averageValue | number: '1.1-1' }}</span>
+                    }
                   </td>
                 </ng-container>
 
