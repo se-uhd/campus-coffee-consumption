@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.7] - 2026-07-03
 
 ### Changed
 
@@ -1049,6 +1049,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.9.7]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.7
 [0.9.6]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.6
 [0.9.5]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.5
 [0.9.4]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.4
