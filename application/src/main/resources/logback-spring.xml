@@ -8,10 +8,18 @@
         <include resource="org/springframework/boot/logging/logback/file-appender.xml" />
     </springProfile>
 
-    <root level="INFO">
-        <appender-ref ref="CONSOLE" />
-        <springProfile name="dev">
+    <!-- springProfile must wrap a whole <root>, not sit inside it, so each profile gets its own root: dev
+         adds the FILE appender (defined only in the dev include above); every other profile logs to the
+         console only. -->
+    <springProfile name="dev">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE" />
             <appender-ref ref="FILE" />
-        </springProfile>
-    </root>
+        </root>
+    </springProfile>
+    <springProfile name="!dev">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE" />
+        </root>
+    </springProfile>
 </configuration>

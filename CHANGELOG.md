@@ -7,6 +7,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Silence a Logback startup warning by moving the `<springProfile>` guard out of the `<root>` element in
+  `logback-spring.xml`. Spring Boot's `<springProfile>` must wrap a whole `<root>`/`<appender>`/`<logger>`,
+  not sit inside one, so the dev and non-dev profiles now declare their own `<root>` (dev adds the rolling
+  file appender; other profiles log to the console only). Behavior is unchanged.
+
 ### Changed
 
 - Local dev now publishes the PostgreSQL container on host port `5433` instead of the conventional `5432`,
