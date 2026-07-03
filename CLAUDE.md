@@ -278,7 +278,7 @@ its `META-INF/services` provider; they are covered by `gradle :detekt-rules:test
 ### Start PostgreSQL Database
 
 ```shell
-docker run -d --name campus-coffee-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:18-alpine
+docker run -d --name campus-coffee-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -p ${DB_PORT:-5433}:5432 postgres:18-alpine
 ```
 
 ### Run Application (dev profile)
@@ -416,7 +416,7 @@ gradle :domain:test --tests "CoffeeConsumptionServiceTest.decrementing a count a
   - **Backend (JVM) e2e coverage merged into the JaCoCo gate.** `gradle :coverage:runE2eCoverage`
     (`scripts/run-e2e-coverage.sh`) builds the source-mapped SPA + jar, launches it under the JaCoCo agent
     (`-javaagent:…=destfile=coverage/build/jacoco/e2e.exec,output=file,append=false`) on the dev profile
-    against PostgreSQL on `:5432`, waits for `/actuator/health`, runs the e2e (`PW_COVERAGE=1 npm run
+    against PostgreSQL on `:5433`, waits for `/actuator/health`, runs the e2e (`PW_COVERAGE=1 npm run
     e2e`), then SIGTERMs the app so the agent flushes `e2e.exec`. The aggregate report and `coverageGate`
     in `coverage/build.gradle.kts` add `coverage/build/jacoco/e2e.exec` to their `executionData` *when it
     exists*, so an e2e run's HTTP traffic counts toward the same gate; a plain `gradle build` (no

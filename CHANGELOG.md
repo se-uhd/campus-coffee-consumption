@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Local dev now publishes the PostgreSQL container on host port `5433` instead of the conventional `5432`,
+  overridable with the `DB_PORT` environment variable, so it does not collide with a system Postgres or
+  another project already bound to `5432` (the same collision-avoidance as naming the container
+  `campus-coffee-db`). The container-internal port and the app-to-database connection inside Docker Compose
+  stay `5432`; only the host-published port and the local dev datasource change. Testcontainers-based tests
+  are unaffected (they use random host ports).
+
 ## [0.9.7] - 2026-07-03
 
 ### Changed

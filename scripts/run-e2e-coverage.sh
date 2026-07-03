@@ -9,7 +9,8 @@
 #      writes a source-mapped lcov report under frontend/coverage-e2e/ (coverage JaCoCo can never see).
 #
 # Prerequisites (the script does NOT provision these):
-#   - A PostgreSQL reachable at localhost:5432 (user/password postgres), the dev profile's datasource.
+#   - A PostgreSQL reachable at localhost:5433 (user/password postgres), the dev profile's datasource
+#     (override the port with DB_PORT; it propagates to the dev-profile jar this script launches).
 #   - Node on PATH (run via `mise exec --`), Playwright's chromium installed (`npx playwright install`).
 #   - The application jar built with the source-mapped ("coverage") SPA, which this script builds.
 #   - The JaCoCo agent jar path passed as $JACOCO_AGENT_JAR (the :coverage Gradle task resolves and passes

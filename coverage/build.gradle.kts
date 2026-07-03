@@ -109,7 +109,7 @@ tasks.named("check") {
 // Runs the Playwright e2e against the application jar launched under the JaCoCo agent, writing
 // build/jacoco/e2e.exec (backend coverage, merged into the gate above on the next report) plus
 // frontend/coverage-e2e/ (browser V8 coverage source-mapped to .ts). It resolves the agent jar from the
-// jacocoAgentJar configuration and passes it to the script. Requires Docker PostgreSQL on :5432, Node on
+// jacocoAgentJar configuration and passes it to the script. Requires Docker PostgreSQL on :5433, Node on
 // PATH, and Playwright's chromium installed (`npx playwright install --with-deps chromium`); see the
 // script header. Opt-in and orchestration-heavy, not wired into `check`. After it runs, re-run
 // `:coverage:coverageGate` (or `gradle build`) to fold e2e.exec into the gate.

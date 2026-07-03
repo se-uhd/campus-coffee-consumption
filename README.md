@@ -74,7 +74,7 @@ Event sourcing is the only persistence model. See `CLAUDE.md` for the full archi
 Start PostgreSQL 18:
 
 ```shell
-docker run -d --name campus-coffee-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:18-alpine
+docker run -d --name campus-coffee-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -p ${DB_PORT:-5433}:5432 postgres:18-alpine
 ```
 
 Run the backend in the `dev` profile (loads the seeded fixtures on first start):

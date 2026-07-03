@@ -62,7 +62,10 @@ spring:
     activate:
       on-profile: dev
   datasource:
-    url: jdbc:postgresql://localhost:5432/postgres
+    # Local dev publishes Postgres on host :5433 (not the conventional :5432) so it does not collide with a
+    # system Postgres or another project's container, the same collision-avoidance as the campus-coffee-db
+    # container name. Override with DB_PORT (e.g. DB_PORT=5432). The container-internal port stays 5432.
+    url: jdbc:postgresql://localhost:${DB_PORT:5433}/postgres
     username: postgres
     password: postgres
   web:

@@ -5,7 +5,7 @@
 # inline-critical-CSS regression. Opt-in (a dedicated CI job, not part of `gradle build`).
 #
 # Prerequisites (NOT provisioned here):
-#   - A PostgreSQL reachable at localhost:5432 (user/password postgres).
+#   - A PostgreSQL reachable at localhost:5433 (user/password postgres; override the port with DB_PORT).
 #   - Node on PATH (run via `mise exec --`), Playwright's chromium installed (`npx playwright install`).
 #
 # Env knobs:
@@ -39,7 +39,7 @@ fi
 [[ -f "$JAR" ]] || { log "ERROR: jar not found at ${JAR}"; exit 1; }
 
 # --- 2. Fresh prod secrets (NOT the committed dev fallbacks, which WeakDevSecretGuard refuses) ---------
-export SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL:-jdbc:postgresql://localhost:${DB_PORT:-5432}/postgres}"
+export SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL:-jdbc:postgresql://localhost:${DB_PORT:-5433}/postgres}"
 export SPRING_DATASOURCE_USERNAME="${SPRING_DATASOURCE_USERNAME:-postgres}"
 export SPRING_DATASOURCE_PASSWORD="${SPRING_DATASOURCE_PASSWORD:-postgres}"
 JWT_SECRET="$(openssl rand -hex 32)"; export JWT_SECRET

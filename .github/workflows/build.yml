@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule' # the nightly `e2e` job already exercises the browser layer
 
-    # The dev profile's datasource expects PostgreSQL at localhost:5432 (user/password postgres). A service
+    # The dev profile's datasource expects PostgreSQL at localhost:5433 (user/password postgres). A service
     # container provides it; the health-check gates the job until it accepts connections.
     services:
       postgres:
@@ -75,7 +75,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
         ports:
-          - 5432:5432
+          - 5433:5432
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s
@@ -131,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 
-    # The dev profile's datasource expects PostgreSQL at localhost:5432 (user/password postgres). A service
+    # The dev profile's datasource expects PostgreSQL at localhost:5433 (user/password postgres). A service
     # container provides it; the health-check gates the job until it accepts connections.
     services:
       postgres:
@@ -141,7 +141,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
         ports:
-          - 5432:5432
+          - 5433:5432
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s
@@ -214,7 +214,7 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
         ports:
-          - 5432:5432
+          - 5433:5432
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s

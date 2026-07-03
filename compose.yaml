@@ -21,7 +21,9 @@ services:
       # DB_HOST defaults to localhost for Cloud Run: `gcloud run compose up` deploys the app and db as
       # sidecar containers in one service that share a network namespace and talk over localhost (no
       # service-name DNS, unlike Docker Compose). Local Docker Compose reaches the db by its service
-      # name, so run it as: DB_HOST=db docker compose up
+      # name, so run it as: DB_HOST=db docker compose up. This is the container-internal 5432 (the app talks
+      # to the db over the compose network or the shared namespace), independent of the host-published DB_PORT
+      # under the db service below.
       - SPRING_DATASOURCE_URL=jdbc:postgresql://${DB_HOST:-localhost}:5432/postgres
       - SPRING_PROFILES_ACTIVE=dev
       # The dev profile defaults to :8081 for direct local dev (gradle bootRun); pin this container back to
@@ -36,7 +38,10 @@ services:
     networks:
       - campus-coffee-net
     ports:
-      - '5432:5432'
+      # Publish on host :5433 by default (override with DB_PORT) to avoid colliding with a system Postgres or
+      # another project on :5432. The container-internal port stays 5432 (what the app connects to), so only
+      # the host side is remapped.
+      - '${DB_PORT:-5433}:5432'
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
