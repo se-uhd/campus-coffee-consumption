@@ -35,7 +35,7 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
 import { UserSelectComponent } from '../../components/user-select/user-select.component';
 import { EuroAmountDirective } from '../../directives/euro-amount.directive';
-import { AdminExpenseRequest, CoffeeBeanDto, ExpenseDto, ExpenseType, UserDto } from '../../models';
+import { AdminExpenseDto, CoffeeBeanDto, ExpenseDto, ExpenseType, UserDto } from '../../models';
 import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../util/money';
 
 /**
@@ -480,7 +480,7 @@ export class AdminExpensesComponent implements OnInit {
   }
 
   /** Validates and assembles the request body, or sets an error and returns null. */
-  private buildRequest(): AdminExpenseRequest | null {
+  private buildRequest(): AdminExpenseDto | null {
     const beans = this.expenseType === ExpenseType.Beans;
     const amountCents = toCents(this.amountEuros);
     const privateAmountCents = toCents(this.privateEuros);

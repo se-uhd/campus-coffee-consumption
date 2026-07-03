@@ -7,13 +7,14 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ExpenseType } from './expenseType';
 
 
 export interface ExpenseDto { 
     id: string;
     buyerUserId: string;
     buyerLoginName: string;
-    expenseType: ExpenseDto.ExpenseTypeEnum;
+    expenseType: ExpenseType;
     beanId?: string | null;
     beanName?: string | null;
     weightGrams?: number | null;
@@ -24,11 +25,6 @@ export interface ExpenseDto {
     createdAt?: string | null;
 }
 export namespace ExpenseDto {
-    export const ExpenseTypeEnum = {
-        Beans: 'BEANS',
-        Other: 'OTHER'
-    } as const;
-    export type ExpenseTypeEnum = typeof ExpenseTypeEnum[keyof typeof ExpenseTypeEnum];
 }
 
 

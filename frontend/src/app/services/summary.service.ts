@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { ActivityEntryDto, OwnExpenseRequest, RatingRequest, UserSummaryDto } from '../models';
+import { ActivityEntryDto, OwnExpenseDto, RatingRequestDto, UserSummaryDto } from '../models';
 
 /**
  * The authenticated user's accounting self-service. Every call hits a user endpoint, so the interceptor
@@ -35,7 +35,7 @@ export class SummaryService {
   }
 
   /** Records the user's own outlay (a bean purchase booked 100% to their pocket), returning the refreshed summary. */
-  recordExpense(request: OwnExpenseRequest): Promise<UserSummaryDto> {
+  recordExpense(request: OwnExpenseDto): Promise<UserSummaryDto> {
     return firstValueFrom(this.http.post<UserSummaryDto>('/api/expenses', request));
   }
 
@@ -44,7 +44,7 @@ export class SummaryService {
    * only while a cup is still cancellable; a late rating yields a 409.
    */
   rateCoffee(beanId: string, value: number): Promise<UserSummaryDto> {
-    const body: RatingRequest = { beanId, value };
+    const body: RatingRequestDto = { beanId, value };
     return firstValueFrom(this.http.put<UserSummaryDto>('/api/consumption/rating', body));
   }
 }

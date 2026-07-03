@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { SummaryPanel } from './summaryPanel';
 
 
 /**
@@ -16,14 +17,9 @@ export interface ProfileUpdateDto {
     firstName: string;
     lastName: string;
     emailAddress: string;
-    summaryPanel: ProfileUpdateDto.SummaryPanelEnum;
+    summaryPanel: SummaryPanel;
 }
 export namespace ProfileUpdateDto {
-    export const SummaryPanelEnum = {
-        Balance: 'BALANCE',
-        Cups: 'CUPS'
-    } as const;
-    export type SummaryPanelEnum = typeof SummaryPanelEnum[keyof typeof SummaryPanelEnum];
 }
 
 

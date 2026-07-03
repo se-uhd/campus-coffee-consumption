@@ -3966,8 +3966,7 @@
         "type" : "object",
         "properties" : {
           "expenseType" : {
-            "type" : "string",
-            "enum" : [ "BEANS", "OTHER" ]
+            "$ref" : "#/components/schemas/ExpenseType"
           },
           "beanName" : {
             "type" : [ "string", "null" ],
@@ -4006,6 +4005,10 @@
         },
         "required" : [ "amountCents", "expenseType", "kittyAmountCents", "privateAmountCents" ]
       },
+      "ExpenseType" : {
+        "type" : "string",
+        "enum" : [ "BEANS", "OTHER" ]
+      },
       "ExpenseDto" : {
         "type" : "object",
         "properties" : {
@@ -4021,8 +4024,7 @@
             "type" : "string"
           },
           "expenseType" : {
-            "type" : "string",
-            "enum" : [ "BEANS", "OTHER" ]
+            "$ref" : "#/components/schemas/ExpenseType"
           },
           "beanId" : {
             "type" : [ "string", "null" ],
@@ -4131,6 +4133,14 @@
         },
         "required" : [ "beanId", "value" ]
       },
+      "Role" : {
+        "type" : "string",
+        "enum" : [ "USER", "ADMIN" ]
+      },
+      "SummaryPanel" : {
+        "type" : "string",
+        "enum" : [ "BALANCE", "CUPS" ]
+      },
       "UserDto" : {
         "type" : "object",
         "description" : "Data of the user to create, including their role.",
@@ -4177,15 +4187,21 @@
             "writeOnly" : true
           },
           "role" : {
-            "type" : [ "string", "null" ],
-            "enum" : [ "USER", "ADMIN" ]
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/Role"
+            }, {
+              "type" : "null"
+            } ]
           },
           "active" : {
             "type" : [ "boolean", "null" ]
           },
           "summaryPanel" : {
-            "type" : [ "string", "null" ],
-            "enum" : [ "BALANCE", "CUPS" ]
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SummaryPanel"
+            }, {
+              "type" : "null"
+            } ]
           },
           "capabilityUrl" : {
             "type" : [ "string", "null" ]
@@ -4214,8 +4230,7 @@
             "minLength" : 0
           },
           "summaryPanel" : {
-            "type" : "string",
-            "enum" : [ "BALANCE", "CUPS" ]
+            "$ref" : "#/components/schemas/SummaryPanel"
           }
         },
         "required" : [ "emailAddress", "firstName", "lastName", "summaryPanel" ]
@@ -4260,8 +4275,7 @@
         "type" : "object",
         "properties" : {
           "type" : {
-            "type" : "string",
-            "enum" : [ "CONSUMPTION", "CONSUMPTION_CANCEL", "PRIVATE_EXPENSE", "DEPOSIT", "KITTY_EXPENSE", "KITTY_ADJUSTMENT", "PRICE_CHANGE", "RATING" ]
+            "$ref" : "#/components/schemas/ActivityEntryType"
           },
           "id" : {
             "type" : "string",
@@ -4315,6 +4329,10 @@
         },
         "required" : [ "amountCents", "createdAt", "createdBy", "id", "runningBalanceCents", "type" ]
       },
+      "ActivityEntryType" : {
+        "type" : "string",
+        "enum" : [ "CONSUMPTION", "CONSUMPTION_CANCEL", "PRIVATE_EXPENSE", "DEPOSIT", "KITTY_EXPENSE", "KITTY_ADJUSTMENT", "PRICE_CHANGE", "RATING" ]
+      },
       "CoffeeRatingPromptDto" : {
         "type" : "object",
         "properties" : {
@@ -4355,8 +4373,7 @@
             "type" : "boolean"
           },
           "summaryPanel" : {
-            "type" : "string",
-            "enum" : [ "BALANCE", "CUPS" ]
+            "$ref" : "#/components/schemas/SummaryPanel"
           },
           "firstCupAt" : {
             "type" : [ "string", "null" ],
@@ -4492,8 +4509,7 @@
         "type" : "object",
         "properties" : {
           "expenseType" : {
-            "type" : "string",
-            "enum" : [ "BEANS", "OTHER" ]
+            "$ref" : "#/components/schemas/ExpenseType"
           },
           "beanName" : {
             "type" : [ "string", "null" ],
@@ -4581,8 +4597,7 @@
         "type" : "object",
         "properties" : {
           "type" : {
-            "type" : "string",
-            "enum" : [ "CONSUMPTION", "CONSUMPTION_CANCEL", "PRIVATE_EXPENSE", "DEPOSIT", "KITTY_EXPENSE", "KITTY_ADJUSTMENT", "PRICE_CHANGE", "RATING" ]
+            "$ref" : "#/components/schemas/ActivityEntryType"
           },
           "id" : {
             "type" : "string",

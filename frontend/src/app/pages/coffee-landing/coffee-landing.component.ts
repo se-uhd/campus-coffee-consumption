@@ -41,10 +41,10 @@ import { UserSelectComponent } from '../../components/user-select/user-select.co
 import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import {
   ActivityEntryDto,
-  AdminExpenseRequest,
+  AdminExpenseDto,
   CoffeeBeanDto,
   ExpenseType,
-  OwnExpenseRequest,
+  OwnExpenseDto,
   UserDto,
   UserSummaryDto
 } from '../../models';
@@ -962,7 +962,7 @@ export class CoffeeLandingComponent implements OnInit {
       if (this.adminMode) {
         // the landing form records a simple full-private purchase (the whole amount credits the user); the
         // Expenses page is where an admin records a kitty-funded split or corrects a purchase
-        const request: AdminExpenseRequest = {
+        const request: AdminExpenseDto = {
           expenseType: this.expenseType,
           beanName,
           weightGrams,
@@ -973,7 +973,7 @@ export class CoffeeLandingComponent implements OnInit {
         };
         await this.mutateSelectedThenRefresh(id, () => this.expenseService.adminCreate(id, request));
       } else {
-        const request: OwnExpenseRequest = {
+        const request: OwnExpenseDto = {
           expenseType: this.expenseType,
           beanName,
           weightGrams,

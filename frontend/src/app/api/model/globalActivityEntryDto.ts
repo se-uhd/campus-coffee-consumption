@@ -7,10 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ActivityEntryType } from './activityEntryType';
 
 
 export interface GlobalActivityEntryDto { 
-    type: GlobalActivityEntryDto.TypeEnum;
+    type: ActivityEntryType;
     id: string;
     createdAt: string;
     actorLogin: string;
@@ -32,17 +33,6 @@ export interface GlobalActivityEntryDto {
     ratingValue?: number | null;
 }
 export namespace GlobalActivityEntryDto {
-    export const TypeEnum = {
-        Consumption: 'CONSUMPTION',
-        ConsumptionCancel: 'CONSUMPTION_CANCEL',
-        PrivateExpense: 'PRIVATE_EXPENSE',
-        Deposit: 'DEPOSIT',
-        KittyExpense: 'KITTY_EXPENSE',
-        KittyAdjustment: 'KITTY_ADJUSTMENT',
-        PriceChange: 'PRICE_CHANGE',
-        Rating: 'RATING'
-    } as const;
-    export type TypeEnum = typeof TypeEnum[keyof typeof TypeEnum];
 }
 
 

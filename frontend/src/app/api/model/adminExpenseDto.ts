@@ -7,10 +7,11 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { ExpenseType } from './expenseType';
 
 
 export interface AdminExpenseDto { 
-    expenseType: AdminExpenseDto.ExpenseTypeEnum;
+    expenseType: ExpenseType;
     beanName?: string | null;
     weightGrams?: number | null;
     amountCents: number;
@@ -19,11 +20,6 @@ export interface AdminExpenseDto {
     note?: string | null;
 }
 export namespace AdminExpenseDto {
-    export const ExpenseTypeEnum = {
-        Beans: 'BEANS',
-        Other: 'OTHER'
-    } as const;
-    export type ExpenseTypeEnum = typeof ExpenseTypeEnum[keyof typeof ExpenseTypeEnum];
 }
 
 

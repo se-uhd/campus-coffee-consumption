@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { AdminExpenseRequest, ExpenseDto } from '../models';
+import { AdminExpenseDto, ExpenseDto } from '../models';
 
 /**
  * The admin bean-purchase calls against `/api/users/{userId}/expenses` (the interceptor adds the JWT).
@@ -18,12 +18,12 @@ export class ExpenseService {
   }
 
   /** Records a bean purchase for a user with the kitty/private split. */
-  adminCreate(userId: string, request: AdminExpenseRequest): Promise<ExpenseDto> {
+  adminCreate(userId: string, request: AdminExpenseDto): Promise<ExpenseDto> {
     return firstValueFrom(this.http.post<ExpenseDto>(`/api/users/${userId}/expenses`, request));
   }
 
   /** Corrects an existing bean purchase by id. */
-  adminUpdate(userId: string, expenseId: string, request: AdminExpenseRequest): Promise<ExpenseDto> {
+  adminUpdate(userId: string, expenseId: string, request: AdminExpenseDto): Promise<ExpenseDto> {
     return firstValueFrom(this.http.put<ExpenseDto>(`/api/users/${userId}/expenses/${expenseId}`, request));
   }
 

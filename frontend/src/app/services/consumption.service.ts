@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { ConsumptionDeltaDto, ConsumptionDto, ConsumptionOverrideDto, RatingRequest } from '../models';
+import { ConsumptionDeltaDto, ConsumptionDto, ConsumptionOverrideDto, RatingRequestDto } from '../models';
 
 /**
  * Admin coffee-consumption calls against `/api/users/{id}/consumption` (the interceptor adds the JWT). The
@@ -32,7 +32,7 @@ export class ConsumptionService {
 
   /** Rates the beans of a user's current cup on their behalf, by user id (admin); 409 if no cup to rate. */
   rateForUser(userId: string, beanId: string, value: number): Promise<ConsumptionDto> {
-    const body: RatingRequest = { beanId, value };
+    const body: RatingRequestDto = { beanId, value };
     return firstValueFrom(this.http.put<ConsumptionDto>(`/api/users/${userId}/consumption/rating`, body));
   }
 }

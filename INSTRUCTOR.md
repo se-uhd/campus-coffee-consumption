@@ -64,19 +64,18 @@ Open these three files side by side so the audience sees the same type in three 
 
 Point out the banner at the top of every generated file (`Do not edit the class manually.`), then explain
 the **re-export step**, the last stage of the pipeline. The components never import from `api/model/`
-directly. Instead `frontend/src/app/models.ts` re-exports the generated types, and every component imports
-its DTOs from `models.ts`. That one file does three jobs:
+directly. Instead `frontend/src/app/models.ts` re-exports each generated type under its exact generated
+name, and every component imports its DTOs from `models.ts`. That single barrel gives the whole app one
+import path (`export type { UserDto } from './api/model/userDto';`), so regenerating `api/model/` can
+reshape a generated file and no component import has to change, because the components only ever see
+`models.ts`.
 
-- It re-exports each generated DTO under its spec name (`export type { UserDto } from './api/model/userDto';`),
-  giving the whole app a single import path.
-- It renames a few request DTOs to the names the components already use
-  (`export type { OwnExpenseDto as OwnExpenseRequest } from './api/model/ownExpenseDto';`), so a
-  generator-chosen name does not leak into the components.
-- It surfaces the inline enums, which the generator emits namespaced on their owning DTO (`UserDto.RoleEnum`),
-  as standalone union aliases (`Role`, `ActivityEntryType`).
-
-The payoff: regenerating `api/model/` can rename or reshape a generated file and no component import has to
-change, because the components only ever see `models.ts`.
+The enums are handled the same way. The backend emits each enum as a named, reusable schema instead of
+inlining it on every property (springdoc's `ModelResolver.enumsAsRef`, set in the api-layer `OpenApiConfig`
+so no swagger dependency reaches the domain enums), so the generator writes a standalone module per enum
+with a clean `Role` / `ActivityEntryType` union rather than one namespaced under its DTO (`UserDto.RoleEnum`).
+`models.ts` re-exports those by name (`Role`, `ActivityEntryType`, `SummaryPanel`, and `ExpenseType`, which
+is also a runtime value), with no hand-written aliasing.
 
 ### Option A: the mechanical demo (no Docker, instant)
 

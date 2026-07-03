@@ -474,7 +474,7 @@ OpenAPI spec, not written by hand. The `generateFrontendDtos` Gradle task runs
 `scripts/generate-frontend-dtos.sh`, which generates into `frontend/src/app/api/model/` and is **hash-skip**
 (it regenerates only when the committed spec `frontend/src-gen/api-docs.json` changes). It is a dependency
 of `frontendBuild` and `frontendLint`, so the build keeps the DTOs current. `frontend/src/app/models.ts`
-re-exports the generated DTOs (aliasing request bodies and surfacing the enum unions), so the rest of the
+re-exports each generated DTO and enum under its exact spec name, so the rest of the
 SPA imports from `models.ts` and the frontend/backend contracts cannot drift. **Do not hand-edit
 `frontend/src/app/api/model/`**: regenerate it. A **drift gate** keeps the committed spec honest: the
 `dev`-profile `DevSystemTests."the committed OpenAPI spec matches the live spec"` compares

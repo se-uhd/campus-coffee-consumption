@@ -7,6 +7,7 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { SummaryPanel } from './summaryPanel';
 import { CoffeeRatingPromptDto } from './coffeeRatingPromptDto';
 import { ActivityEntryDto } from './activityEntryDto';
 
@@ -17,7 +18,7 @@ export interface UserSummaryDto {
     balanceCents: number;
     kittyBalanceCents: number;
     cancellable: boolean;
-    summaryPanel: UserSummaryDto.SummaryPanelEnum;
+    summaryPanel: SummaryPanel;
     firstCupAt?: string | null;
     cupsThisWeek: number;
     cupsToday: number;
@@ -25,11 +26,6 @@ export interface UserSummaryDto {
     activity: Array<ActivityEntryDto>;
 }
 export namespace UserSummaryDto {
-    export const SummaryPanelEnum = {
-        Balance: 'BALANCE',
-        Cups: 'CUPS'
-    } as const;
-    export type SummaryPanelEnum = typeof SummaryPanelEnum[keyof typeof SummaryPanelEnum];
 }
 
 

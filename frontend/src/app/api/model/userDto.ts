@@ -7,6 +7,8 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { Role } from './role';
+import { SummaryPanel } from './summaryPanel';
 
 
 /**
@@ -21,22 +23,12 @@ export interface UserDto {
     firstName: string;
     lastName: string;
     password?: string | null;
-    role?: UserDto.RoleEnum | null;
+    role?: Role | null;
     active?: boolean | null;
-    summaryPanel?: UserDto.SummaryPanelEnum | null;
+    summaryPanel?: SummaryPanel | null;
     capabilityUrl?: string | null;
 }
 export namespace UserDto {
-    export const RoleEnum = {
-        User: 'USER',
-        Admin: 'ADMIN'
-    } as const;
-    export type RoleEnum = typeof RoleEnum[keyof typeof RoleEnum];
-    export const SummaryPanelEnum = {
-        Balance: 'BALANCE',
-        Cups: 'CUPS'
-    } as const;
-    export type SummaryPanelEnum = typeof SummaryPanelEnum[keyof typeof SummaryPanelEnum];
 }
 
 

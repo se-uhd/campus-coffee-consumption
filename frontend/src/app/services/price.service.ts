@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { PriceChangeDto, PriceDto, PriceUpdateRequest } from '../models';
+import { PriceChangeDto, PriceDto, PriceUpdateDto } from '../models';
 
 /**
  * The admin coffee-price calls against `/api/price` (the interceptor adds the JWT). Users never call
@@ -18,7 +18,7 @@ export class PriceService {
 
   /** Sets a new global coffee price (euro cents), returning the stored price. */
   setPrice(amountCents: number): Promise<PriceDto> {
-    const body: PriceUpdateRequest = { amountCents };
+    const body: PriceUpdateDto = { amountCents };
     return firstValueFrom(this.http.put<PriceDto>('/api/price', body));
   }
 

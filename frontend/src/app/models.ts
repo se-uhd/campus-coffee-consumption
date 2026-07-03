@@ -2,13 +2,14 @@
  * Mirrors the backend response/request DTOs.
  *
  * These types are GENERATED from the backend OpenAPI spec (`frontend/src-gen/api-docs.json`) by
- * openapi-generator into `./api/model`, and re-exported here so components keep importing from
- * `../models` / `../../models`. Regenerate with `scripts/generate-frontend-dtos.sh` (also run by the
- * Gradle build). Do not hand-edit the generated files under `api/model/`.
+ * openapi-generator into `./api/model`, and re-exported here so components import from a single path
+ * (`../models` / `../../models`) instead of reaching into the generated tree. Regenerate with
+ * `scripts/generate-frontend-dtos.sh` (also run by the Gradle build). Do not hand-edit the generated
+ * files under `api/model/`.
  *
- * A few re-exports rename a generated type to the name the components already use, and the two inline
- * enums are surfaced as standalone union aliases (`Role`, `ActivityEntryType`). Frontend-only types that
- * have no spec counterpart (e.g. the activity-list `ActivityFilter`) stay hand-written in their component.
+ * Every type is re-exported under its exact generated name, so the frontend vocabulary matches the
+ * backend DTOs. Frontend-only types that have no spec counterpart (e.g. the activity-list
+ * `ActivityFilter`) stay hand-written in their component.
  */
 
 // --- Generated DTOs, re-exported under their spec names ------------------------------------------
@@ -33,38 +34,20 @@ export type { CoffeeBeanDto } from './api/model/coffeeBeanDto';
 export type { CoffeeBeanRatingsDto } from './api/model/coffeeBeanRatingsDto';
 export type { CoffeeRatingPromptDto } from './api/model/coffeeRatingPromptDto';
 
-// --- Generated request DTOs, re-exported under the names the components already use --------------
-// The spec names these `*Dto`; the frontend calls them `*Request`. The aliases keep both stable.
-export type { OwnExpenseDto as OwnExpenseRequest } from './api/model/ownExpenseDto';
-export type { AdminExpenseDto as AdminExpenseRequest } from './api/model/adminExpenseDto';
-export type { RatingRequestDto as RatingRequest } from './api/model/ratingRequestDto';
-export type { PriceUpdateDto as PriceUpdateRequest } from './api/model/priceUpdateDto';
-export type { DepositRequestDto as DepositRequest } from './api/model/depositRequestDto';
-export type { AdjustmentRequestDto as AdjustmentRequest } from './api/model/adjustmentRequestDto';
-export type { ProfileUpdateDto as ProfileUpdateRequest } from './api/model/profileUpdateDto';
+// --- Generated request DTOs (outbound request bodies), under their spec names --------------------
+export type { OwnExpenseDto } from './api/model/ownExpenseDto';
+export type { AdminExpenseDto } from './api/model/adminExpenseDto';
+export type { RatingRequestDto } from './api/model/ratingRequestDto';
+export type { PriceUpdateDto } from './api/model/priceUpdateDto';
+export type { DepositRequestDto } from './api/model/depositRequestDto';
+export type { AdjustmentRequestDto } from './api/model/adjustmentRequestDto';
+export type { ProfileUpdateDto } from './api/model/profileUpdateDto';
 
-// --- Inline-enum unions surfaced as standalone aliases ------------------------------------------
-// openapi-generator emits these enums namespaced on their owning DTO (`UserDto.RoleEnum`,
-// `ActivityEntryDto.TypeEnum`); re-export the value-union types under the bare names the code uses.
-import { UserDto } from './api/model/userDto';
-import { ActivityEntryDto } from './api/model/activityEntryDto';
-import { OwnExpenseDto } from './api/model/ownExpenseDto';
-
-/** A user's role (`'USER' | 'ADMIN'`). */
-export type Role = UserDto.RoleEnum;
-
-/** An expense's type (`'BEANS' | 'OTHER'`): a bean purchase or any other outlay. */
-export type ExpenseType = OwnExpenseDto.ExpenseTypeEnum;
-
-/** The expense-type values, so components can set `'BEANS'` / `'OTHER'` by name. */
-export const ExpenseType = OwnExpenseDto.ExpenseTypeEnum;
-
-/** A user's landing-panel preference (`'BALANCE' | 'CUPS'`): the money panel or the cup-stats panel. */
-export type SummaryPanel = UserDto.SummaryPanelEnum;
-
-/**
- * The kind of an activity-feed row. The first four appear in a user's activity feed; the kitty-funded ones
- * (plus `DEPOSIT`) appear in the admin-only kitty history; `PRICE_CHANGE` appears only in the admin global
- * activity feed. All money is signed integer euro cents.
- */
-export type ActivityEntryType = ActivityEntryDto.TypeEnum;
+// --- Enums, re-exported from their standalone generated modules ----------------------------------
+// The backend emits each enum as a named schema (springdoc's enumsAsRef), so the generator produces a
+// standalone module per enum with a clean union. Re-export as a type, except ExpenseType, which is also
+// used as a runtime value (`ExpenseType.Beans`).
+export type { Role } from './api/model/role';
+export type { ActivityEntryType } from './api/model/activityEntryType';
+export type { SummaryPanel } from './api/model/summaryPanel';
+export { ExpenseType } from './api/model/expenseType';

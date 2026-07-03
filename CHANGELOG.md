@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The OpenAPI spec now emits the four enums (`Role`, `ActivityEntryType`, `ExpenseType`, `SummaryPanel`) as
+  named, reusable schemas rather than inlining them on every property, using springdoc's `enumsAsRef` (set in
+  the api-layer `OpenApiConfig`, so no swagger dependency reaches the domain enums). The generated frontend
+  enum types are now standalone unions rather than namespaced under a DTO such as `UserDto.RoleEnum`, and the
+  frontend DTO re-exports use the generated `*Dto` names directly, dropping the hand-written `*Request`
+  aliases.
+
 ## [0.9.6] - 2026-07-03
 
 ### Added
