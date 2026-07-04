@@ -6,7 +6,7 @@
 # major, and scripts/check-toolchain-versions.sh (run in CI) fails the build if they drift.
 java = "25"
 spring-boot = "4.1.0"
-junit = "6.1.0"
+junit = "6.1.1"
 springdoc = "3.0.3"
 mapstruct = "1.6.3"
 # kotlin-logging: idiomatic Kotlin logging over SLF4J. Log calls take a lambda (built only when the level
@@ -19,7 +19,7 @@ zxing = "3.5.4"
 # Apache PDFBox renders the printable PDF grid of every user's QR code; Apache-2.0, not in the Boot BOM.
 pdfbox = "3.0.7"
 # Cloud SQL Java connector (postgres socket factory) for the prod datasource URL; not in the Boot BOM.
-cloud-sql = "1.28.4"
+cloud-sql = "1.28.6"
 # Testcontainers is not managed by the Boot 4 BOM at these coordinates, so pin it explicitly.
 testcontainers = "1.21.4"
 jacoco = "0.8.13"
