@@ -5,6 +5,21 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.9] - 2026-07-07
+
+### Changed
+
+- The bean ratings page now renders as a responsive list of cards instead of a fixed-width table, so it reads
+  well on a phone as well as on a desktop. Each bean is one card carrying its name (which wraps in full rather
+  than truncating), the average-rating icons and numeric value, the vote count, and the latest rating and
+  purchase times; a compact toggle re-sorts the list by rating (the default, best first), name, or votes. The
+  card is a two-column layout on a wider card (the name and rating on the left, and the vote count over the
+  latest rating and purchase times on the right) that collapses to a single stack on a phone, so it uses the
+  available width at every size. The split is driven by a CSS container query, so the card responds to the
+  list's own width rather than the viewport. The old table forced a 520px minimum width, so on a narrow phone
+  the Votes column scrolled off the screen and the bean name was clipped. The admin rename and merge actions
+  move into each card unchanged.
+
 ## [0.9.8] - 2026-07-03
 
 ### Fixed
@@ -1067,6 +1082,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.9.9]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.9
 [0.9.8]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.8
 [0.9.7]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.7
 [0.9.6]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.6

@@ -4,19 +4,15 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   computed,
-  effect,
-  signal,
-  viewChild
+  signal
 } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
-import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -32,13 +28,19 @@ import { CoffeeBeanDto, CoffeeBeanRatingsDto } from '../../models';
 /** The five rating positions, so the template can render one bean icon per position. */
 const RATING_POSITIONS = [1, 2, 3, 4, 5];
 
+/** How the bean list is ordered: by average rating (best first), by name, or by vote count. */
+type BeanSortKey = 'RATING' | 'NAME' | 'VOTES';
+
 /**
  * The bean ratings page, shared by a user and an admin (the same dual-mode pattern as the landing). It shows
- * a paginated table sortable by name, rating, or vote count (defaulting to rating, best first), with a column
- * each for the bean name (truncated with a full-name tooltip), the average rating (full/half/empty coffee-bean
- * icons plus the numeric value), and the vote/purchase metadata. In ADMIN mode an edit mode adds a per-row
- * actions column to rename a bean inline or merge one bean into another (its votes and purchases then count
- * under the target). Reading the ratings is open to any authenticated caller; the edit actions are admin-only.
+ * the beans as a responsive list of cards: each card is a single stacked column on a phone and, driven by a
+ * container query on the list, a two-column layout on a wider card (the name over the rating on the left, the
+ * vote count over the latest rating and purchase times on the right). Each card carries the bean name, its
+ * average rating (full/half/empty coffee-bean icons plus the numeric value), the vote count, and the latest
+ * rating and purchase times. A compact toggle re-sorts the list by rating (the default, best first), name, or
+ * votes. In ADMIN mode an edit mode reveals per-card actions to rename a bean inline or
+ * merge one bean into another (its votes and purchases then count under the target). Reading the ratings is
+ * open to any authenticated caller; the edit actions are admin-only.
  */
 @Component({
   selector: 'cc-bean-ratings',
@@ -48,10 +50,8 @@ const RATING_POSITIONS = [1, 2, 3, 4, 5];
     FormsModule,
     MatCardModule,
     MatButtonModule,
+    MatButtonToggleModule,
     MatIconModule,
-    MatTableModule,
-    MatPaginatorModule,
-    MatSortModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -103,25 +103,26 @@ const RATING_POSITIONS = [1, 2, 3, 4, 5];
       } @else {
         <mat-card class="card">
           @if (hasRows()) {
-            <div class="table-scroll">
-              <table
-                mat-table
-                matSort
-                matSortActive="rating"
-                matSortDirection="desc"
-                (matSortChange)="onSortChange()"
-                [dataSource]="dataSource"
-                [trackBy]="trackByBeanId"
-                class="cc-ratings-table"
+            <div class="cc-sort">
+              <span id="cc-sort-label" class="cc-sort-label">Sort by</span>
+              <mat-button-toggle-group
+                class="cc-sort-group"
+                aria-labelledby="cc-sort-label"
+                hideSingleSelectionIndicator="true"
+                name="beanSort"
+                [ngModel]="sortKey()"
+                (ngModelChange)="sortKey.set($event)"
               >
-                <caption class="cc-visually-hidden">
-                  Beans with their average rating, vote count, and latest rating and purchase; sortable by
-                  name, rating, and vote count.
-                </caption>
+                <mat-button-toggle value="RATING">Rating</mat-button-toggle>
+                <mat-button-toggle value="NAME">Name</mat-button-toggle>
+                <mat-button-toggle value="VOTES">Votes</mat-button-toggle>
+              </mat-button-toggle-group>
+            </div>
 
-                <ng-container matColumnDef="name">
-                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Bean</th>
-                  <td mat-cell *matCellDef="let row">
+            <ul class="cc-bean-list" aria-label="Beans by rating">
+              @for (row of sortedRatings(); track row.beanId) {
+                <li class="cc-bean-card">
+                  <div class="cc-bean-head">
                     @if (renamingId() === row.beanId) {
                       <span class="cc-edit-cell">
                         <mat-form-field class="cc-edit-field" subscriptSizing="dynamic">
@@ -179,14 +180,33 @@ const RATING_POSITIONS = [1, 2, 3, 4, 5];
                         </button>
                       </span>
                     } @else {
-                      <span class="cc-bean-name" [matTooltip]="row.name">{{ row.name }}</span>
+                      <span class="cc-bean-name">{{ row.name }}</span>
+                      @if (adminMode && editMode()) {
+                        <span class="cc-bean-actions">
+                          <button
+                            mat-icon-button
+                            (click)="startRename(row)"
+                            [disabled]="busy()"
+                            aria-label="Rename bean"
+                            matTooltip="Rename"
+                          >
+                            <mat-icon>edit</mat-icon>
+                          </button>
+                          <button
+                            mat-icon-button
+                            (click)="startMerge(row)"
+                            [disabled]="busy() || ratings().length < 2"
+                            aria-label="Merge bean"
+                            matTooltip="Merge into another bean"
+                          >
+                            <mat-icon>merge</mat-icon>
+                          </button>
+                        </span>
+                      }
                     }
-                  </td>
-                </ng-container>
+                  </div>
 
-                <ng-container matColumnDef="rating">
-                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Rating</th>
-                  <td mat-cell *matCellDef="let row">
+                  <div class="cc-bean-rating">
                     <span class="cc-rating" aria-hidden="true">
                       @for (position of ratingPositions; track position) {
                         @let fill = beanFill(row.averageValue, position);
@@ -208,59 +228,24 @@ const RATING_POSITIONS = [1, 2, 3, 4, 5];
                     @if (row.averageValue != null) {
                       <span class="cc-average">{{ row.averageValue | number: '1.1-1' }}</span>
                     }
-                  </td>
-                </ng-container>
+                  </div>
 
-                <ng-container matColumnDef="meta">
-                  <th mat-header-cell *matHeaderCellDef mat-sort-header>Votes</th>
-                  <td mat-cell *matCellDef="let row">
-                    <div>{{ row.voteCount }} {{ row.voteCount === 1 ? 'vote' : 'votes' }}</div>
-                    <div class="muted cc-meta-dates">
-                      @if (row.latestRatingAt) {
-                        <span>last rated {{ row.latestRatingAt | utcDate | date: 'short' }}</span>
-                      }
-                      @if (row.latestPurchaseAt) {
-                        <span>last bought {{ row.latestPurchaseAt | utcDate | date: 'short' }}</span>
-                      }
-                    </div>
-                  </td>
-                </ng-container>
-
-                <ng-container matColumnDef="actions">
-                  <th mat-header-cell *matHeaderCellDef class="col-actions">
-                    <span class="cc-visually-hidden">Actions</span>
-                  </th>
-                  <td mat-cell *matCellDef="let row" class="col-actions">
-                    @if (renamingId() !== row.beanId && mergingId() !== row.beanId) {
-                      <button
-                        mat-icon-button
-                        (click)="startRename(row)"
-                        [disabled]="busy()"
-                        aria-label="Rename bean"
-                        matTooltip="Rename"
-                      >
-                        <mat-icon>edit</mat-icon>
-                      </button>
-                      <button
-                        mat-icon-button
-                        (click)="startMerge(row)"
-                        [disabled]="busy() || ratings().length < 2"
-                        aria-label="Merge bean"
-                        matTooltip="Merge into another bean"
-                      >
-                        <mat-icon>merge</mat-icon>
-                      </button>
+                  <div class="cc-bean-meta muted">
+                    @if (row.voteCount > 0) {
+                      <span>{{ row.voteCount }} {{ row.voteCount === 1 ? 'vote' : 'votes' }}</span>
+                    } @else {
+                      <span>Not rated yet</span>
                     }
-                  </td>
-                </ng-container>
-
-                <tr mat-header-row *matHeaderRowDef="columns()"></tr>
-                <ng-template matRowDef [matRowDefColumns]="columns()">
-                  <tr mat-row></tr>
-                </ng-template>
-              </table>
-            </div>
-            <mat-paginator [pageSize]="10" [pageSizeOptions]="[10, 25, 50]"></mat-paginator>
+                    @if (row.latestRatingAt) {
+                      <span>last rated {{ row.latestRatingAt | utcDate | date: 'short' }}</span>
+                    }
+                    @if (row.latestPurchaseAt) {
+                      <span>last bought {{ row.latestPurchaseAt | utcDate | date: 'short' }}</span>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
           } @else if (!loading()) {
             <p class="muted">No beans yet. Record a bean purchase to add one.</p>
           }
@@ -271,57 +256,106 @@ const RATING_POSITIONS = [1, 2, 3, 4, 5];
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
-      /* Override the global .table-scroll full-bleed (margin: 0 -16px) so the table sits inside the card's
-         padding instead of running to the card edge, leaving a comfortable margin between the table and the
-         card. */
-      .table-scroll {
-        margin: 4px 0 8px;
+      /* The sort control above the list: a small label over a full-width toggle group, so the three keys
+         share the width evenly and stay reachable on the narrowest phone. */
+      .cc-sort {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 12px;
       }
 
-      /* Fixed layout so the rating column keeps a stable width and the name column absorbs the slack (and
-         truncates), matching the users/activity tables; below the min-width the table scrolls horizontally. */
-      table.mat-mdc-table {
-        min-width: 520px;
-        table-layout: fixed;
+      .cc-sort-label {
+        color: var(--cc-ink-muted);
+        font-size: 0.85rem;
       }
 
-      .mat-mdc-header-cell,
-      .mat-mdc-cell {
-        padding-left: 8px;
-        padding-right: 8px;
+      .cc-sort-group {
+        display: flex;
+        width: 100%;
       }
 
-      /* The name column has no explicit width, so it is the flexible column that absorbs the table's slack
-         (and truncates long names, with the full name in the tooltip). The rating and votes columns take fixed
-         widths, so widening one narrows the name column, never the other way around. */
+      .cc-sort-group .mat-button-toggle {
+        flex: 1 1 0;
+      }
+
+      /* A container context so each card reflows against the list's own width, not the viewport (see the
+         @container rule below): the two-column layout appears whenever the list itself is wide enough, even if
+         the list ever sits in a narrow region of a wide screen. */
+      .cc-bean-list {
+        container-type: inline-size;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* One bean per card, separated by a hairline (no border below the last). Mobile-first: a single
+         stacked column on a phone, promoted to two columns on a wider card (see the min-width rule below) so
+         the name and rating fill the left while the recency dates use the right instead of leaving it empty. */
+      .cc-bean-card {
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          'name'
+          'rating'
+          'meta';
+        gap: 4px 32px;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--cc-hairline);
+      }
+
+      .cc-bean-card:last-child {
+        border-bottom: none;
+      }
+
+      /* The name sits left with the admin edit actions pushed to the right; the name wraps in full (even a
+         single very long word) rather than truncating, since a card has the vertical room a table row lacked. */
+      .cc-bean-head {
+        grid-area: name;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 36px;
+      }
+
       .cc-bean-name {
         font-weight: 600;
         color: var(--cc-ink);
+        font-size: 1.05rem;
+        overflow-wrap: anywhere;
       }
 
-      /* A fixed-width rating column so the icon scale lines up down the table regardless of name length; wide
-         enough for the five icons plus the numeric value with a little breathing room. */
-      .mat-column-rating {
-        width: 178px;
-      }
-
-      td.mat-column-rating {
-        overflow: visible;
-        text-overflow: clip;
+      .cc-bean-actions {
+        flex: 0 0 auto;
         white-space: nowrap;
       }
 
-      .mat-column-meta {
-        width: 36%;
+      /* Dense icon controls, matching the users table's action buttons. */
+      .cc-bean-actions button.mat-mdc-icon-button {
+        --mdc-icon-button-state-layer-size: 36px;
+
+        width: 36px;
+        height: 36px;
+        padding: 6px;
       }
 
-      .mat-column-actions {
-        width: 96px;
+      .cc-bean-actions button + button {
+        margin-left: 2px;
+      }
+
+      /* The rating row: the five icons, then the numeric average and vote count on the same baseline. */
+      .cc-bean-rating {
+        grid-area: rating;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 2px 6px;
       }
 
       .cc-rating {
         white-space: nowrap;
-        vertical-align: middle;
+        line-height: 1;
       }
 
       .cc-bean-svg {
@@ -357,46 +391,52 @@ const RATING_POSITIONS = [1, 2, 3, 4, 5];
       }
 
       .cc-average {
-        margin-left: 8px;
-        color: var(--cc-muted);
+        color: var(--cc-ink);
+        font-weight: 600;
         font-variant-numeric: tabular-nums;
-        vertical-align: middle;
+        margin-left: 4px;
       }
 
-      /* Stack the two recency dates so a narrow window keeps them under the vote count rather than clipping. */
-      .cc-meta-dates {
+      /* The vote count then the recency dates, each on its own line (votes, last rated, last bought). They sit
+         under the rating on a phone and move to their own right-hand column on a wider card. */
+      .cc-bean-meta {
+        grid-area: meta;
         display: flex;
-        flex-wrap: wrap;
-        gap: 2px 10px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        font-size: 0.9rem;
       }
 
-      /* The inline rename/merge editor replaces the name cell; keep its field and buttons on one centered row. */
+      /* On a card wide enough for it (roughly a tablet and up), lay the bean out in two columns: the name over
+         the rating on the left, the votes and recency dates filling the right instead of stacking under a
+         half-empty row. Below this width the single-column stack above stands. This is a container query, so it
+         responds to the list's own width rather than the viewport. */
+      @container (min-width: 600px) {
+        .cc-bean-card {
+          grid-template-columns: minmax(0, 1fr) auto;
+          grid-template-areas:
+            'name   meta'
+            'rating meta';
+          align-items: start;
+        }
+
+        .cc-bean-meta {
+          align-items: flex-end;
+          text-align: right;
+        }
+      }
+
+      /* The inline rename/merge editor replaces the name; keep its field and buttons on one row. */
       .cc-edit-cell {
         display: inline-flex;
         align-items: center;
         gap: 4px;
+        flex-wrap: wrap;
       }
 
       .cc-edit-field {
         min-width: 160px;
-      }
-
-      /* Fixed-size icon controls, never ellipsized like a text cell; kept dense to match the users table. */
-      .col-actions {
-        white-space: nowrap;
-        overflow: visible;
-      }
-
-      .col-actions button.mat-mdc-icon-button {
-        --mdc-icon-button-state-layer-size: 36px;
-
-        width: 36px;
-        height: 36px;
-        padding: 6px;
-      }
-
-      .col-actions button + button {
-        margin-left: 2px;
       }
     `
   ]
@@ -416,6 +456,9 @@ export class BeanRatingsComponent implements OnInit {
   readonly loadError = signal('');
   readonly busy = signal(false);
 
+  /** The active sort key; the list re-sorts client-side (the backend returns the full list, best first). */
+  readonly sortKey = signal<BeanSortKey>('RATING');
+
   /** Whether the admin rename/merge affordances are shown. */
   readonly editMode = signal(false);
   /** The bean currently being renamed, or null. */
@@ -425,19 +468,30 @@ export class BeanRatingsComponent implements OnInit {
   readonly mergingId = signal<string | null>(null);
   mergeTargetId = '';
 
-  /** Client-side paginated table over the loaded ratings (the backend returns the full list, best first). */
-  readonly dataSource = new MatTableDataSource<CoffeeBeanRatingsDto>([]);
-  /** Whether there is at least one bean to show (drives the table-vs-empty-state branch under OnPush). */
+  /** Whether there is at least one bean to show (drives the list-vs-empty-state branch under OnPush). */
   readonly hasRows = computed(() => this.ratings().length > 0);
-  /** The visible columns: the admin edit mode adds a trailing per-row actions column. */
-  readonly columns = computed(() =>
-    this.adminMode && this.editMode() ? ['name', 'rating', 'meta', 'actions'] : ['name', 'rating', 'meta']
-  );
 
-  // The table lives inside a conditional block, so query the paginator and sort reactively and wire them onto
-  // the data source once they appear (mirrors the users/activity tables).
-  private readonly paginator = viewChild(MatPaginator);
-  private readonly sort = viewChild(MatSort);
+  /**
+   * The beans in the active sort order. Rating (the default) is best first, an unrated bean sorting below
+   * every rated one, with the vote count then the name breaking ties; name is case-insensitive ascending;
+   * votes is most first. Every order falls back to the name so it is stable.
+   */
+  readonly sortedRatings = computed<CoffeeBeanRatingsDto[]>(() => {
+    const rows = [...this.ratings()];
+    const byName = (a: CoffeeBeanRatingsDto, b: CoffeeBeanRatingsDto): number =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    switch (this.sortKey()) {
+      case 'NAME':
+        return rows.sort(byName);
+      case 'VOTES':
+        return rows.sort((a, b) => b.voteCount - a.voteCount || byName(a, b));
+      default:
+        return rows.sort(
+          (a, b) =>
+            (b.averageValue ?? -1) - (a.averageValue ?? -1) || b.voteCount - a.voteCount || byName(a, b)
+        );
+    }
+  });
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -445,42 +499,7 @@ export class BeanRatingsComponent implements OnInit {
     private readonly beanService: BeanService,
     private readonly notifications: NotificationService,
     private readonly cdr: ChangeDetectorRef
-  ) {
-    // Sort each column by the value behind it: the name case-insensitively, the rating by its average (an
-    // unrated bean sorts below every rated one), and the votes column by the vote count.
-    this.dataSource.sortingDataAccessor = (row, id) => {
-      switch (id) {
-        case 'name':
-          return row.name.toLowerCase();
-        case 'rating':
-          return row.averageValue ?? -1;
-        case 'meta':
-          return row.voteCount;
-        default:
-          return '';
-      }
-    };
-    effect(() => {
-      this.dataSource.data = this.ratings();
-    });
-    effect(() => {
-      const paginator = this.paginator();
-      if (paginator) {
-        this.dataSource.paginator = paginator;
-      }
-    });
-    effect(() => {
-      const sort = this.sort();
-      if (sort) {
-        this.dataSource.sort = sort;
-      }
-    });
-  }
-
-  /** Resets the table to the first page on a sort change, so the new order is read from its start. */
-  onSortChange(): void {
-    this.paginator()?.firstPage();
-  }
+  ) {}
 
   async ngOnInit(): Promise<void> {
     this.token = this.route.snapshot.paramMap.get('token') ?? '';
@@ -509,11 +528,6 @@ export class BeanRatingsComponent implements OnInit {
     }
   }
 
-  /** The mat-table track key: the stable bean id, so a page change reuses rows instead of recreating them. */
-  trackByBeanId(_index: number, row: CoffeeBeanRatingsDto): string {
-    return row.beanId;
-  }
-
   /**
    * The fill state of the bean icon at a rating position (1 to 5): `full` at or above the position, `half`
    * within half a point below it, otherwise `empty`. The average is rounded to the nearest half first, so a
@@ -538,7 +552,7 @@ export class BeanRatingsComponent implements OnInit {
     return this.beans().filter((bean) => bean.id !== beanId);
   }
 
-  /** Toggles the admin rename/merge affordances, closing any open row editor. */
+  /** Toggles the admin rename/merge affordances, closing any open card editor. */
   toggleEdit(): void {
     this.editMode.set(!this.editMode());
     this.cancelRename();
