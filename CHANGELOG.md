@@ -5,6 +5,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.10] - 2026-07-10
+
+### Fixed
+
+- Adding a user no longer leaves the "required" validation errors showing on the emptied fields. The old code
+  reset the bound form model, which cleared the field values but kept the controls marked as touched, and
+  Angular shows a required error on any touched empty field. The form is now cleared with
+  `NgForm.resetForm()`, which resets the controls to untouched as well as clearing the values.
+
 ## [0.9.9] - 2026-07-07
 
 ### Changed
@@ -1082,6 +1091,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.9.10]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.10
 [0.9.9]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.9
 [0.9.8]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.8
 [0.9.7]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.7

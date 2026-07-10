@@ -9,7 +9,7 @@ import {
   viewChild
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -515,6 +515,9 @@ export class AdminUsersComponent {
   // directive appears only once the table renders, and an effect wires it onto the data source then.
   private readonly sort = viewChild(MatSort);
 
+  // The "Add a user" form directive, so a successful create can reset it to a pristine, untouched state.
+  private readonly addUserForm = viewChild<NgForm>('form');
+
   constructor(
     private readonly userService: UserService,
     private readonly adminUserService: AdminUserService,
@@ -624,6 +627,10 @@ export class AdminUsersComponent {
       const created = await this.userService.create(payload);
       this.createdLink.set(created.capabilityUrl ?? '');
       this.draft = this.emptyDraft();
+      // Reset the control state, not just the model: resetForm() clears the values and marks the controls
+      // untouched. Resetting only the draft would leave the empty required fields touched, and Angular shows
+      // a required error on a touched empty field, so they would all show errors on the blank form.
+      this.addUserForm()?.resetForm(this.draft);
       // the draft reset above is a non-DOM write, so mark this OnPush view for check to clear the form fields
       this.cdr.markForCheck();
       this.notifications.success('User created.');

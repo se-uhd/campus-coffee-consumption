@@ -281,6 +281,34 @@ test.describe('admin flow', () => {
     await expect(row).toContainText('kitty 2.00 €');
   });
 
+  test('creating a user clears the Add-a-user form without showing the required-field errors', async ({
+    page
+  }) => {
+    await loginAsAdmin(page);
+    await page.goto('/admin/users');
+    await expect(page.getByRole('heading', { name: 'Add a user' })).toBeVisible();
+
+    await page.getByLabel('Login name').fill('e2e_reset_user');
+    await page.getByLabel('Email').fill('e2e_reset_user@example.com');
+    await page.getByLabel('First name').fill('Reset');
+    await page.getByLabel('Last name').fill('Tester');
+    await page.getByRole('button', { name: 'Create' }).click();
+
+    // the create succeeded (the assigned capability link is shown)
+    await expect(page.getByText(/^Coffee link:/)).toBeVisible();
+
+    // after a successful create the form is cleared: the fields are empty and no "required" error shows
+    // (the bug: resetting only the model left the controls touched, so the empty required fields showed errors)
+    await expect(page.getByLabel('Login name')).toHaveValue('');
+    await expect(page.getByLabel('Email')).toHaveValue('');
+    await expect(page.getByLabel('First name')).toHaveValue('');
+    await expect(page.getByLabel('Last name')).toHaveValue('');
+    await expect(page.getByText('A login name is required.')).toHaveCount(0);
+    await expect(page.getByText('Enter a valid email address.')).toHaveCount(0);
+    await expect(page.getByText('A first name is required.')).toHaveCount(0);
+    await expect(page.getByText('A last name is required.')).toHaveCount(0);
+  });
+
   test('the Users page "Download all QR codes" button triggers a coffee-qr-codes.zip download', async ({
     page
   }) => {
