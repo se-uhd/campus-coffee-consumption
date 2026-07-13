@@ -41,14 +41,15 @@ exclude:
       - .angular
       - out-tsc
       - src/theme-colors.scss
-  # The profile page's QR image is fetched as an authenticated blob (the QR endpoint needs the
-  # X-Capability-Token header, so it cannot be a plain static src) and shown via an object URL.
-  # NgOptimizedImage's `ngSrc` rejects blob:/object URLs (NG02952), so the directive genuinely cannot apply
-  # here; the static header logo IS migrated to NgOptimizedImage. Scope this to the one file with the
-  # unavoidable object-URL image rather than disabling the inspection everywhere.
+  # The profile page's capability QR and the security page's two-factor enrollment QR are both fetched as
+  # authenticated blobs (the QR endpoints need a session/capability header, so they cannot be plain static
+  # srcs) and shown via object URLs. NgOptimizedImage's `ngSrc` rejects blob:/object URLs (NG02952), so the
+  # directive genuinely cannot apply here; the static header logo IS migrated to NgOptimizedImage. Scope this
+  # to the two files with the unavoidable object-URL image rather than disabling the inspection everywhere.
   - name: AngularNgOptimizedImage
     paths:
       - src/app/pages/profile/profile.component.ts
+      - src/app/pages/admin-security/admin-security.component.ts
   # `provideAnimationsAsync` (and the synchronous `provideAnimations`) were both deprecated in Angular 20.2
   # in favor of the template-level `animate.enter`/`animate.leave` API (intended removal in v23). Angular
   # Material still relies on an animations provider, so there is no drop-in provider replacement yet; the
