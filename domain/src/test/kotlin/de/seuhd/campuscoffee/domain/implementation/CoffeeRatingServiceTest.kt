@@ -118,6 +118,25 @@ class CoffeeRatingServiceTest {
     }
 
     @Test
+    fun `rateCurrentBean resolves a chained merge to the final canonical bean`() {
+        stubCancellableWindow()
+        val midId = UUID(0L, 3L)
+        val finalId = UUID(0L, 4L)
+        val finalBean = CoffeeBean(id = finalId, name = "Ethiopia Sidamo")
+        // beanId -> midId (a tombstone) -> finalId (live); a single hop would stop on the mid tombstone
+        whenever(coffeeBeanService.getById(beanId)).thenReturn(bean.copy(active = false, mergedIntoId = midId))
+        whenever(coffeeBeanService.getById(midId))
+            .thenReturn(CoffeeBean(id = midId, name = "Ethiopia Mid", active = false, mergedIntoId = finalId))
+        whenever(coffeeBeanService.getById(finalId)).thenReturn(finalBean)
+        whenever(coffeeRatingDataService.findCurrentWindowVote(eq(userId), any())).thenReturn(null)
+        whenever(coffeeRatingDataService.upsert(any())).thenAnswer { it.arguments[0] as CoffeeRating }
+
+        val rating = service.rateCurrentBean(userId, beanId, 3, user)
+
+        assertThat(rating.bean).isEqualTo(finalBean)
+    }
+
+    @Test
     fun `rateCurrentBean by a non-owner non-admin throws ForbiddenException`() {
         val other = user.copy(id = UUID(0L, 7L), loginName = "other")
         assertThrows<ForbiddenException> { service.rateCurrentBean(userId, beanId, 4, other) }
@@ -205,9 +224,25 @@ class CoffeeRatingServiceTest {
     }
 
     @Test
-    fun `promptFor defaults to the most recently purchased bean when there is no vote yet`() {
+    fun `promptFor defaults to the bean most recently rated by anyone when there is no vote yet`() {
         val increment = CancellableIncrement(now(), priceCents = 50)
         whenever(coffeeRatingDataService.findCurrentWindowVote(eq(userId), any())).thenReturn(null)
+        // the most recently rated bean is chosen ahead of the most recently purchased one, which the elvis
+        // chain never consults once a rating exists, so stubbing it would be dead
+        whenever(coffeeBeanService.mostRecentlyRated()).thenReturn(bean)
+
+        val prompt = service.promptFor(userId, increment)
+
+        assertThat(prompt.canRate).isTrue()
+        assertThat(prompt.defaultBeanId).isEqualTo(beanId)
+        assertThat(prompt.value).isNull()
+    }
+
+    @Test
+    fun `promptFor falls back to the most recently purchased bean when nothing has been rated yet`() {
+        val increment = CancellableIncrement(now(), priceCents = 50)
+        whenever(coffeeRatingDataService.findCurrentWindowVote(eq(userId), any())).thenReturn(null)
+        whenever(coffeeBeanService.mostRecentlyRated()).thenReturn(null)
         whenever(coffeeBeanService.mostRecentlyPurchased()).thenReturn(bean)
 
         val prompt = service.promptFor(userId, increment)

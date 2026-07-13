@@ -149,6 +149,27 @@ export async function apiContext(): Promise<APIRequestContext> {
 }
 
 /**
+ * Records a bean purchase for a user directly via the API (as that user's capability token), which creates
+ * the bean in the shared catalog. Used to simulate another user adding a bean while a landing page is
+ * already open, so its in-page bean dropdown is stale.
+ *
+ * @param api a Playwright request context bound to the app base URL
+ * @param capabilityToken the buyer's capability token (the `/login/:token` secret)
+ * @param beanName the bean name to purchase (created in the catalog if new)
+ */
+export async function recordBeanPurchaseViaApi(
+  api: APIRequestContext,
+  capabilityToken: string,
+  beanName: string
+): Promise<void> {
+  const response = await api.post('/api/expenses', {
+    headers: { 'X-Capability-Token': capabilityToken },
+    data: { expenseType: 'BEANS', beanName, weightGrams: 500, amountCents: 700 }
+  });
+  expect(response.ok(), `recording a bean purchase should succeed, got ${response.status()}`).toBeTruthy();
+}
+
+/**
  * Returns the current number of users via the admin API.
  *
  * @param api a Playwright request context bound to the app base URL

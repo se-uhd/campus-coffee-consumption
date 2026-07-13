@@ -25,4 +25,13 @@ interface CoffeeBeanDataService : CrudDataService<CoffeeBean, UUID> {
      * @return the most recently purchased bean, or null
      */
     fun findMostRecentlyPurchased(): CoffeeBean?
+
+    /**
+     * Returns the bean of the most recent rating cast by any user (by rating creation time), or null when no
+     * rating exists yet. The bean may be a merge tombstone (ratings are not repointed on merge); the caller
+     * resolves it to its canonical bean.
+     *
+     * @return the bean of the most recent rating (possibly a tombstone), or null
+     */
+    fun findMostRecentlyRated(): CoffeeBean?
 }

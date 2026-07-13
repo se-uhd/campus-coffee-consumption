@@ -129,6 +129,42 @@ class CoffeeBeanServiceTest {
     }
 
     @Test
+    fun `mostRecentlyRated returns the bean of the most recent rating when it is live`() {
+        whenever(coffeeBeanDataService.findMostRecentlyRated()).thenReturn(beanA)
+
+        assertThat(service.mostRecentlyRated()).isEqualTo(beanA)
+    }
+
+    @Test
+    fun `mostRecentlyRated resolves a since-merged bean to its canonical target`() {
+        val tombstone = beanA.copy(active = false, mergedIntoId = idB)
+        whenever(coffeeBeanDataService.findMostRecentlyRated()).thenReturn(tombstone)
+        whenever(coffeeBeanDataService.getById(idB)).thenReturn(beanB)
+
+        assertThat(service.mostRecentlyRated()).isEqualTo(beanB)
+    }
+
+    @Test
+    fun `mostRecentlyRated follows a chained merge to the final canonical bean`() {
+        val idC = UUID(0L, 15L)
+        val beanC = CoffeeBean(id = idC, name = "Kenya")
+        val tombstoneA = beanA.copy(active = false, mergedIntoId = idB)
+        val tombstoneB = beanB.copy(active = false, mergedIntoId = idC)
+        whenever(coffeeBeanDataService.findMostRecentlyRated()).thenReturn(tombstoneA)
+        whenever(coffeeBeanDataService.getById(idB)).thenReturn(tombstoneB)
+        whenever(coffeeBeanDataService.getById(idC)).thenReturn(beanC)
+
+        assertThat(service.mostRecentlyRated()).isEqualTo(beanC)
+    }
+
+    @Test
+    fun `mostRecentlyRated returns null when nothing has been rated`() {
+        whenever(coffeeBeanDataService.findMostRecentlyRated()).thenReturn(null)
+
+        assertThat(service.mostRecentlyRated()).isNull()
+    }
+
+    @Test
     fun `ratings count a merged bean's votes and purchases under its canonical target`() {
         val mergedIntoA = CoffeeBean(id = UUID(0L, 14L), name = "Ethiopia Old", active = false, mergedIntoId = idA)
         whenever(coffeeBeanDataService.getAll()).thenReturn(listOf(beanA, beanB, mergedIntoA))

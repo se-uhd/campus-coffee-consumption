@@ -27,7 +27,10 @@ import java.util.UUID
 class RatingSystemTests : AbstractSystemTest() {
     private val user = "maxmustermann"
 
-    private fun recordBeanPurchase(beanName: String) {
+    private fun recordBeanPurchase(
+        beanName: String,
+        asUser: String = user
+    ) {
         client()
             .post()
             .uri("/api/expenses")
@@ -40,7 +43,7 @@ class RatingSystemTests : AbstractSystemTest() {
                     amountCents = 900,
                     note = null
                 )
-            ).withUser(user)
+            ).withUser(asUser)
             .exchange()
     }
 
@@ -55,13 +58,23 @@ class RatingSystemTests : AbstractSystemTest() {
             .responseBody!!
             .toList()
 
-    private fun addCoffee() {
+    private fun addCoffee(asUser: String = user) {
         client()
             .post()
             .uri("/api/consumption")
-            .withUser(user)
+            .withUser(asUser)
             .exchange()
     }
+
+    private fun summaryOf(loginName: String): UserSummaryDto =
+        client()
+            .get()
+            .uri("/api/summary")
+            .accept(MediaType.APPLICATION_JSON)
+            .withUser(loginName)
+            .exchange()
+            .returnResult<UserSummaryDto>()
+            .responseBody!!
 
     private fun rate(
         beanId: UUID,
@@ -102,6 +115,59 @@ class RatingSystemTests : AbstractSystemTest() {
         assertThat(row.voteCount).isEqualTo(1)
         assertThat(row.averageValue).isEqualTo(4.0)
         assertThat(row.latestPurchaseAt).isNotNull()
+    }
+
+    @Test
+    fun `the rating prompt preselects the bean most recently rated by anyone`() {
+        val other = "student2023"
+        // maxmustermann rates "Ethiopia Yirgacheffe"
+        recordBeanPurchase("Ethiopia Yirgacheffe")
+        val ratedBeanId = beans().first { it.name == "Ethiopia Yirgacheffe" }.id
+        addCoffee()
+        rate(ratedBeanId, 4).exchange()
+        // a newer purchase of a different bean by another user: the old default was the newest purchase, so it
+        // must not win the preselection now that a rating exists
+        recordBeanPurchase("Colombia Supremo", asUser = other)
+        val purchasedBeanId = beans().first { it.name == "Colombia Supremo" }.id
+
+        // a second user with a fresh cup and no vote of their own sees the group's last-rated bean preselected
+        addCoffee(asUser = other)
+        val summary = summaryOf(other)
+
+        assertThat(summary.ratingPrompt.canRate).isTrue()
+        assertThat(summary.ratingPrompt.value).isNull()
+        assertThat(summary.ratingPrompt.defaultBeanId).isEqualTo(ratedBeanId)
+        assertThat(summary.ratingPrompt.defaultBeanId).isNotEqualTo(purchasedBeanId)
+    }
+
+    @Test
+    fun `the rating prompt preselects the canonical target of a since-merged most-recently-rated bean`() {
+        val other = "student2023"
+        // rate a bean, then merge it into a live target; the rating row still points at the tombstone
+        recordBeanPurchase("Old Name")
+        recordBeanPurchase("Canonical Bean")
+        val sourceId = beans().first { it.name == "Old Name" }.id
+        val targetId = beans().first { it.name == "Canonical Bean" }.id
+        addCoffee()
+        rate(sourceId, 5).exchange()
+
+        val mergeStatus =
+            client()
+                .post()
+                .uri("/api/beans/{id}/merge", sourceId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(mapOf("targetBeanId" to targetId))
+                .withAdmin()
+                .exchange()
+                .statusCode()
+        assertThat(mergeStatus).isEqualTo(200)
+
+        // the preselection resolves the tombstone to its live canonical target, never a non-selectable id
+        addCoffee(asUser = other)
+        val summary = summaryOf(other)
+
+        assertThat(summary.ratingPrompt.defaultBeanId).isEqualTo(targetId)
+        assertThat(beans().map { it.id }).contains(targetId).doesNotContain(sourceId)
     }
 
     @Test

@@ -1086,9 +1086,16 @@ export class CoffeeLandingComponent implements OnInit {
   private applySummary(summary: UserSummaryDto, peeked = false): void {
     this.summary.set(summary);
     this.displayCount.set(summary.count);
-    // preselect the rating dropdown to the prompt's suggested bean (the current vote's bean, else the most
-    // recently purchased); a rating refresh returns the voted bean, so the selection stays in step
+    // preselect the rating dropdown to the prompt's suggested bean (the current vote's bean, else the bean
+    // most recently rated by anyone, else the most recently purchased); a rating refresh returns the voted
+    // bean, so the selection stays in step
     this.ratingBeanId = summary.ratingPrompt?.defaultBeanId ?? '';
+    // the suggested bean may have been created since the options were last loaded (a purchase or rating by
+    // another user in the meantime), so it can be missing from the dropdown, which would render the
+    // preselection blank; refresh the options when that happens so the suggested bean actually shows
+    if (this.ratingBeanId && !this.beanOptions().some((bean) => bean.id === this.ratingBeanId)) {
+      this.loadBeans();
+    }
     // keep the absolute-correction field in step with the count so opening Edit after a +/- does not pre-fill
     // a stale total that, if Set without retyping, would silently revert the change
     this.newTotal = summary.count;

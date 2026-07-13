@@ -34,4 +34,15 @@ interface CoffeeBeanRepository : JpaRepository<CoffeeBeanEntity, UUID> {
      */
     @Query("select e.bean from ExpenseEntity e where e.bean is not null order by e.createdAt desc")
     fun findMostRecentlyPurchased(pageable: Pageable): List<CoffeeBeanEntity>
+
+    /**
+     * Returns the rated beans newest first (paged to one for the most recent). A projection of the rated bean
+     * over the coffee-ratings read table by rating creation time; the caller takes the first. The bean may be
+     * a merge tombstone (ratings are not repointed on merge), which the caller resolves to its canonical bean.
+     *
+     * @param pageable the page window (the caller passes the first page of size one)
+     * @return the beans of the most recent ratings, newest first
+     */
+    @Query("select r.bean from CoffeeRatingEntity r order by r.createdAt desc")
+    fun findMostRecentlyRated(pageable: Pageable): List<CoffeeBeanEntity>
 }

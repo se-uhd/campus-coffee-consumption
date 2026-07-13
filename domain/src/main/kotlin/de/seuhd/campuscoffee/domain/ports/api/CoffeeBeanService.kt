@@ -83,11 +83,20 @@ interface CoffeeBeanService {
 
     /**
      * Returns the most recently purchased bean (the bean of the newest `BEANS` expense), or null if no bean
-     * has been purchased yet. Used to preselect a default in the rating prompt.
+     * has been purchased yet. Used as the rating prompt's fallback default when nothing has been rated yet.
      *
      * @return the most recently purchased bean, or null
      */
     fun mostRecentlyPurchased(): CoffeeBean?
+
+    /**
+     * Returns the bean of the most recent rating by any user, resolved through any merge tombstone to its
+     * canonical (live, selectable) bean, or null when no rating exists yet. Used to preselect the rating
+     * prompt so a user rating a fresh cup starts on the bean the group most recently rated.
+     *
+     * @return the canonical bean of the most recent rating, or null
+     */
+    fun mostRecentlyRated(): CoffeeBean?
 
     /**
      * Returns the rating rows for every canonical bean (average rating, vote count, latest rating, latest

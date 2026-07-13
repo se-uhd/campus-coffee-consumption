@@ -85,7 +85,13 @@ class CoffeeRatingServiceImpl(
             return CoffeeRatingPrompt(canRate = false, defaultBeanId = null, value = null)
         }
         val currentVote = coffeeRatingDataService.findCurrentWindowVote(userId, cancellableIncrement.createdAt)
-        val defaultBeanId = currentVote?.bean?.id ?: coffeeBeanService.mostRecentlyPurchased()?.id
+        // preselect the current window's own vote if any (so re-rating shows the user their own bean and value),
+        // else the bean of the most recent rating by anyone, and only when nothing has been rated yet the most
+        // recently purchased bean
+        val defaultBeanId =
+            currentVote?.bean?.id
+                ?: coffeeBeanService.mostRecentlyRated()?.id
+                ?: coffeeBeanService.mostRecentlyPurchased()?.id
         return CoffeeRatingPrompt(canRate = true, defaultBeanId = defaultBeanId, value = currentVote?.value)
     }
 
@@ -103,11 +109,20 @@ class CoffeeRatingServiceImpl(
         return candidate.createdAt
     }
 
-    /** Resolves a bean id to its canonical (un-merged) bean, following a merge tombstone. */
+    /**
+     * Resolves a bean id to its canonical (un-merged) bean, following the merge-tombstone chain (a bean may
+     * be merged again after it was already a target, so a single hop can still land on a tombstone). A
+     * visited set bounds a stray cycle so it cannot loop forever.
+     */
     private fun canonicalBean(beanId: UUID): CoffeeBean {
-        val bean = coffeeBeanService.getById(beanId)
-        val mergedInto = bean.mergedIntoId ?: return bean
-        return coffeeBeanService.getById(mergedInto)
+        val seen = HashSet<UUID>()
+        var current = coffeeBeanService.getById(beanId)
+        var mergedInto = current.mergedIntoId
+        while (mergedInto != null && seen.add(current.persistedId)) {
+            current = coffeeBeanService.getById(mergedInto)
+            mergedInto = current.mergedIntoId
+        }
+        return current
     }
 
     /**

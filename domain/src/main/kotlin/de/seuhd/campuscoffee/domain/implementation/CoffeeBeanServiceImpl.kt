@@ -81,6 +81,20 @@ class CoffeeBeanServiceImpl(
 
     override fun mostRecentlyPurchased(): CoffeeBean? = coffeeBeanDataService.findMostRecentlyPurchased()
 
+    override fun mostRecentlyRated(): CoffeeBean? {
+        // resolve the rated bean through any merge tombstones to its canonical (live, selectable) bean,
+        // following the mergedIntoId chain (a bean may be merged again after it was already a target); a
+        // visited set bounds a stray cycle so it cannot loop forever
+        val seen = HashSet<UUID>()
+        var current = coffeeBeanDataService.findMostRecentlyRated() ?: return null
+        var mergedInto = current.mergedIntoId
+        while (mergedInto != null && seen.add(current.persistedId)) {
+            current = coffeeBeanDataService.getById(mergedInto)
+            mergedInto = current.mergedIntoId
+        }
+        return current
+    }
+
     override fun ratings(): List<CoffeeBeanRatings> {
         val beans = coffeeBeanDataService.getAll()
         val byId = beans.associateBy { it.persistedId }

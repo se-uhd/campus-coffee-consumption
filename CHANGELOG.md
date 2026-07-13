@@ -5,6 +5,25 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The rating prompt now pre-selects the bean of the most recent rating cast by anyone (the current user or a
+  different user), instead of the most recently purchased bean. When a user rates the coffee they just drank,
+  the bean dropdown starts on whatever bean the group rated last, which is usually the bean currently in the
+  machine. The old default (the most recently purchased bean) is kept as a fallback for when nothing has been
+  rated yet, and a user who has already voted on their current cup still sees their own vote. If the most
+  recently rated bean was later merged into another, the pre-selection uses the bean it was merged into, so
+  it is always a bean still in the catalog.
+
+### Fixed
+
+- The rating bean dropdown now shows a bean that another user added since the page was opened. The dropdown
+  options were loaded once and not refreshed, so when the suggested bean had been created in the meantime (a
+  purchase or rating by someone else), the pre-selection pointed at a bean the dropdown did not list and the
+  field rendered blank. The options are now refreshed whenever the suggested bean is missing from them.
+
 ## [0.9.10] - 2026-07-10
 
 ### Fixed

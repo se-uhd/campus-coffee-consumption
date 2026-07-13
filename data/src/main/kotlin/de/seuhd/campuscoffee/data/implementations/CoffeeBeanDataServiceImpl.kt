@@ -35,6 +35,9 @@ class CoffeeBeanDataServiceImpl(
     override fun findMostRecentlyPurchased(): CoffeeBean? =
         repository.findMostRecentlyPurchased(PageRequest.of(0, 1)).firstOrNull()?.let { mapper.fromEntity(it) }
 
+    override fun findMostRecentlyRated(): CoffeeBean? =
+        repository.findMostRecentlyRated(PageRequest.of(0, 1)).firstOrNull()?.let { mapper.fromEntity(it) }
+
     companion object {
         /**
          * Spring bean name of this relational adapter. The event-sourcing decorator qualifies on it so the

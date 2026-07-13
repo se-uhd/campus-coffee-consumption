@@ -1,6 +1,12 @@
 import { APIRequestContext } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { USER_TOKENS, apiContext, recordExpenseInActivity, resetFixtures } from './helpers';
+import {
+  USER_TOKENS,
+  apiContext,
+  recordBeanPurchaseViaApi,
+  recordExpenseInActivity,
+  resetFixtures
+} from './helpers';
 
 const MAX = USER_TOKENS.maxmustermann;
 const USER_URL = `/login/${MAX}`;
@@ -57,6 +63,24 @@ test.describe('user flow', () => {
     await expect(page.locator('.cc-count-card .display')).toHaveText('0');
     await expect(balance).toHaveText(/0\.00 €/);
     await expect(undo).toBeHidden();
+  });
+
+  test('the rating dropdown shows a bean another user added after the page loaded', async ({ page }) => {
+    await page.goto(USER_URL);
+    await expect(page.getByText('Signed in as maxmustermann')).toBeVisible();
+
+    // another user records a purchase of a brand-new bean AFTER maxmustermann's page (and its bean dropdown)
+    // has already loaded, so the new bean is absent from the stale in-page options
+    await recordBeanPurchaseViaApi(api, USER_TOKENS.student2023, 'Fresh Roast');
+
+    // adding a coffee refreshes the summary in place (no page reload); the prompt now suggests the new bean,
+    // and the dropdown must show it selected rather than a blank value
+    await page.getByRole('button', { name: 'Add a coffee' }).click();
+    await expect(page.locator('.cc-count-card .display')).toHaveText('1');
+
+    const ratingCard = page.locator('.cc-rating-card');
+    await expect(ratingCard.getByText('Rate these beans')).toBeVisible();
+    await expect(ratingCard.locator('mat-select')).toContainText('Fresh Roast');
   });
 
   test('the expense form records a purchase shown in Recent activity as a signed credit', async ({
