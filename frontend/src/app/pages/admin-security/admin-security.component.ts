@@ -81,7 +81,7 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
         <mat-card class="card">
           <h2>Set up two-factor authentication</h2>
           <p class="muted">Scan the QR code with an authenticator app.</p>
-          <img class="qr" [src]="qrUrl()" alt="Two-factor QR code" width="240" height="240" />
+          <img class="qr" [src]="qrUrl()" alt="Two-factor QR code" />
           <p class="muted">Or enter this key manually.</p>
           <code class="secret break-word">{{ secret() }}</code>
           <form #form="ngForm">
@@ -133,8 +133,9 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
     `
       .qr {
         display: block;
+        width: 240px;
         max-width: 100%;
-        height: auto;
+        aspect-ratio: 1;
         margin: 8px 0;
       }
       .secret {
