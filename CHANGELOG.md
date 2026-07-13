@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.11] - 2026-07-13
 
 ### Changed
 
@@ -19,6 +19,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The add-coffee (+1) button no longer gets stuck on its dark pressed color after a tap on a phone. The
+  darker brand fill was applied on `:hover`, and a touchscreen keeps a `:hover` active after a tap until you
+  tap elsewhere, so the button held the dark color after every +1. The hover deepening is now limited to
+  devices with a real hovering pointer, and a press on any device deepens via `:active`, which clears as soon
+  as you lift your finger. The neutral admin −1 button had the same latent issue and is fixed the same way.
 - The rating bean dropdown now shows a bean that another user added since the page was opened. The dropdown
   options were loaded once and not refreshed, so when the suggested bean had been created in the meantime (a
   purchase or rating by someone else), the pre-selection pointed at a bean the dropdown did not list and the
@@ -1110,6 +1115,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[0.9.11]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.11
 [0.9.10]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.10
 [0.9.9]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.9
 [0.9.8]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.8

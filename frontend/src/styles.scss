@@ -345,8 +345,18 @@ mat-card.card h2:last-child {
 }
 
 // The add-coffee FAB keeps the M3 light-red tonal fill at rest (a soft, friendly accent for the most-tapped
-// user action), deepening to the darker brand tone on hover/press.
-.mat-mdc-fab.mat-primary:hover {
+// user action), deepening to the darker brand tone on hover/press. The hover deepening is gated to devices
+// with a true hovering pointer (`hover: hover`): on a touchscreen a `:hover` state is applied on tap and
+// sticks until the user taps elsewhere, which left the FAB stuck on the dark tone after every +1. The
+// `:active` rule gives the same deepening on a real press and clears on release, so touch still gets the
+// press feedback without the stuck color.
+@media (hover: hover) {
+  .mat-mdc-fab.mat-primary:hover {
+    --mat-fab-container-color: var(--cc-brand-dark);
+  }
+}
+
+.mat-mdc-fab.mat-primary:active {
   --mat-fab-container-color: var(--cc-brand-dark);
 }
 
@@ -373,7 +383,15 @@ mat-card.card h2:last-child {
   border: 1px solid var(--cc-hairline);
 }
 
-.cc-fab-neutral.mat-mdc-fab:hover {
+// Same touch-sticky-hover guard as the primary FAB above: pointer-only hover, plus an `:active` that clears
+// on release so a tap does not leave the neutral step button stuck on its hover tone.
+@media (hover: hover) {
+  .cc-fab-neutral.mat-mdc-fab:hover {
+    --mat-fab-container-color: var(--cc-hairline);
+  }
+}
+
+.cc-fab-neutral.mat-mdc-fab:active {
   --mat-fab-container-color: var(--cc-hairline);
 }
 
