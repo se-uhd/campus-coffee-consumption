@@ -7,6 +7,7 @@ import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.system.TotpService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import de.seuhd.campuscoffee.tests.SystemTestUtils.configureClient
 import de.seuhd.campuscoffee.tests.SystemTestUtils.getPostgresContainer
@@ -52,6 +53,9 @@ abstract class AbstractProdProfileSystemTest {
     @Autowired
     protected lateinit var paymentService: PaymentService
 
+    @Autowired
+    protected lateinit var totpService: TotpService
+
     @LocalServerPort
     private var port: Int = 0
 
@@ -62,6 +66,9 @@ abstract class AbstractProdProfileSystemTest {
     fun beforeEach() {
         clearAll()
         seededUsers = TestFixtures.createUserFixtures(userService)
+        // 2FA is required for admins, so enroll the fixture admin (with the deterministic secret) so an admin
+        // login yields a full-scope token; the admin login helper supplies a matching code
+        TestFixtures.enrollAdminFixture(userService, totpService)
         TestFixtures.createConsumptionFixtures(coffeeConsumptionService, seededUsers)
         TestFixtures.createPriceFixture(coffeePriceService)
         configureClient(port)
@@ -104,8 +111,13 @@ abstract class AbstractProdProfileSystemTest {
             registry.add("campus-coffee.login-encryption.private-key-pem") { freshLoginKeyPem }
             // a public https origin so PublicBaseUrlGuard accepts the boot
             registry.add("campus-coffee.app.base-url") { "https://coffee.se.uni-heidelberg.de" }
-            // keep the (prod-enabled) login rate limiter out of the cookie/login assertion
+            // prod requires a TOTP encryption key with no fallback; supply a non-dev value (the dev default is
+            // rejected by TotpEncryptionKeyGuard under prod, so give it a key it has never seen)
+            registry.add("campus-coffee.totp.encryption-key") { "prod-test-totp-encryption-key-not-the-dev-default" }
+            // keep the (prod-enabled) login rate limiter and the TOTP guards out of the cookie/login assertions
             registry.add("campus-coffee.auth.rate-limit.enabled") { "false" }
+            registry.add("campus-coffee.auth.totp.lockout-enabled") { "false" }
+            registry.add("campus-coffee.auth.totp.step-reuse-guard-enabled") { "false" }
         }
     }
 }

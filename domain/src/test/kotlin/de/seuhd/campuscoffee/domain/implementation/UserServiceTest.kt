@@ -18,6 +18,7 @@ import de.seuhd.campuscoffee.domain.ports.data.PasswordHasherService
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import de.seuhd.campuscoffee.domain.ports.system.CapabilityTokenGeneratorService
+import de.seuhd.campuscoffee.domain.ports.system.TotpService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -43,6 +44,7 @@ class UserServiceTest {
     private val expenseDataService: ExpenseDataService = mock()
     private val paymentDataService: PaymentDataService = mock()
     private val balanceDataService: BalanceDataService = mock()
+    private val totpService: TotpService = mock()
 
     private lateinit var service: UserServiceImpl
 
@@ -92,7 +94,8 @@ class UserServiceTest {
                 coffeeConsumptionDataService,
                 expenseDataService,
                 paymentDataService,
-                balanceDataService
+                balanceDataService,
+                totpService
             )
     }
 

@@ -28,6 +28,8 @@ dependencies {
     implementation(libs.zxing.javase)
     // Apache PDFBox lays those QR codes out as a printable PDF grid (the all-user QR sheet).
     implementation(libs.pdfbox)
+    // otp-java generates and verifies the admin TOTP second factor (RFC 6238), hidden behind the TotpService port.
+    implementation(libs.otp.java)
 
     // MapStruct is compile-only for the Kotlin mappers; kapt runs the processor that generates the impls.
     compileOnly(libs.mapstruct)

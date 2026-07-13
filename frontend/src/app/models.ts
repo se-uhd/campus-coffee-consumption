@@ -21,6 +21,9 @@ export type { ConsumptionOverrideDto } from './api/model/consumptionOverrideDto'
 export type { TokenRequestDto } from './api/model/tokenRequestDto';
 export type { TokenResponseDto } from './api/model/tokenResponseDto';
 export type { PublicKeyDto } from './api/model/publicKeyDto';
+export type { TotpEnrollmentDto } from './api/model/totpEnrollmentDto';
+export type { TotpActivateRequestDto } from './api/model/totpActivateRequestDto';
+export type { TotpStatusDto } from './api/model/totpStatusDto';
 export type { ActivityEntryDto } from './api/model/activityEntryDto';
 export type { GlobalActivityEntryDto } from './api/model/globalActivityEntryDto';
 export type { UserSummaryDto } from './api/model/userSummaryDto';

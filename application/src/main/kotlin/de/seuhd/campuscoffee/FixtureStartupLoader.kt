@@ -10,6 +10,7 @@ import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
 import de.seuhd.campuscoffee.domain.ports.system.StartupTaskService
+import de.seuhd.campuscoffee.domain.ports.system.TotpService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -35,6 +36,7 @@ class FixtureStartupLoader(
     private val coffeeRatingService: CoffeeRatingService,
     private val coffeeBeanService: CoffeeBeanService,
     private val idGenerator: IdGeneratorService,
+    private val totpService: TotpService,
     private val fixturesProperties: FixturesProperties
 ) : StartupTaskService {
     override val order = ORDER
@@ -51,7 +53,13 @@ class FixtureStartupLoader(
         if (fixturesProperties.resetOnStartup) {
             idGenerator.reset()
             clearAll()
-            val (users, consumptions) = TestFixtures.loadAll(userService, coffeeConsumptionService, coffeePriceService)
+            val (users, consumptions) =
+                TestFixtures.loadAll(
+                    userService,
+                    coffeeConsumptionService,
+                    coffeePriceService,
+                    totpService
+                )
             log.info { "Reset and reseeded the fixture data on startup: $users users, $consumptions consumptions." }
             return
         }
@@ -59,7 +67,13 @@ class FixtureStartupLoader(
             log.info { "Skipping the fixture load: the database already has users." }
             return
         }
-        val (users, consumptions) = TestFixtures.loadAll(userService, coffeeConsumptionService, coffeePriceService)
+        val (users, consumptions) =
+            TestFixtures.loadAll(
+                userService,
+                coffeeConsumptionService,
+                coffeePriceService,
+                totpService
+            )
         log.info { "Loaded the fixture data on startup: $users users, $consumptions consumptions." }
     }
 

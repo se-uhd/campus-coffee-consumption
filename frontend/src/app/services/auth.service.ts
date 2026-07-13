@@ -2,7 +2,8 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AdminSelectionService } from './admin-selection.service';
-import { PublicKeyDto, TokenRequestDto } from '../models';
+import { TwoFactorService } from './two-factor.service';
+import { PublicKeyDto, TokenRequestDto, TokenResponseDto } from '../models';
 
 /**
  * Admin authentication. The credentials are encrypted before they leave the browser (a compact JWE under the
@@ -19,26 +20,38 @@ export class AuthService {
 
   constructor(
     private readonly http: HttpClient,
-    private readonly selection: AdminSelectionService
+    private readonly selection: AdminSelectionService,
+    private readonly twoFactor: TwoFactorService
   ) {}
 
   /**
-   * Logs an admin in: encrypts the credentials, posts them (the server sets the httpOnly session cookie),
-   * and marks the session active. The response body token is not read or stored.
+   * Logs an admin in: encrypts the credentials (with the authenticator code, if supplied), posts them (the
+   * server sets the httpOnly session cookie), and marks the session active. Returns whether the admin still
+   * needs to enroll a second factor, so the caller can route them to the enrollment page; the enrollment
+   * status is cached for the route guard. The response body token is not read or stored.
    */
-  async login(loginName: string, password: string): Promise<void> {
-    const request: TokenRequestDto = { encryptedPayload: await this.encryptCredentials(loginName, password) };
-    await firstValueFrom(this.http.post('/api/auth/token', request));
+  async login(loginName: string, password: string, totp?: string): Promise<boolean> {
+    const request: TokenRequestDto = {
+      encryptedPayload: await this.encryptCredentials(loginName, password, totp)
+    };
+    const response = await firstValueFrom(this.http.post<TokenResponseDto>('/api/auth/token', request));
     localStorage.setItem(AuthService.SESSION_KEY, '1');
+    this.twoFactor.setEnrolled(!response.enrollmentRequired);
+    return response.enrollmentRequired;
   }
 
-  /** Encrypts the credentials plus a fresh `iat` as a compact JWE under the backend's published RSA public key. */
-  private async encryptCredentials(loginName: string, password: string): Promise<string> {
+  /** Encrypts the credentials plus a fresh `iat` (and the code, if any) as a compact JWE under the backend's RSA key. */
+  private async encryptCredentials(loginName: string, password: string, totp?: string): Promise<string> {
     // jose is loaded lazily (only at sign-in) so the crypto library stays out of the initial bundle.
     const { CompactEncrypt, importJWK } = await import('jose');
     const jwk = await firstValueFrom(this.http.get<PublicKeyDto>('/api/auth/public-key'));
     const publicKey = await importJWK(jwk, 'RSA-OAEP-256');
-    const plaintext = new TextEncoder().encode(JSON.stringify({ loginName, password, iat: Date.now() }));
+    // the code rides inside the encrypted payload alongside the password, so it is verified atomically and a
+    // wrong code is indistinguishable from a wrong password (an identical 401). It is omitted when absent.
+    const payload = totp
+      ? { loginName, password, totp, iat: Date.now() }
+      : { loginName, password, iat: Date.now() };
+    const plaintext = new TextEncoder().encode(JSON.stringify(payload));
     return new CompactEncrypt(plaintext)
       .setProtectedHeader({ alg: 'RSA-OAEP-256', enc: 'A256GCM', kid: jwk.kid })
       .encrypt(publicKey);
@@ -60,6 +73,7 @@ export class AuthService {
   async logout(): Promise<void> {
     localStorage.removeItem(AuthService.SESSION_KEY);
     this.selection.reset();
+    this.twoFactor.reset();
     try {
       await firstValueFrom(this.http.post('/api/auth/logout', {}));
     } catch {

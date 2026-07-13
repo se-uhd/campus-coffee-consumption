@@ -101,6 +101,12 @@ class SecurityConfig {
                 // the admin rule so a capability-token user (ROLE_USER) can still read the selectable beans.
                 authorize(org.springframework.http.HttpMethod.GET, "/api/beans/**", authenticated)
                 authorize("/api/beans/**", hasRole("ADMIN"))
+                // Two-factor enrollment: an admin whose session is enrollment-only (ROLE_ADMIN_ENROLLMENT,
+                // minted when 2FA is required but not yet set up) may reach ONLY their own enrollment
+                // endpoints. This narrow rule must precede the broad `/api/users/**` admin rule below
+                // (first-match wins), so a pending admin can enroll but reaches nothing else under /api/users
+                // (create/delete users, count corrections, peer reset all stay full-ADMIN-only).
+                authorize("/api/users/me/totp/**", hasAnyRole("ADMIN", "ADMIN_ENROLLMENT"))
                 // User management and the per-user admin views are admin-only (JWT, ROLE_ADMIN).
                 authorize("/api/users/**", hasRole("ADMIN"))
                 // No anonymous access to any other API endpoint.

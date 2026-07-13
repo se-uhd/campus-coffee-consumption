@@ -19,15 +19,21 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     <header class="cc-header">
       <span class="cc-header-leading">
         @if (title()) {
-          <a
-            mat-icon-button
-            [routerLink]="home()"
-            [queryParamsHandling]="queryParamsHandling()"
-            aria-label="Back"
-            matTooltip="Back"
-          >
-            <mat-icon>arrow_back</mat-icon>
-          </a>
+          @if (backDisabled()) {
+            <button mat-icon-button disabled aria-label="Back" matTooltip="Back">
+              <mat-icon>arrow_back</mat-icon>
+            </button>
+          } @else {
+            <a
+              mat-icon-button
+              [routerLink]="home()"
+              [queryParamsHandling]="queryParamsHandling()"
+              aria-label="Back"
+              matTooltip="Back"
+            >
+              <mat-icon>arrow_back</mat-icon>
+            </a>
+          }
         } @else {
           <a
             class="cc-header-logo"
@@ -118,6 +124,12 @@ export class AppHeaderComponent {
 
   /** The Material icon name shown before the centered title; empty for no icon. */
   readonly icon = input('');
+
+  /**
+   * Disables the back arrow (renders it grayed and non-navigating) when going back is not available, e.g. a
+   * not-yet-enrolled admin on the security page who must finish setup before any other admin route is reachable.
+   */
+  readonly backDisabled = input(false);
 
   /**
    * How the back/home link carries the current URL query params. Defaults to `''` (drop them); an admin

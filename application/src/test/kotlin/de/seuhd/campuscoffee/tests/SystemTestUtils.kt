@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.tests
 
+import com.bastiaanjansen.otp.TOTPGenerator
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWEHeader
@@ -111,13 +112,18 @@ object SystemTestUtils {
         return RSAKey.Builder(Base64URL.from(jwk.n), Base64URL.from(jwk.e)).keyID(jwk.kid).build()
     }
 
+    /** A current valid authenticator code for the enrolled fixture admin (from the shared deterministic secret). */
+    fun currentAdminTotpCode(): String = TOTPGenerator.Builder(TestFixtures.ADMIN_TOTP_SECRET_BASE32).build().now()
+
     /**
      * Encrypts the credentials as a compact JWE for the token endpoint, by default under the server's
-     * published key; pass another key to exercise the wrong-key path.
+     * published key; pass another key to exercise the wrong-key path. A non-null [totp] rides inside the
+     * payload (the second factor); omit it to post a password-only payload (an enrolled admin then fails).
      */
     fun encryptCredentials(
         loginName: String,
         password: String,
+        totp: String? = null,
         publicKey: RSAKey = publicKey()
     ): String {
         val header =
@@ -128,15 +134,14 @@ object SystemTestUtils {
                 ).keyID(publicKey.keyID)
                 .build()
         // include a fresh `iat` (epoch millis) so the decryptor's replay-freshness check accepts the payload
-        val payload =
-            Payload(
-                mapOf<String, Any>(
-                    "loginName" to loginName,
-                    "password" to password,
-                    "iat" to System.currentTimeMillis()
-                )
-            )
-        val jwe = JWEObject(header, payload)
+        val fields =
+            buildMap<String, Any> {
+                put("loginName", loginName)
+                put("password", password)
+                put("iat", System.currentTimeMillis())
+                if (totp != null) put("totp", totp)
+            }
+        val jwe = JWEObject(header, Payload(fields))
         jwe.encrypt(RSAEncrypter(publicKey.toRSAPublicKey()))
         return jwe.serialize()
     }
@@ -162,26 +167,29 @@ object SystemTestUtils {
             .returnResult<ErrorResponse>()
             .responseBody!!
 
-    /** Mints a JWT for the given credentials via the token endpoint and returns the bearer value. */
+    /** Mints a JWT for the given credentials (with an optional second-factor code) and returns the bearer value. */
     fun jwtFor(
         loginName: String,
-        password: String
+        password: String,
+        totp: String? = null
     ): String {
         val result =
             client
                 .post()
                 .uri("/api/auth/token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(TokenRequestDto(encryptCredentials(loginName, password)))
+                .body(TokenRequestDto(encryptCredentials(loginName, password, totp)))
                 .exchange()
                 .returnResult<TokenResponseDto>()
         assertThat(result.status.value()).isEqualTo(200)
         return result.responseBody!!.token
     }
 
-    /** The JWT bearer value for the seeded admin fixture. */
+    /** The JWT bearer value for the seeded (enrolled) admin fixture, including a current second-factor code. */
     fun adminBearer(): String =
-        TestFixtures.rawCredentialsFor(Role.ADMIN).let { (login, password) -> "Bearer ${jwtFor(login, password)}" }
+        TestFixtures.rawCredentialsFor(Role.ADMIN).let { (login, password) ->
+            "Bearer ${jwtFor(login, password, currentAdminTotpCode())}"
+        }
 
     /** The capability token of the seeded user fixture with the given login name. */
     fun userToken(loginName: String): String = TestFixtures.rawCapabilityTokenFor(loginName)

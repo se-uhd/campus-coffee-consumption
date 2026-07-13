@@ -5,6 +5,7 @@ import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.system.TotpService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import de.seuhd.campuscoffee.tests.SystemTestUtils.configureClient
 import de.seuhd.campuscoffee.tests.SystemTestUtils.configurePostgresContainers
@@ -31,7 +32,8 @@ class CucumberSpringConfiguration(
     private val coffeeConsumptionService: CoffeeConsumptionService,
     private val coffeePriceService: CoffeePriceService,
     private val expenseService: ExpenseService,
-    private val paymentService: PaymentService
+    private val paymentService: PaymentService,
+    private val totpService: TotpService
 ) {
     @LocalServerPort
     private var port: Int = 0
@@ -40,6 +42,8 @@ class CucumberSpringConfiguration(
     fun beforeEach() {
         clearAll()
         val users = TestFixtures.createUserFixtures(userService)
+        // 2FA is required for admins, so enroll the fixture admin; the admin login helper supplies a code
+        TestFixtures.enrollAdminFixture(userService, totpService)
         TestFixtures.createConsumptionFixtures(coffeeConsumptionService, users)
         TestFixtures.createPriceFixture(coffeePriceService)
         configureClient(port)
@@ -69,6 +73,10 @@ class CucumberSpringConfiguration(
             // disable the login rate limiter for the acceptance suite (it is covered by its own system test),
             // so repeated scenario logins from the loopback client cannot trip the shared failure budget
             registry.add("campus-coffee.auth.rate-limit.enabled") { "false" }
+            // disable the per-account TOTP lockout and code-reuse guard so the many admin logins the scenarios
+            // make within one 30-second step (reusing the same code) are not rejected
+            registry.add("campus-coffee.auth.totp.lockout-enabled") { "false" }
+            registry.add("campus-coffee.auth.totp.step-reuse-guard-enabled") { "false" }
         }
     }
 }

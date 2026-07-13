@@ -12,6 +12,8 @@ import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
+import de.seuhd.campuscoffee.domain.ports.system.TotpService
+import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.atLeastOnce
@@ -33,6 +35,7 @@ class FixtureStartupLoaderTest {
     private val coffeeRatingService = mock<CoffeeRatingService>()
     private val coffeeBeanService = mock<CoffeeBeanService>()
     private val idGenerator = mock<IdGeneratorService>()
+    private val totpService = mock<TotpService>()
     private val loader =
         FixtureStartupLoader(
             userService,
@@ -43,6 +46,7 @@ class FixtureStartupLoaderTest {
             coffeeRatingService,
             coffeeBeanService,
             idGenerator,
+            totpService,
             FixturesProperties(loadOnStartup = true, resetOnStartup = false)
         )
 
@@ -50,6 +54,9 @@ class FixtureStartupLoaderTest {
     fun `loadOnStartup seeds the fixtures when the database is empty`() {
         whenever(userService.getAll()).thenReturn(emptyList())
         whenever(userService.upsert(any())).thenAnswer { it.arguments[0] as User }
+        // the admin second-factor enrollment step reads the seeded admin back and encrypts a known secret
+        whenever(userService.getByLoginName(any())).thenReturn(TestFixtures.admin())
+        whenever(totpService.encrypt(any())).thenReturn("cipher")
         whenever(coffeeConsumptionService.createForUser(any())).thenReturn(mock<CoffeeConsumption>())
         whenever(coffeePriceService.ensureInitialPrice(any())).thenReturn(mock<CoffeePrice>())
 
@@ -81,10 +88,13 @@ class FixtureStartupLoaderTest {
                 coffeeRatingService,
                 coffeeBeanService,
                 idGenerator,
+                totpService,
                 FixturesProperties(loadOnStartup = true, resetOnStartup = true)
             )
         whenever(userService.getAll()).thenReturn(listOf(mock<User>()))
         whenever(userService.upsert(any())).thenAnswer { it.arguments[0] as User }
+        whenever(userService.getByLoginName(any())).thenReturn(TestFixtures.admin())
+        whenever(totpService.encrypt(any())).thenReturn("cipher")
         whenever(coffeeConsumptionService.createForUser(any())).thenReturn(mock<CoffeeConsumption>())
         whenever(coffeePriceService.ensureInitialPrice(any())).thenReturn(mock<CoffeePrice>())
 

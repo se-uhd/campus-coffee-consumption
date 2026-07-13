@@ -29,6 +29,11 @@ import tools.jackson.module.kotlin.KotlinModule
  * - a [CoffeeConsumption] is flattened to its user id, so a consumption event records a reference rather
  *   than a copy of the user (a copy would leak the user's `passwordHash`). A `User` event does keep
  *   `passwordHash`, so a login still works after a rebuild from the log.
+ * - a `User` event also keeps `totpSecret` (the admin's TOTP second factor) and `totpEnabled` in the body on
+ *   purpose, so a second factor survives a rebuild and is not wiped when the read model is re-projected on
+ *   the next user write. `totpSecret` is already an at-rest ciphertext (the TOTP adapter encrypts it before
+ *   it ever reaches the model), so it is safe in the append-only log and must **not** be added to
+ *   [UserSecretsMixin]: excluding it would null the column on the next projection and break 2FA.
  * - an [Expense] is flattened to its buyer's id (`buyerUserId`) and a [Payment] to its user's id
  *   (`userId`, written as JSON null for a pure kitty adjustment), for the same reason. A [CoffeePrice] has
  *   no references, so it needs no custom serializer and is written field for field.

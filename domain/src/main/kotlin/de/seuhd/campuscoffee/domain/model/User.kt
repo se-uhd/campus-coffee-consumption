@@ -24,6 +24,14 @@ import java.util.UUID
  *   (the money) or [SummaryPanel.CUPS] (coffee stats). It follows the same nullable accept-or-keep pattern
  *   (omitted keeps the stored value, defaults to [SummaryPanel.BALANCE] on create); a user read back from the
  *   store always carries it.
+ * - [totpSecret] is the admin's TOTP (two-factor) shared secret, stored **encrypted at rest** (an opaque
+ *   ciphertext produced by the TOTP adapter, never the raw secret). Like [passwordHash] it is populated when
+ *   a user is *read* and is never a field on any DTO, so it never reaches a client. Only an admin ever has
+ *   one; a user (`USER`) is always null. It is written verbatim from this model rather than via accept-or-keep
+ *   (it has no "raw" input form): the DTO mapper never populates it, so a non-null value can only come from
+ *   the enrollment operations or the test fixtures. [totpEnabled] is whether that second factor is active.
+ *   Only the dedicated enrollment operations change these two; a generic profile update keeps the stored
+ *   values, and both default to `false`/null on create.
  */
 data class User(
     override val id: UUID? = null,
@@ -38,5 +46,7 @@ data class User(
     val summaryPanel: SummaryPanel? = null,
     val capabilityToken: String? = null,
     val passwordHash: String? = null,
+    val totpSecret: String? = null,
+    val totpEnabled: Boolean? = null,
     val password: String? = null
 ) : DomainModel<UUID>

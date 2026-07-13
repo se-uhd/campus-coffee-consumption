@@ -63,7 +63,10 @@ class LoginPayloadDecryptor(
             }
             LoginCredentials(
                 loginName = json["loginName"] as? String ?: missingField("loginName"),
-                password = json["password"] as? String ?: missingField("password")
+                password = json["password"] as? String ?: missingField("password"),
+                // the authenticator code is optional (a not-yet-enrolled admin omits it), so an absent or
+                // non-string value carries no code rather than failing the payload
+                totp = json["totp"] as? String
             )
         } catch (e: ParseException) {
             throw LoginPayloadException(e)

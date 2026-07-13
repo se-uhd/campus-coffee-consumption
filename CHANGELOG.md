@@ -5,6 +5,20 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-07-13
+
+### Added
+
+- Two-factor authentication (TOTP) is now required for every admin. After the username and password, an
+  enrolled admin enters a 6-digit code from an authenticator app; the code travels inside the existing
+  encrypted login payload, so a wrong or missing code returns the same 401 as a wrong password. An admin who
+  has not set up a second factor lands in an enrollment-only session limited to the new security page
+  (`/admin/security`) until setup is complete. An admin can deactivate their own second factor, and any admin
+  can reset a colleague's for a lost authenticator.
+- The second factor is protected against brute force by a per-account lockout and a code-reuse guard, on top
+  of the existing per-IP login limiter. The TOTP secret is stored AES-256-GCM encrypted at rest under a
+  Secret Manager key, and a prod startup guard fails fast if a development key or clock override is in effect.
+
 ## [0.9.11] - 2026-07-13
 
 ### Changed
@@ -1115,6 +1129,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[1.0.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v1.0.0
 [0.9.11]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.11
 [0.9.10]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.10
 [0.9.9]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v0.9.9

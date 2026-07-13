@@ -114,11 +114,23 @@ campus-coffee:
     load-on-startup: true
     # dev: clear + reseed every start so a persisted database can't collide with the restarted seeded ids
     reset-on-startup: true
+  totp:
+    # Local-dev convenience: pin the TOTP time base to a fixed instant so the real RFC 6238 code is a
+    # deterministic constant, the same idea as the seeded (deterministic) id generator. Combined with the
+    # pre-enrolled fixture admin (jane_doe)'s fixed secret, the required sign-in code is always 217662 (the
+    # code for that secret at 2025-01-01T12:00:00Z). 0 (every other profile) uses the real clock, so a real
+    # authenticator app works there. TotpEncryptionKeyGuard refuses a prod boot if this is set.
+    fixed-clock-epoch-second: ${TOTP_FIXED_CLOCK:1735732800}
   auth:
     cookie:
       # dev is served over plain http on localhost, so the admin session cookie cannot be Secure there
       # (a Secure cookie is dropped over http); prod keeps the default Secure=true.
       secure: false
+    totp:
+      # the fixed dev clock makes every login fall in the same 30-second step, so turn off the per-account
+      # lockout and the code-reuse guard (which would otherwise reject a repeated same-step code) in dev
+      lockout-enabled: false
+      step-reuse-guard-enabled: false
 
 ---
 spring:
@@ -168,6 +180,10 @@ campus-coffee:
     secret: ${JWT_SECRET} # required, no fallback
   login-encryption:
     private-key-pem: ${LOGIN_PRIVATE_KEY_PEM} # required, no fallback (Secret Manager)
+  totp:
+    # AES key for the admin two-factor secret at rest; required, no fallback (Secret Manager). Must be the
+    # same value on every instance. TotpEncryptionKeyGuard also rejects the committed dev default in prod.
+    encryption-key: ${TOTP_ENCRYPTION_KEY}
   fixtures:
     load-on-startup: false # prod has real users, not fixtures
   bootstrap-admin: # create one admin on first startup if none exists; all defaults live here, not in the class

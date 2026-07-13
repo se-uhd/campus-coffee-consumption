@@ -61,6 +61,11 @@ data class UserDto(
     // the user's own landing-panel preference (BALANCE / CUPS). Nullable accept-or-keep (omitted keeps the
     // stored value); a read always carries it. Preserved on an admin save; the user edits it on their profile.
     val summaryPanel: SummaryPanel? = null,
+    // whether an admin has enrolled a second factor. Read-only: it appears in responses (so the admin UI can
+    // show who still needs to enroll) but is never accepted from a request; only the dedicated two-factor
+    // endpoints change it (the mapper ignores it on the way in).
+    @field:JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    val totpEnabled: Boolean? = null,
     // server-assigned "your coffee link"; present in responses and ignored by the mapper on input
     val capabilityUrl: String? = null
 ) : Dto<UUID>

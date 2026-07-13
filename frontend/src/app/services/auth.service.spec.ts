@@ -76,16 +76,36 @@ describe('AuthService', () => {
     expect(tokenReq.request.body).toEqual({ encryptedPayload: 'compact.jwe.value' });
 
     // the bytes handed to the encrypter are exactly the credentials JSON (so the credentials are what is
-    // encrypted, not sent in the clear), plus a fresh `iat` for the backend's replay-freshness check
+    // encrypted, not sent in the clear), plus a fresh `iat` for the backend's replay-freshness check. With no
+    // code supplied, the payload carries no `totp` field.
     const encrypted = JSON.parse(new TextDecoder().decode(mocks.capturedPlaintext.value));
     expect(encrypted).toMatchObject({ loginName: 'jane_doe', password: 's3cret-pw' });
+    expect(encrypted.totp).toBeUndefined();
     expect(typeof encrypted.iat).toBe('number');
     expect(mocks.importJWK).toHaveBeenCalledWith(jwk, 'RSA-OAEP-256');
     expect(mocks.setHeader).toHaveBeenCalledWith({ alg: 'RSA-OAEP-256', enc: 'A256GCM', kid: 'k1' });
 
-    // the backend sets the JWT in an httpOnly cookie; the body token is ignored and only a session marker is kept
-    tokenReq.flush({ token: 'jwt-123' });
-    await promise;
+    // the backend sets the JWT in an httpOnly cookie; the body token is ignored and only a session marker is
+    // kept. An enrolled admin's response reports no enrollment needed, so login resolves false.
+    tokenReq.flush({ token: 'jwt-123', enrollmentRequired: false });
+    await expect(promise).resolves.toBe(false);
     expect(service.isLoggedIn).toBe(true);
+  });
+
+  it('carries the authenticator code inside the encrypted payload and reports when enrollment is required', async () => {
+    const jwk = { kty: 'RSA', n: 'modulus', e: 'AQAB', alg: 'RSA-OAEP-256', use: 'enc', kid: 'k1' };
+    const promise = service.login('jane_doe', 's3cret-pw', '123456');
+
+    (await waitForRequest(httpMock, '/api/auth/public-key')).flush(jwk);
+    const tokenReq = await waitForRequest(httpMock, '/api/auth/token');
+
+    // the code rides inside the ciphertext, never as a plaintext request field
+    expect(tokenReq.request.body).toEqual({ encryptedPayload: 'compact.jwe.value' });
+    const encrypted = JSON.parse(new TextDecoder().decode(mocks.capturedPlaintext.value));
+    expect(encrypted).toMatchObject({ loginName: 'jane_doe', password: 's3cret-pw', totp: '123456' });
+
+    // a pending admin's response asks the SPA to route them to enrollment
+    tokenReq.flush({ token: 'jwt-123', enrollmentRequired: true });
+    await expect(promise).resolves.toBe(true);
   });
 });

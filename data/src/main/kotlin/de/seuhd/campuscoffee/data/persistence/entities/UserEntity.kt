@@ -44,6 +44,12 @@ class UserEntity : Entity() {
     @field:Column(name = CAPABILITY_TOKEN_COLUMN)
     var capabilityToken: String? = null
 
+    @field:Column(name = "totp_secret")
+    var totpSecret: String? = null
+
+    @field:Column(name = "totp_enabled")
+    var totpEnabled: Boolean? = null
+
     @field:Version
     @field:Column(name = "version")
     var version: Long? = 0

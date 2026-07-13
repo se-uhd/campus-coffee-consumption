@@ -1,4 +1,5 @@
 import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -58,6 +59,18 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
               <mat-error>Enter your password.</mat-error>
             }
           </mat-form-field>
+          <mat-form-field class="full-width">
+            <mat-label>Authenticator code</mat-label>
+            <input
+              matInput
+              name="totp"
+              [(ngModel)]="totp"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="6"
+            />
+            <mat-hint>Leave blank if you have not set up two-factor authentication yet.</mat-hint>
+          </mat-form-field>
           <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid || loading()">
             @if (loading()) {
               <mat-spinner diameter="20"></mat-spinner>
@@ -80,6 +93,7 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
 export class LoginComponent {
   loginName = '';
   password = '';
+  totp = '';
   readonly loading = signal(false);
   readonly error = signal('');
 
@@ -88,15 +102,25 @@ export class LoginComponent {
     private readonly router: Router
   ) {}
 
-  /** Submits the credentials and navigates to the admin landing on success. */
+  /**
+   * Submits the credentials and navigates on success: to the enrollment page when the admin still needs to
+   * set up a second factor, otherwise to the admin landing.
+   */
   async submit(): Promise<void> {
     this.loading.set(true);
     this.error.set('');
     try {
-      await this.auth.login(this.loginName, this.password);
-      await this.router.navigate(['/admin']);
-    } catch {
-      this.error.set('Login failed. Check your credentials.');
+      const enrollmentRequired = await this.auth.login(this.loginName, this.password, this.totp || undefined);
+      await this.router.navigate([enrollmentRequired ? '/admin/security' : '/admin']);
+    } catch (error) {
+      // a rate-limit (429) is about attempt volume, not credential correctness, so it is not a credential
+      // oracle and gets its own message; every other failure keeps the single non-revealing message (a wrong
+      // password and a wrong or missing 2FA code are indistinguishable)
+      if (error instanceof HttpErrorResponse && error.status === 429) {
+        this.error.set('Too many attempts. Please wait a moment and try again.');
+      } else {
+        this.error.set('Login failed. Check your credentials.');
+      }
     } finally {
       this.loading.set(false);
     }

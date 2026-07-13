@@ -33,6 +33,9 @@
     "name" : "Users",
     "description" : "Admin operations for managing users and their capability links."
   }, {
+    "name" : "Two-factor",
+    "description" : "Admin two-factor (TOTP) enrollment and reset."
+  }, {
     "name" : "Authentication",
     "description" : "Exchange credentials for a stateless JWT bearer token."
   }, {
@@ -1858,6 +1861,147 @@
         }
       }
     },
+    "/api/users/me/totp/enroll" : {
+      "post" : {
+        "tags" : [ "Two-factor" ],
+        "summary" : "Begin two-factor enrollment; returns the one-time secret and otpauth URI.",
+        "operationId" : "enroll",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TotpEnrollmentDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/totp/activate" : {
+      "post" : {
+        "tags" : [ "Two-factor" ],
+        "summary" : "Activate two-factor with a current code; upgrades the session to full admin.",
+        "operationId" : "activate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TotpActivateRequestDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/kitty/deposit" : {
       "post" : {
         "tags" : [ "Kitty" ],
@@ -3100,6 +3244,145 @@
         }
       }
     },
+    "/api/users/me/totp/status" : {
+      "get" : {
+        "tags" : [ "Two-factor" ],
+        "summary" : "Whether the acting admin has enrolled a second factor.",
+        "operationId" : "status",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TotpStatusDto"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/totp/qr.png" : {
+      "get" : {
+        "tags" : [ "Two-factor" ],
+        "summary" : "The acting admin's pending enrollment QR code (PNG).",
+        "operationId" : "qrCode_1",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "image/png" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "byte"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/users/filter" : {
       "get" : {
         "tags" : [ "Users" ],
@@ -3404,7 +3687,7 @@
       "get" : {
         "tags" : [ "Profile" ],
         "summary" : "Download the user's own capability QR code (high-resolution PNG).",
-        "operationId" : "qrCode_1",
+        "operationId" : "qrCode_2",
         "responses" : {
           "200" : {
             "description" : "OK",
@@ -3958,6 +4241,139 @@
           }
         }
       }
+    },
+    "/api/users/{id}/totp" : {
+      "delete" : {
+        "tags" : [ "Two-factor" ],
+        "summary" : "Reset another admin's second factor (recovery).",
+        "operationId" : "reset",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/totp" : {
+      "delete" : {
+        "tags" : [ "Two-factor" ],
+        "summary" : "Disable the acting admin's own second factor.",
+        "operationId" : "disable",
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "400" : {
+            "description" : "The request is malformed or violates a validation rule.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "The request is unauthenticated (a missing, unknown, or rotated credential).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The authenticated caller is not permitted to perform this operation.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "A referenced resource does not exist.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "The request conflicts with the current state of the resource.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -4203,6 +4619,10 @@
               "type" : "null"
             } ]
           },
+          "totpEnabled" : {
+            "type" : [ "boolean", "null" ],
+            "readOnly" : true
+          },
           "capabilityUrl" : {
             "type" : [ "string", "null" ]
           }
@@ -4439,6 +4859,28 @@
         },
         "required" : [ "delta" ]
       },
+      "TotpEnrollmentDto" : {
+        "type" : "object",
+        "properties" : {
+          "secret" : {
+            "type" : "string"
+          },
+          "otpauthUri" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "otpauthUri", "secret" ]
+      },
+      "TotpActivateRequestDto" : {
+        "type" : "object",
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "pattern" : "\\d{6}"
+          }
+        },
+        "required" : [ "code" ]
+      },
       "DepositRequestDto" : {
         "type" : "object",
         "properties" : {
@@ -4561,9 +5003,12 @@
         "properties" : {
           "token" : {
             "type" : "string"
+          },
+          "enrollmentRequired" : {
+            "type" : "boolean"
           }
         },
-        "required" : [ "token" ]
+        "required" : [ "enrollmentRequired", "token" ]
       },
       "StreamingResponseBody" : { },
       "UserBalanceDto" : {
@@ -4592,6 +5037,15 @@
           }
         },
         "required" : [ "balanceCents", "count", "firstName", "lastName", "loginName", "userId" ]
+      },
+      "TotpStatusDto" : {
+        "type" : "object",
+        "properties" : {
+          "enrolled" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "enrolled" ]
       },
       "GlobalActivityEntryDto" : {
         "type" : "object",

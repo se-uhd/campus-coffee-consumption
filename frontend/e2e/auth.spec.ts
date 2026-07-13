@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { ADMIN, loginAsAdmin, signInAsAdmin } from './helpers';
+import { ADMIN, TOTP_CODE, loginAsAdmin, signInAsAdmin } from './helpers';
 
 /**
  * Authentication and routing: an unauthenticated visit to the root redirects to the login page, and a
@@ -31,6 +31,7 @@ test.describe('auth and routing', () => {
     await page.goto('/admin/login');
     await page.getByLabel('Login name').fill(ADMIN.loginName);
     await page.getByLabel('Password').fill(ADMIN.password);
+    await page.getByLabel('Authenticator code').fill(TOTP_CODE);
 
     const tokenRequest = page.waitForRequest(
       (request) => request.url().endsWith('/api/auth/token') && request.method() === 'POST'

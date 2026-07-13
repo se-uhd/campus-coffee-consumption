@@ -6,6 +6,7 @@ import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import de.seuhd.campuscoffee.tests.SystemTestUtils.adminBearer
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
+import de.seuhd.campuscoffee.tests.SystemTestUtils.currentAdminTotpCode
 import de.seuhd.campuscoffee.tests.SystemTestUtils.encryptCredentials
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -48,7 +49,7 @@ class ProdProfileSecuritySystemTest : AbstractProdProfileSystemTest() {
                 .post()
                 .uri("/api/auth/token")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(TokenRequestDto(encryptCredentials(login, password)))
+                .body(TokenRequestDto(encryptCredentials(login, password, currentAdminTotpCode())))
                 .exchange()
                 .returnResult<TokenResponseDto>()
         assertThat(result.status.value()).isEqualTo(200)

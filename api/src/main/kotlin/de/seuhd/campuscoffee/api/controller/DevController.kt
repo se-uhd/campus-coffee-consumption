@@ -9,6 +9,7 @@ import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
 import de.seuhd.campuscoffee.domain.ports.system.IdGeneratorService
+import de.seuhd.campuscoffee.domain.ports.system.TotpService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -35,7 +36,8 @@ class DevController(
     private val paymentService: PaymentService,
     private val coffeeRatingService: CoffeeRatingService,
     private val coffeeBeanService: CoffeeBeanService,
-    private val idGenerator: IdGeneratorService
+    private val idGenerator: IdGeneratorService,
+    private val totpService: TotpService
 ) {
     /** Reports the current number of users and coffee consumptions. */
     @Operation(summary = "Report the current number of users and coffee consumptions.")
@@ -50,7 +52,13 @@ class DevController(
         // restart the id sequence so a reload assigns the fixtures the same ids
         idGenerator.reset()
         clearAll()
-        val (users, consumptions) = TestFixtures.loadAll(userService, coffeeConsumptionService, coffeePriceService)
+        val (users, consumptions) =
+            TestFixtures.loadAll(
+                userService,
+                coffeeConsumptionService,
+                coffeePriceService,
+                totpService
+            )
         return ResponseEntity.ok(DevSummaryDto(users, consumptions))
     }
 

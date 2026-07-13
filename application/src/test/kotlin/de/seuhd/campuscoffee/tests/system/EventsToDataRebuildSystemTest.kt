@@ -9,6 +9,7 @@ import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.system.TotpService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
 import de.seuhd.campuscoffee.tests.SystemTestUtils.configureClient
@@ -54,6 +55,9 @@ class EventsToDataRebuildSystemTest {
     @Autowired
     private lateinit var eventsToDataRunner: EventsToDataRunner
 
+    @Autowired
+    private lateinit var totpService: TotpService
+
     @LocalServerPort
     private var port: Int = 0
 
@@ -65,6 +69,8 @@ class EventsToDataRebuildSystemTest {
         TestFixtures.createUserFixtures(userService).let {
             TestFixtures.createConsumptionFixtures(coffeeConsumptionService, it)
         }
+        // 2FA is required for admins, so enroll the fixture admin (the admin login helper supplies a code)
+        TestFixtures.enrollAdminFixture(userService, totpService)
         TestFixtures.createPriceFixture(coffeePriceService)
         configureClient(port)
     }
@@ -151,6 +157,9 @@ class EventsToDataRebuildSystemTest {
             configurePostgresContainers(registry, postgresContainer)
             // turn the rebuild runner on so its bean is registered (we invoke it directly in the test)
             registry.add("campus-coffee.persistence.events-to-data-on-startup") { "true" }
+            // the several admin logins here reuse the same code within one TOTP step, so turn off the guards
+            registry.add("campus-coffee.auth.totp.lockout-enabled") { "false" }
+            registry.add("campus-coffee.auth.totp.step-reuse-guard-enabled") { "false" }
         }
     }
 }

@@ -9,6 +9,7 @@ import de.seuhd.campuscoffee.domain.ports.api.CoffeeRatingService
 import de.seuhd.campuscoffee.domain.ports.api.ExpenseService
 import de.seuhd.campuscoffee.domain.ports.api.PaymentService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.system.TotpService
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import de.seuhd.campuscoffee.tests.SystemTestUtils.configureClient
 import de.seuhd.campuscoffee.tests.SystemTestUtils.configurePostgresContainers
@@ -53,6 +54,9 @@ abstract class AbstractSystemTest {
     @Autowired
     protected lateinit var coffeeBeanService: CoffeeBeanService
 
+    @Autowired
+    protected lateinit var totpService: TotpService
+
     @LocalServerPort
     private var port: Int = 0
 
@@ -65,6 +69,9 @@ abstract class AbstractSystemTest {
         // seed the fixture users (with their known capability tokens and passwords) and their
         // consumptions at zero, so a user can authenticate by token and an admin by JWT
         seededUsers = TestFixtures.createUserFixtures(userService)
+        // 2FA is required for admins, so enroll the fixture admin with the deterministic secret; the admin
+        // login helpers in SystemTestUtils compute a valid code from the same secret
+        TestFixtures.enrollAdminFixture(userService, totpService)
         TestFixtures.createConsumptionFixtures(coffeeConsumptionService, seededUsers)
         // seed the initial price after the users/consumptions, so a price is in effect before any coffee
         TestFixtures.createPriceFixture(coffeePriceService)
@@ -104,6 +111,11 @@ abstract class AbstractSystemTest {
             // rate limiter has its own test (LoginRateLimitSystemTest), so turn it off here so an unrelated
             // test cannot hit the shared per-client failure budget
             registry.add("campus-coffee.auth.rate-limit.enabled") { "false" }
+            // the admin login helpers mint many tokens for the fixture admin, often within one 30-second TOTP
+            // step reusing the same code; turn off the per-account lockout and the code-reuse guard so those
+            // repeated same-step logins are not rejected (both guards have their own focused unit tests)
+            registry.add("campus-coffee.auth.totp.lockout-enabled") { "false" }
+            registry.add("campus-coffee.auth.totp.step-reuse-guard-enabled") { "false" }
         }
     }
 }

@@ -7,8 +7,11 @@ package de.seuhd.campuscoffee.api.security
  *
  * @property loginName the admin's login name.
  * @property password the admin's password.
+ * @property totp the admin's current 6-digit authenticator code, if supplied. Optional: an admin who has
+ *   not yet enrolled a second factor omits it, and an enrolled admin must supply a valid one.
  */
 data class LoginCredentials(
     val loginName: String,
-    val password: String
+    val password: String,
+    val totp: String? = null
 )

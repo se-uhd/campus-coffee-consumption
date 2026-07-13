@@ -4,8 +4,10 @@ import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.MissingFieldException
+import de.seuhd.campuscoffee.domain.exceptions.ValidationException
 import de.seuhd.campuscoffee.domain.model.Role
 import de.seuhd.campuscoffee.domain.model.SummaryPanel
+import de.seuhd.campuscoffee.domain.model.TotpEnrollment
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
@@ -18,6 +20,7 @@ import de.seuhd.campuscoffee.domain.ports.data.PasswordHasherService
 import de.seuhd.campuscoffee.domain.ports.data.PaymentDataService
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import de.seuhd.campuscoffee.domain.ports.system.CapabilityTokenGeneratorService
+import de.seuhd.campuscoffee.domain.ports.system.TotpService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -39,7 +42,8 @@ class UserServiceImpl(
     private val coffeeConsumptionDataService: CoffeeConsumptionDataService,
     private val expenseDataService: ExpenseDataService,
     private val paymentDataService: PaymentDataService,
-    private val balanceDataService: BalanceDataService
+    private val balanceDataService: BalanceDataService,
+    private val totpService: TotpService
 ) : CrudServiceImpl<User, UUID>(User::class.java),
     UserService {
     override fun dataService(): CrudDataService<User, UUID> = userDataService
@@ -106,6 +110,13 @@ class UserServiceImpl(
                 summaryPanel = keepOrDefault(domainObject.summaryPanel, existing?.summaryPanel, SummaryPanel.BALANCE),
                 capabilityToken = capabilityToken,
                 passwordHash = passwordHash,
+                // the TOTP second factor: only an admin has one. Written verbatim from the domain object (it
+                // has no "raw" input form like the password): the DTO mapper never populates these two, so a
+                // non-null value can only come from the enrollment transitions or the test fixtures. A generic
+                // edit carries the stored values forward in update(), so an unrelated profile change never
+                // wipes an enrolled admin's secret.
+                totpSecret = if (role != Role.ADMIN) null else domainObject.totpSecret,
+                totpEnabled = if (role != Role.ADMIN) false else (domainObject.totpEnabled ?: false),
                 password = null
             )
         )
@@ -189,7 +200,17 @@ class UserServiceImpl(
         // token): the append-only event log attributes each change to the actor's login name, and the activity
         // classifies an owner self-scan vs an admin step by that login, so a rename would silently break a
         // user's undo and could misvalue their balance.
-        return upsert(user.copy(loginName = existing.loginName, role = newRole, active = newActive))
+        return upsert(
+            user.copy(
+                loginName = existing.loginName,
+                role = newRole,
+                active = newActive,
+                // a generic edit (a DTO carries no TOTP fields) must carry the stored second factor forward,
+                // or the read-model re-projection would wipe an enrolled admin's secret on any unrelated edit
+                totpSecret = existing.totpSecret,
+                totpEnabled = existing.totpEnabled
+            )
+        )
     }
 
     @Transactional
@@ -200,6 +221,63 @@ class UserServiceImpl(
         requireAdmin(actingUser, "rotate a capability token")
         val existing = userDataService.getById(userId)
         return upsert(existing.copy(capabilityToken = capabilityTokenGenerator.newToken()))
+    }
+
+    @Transactional
+    override fun beginTotpEnrollment(actingUser: User): TotpEnrollment {
+        val admin = requireOwnAdminAccount(actingUser)
+        val enrollment = totpService.enroll(admin.loginName)
+        // store the encrypted secret as pending (not yet enabled); activation follows once the admin
+        // confirms a current code, so a mis-scan never locks them out
+        upsert(admin.copy(totpSecret = enrollment.encryptedSecret, totpEnabled = false))
+        return enrollment
+    }
+
+    @Transactional
+    override fun enableTotp(
+        code: String,
+        actingUser: User
+    ): User {
+        val admin = requireOwnAdminAccount(actingUser)
+        val secret =
+            admin.totpSecret ?: throw ConflictException("Start two-factor enrollment before activating it.")
+        if (totpService.verify(secret, code) == null) {
+            throw ValidationException("That authenticator code is not valid; check the code and try again.")
+        }
+        return upsert(admin.copy(totpEnabled = true))
+    }
+
+    @Transactional
+    override fun disableTotp(actingUser: User): User {
+        val admin = requireOwnAdminAccount(actingUser)
+        return upsert(admin.copy(totpSecret = null, totpEnabled = false))
+    }
+
+    @Transactional
+    override fun resetTotpFor(
+        targetId: UUID,
+        actingUser: User
+    ): User {
+        requireAdmin(actingUser, "reset two-factor authentication")
+        val target = userDataService.getById(targetId)
+        return upsert(target.copy(totpSecret = null, totpEnabled = false))
+    }
+
+    override fun totpEnrolled(actingUser: User): Boolean =
+        userDataService.getById(actingUser.persistedId).totpEnabled == true
+
+    /**
+     * Re-reads the acting admin's own record from the store (so the second-factor transition works from the
+     * persisted state, not a possibly-stale principal) after confirming they are an admin. Enrollment,
+     * activation, and self-disable are self-service, so they always operate on the acting user's own account.
+     *
+     * @param actingUser the authenticated principal
+     * @return the fresh, persisted admin record
+     * @throws ForbiddenException if [actingUser] is not an admin
+     */
+    private fun requireOwnAdminAccount(actingUser: User): User {
+        requireAdmin(actingUser, "manage two-factor authentication")
+        return userDataService.getById(actingUser.persistedId)
     }
 
     /** Allows a read only when [actingUser] is the target user or an admin. */

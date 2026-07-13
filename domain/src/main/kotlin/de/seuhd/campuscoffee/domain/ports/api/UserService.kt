@@ -2,6 +2,7 @@ package de.seuhd.campuscoffee.domain.ports.api
 
 import de.seuhd.campuscoffee.domain.exceptions.ForbiddenException
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
+import de.seuhd.campuscoffee.domain.model.TotpEnrollment
 import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.data.UserDataService
 import java.util.UUID
@@ -17,6 +18,7 @@ import java.util.UUID
  * CampusCoffee there is no open self-registration: creating a user is an admin operation ([create]), and
  * the capability token a user authenticates with is issued by the service, never by the client.
  */
+@Suppress("TooManyFunctions") // the CRUD reads plus the profile, token-rotation, and two-factor operations
 interface UserService : CrudService<User, UUID> {
     /**
      * Retrieves a specific user by their unique login name. This overload resolves the authenticated
@@ -115,4 +117,65 @@ interface UserService : CrudService<User, UUID> {
         userId: UUID,
         actingUser: User
     ): User
+
+    /**
+     * Begins TOTP (two-factor) enrollment for the acting admin themselves: generates and stores an encrypted
+     * secret in the pending state ([User.totpEnabled] `= false`) and returns the one-time material for the
+     * authenticator app. Enrollment is self-service; an admin enrolls only their own account.
+     *
+     * @param actingUser the authenticated admin enrolling their own second factor
+     * @return the enrollment material (the QR URI and the base32 secret, shown once)
+     * @throws ForbiddenException if [actingUser] is not an admin
+     */
+    fun beginTotpEnrollment(actingUser: User): TotpEnrollment
+
+    /**
+     * Activates the acting admin's pending TOTP enrollment after verifying a current [code], flipping the
+     * account to [User.totpEnabled] `= true`.
+     *
+     * @param code the 6-digit code from the admin's authenticator app
+     * @param actingUser the authenticated admin activating their own second factor
+     * @return the persisted, now-enrolled admin
+     * @throws ForbiddenException if [actingUser] is not an admin
+     * @throws de.seuhd.campuscoffee.domain.exceptions.ConflictException if there is no pending secret to activate
+     * @throws de.seuhd.campuscoffee.domain.exceptions.ValidationException if the code is not valid
+     */
+    fun enableTotp(
+        code: String,
+        actingUser: User
+    ): User
+
+    /**
+     * Clears the acting admin's own second factor, returning them to the not-enrolled state (they must
+     * re-enroll on their next login, since 2FA is required for admins).
+     *
+     * @param actingUser the authenticated admin disabling their own second factor
+     * @return the persisted admin with the second factor cleared
+     * @throws ForbiddenException if [actingUser] is not an admin
+     */
+    fun disableTotp(actingUser: User): User
+
+    /**
+     * Clears another admin's second factor as a recovery reset (for a colleague who lost their
+     * authenticator), forcing them to re-enroll on their next login. Any admin may reset any user.
+     *
+     * @param targetId the id of the user whose second factor to clear
+     * @param actingUser the authenticated admin performing the reset
+     * @return the persisted target user with the second factor cleared
+     * @throws NotFoundException if no user exists with [targetId]
+     * @throws ForbiddenException if [actingUser] is not an admin
+     */
+    fun resetTotpFor(
+        targetId: UUID,
+        actingUser: User
+    ): User
+
+    /**
+     * Whether the acting admin has an active second factor. Used by the enrollment status endpoint so the
+     * SPA can route a not-yet-enrolled admin to the enrollment page.
+     *
+     * @param actingUser the authenticated admin
+     * @return true when the admin has completed enrollment
+     */
+    fun totpEnrolled(actingUser: User): Boolean
 }

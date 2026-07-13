@@ -7,6 +7,7 @@ import de.seuhd.campuscoffee.domain.model.User
 import de.seuhd.campuscoffee.domain.ports.api.CoffeeConsumptionService
 import de.seuhd.campuscoffee.domain.ports.api.CoffeePriceService
 import de.seuhd.campuscoffee.domain.ports.api.UserService
+import de.seuhd.campuscoffee.domain.ports.system.TotpService
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -15,11 +16,20 @@ import java.util.UUID
  * capability token (for repeatable demos) and a coffee consumption starting at zero. Lives in `src/main`
  * so the dev endpoint, the startup loader, and the system tests share a single source of fixture data.
  */
+@Suppress("TooManyFunctions") // a cohesive set of fixture builders/loaders plus the admin two-factor enrollment
 object TestFixtures {
     private val DATE_TIME: LocalDateTime = LocalDateTime.of(2025, 10, 29, 12, 0, 0)
 
     /** The initial coffee price the fixtures seed, in euro cents (50 cents per cup). */
     const val INITIAL_PRICE_CENTS = 50
+
+    /**
+     * The deterministic base32 TOTP secret the fixture admin is enrolled with, so the system tests, the e2e
+     * suite, and a local dev login can compute valid authenticator codes for the required second factor. It is
+     * the RFC 6238 test key ("12345678901234567890") base32-encoded, and is not a real secret: it guards only
+     * fixture and test data (and the reset-on-every-restart dev database). See [enrollAdminFixture].
+     */
+    const val ADMIN_TOTP_SECRET_BASE32 = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
 
     /**
      * Builds a deterministic UUID for a fixture. UUID(long mostSigBits, long leastSigBits) is the JDK
@@ -141,6 +151,25 @@ object TestFixtures {
         getUserFixturesForInsertion().map { userService.upsert(it) }
 
     /**
+     * Enrolls the fixture admin in two-factor authentication with the deterministic
+     * [ADMIN_TOTP_SECRET_BASE32], so an admin login can present a valid code (2FA is required for every
+     * admin). The known secret is encrypted at rest through [totpService] under the running app's key, so
+     * this works in any profile that seeds fixtures. Call after [createUserFixtures].
+     *
+     * @param userService the service holding the seeded admin
+     * @param totpService encrypts the known secret for at-rest storage
+     */
+    fun enrollAdminFixture(
+        userService: UserService,
+        totpService: TotpService
+    ) {
+        val admin = userService.getByLoginName(admin().loginName)
+        userService.upsert(
+            admin.copy(totpSecret = totpService.encrypt(ADMIN_TOTP_SECRET_BASE32), totpEnabled = true)
+        )
+    }
+
+    /**
      * Creates one coffee consumption per persisted user, each starting at `count = 0`.
      *
      * @param coffeeConsumptionService the service used to create the consumptions
@@ -162,19 +191,23 @@ object TestFixtures {
         coffeePriceService.ensureInitialPrice(INITIAL_PRICE_CENTS)
 
     /**
-     * Loads the users, their (zeroed) consumptions, and the initial price into the given services and
-     * returns the counts (users, consumptions). Used by the dev endpoint and the optional startup loader.
+     * Loads the users, their (zeroed) consumptions, and the initial price into the given services, enrolls
+     * the admin's second factor with the deterministic secret, and returns the counts (users, consumptions).
+     * Used by the dev endpoint and the optional startup loader.
      *
      * @param userService              the service used to persist the users
      * @param coffeeConsumptionService the service used to create the consumptions
      * @param coffeePriceService       the service used to seed the initial price
+     * @param totpService              encrypts the admin's known second-factor secret at rest
      */
     fun loadAll(
         userService: UserService,
         coffeeConsumptionService: CoffeeConsumptionService,
-        coffeePriceService: CoffeePriceService
+        coffeePriceService: CoffeePriceService,
+        totpService: TotpService
     ): Pair<Int, Int> {
         val users = createUserFixtures(userService)
+        enrollAdminFixture(userService, totpService)
         val consumptions = createConsumptionFixtures(coffeeConsumptionService, users)
         createPriceFixture(coffeePriceService)
         return users.size to consumptions.size

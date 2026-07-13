@@ -12,6 +12,7 @@ import de.seuhd.campuscoffee.domain.model.persistedId
 import de.seuhd.campuscoffee.domain.tests.TestFixtures
 import de.seuhd.campuscoffee.tests.SystemTestUtils.CAPABILITY_TOKEN_HEADER
 import de.seuhd.campuscoffee.tests.SystemTestUtils.client
+import de.seuhd.campuscoffee.tests.SystemTestUtils.currentAdminTotpCode
 import de.seuhd.campuscoffee.tests.SystemTestUtils.encryptCredentials
 import de.seuhd.campuscoffee.tests.SystemTestUtils.jwtFor
 import de.seuhd.campuscoffee.tests.SystemTestUtils.postToken
@@ -245,7 +246,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
     fun `a valid encrypted login issues a token that authorizes an admin endpoint`() {
         val (login, password) = TestFixtures.rawCredentialsFor(Role.ADMIN)
 
-        val token = jwtFor(login, password)
+        val token = jwtFor(login, password, currentAdminTotpCode())
 
         assertThat(token).isNotBlank()
         val status =
@@ -271,7 +272,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
         val (login, password) = TestFixtures.rawCredentialsFor(Role.ADMIN)
         // a JWE encrypted under a key the server does not hold cannot be decrypted, so it is a malformed payload
         val wrongKey = RSAKeyGenerator(2048).keyID("wrong-key").generate()
-        assertThat(postToken(encryptCredentials(login, password, wrongKey.toPublicJWK()))).isEqualTo(400)
+        assertThat(postToken(encryptCredentials(login, password, publicKey = wrongKey.toPublicJWK()))).isEqualTo(400)
     }
 
     @Test
@@ -308,7 +309,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
         val wrongKey = RSAKeyGenerator(2048).keyID("wrong-key").generate()
 
         val malformed = tokenErrorFor("not-a-valid-jwe")
-        val wrongKeyError = tokenErrorFor(encryptCredentials(login, password, wrongKey.toPublicJWK()))
+        val wrongKeyError = tokenErrorFor(encryptCredentials(login, password, publicKey = wrongKey.toPublicJWK()))
 
         // both undecryptable cases produce the identical fixed message, so the 400 is not a decryption oracle
         assertThat(malformed.message).isEqualTo("Malformed login payload.")
@@ -321,7 +322,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
         val seededAdmin = seededUser("jane_doe")
         val (login, password) = TestFixtures.rawCredentialsFor(Role.ADMIN)
         // mint a JWT while the admin is still active, then deactivate them
-        val inFlight = jwtFor(login, password)
+        val inFlight = jwtFor(login, password, currentAdminTotpCode())
         userService.update(seededAdmin.copy(active = false), secondAdmin)
 
         // the still-valid token authenticates, but resolving the principal (here, /api/users/me, which
@@ -345,7 +346,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
         val target = seededUser(user)
         val (login, password) = TestFixtures.rawCredentialsFor(Role.ADMIN)
         // issue a JWT while the admin is still active, then deactivate them
-        val inFlight = jwtFor(login, password)
+        val inFlight = jwtFor(login, password, currentAdminTotpCode())
         userService.update(seededAdmin.copy(active = false), secondAdmin)
 
         // the delete path now resolves the acting user too, so the deactivated admin is rejected before any
@@ -371,7 +372,7 @@ class AuthorizationSystemTests : AbstractSystemTest() {
         val admin = seededUser("jane_doe")
         val max = seededUser(user)
         val (login, password) = TestFixtures.rawCredentialsFor(Role.ADMIN)
-        val adminJwt = jwtFor(login, password)
+        val adminJwt = jwtFor(login, password, currentAdminTotpCode())
 
         val status =
             client()

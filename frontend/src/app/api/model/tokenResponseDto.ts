@@ -11,5 +11,6 @@
 
 export interface TokenResponseDto { 
     token: string;
+    enrollmentRequired: boolean;
 }
 

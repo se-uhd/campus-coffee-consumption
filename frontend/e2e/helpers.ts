@@ -10,6 +10,11 @@ import { CompactEncrypt, importJWK } from 'jose';
 /** The fixture admin's credentials (admin JWT login). */
 export const ADMIN = { loginName: 'jane_doe', password: 'aaaMbnPdFYDqkOpS3fVA2xyz' } as const;
 
+// The fixture admin is enrolled in two-factor auth. The dev profile (which the e2e runs under) pins the TOTP
+// clock to a fixed instant, so the admin's real RFC 6238 code is the deterministic constant 217662 rather
+// than a time-varying value.
+export const TOTP_CODE = '217662';
+
 /** Fixture user capability tokens (the secret in the `/login/:token` URL), keyed by login name. */
 export const USER_TOKENS = {
   maxmustermann: 'Pq3wE9rT5yU1iO7pA2sD8fG4hJ6kL0zXcVbN3mM1nBqe',
@@ -68,8 +73,11 @@ async function encryptCredentials(
   ).toBeTruthy();
   const jwk = (await keyResponse.json()) as { n: string; e: string; kid: string };
   const publicKey = await importJWK({ ...jwk, kty: 'RSA', alg: 'RSA-OAEP-256' }, 'RSA-OAEP-256');
-  // include a fresh `iat` so the backend's replay-freshness check accepts the payload (mirrors the SPA)
-  const plaintext = new TextEncoder().encode(JSON.stringify({ loginName, password, iat: Date.now() }));
+  // include a fresh `iat` so the backend's replay-freshness check accepts the payload, and the second-factor
+  // code (the dev bypass) so an enrolled admin logs in fully (mirrors the SPA)
+  const plaintext = new TextEncoder().encode(
+    JSON.stringify({ loginName, password, totp: TOTP_CODE, iat: Date.now() })
+  );
   return new CompactEncrypt(plaintext)
     .setProtectedHeader({ alg: 'RSA-OAEP-256', enc: 'A256GCM', kid: jwk.kid })
     .encrypt(publicKey);
@@ -86,6 +94,7 @@ export async function signInAsAdmin(page: Page): Promise<void> {
   await page.goto('/admin/login');
   await page.getByLabel('Login name').fill(ADMIN.loginName);
   await page.getByLabel('Password').fill(ADMIN.password);
+  await page.getByLabel('Authenticator code').fill(TOTP_CODE);
   await page.getByRole('button', { name: 'Sign in' }).click();
 }
 

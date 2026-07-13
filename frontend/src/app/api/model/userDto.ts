@@ -26,6 +26,7 @@ export interface UserDto {
     role?: Role | null;
     active?: boolean | null;
     summaryPanel?: SummaryPanel | null;
+    readonly totpEnabled?: boolean | null;
     capabilityUrl?: string | null;
 }
 export namespace UserDto {

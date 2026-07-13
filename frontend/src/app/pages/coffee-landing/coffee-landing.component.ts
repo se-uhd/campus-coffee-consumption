@@ -154,6 +154,15 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
         >
           <mat-icon>person</mat-icon>
         </a>
+        <a
+          mat-icon-button
+          routerLink="/admin/security"
+          queryParamsHandling="preserve"
+          aria-label="Security"
+          matTooltip="Security"
+        >
+          <mat-icon>security</mat-icon>
+        </a>
         <button mat-icon-button (click)="logout()" aria-label="Sign out" matTooltip="Sign out">
           <mat-icon>logout</mat-icon>
         </button>

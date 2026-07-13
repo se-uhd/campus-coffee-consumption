@@ -40,6 +40,9 @@ dependencies {
 
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.assertj.core)
+    // otp-java is a non-transitive `implementation` of :data, so re-declare it here for the system-test
+    // helpers that generate a current admin authenticator code (SystemTestUtils.currentAdminTotpCode).
+    testImplementation(libs.otp.java)
     testImplementation(libs.junit.platform.suite)
     testImplementation(libs.cucumber.java)
     testImplementation(libs.cucumber.junit)
