@@ -54,7 +54,7 @@ admin_email="$(val BOOTSTRAP_ADMIN_EMAIL)"
 admin_first="$(val BOOTSTRAP_ADMIN_FIRST_NAME)"
 admin_last="$(val BOOTSTRAP_ADMIN_LAST_NAME)"
 
-# --- sync the four secrets from deploy.prod.env into Secret Manager ----------------------------------------
+# --- sync the secrets from deploy.prod.env into Secret Manager ---------------------------------------------
 # Create the secret if missing; add a new version only when the deploy.prod.env value differs from the current
 # latest, so re-deploys do not churn versions. Values flow through a temp file (umask 077) and are never echoed.
 sync_secret() { # secret-name; value on stdin
@@ -78,12 +78,14 @@ printf '%s' "$(val JWT_SECRET)" | sync_secret jwt-secret
 login_key | sync_secret login-key
 printf '%s' "$(val DB_PASSWORD)" | sync_secret db-app-password
 printf '%s' "$(val BOOTSTRAP_ADMIN_PASSWORD)" | sync_secret bootstrap-admin-password
+printf '%s' "$(val TOTP_ENCRYPTION_KEY)" | sync_secret totp-encryption-key
 
 # --- deploy: build from source, bind the secrets and non-secret config ------------------------------------
 secrets="JWT_SECRET=jwt-secret:latest"
 secrets+=",LOGIN_PRIVATE_KEY_PEM=login-key:latest"
 secrets+=",DB_PASSWORD=db-app-password:latest"
 secrets+=",BOOTSTRAP_ADMIN_PASSWORD=bootstrap-admin-password:latest"
+secrets+=",TOTP_ENCRYPTION_KEY=totp-encryption-key:latest"
 
 env_vars="SPRING_PROFILES_ACTIVE=prod"
 env_vars+=",DB_USERNAME=${db_username}"
