@@ -31,7 +31,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false # no step pushes back to the repository
 
-      - uses: jdx/mise-action@v4
+      - uses: jdx/mise-action@v4.2.3
 
       # Fail fast if the Java major version drifts across the version catalog, mise.toml, and the
       # Dockerfile before spending time on the full build.
@@ -88,7 +88,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: jdx/mise-action@v4 # provisions Node 24 and Java 25 from mise.toml
+      - uses: jdx/mise-action@v4.2.3 # provisions Node 24 and Java 25 from mise.toml
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -97,7 +97,7 @@ jobs:
       # Cache Playwright's browser binaries so `playwright install` is a no-op on a hit; the key tracks the
       # locked dependency set so a Playwright version bump re-primes the cache.
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
@@ -154,7 +154,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: jdx/mise-action@v4 # provisions Node 24 and Java 25 from mise.toml
+      - uses: jdx/mise-action@v4.2.3 # provisions Node 24 and Java 25 from mise.toml
 
       # Install the locked frontend deps and Playwright's chromium (with its OS deps) before the run.
       - name: Install frontend dependencies
@@ -162,7 +162,7 @@ jobs:
         run: npm ci
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
@@ -227,14 +227,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: jdx/mise-action@v4 # provisions Node 24 and Java 25 from mise.toml
+      - uses: jdx/mise-action@v4.2.3 # provisions Node 24 and Java 25 from mise.toml
 
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}

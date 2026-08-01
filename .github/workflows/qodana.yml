@@ -41,7 +41,7 @@ jobs:
           persist-credentials: false # no step pushes back to the repository
 
       - name: Qodana Scan
-        uses: JetBrains/qodana-action@v2026.1.3
+        uses: JetBrains/qodana-action@v2026.2.0
         # qodana.yaml sets `failThreshold: 0`, so this job fails on any problem above the baseline. Once
         # qodana.sarif.baseline is committed (see qodana.yaml), uncomment to count only NEW problems:
         # with:
@@ -103,7 +103,7 @@ jobs:
         # connect to Qodana Cloud, so skip the step rather than fail with no SARIF. With the token present
         # this is a blocking gate (frontend/qodana.yaml sets failThreshold: 0), so any new problem fails CI.
         if: ${{ env.QODANA_TOKEN != '' }}
-        uses: JetBrains/qodana-action@v2026.1.3
+        uses: JetBrains/qodana-action@v2026.2.0
         with:
           # Scan only the Angular SPA; its frontend/qodana.yaml selects the JS linter and sets
           # failThreshold: 0, so this job fails on any problem above the baseline. (Space-separated args;
