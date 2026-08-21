@@ -11,7 +11,7 @@ version: "1.0"
 # qodana-jvm-community, this release linter requires a Qodana Cloud connection, so the workflow runs it only
 # when QODANA_TOKEN is set. Pinned to a release tag (not :latest) so a new linter version cannot silently
 # change the findings on an unrelated commit; bump it deliberately, like the other tool pins.
-linter: jetbrains/qodana-js:2026.1
+linter: jetbrains/qodana-js:2026.2
 
 # Install the SPA's dependencies before the scan so the linter resolves @angular/*, the ESLint package, and
 # the app's own pipes/directives/components. Without this, qodana-js inspects an unbootstrapped project and

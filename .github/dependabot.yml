@@ -7,9 +7,12 @@ version: 2
 updates:
   # Workflow actions in .github/workflows/ (actions/checkout, actions/upload-artifact, jdx/mise-action,
   # JetBrains/qodana-action). The wildcard group already covers every `uses:` action, qodana-action
-  # included. Caveat: dependabot bumps the action only; the Qodana linter image pinned in qodana.yaml
-  # (jetbrains/qodana-jvm-community) is not a manifest dependabot parses, so bump that tag by hand to keep
-  # it on the same Qodana release as the action.
+  # included. Caveat: dependabot bumps the action only; the Qodana linter images pinned in qodana.yaml
+  # (jetbrains/qodana-jvm-community) and frontend/qodana.yaml (jetbrains/qodana-js) are plain strings in a
+  # config it does not parse, so bump those tags by hand to keep them on the same Qodana release as the
+  # action. The action refuses a linter from a different release, and the fourth check in
+  # scripts/check-toolchain-versions.sh now fails CI when the three drift apart, so a lone action bump
+  # cannot land unnoticed.
   - package-ecosystem: github-actions
     directory: /
     schedule:

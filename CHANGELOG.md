@@ -15,6 +15,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   detekt's alpha-to-alpha updates), and `scripts/check-toolchain-versions.sh` gained a third check that
   reads the Kotlin release the pinned detekt was built against from detekt's published module metadata and
   fails CI if it differs from the pinned Kotlin. Both are temporary and go away once detekt 2.0 is stable.
+- The Qodana linter images now track the Qodana action. The action was bumped to the 2026.2 release while
+  both linter images stayed on 2026.1, which the action reports as an incompatible pair, so the linters move
+  to 2026.2 and `scripts/check-toolchain-versions.sh` gained a fourth check that fails CI when the action
+  and the two linter tags name different Qodana releases. Dependabot bumps the action but cannot see the
+  linter tags, so nothing else would have caught the drift.
 
 ## [1.0.0] - 2026-07-13
 
