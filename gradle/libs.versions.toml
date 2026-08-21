@@ -26,7 +26,7 @@ jacoco = "0.8.13"
 pitest-tool = "1.25.1"
 pitest-junit5 = "1.2.3"
 # Kotlin: >= 2.3.0 is required for jvmTarget 25; overrides the Boot 4 BOM's managed Kotlin stdlib.
-# Pinned to 2.4.0 to match detekt 2.0.0-alpha.5, which requires the exact Kotlin version it was built against.
+# Pinned to 2.4.10 to match detekt 2.0.0-alpha.6, which requires the exact Kotlin version it was built against.
 kotlin = "2.4.10"
 # Kotlin-friendly Mockito wrappers (whenever, reified any/mock); not managed by the Boot BOM.
 mockito-kotlin = "6.3.0"
@@ -37,7 +37,7 @@ pitest-plugin = "1.19.0"
 ktlint-plugin = "12.1.2"
 ktlint-tool = "1.5.0"
 # detekt static analysis: the 2.0 alpha is pinned to match the Kotlin version, and gated via `check`.
-detekt = "2.0.0-alpha.5"
+detekt = "2.0.0-alpha.6"
 # Bucket4j: in-memory token-bucket rate limiter for the login endpoint; not in the Boot BOM. The
 # `_jdk17` variant is the current JDK 17+ baseline build.
 bucket4j = "8.19.0"
