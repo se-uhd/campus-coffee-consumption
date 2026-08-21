@@ -1,3 +1,12 @@
+# check=skip=SecretsUsedInArgOrEnv
+# (The directive above must be the first line of the file, ahead of even this comment, or it is ignored.)
+# That check fires on any build arg whose name looks secret-ish, and it flags the MISE_GITHUB_TOKEN arg
+# below. Its usual advice, a `RUN --mount=type=secret`, is not an option here: the same Dockerfile builds
+# the production image through Cloud Build, and a non-BuildKit builder cannot parse that syntax, so taking
+# the advice would risk the deploy path. The exposure the check guards against does not exist in this build
+# (see the arg's own comment), so skip it rather than leave a warning in every build log implying a problem
+# there isn't.
+
 # Build stage: mise installs the JDK and Gradle from mise.toml.
 FROM jdxcode/mise:2026.8.8 AS build
 WORKDIR /app
@@ -7,7 +16,22 @@ WORKDIR /app
 ENV MISE_DISABLE_TOOLS=gcloud,python
 # Copy mise.toml first so the install layer stays cached until a tool version changes.
 COPY mise.toml .
-RUN mise trust && mise install
+# mise resolves the JDK and Gradle through the GitHub releases API, whose unauthenticated quota is keyed on
+# the caller's IP and therefore shared by every job on a CI runner. On a busy day this layer fails with
+# "403 Forbidden ... most commonly caused by exceeding the rate limit", which reads as a broken build but is
+# only throttling. A token raises the quota, so CI passes one in.
+#
+# It is deliberately OPTIONAL. The same Dockerfile builds the production image through Cloud Build
+# (`gcloud run deploy --source .`), which passes no token, as does a plain local `docker build`; both keep
+# working exactly as before on the anonymous quota. An empty value is unset rather than exported, because an
+# empty Authorization header would be rejected outright instead of falling back to anonymous access.
+#
+# A build arg rather than a BuildKit secret mount on purpose: `RUN --mount=type=secret` is not understood by
+# a non-BuildKit builder, which would risk the production deploy path for no benefit here. The token never
+# reaches a published image (this build stage is discarded by the multi-stage copy below) and the CI image is
+# built, never pushed.
+ARG MISE_GITHUB_TOKEN=""
+RUN if [ -z "$MISE_GITHUB_TOKEN" ]; then unset MISE_GITHUB_TOKEN; fi && mise trust && mise install
 COPY . .
 RUN mise exec -- gradle :application:bootJar --no-daemon
 

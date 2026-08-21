@@ -5,6 +5,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The Docker image build no longer fails intermittently on GitHub API rate limiting. It resolves the JDK and
+  Gradle through the GitHub releases API, whose anonymous quota is keyed on the runner's IP and shared by
+  every job, so a busy day failed the build with a 403 that reads as a broken build but is only throttling.
+  CI now passes its job token into the build. The token is optional, so building without one (Cloud Build for
+  the production deploy, or a local `docker build`) is unchanged, and it never reaches the published image.
+
 ## [1.0.1] - 2026-08-21
 
 ### Changed

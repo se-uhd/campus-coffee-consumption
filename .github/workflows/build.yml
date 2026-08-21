@@ -271,5 +271,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Pass the job's token so mise resolves the JDK and Gradle on GitHub's authenticated API quota. The
+      # anonymous quota is per runner IP and shared, so this layer intermittently failed with a 403 that
+      # looks like a broken build but is only throttling. The Dockerfile treats the arg as optional, so a
+      # build without it (Cloud Build, local) still works.
       - name: Build the Docker image
-        run: docker build -t campus-coffee-consumption:ci .
+        run: docker build --build-arg MISE_GITHUB_TOKEN="$GITHUB_TOKEN" -t campus-coffee-consumption:ci .
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
