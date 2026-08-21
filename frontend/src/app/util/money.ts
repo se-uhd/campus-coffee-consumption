@@ -42,8 +42,7 @@ export type EuroParseError = 'empty' | 'ambiguous-separator' | 'invalid';
  * failure) without a second parse.
  */
 export type EuroParseResult =
-  | { readonly ok: true; readonly cents: number }
-  | { readonly ok: false; readonly error: EuroParseError };
+  { readonly ok: true; readonly cents: number } | { readonly ok: false; readonly error: EuroParseError };
 
 /**
  * Parses a user-entered euro amount into integer euro cents without floating-point arithmetic, accepting a
