@@ -15,14 +15,12 @@
 // --- Generated DTOs, re-exported under their spec names ------------------------------------------
 export type { UserDto } from './api/model/userDto';
 export type { ConsumptionDto } from './api/model/consumptionDto';
-export type { ConsumptionChangeDto } from './api/model/consumptionChangeDto';
 export type { ConsumptionDeltaDto } from './api/model/consumptionDeltaDto';
 export type { ConsumptionOverrideDto } from './api/model/consumptionOverrideDto';
 export type { TokenRequestDto } from './api/model/tokenRequestDto';
 export type { TokenResponseDto } from './api/model/tokenResponseDto';
 export type { PublicKeyDto } from './api/model/publicKeyDto';
 export type { TotpEnrollmentDto } from './api/model/totpEnrollmentDto';
-export type { TotpActivateRequestDto } from './api/model/totpActivateRequestDto';
 export type { TotpStatusDto } from './api/model/totpStatusDto';
 export type { ActivityEntryDto } from './api/model/activityEntryDto';
 export type { GlobalActivityEntryDto } from './api/model/globalActivityEntryDto';
@@ -35,7 +33,6 @@ export type { KittyDto } from './api/model/kittyDto';
 export type { UserBalanceDto } from './api/model/userBalanceDto';
 export type { CoffeeBeanDto } from './api/model/coffeeBeanDto';
 export type { CoffeeBeanRatingsDto } from './api/model/coffeeBeanRatingsDto';
-export type { CoffeeRatingPromptDto } from './api/model/coffeeRatingPromptDto';
 
 // --- Generated request DTOs (outbound request bodies), under their spec names --------------------
 export type { OwnExpenseDto } from './api/model/ownExpenseDto';
