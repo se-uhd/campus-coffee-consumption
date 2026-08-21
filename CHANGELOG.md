@@ -15,6 +15,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   problems failed the push run while the pull-request run passed. A pull request could therefore read green
   and still turn main red, which is what the 2026.2 linter bump ran into. Pull requests now scan the whole
   project (`pr-mode: false`), and push is limited to main, which also halves the number of scans.
+- CI no longer runs everything twice for a pull request. Both workflows fired on every branch push and again
+  on the pull request, so one change triggered two Gradle builds, two image builds, and two Playwright runs.
+  Push is now limited to main in both, leaving the pull-request run as the gate, which has the side benefit
+  of testing the merge of the branch and main rather than the branch alone. Halving the jobs also halves the
+  calls to Maven Central and the GitHub releases API, which rate-limited several runs.
 - Dependabot no longer proposes a TypeScript version Angular cannot accept. Angular 22 declares
   `peer typescript@">=6.0 <6.1"`, which admits only the 6.0 line, so a minor bump breaks `npm ci` with
   ERESOLVE just as a major does. Both are now held back and only patches flow, where previously only majors
