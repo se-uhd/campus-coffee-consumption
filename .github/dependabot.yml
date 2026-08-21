@@ -80,6 +80,21 @@ updates:
       # range itself and an ERESOLVE failure is impossible to miss.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # Same shape, for the same reason: Angular 22 declares `peer zone.js@"~0.15.0 || ~0.16.0"`, so it
+      # accepts the 0.15 and 0.16 lines and nothing above them. zone.js is a 0.x package, where the minor
+      # segment is what a stable package would call its major, so a 0.17 release is a new line that falls
+      # outside the range and would fail `npm ci` with ERESOLVE. Semver classifies 0.16 to 0.17 as a MINOR,
+      # which is worse than it sounds here: it would arrive batched into the routine group PR and take a
+      # dozen unrelated, perfectly good updates red with it, rather than standing alone where the cause is
+      # obvious. So majors and minors are both held and patches (0.16.x) flow.
+      #
+      # Unlike the TypeScript rule above, this one is precautionary: 0.17 does not exist yet (0.16.2 is
+      # current) and zone.js has never broken a build here. It is written now because the shape matches the
+      # TypeScript pin exactly, and that one was only noticed by breaking first. Angular widened its range to
+      # take 0.16 when that line shipped, so expect the same for 0.17, and see the expiry note above: when
+      # the SPA moves to an Angular whose peer range accepts the newer line, bump both together and drop this.
+      - dependency-name: "zone.js"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   # Dockerfile base images. Only the build-stage jdxcode/mise image is bumped here; its version is the
   # mise tool version, independent of the bundled JDK. The runtime stage's eclipse-temurin tag is the
