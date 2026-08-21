@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fail if a pinned toolchain version drifts or is not an LTS release. Three checks:
+# Fail if a pinned toolchain version drifts or is not an LTS release. Four checks:
 #
 #  1. Java major consistency. The Gradle toolchain and the Kotlin jvmTarget read it from the version catalog
 #     (gradle/libs.versions.toml, `java`), the source of truth; mise.toml (local + CI tool provisioning) and
@@ -16,6 +16,10 @@
 #     Kotlin it was built against in its Gradle module metadata, so the pair is checked against the real
 #     artifact instead of a hand-maintained table. A Dependabot rule stops Kotlin being bumped on its own
 #     (.github/dependabot.yml); this catches a hand edit that moves one without the other.
+#  4. The Qodana linters match the Qodana action. qodana-action refuses a linter image from a different
+#     Qodana release, and dependabot bumps the action (a `uses:` reference) but not the linter tags in
+#     qodana.yaml and frontend/qodana.yaml (plain strings in a config it does not parse), so the pins drift
+#     apart on their own. Compares the pins only; no network.
 #
 # Run locally or in CI; emits GitHub Actions error annotations on mismatch.
 set -euo pipefail
@@ -120,3 +124,34 @@ else
     fail "detekt $detekt_version was built against Kotlin $detekt_kotlin but the catalog pins Kotlin $kotlin_version; a detekt 2.0 alpha only runs on the exact Kotlin it was compiled with, so bump both together"
   echo "detekt $detekt_version matches the pinned Kotlin ($kotlin_version)."
 fi
+
+### 4. The Qodana linters match the Qodana action ###
+
+# The qodana-action refuses to run a linter image from a different Qodana release ("non-compatible Qodana
+# linter ... with the current CLI"). Dependabot bumps the action, because it is a `uses:` reference it
+# parses, but not the linter tags in the two qodana.yaml files, which are plain strings in a config it does
+# not read. So the action moves on its own and the pins silently drift apart; this check catches that.
+# Purely local: it compares the pins, so no network is involved.
+action_versions=$(sed -n 's|.*uses: *JetBrains/qodana-action@v\([0-9][^[:space:]]*\).*|\1|p' .github/workflows/qodana.yml | sort -u)
+[ -n "$action_versions" ] || fail "could not read the qodana-action version from .github/workflows/qodana.yml"
+[ "$(printf '%s\n' "$action_versions" | wc -l)" -eq 1 ] ||
+  fail "the qodana.yml jobs pin different qodana-action versions ($(printf '%s' "$action_versions" | tr '\n' ' ')); use one version for every job"
+
+# The linters are tagged by Qodana release (major.minor, e.g. 2026.2); the action carries a third segment
+# (v2026.2.0), so compare only the release part.
+action_release=$(printf '%s' "$action_versions" | cut -d. -f1,2)
+
+jvm_linter=$(sed -n 's|^linter: *jetbrains/qodana-jvm-community:\(.*\)$|\1|p' qodana.yaml)
+[ -n "$jvm_linter" ] || fail "could not read the JVM linter tag from qodana.yaml"
+
+js_linter=$(sed -n 's|^linter: *jetbrains/qodana-js:\(.*\)$|\1|p' frontend/qodana.yaml)
+[ -n "$js_linter" ] || fail "could not read the JS linter tag from frontend/qodana.yaml"
+
+echo "Qodana release: action=$action_versions jvm-linter=$jvm_linter js-linter=$js_linter"
+
+[ "$jvm_linter" = "$action_release" ] ||
+  fail "qodana.yaml pins the JVM linter at $jvm_linter but qodana-action is $action_versions (Qodana $action_release); bump the linter tag to $action_release"
+[ "$js_linter" = "$action_release" ] ||
+  fail "frontend/qodana.yaml pins the JS linter at $js_linter but qodana-action is $action_versions (Qodana $action_release); bump the linter tag to $action_release"
+
+echo "Qodana linters match the action (Qodana $action_release)."

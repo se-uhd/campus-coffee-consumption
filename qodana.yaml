@@ -10,7 +10,7 @@ version: "1.0"
 # The free JVM Community linter, which bundles the Java and Kotlin inspections. Pinned to a release tag
 # (not :latest) so a new linter version cannot silently change the findings on an unrelated commit; bump it
 # deliberately, like the other tool pins in the repository.
-linter: jetbrains/qodana-jvm-community:2026.1
+linter: jetbrains/qodana-jvm-community:2026.2
 
 # Use the broad `recommended` profile, NOT Qodana's default `starter` profile. `starter` is a curated subset
 # aimed at probable bugs and high-severity issues; the redundant-SAM / move-lambda / redundant-visibility
