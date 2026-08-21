@@ -12,13 +12,21 @@
 name: Qodana
 
 on:
-  # Run on every push (every branch, like build.yml) so feature-branch work is scanned before it reaches
-  # main, and on PRs to main (the review gate). A Qodana scan is heavier than the Gradle build, but catching
-  # the idiomatic findings on the feature branch (rather than only at merge) is worth it.
+  # One scan per change, not two. This used to run on every branch push AND on pull requests, so a PR
+  # branch was scanned twice, and the two scans did not agree: the action's `pr-mode` defaults to true and
+  # analyzes ONLY the files a pull request touches, while a push scan covers the whole project. With
+  # failThreshold: 0 that asymmetry is a trap. A change that newly surfaces pre-existing problems (a linter
+  # bump is the usual way) fails the push scan while the pull-request scan passes, so the PR shows a green
+  # `qodana` beside a red one and reading the aggregate as green merges a red main. That happened when the
+  # linter moved to 2026.2.
+  #
+  # So: pull requests are the gate (with pr-mode disabled below, so they scan everything a push would), and
+  # push covers main directly for anything landed outside a PR. A branch with no pull request open is no
+  # longer scanned, which is the deliberate trade for halving the scan count; open the PR to get it.
   pull_request:
     branches: [ "main" ]
   push:
-    branches: [ "**" ]
+    branches: [ "main" ]
   workflow_dispatch: {} # allow manual runs
 
 permissions:
@@ -42,9 +50,14 @@ jobs:
 
       - name: Qodana Scan
         uses: JetBrains/qodana-action@v2026.2.0
+        with:
+          # Scan the whole project on a pull request too, not just its changed files (the action's default).
+          # A diff-only scan cannot see a problem this change surfaces elsewhere, so with failThreshold: 0 it
+          # would pass a PR that turns main red. See the trigger comment at the top.
+          pr-mode: false
         # qodana.yaml sets `failThreshold: 0`, so this job fails on any problem above the baseline. Once
-        # qodana.sarif.baseline is committed (see qodana.yaml), uncomment to count only NEW problems:
-        # with:
+        # qodana.sarif.baseline is committed (see qodana.yaml), add to the `with:` above to count only NEW
+        # problems:
         #   args: --baseline,qodana.sarif.baseline
         #
         # Intentionally no QODANA_TOKEN here: the free qodana-jvm-community linter runs without a Qodana Cloud
@@ -109,6 +122,9 @@ jobs:
           # failThreshold: 0, so this job fails on any problem above the baseline. (Space-separated args;
           # the comma-separated form is deprecated.)
           args: --project-dir frontend
+          # Whole-project scan on pull requests too, for the reason given on the backend job above: the
+          # action's diff-only default would let a PR pass while the same code fails the push scan on main.
+          pr-mode: false
           # Keep this job's results and caches in their own directories so they never collide with the
           # backend job's (the two jobs share a workflow run).
           results-dir: ${{ runner.temp }}/qodana-frontend/results
