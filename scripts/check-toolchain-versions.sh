@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fail if a pinned toolchain version drifts or is not an LTS release. Two checks:
+# Fail if a pinned toolchain version drifts or is not an LTS release. Three checks:
 #
 #  1. Java major consistency. The Gradle toolchain and the Kotlin jvmTarget read it from the version catalog
 #     (gradle/libs.versions.toml, `java`), the source of truth; mise.toml (local + CI tool provisioning) and
@@ -11,6 +11,11 @@
 #     rejects odd "Current" lines (e.g. 25, never LTS) AND even-but-not-yet-LTS lines (e.g. 26, which stays
 #     "Current" until October 2026). Dependabot does not manage mise.toml, so a non-LTS Node can only enter
 #     via a human edit, which this guard then catches in CI.
+#  3. detekt matches Kotlin. A detekt 2.0 alpha refuses to run against any Kotlin other than the one it was
+#     compiled with, so the catalog's `kotlin` and `detekt` entries must move together. detekt publishes the
+#     Kotlin it was built against in its Gradle module metadata, so the pair is checked against the real
+#     artifact instead of a hand-maintained table. A Dependabot rule stops Kotlin being bumped on its own
+#     (.github/dependabot.yml); this catches a hand edit that moves one without the other.
 #
 # Run locally or in CI; emits GitHub Actions error annotations on mismatch.
 set -euo pipefail
@@ -83,4 +88,35 @@ else
     fail "Node $node_major reached end-of-life on $end; move to a newer Node LTS"
   fi
   echo "Node $node_major is an active LTS (lts $lts, eol $end)."
+fi
+
+### 3. detekt is built against the pinned Kotlin version ###
+
+# Both entries live in the version catalog and must name the same Kotlin release.
+kotlin_version=$(sed -n 's/^kotlin = "\([^"]*\)".*/\1/p' gradle/libs.versions.toml)
+[ -n "$kotlin_version" ] || fail "could not read the 'kotlin' version from gradle/libs.versions.toml"
+
+detekt_version=$(sed -n 's/^detekt = "\([^"]*\)".*/\1/p' gradle/libs.versions.toml)
+[ -n "$detekt_version" ] || fail "could not read the 'detekt' version from gradle/libs.versions.toml"
+
+echo "Kotlin/detekt pin: kotlin=$kotlin_version detekt=$detekt_version"
+
+# detekt-core is the engine that enforces the match at runtime; its Gradle module metadata records the
+# kotlin-compiler it was built against. Network: skip with a warning if Maven Central cannot be reached so
+# an offline local run is not blocked; CI always has network and enforces it.
+detekt_module_url="https://repo1.maven.org/maven2/dev/detekt/detekt-core/${detekt_version}/detekt-core-${detekt_version}.module"
+detekt_module=$(curl -fsSL --max-time 20 "$detekt_module_url" 2>/dev/null || true)
+if [ -z "$detekt_module" ]; then
+  echo "::warning::could not fetch the detekt $detekt_version module metadata; skipping the Kotlin/detekt check (re-run online)"
+else
+  detekt_kotlin=$(printf '%s' "$detekt_module" | jq -r '
+    [ .variants[]?.dependencies[]?
+      | select(.group == "org.jetbrains.kotlin" and .module == "kotlin-compiler")
+      | .version.requires ] | first // "none"')
+  if [ "$detekt_kotlin" = "none" ]; then
+    fail "could not read the Kotlin version detekt $detekt_version was built against from $detekt_module_url"
+  fi
+  [ "$detekt_kotlin" = "$kotlin_version" ] ||
+    fail "detekt $detekt_version was built against Kotlin $detekt_kotlin but the catalog pins Kotlin $kotlin_version; a detekt 2.0 alpha only runs on the exact Kotlin it was compiled with, so bump both together"
+  echo "detekt $detekt_version matches the pinned Kotlin ($kotlin_version)."
 fi

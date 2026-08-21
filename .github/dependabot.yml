@@ -29,6 +29,19 @@ updates:
       # Bundle minor and patch bumps into one PR; major upgrades get their own PR for careful review.
       gradle-minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # Kotlin and detekt have to move together. A detekt 2.0 alpha refuses to run against any Kotlin other
+      # than the one it was compiled with ("detekt was compiled with Kotlin X but is currently running with
+      # Y"), so a lone Kotlin bump fails every detekt task and with it the whole build. Dependabot cannot
+      # pair them itself: it does not offer detekt's prerelease-to-prerelease updates (alpha.5 to alpha.6
+      # was never proposed even though it existed for days), and the group above batches only minor and
+      # patch updates, which an alpha increment is not. So Kotlin is bumped by hand together with the detekt
+      # alpha built against it, and the third check in scripts/check-toolchain-versions.sh fails CI if the
+      # two ever drift apart. detekt itself is deliberately NOT ignored: once 2.0 is stable, Dependabot will
+      # offer it, and that PR is the prompt to do the paired bump and delete this rule.
+      - dependency-name: "org.jetbrains.kotlin:*"
+      # The Kotlin Gradle plugin is matched by its plugin id, which the wildcard above does not cover.
+      - dependency-name: "org.jetbrains.kotlin.jvm"
 
   # Frontend npm dependencies (the Angular SPA in frontend/). The Angular packages move together each
   # release, so a major (e.g. an Angular major) gets its own PR while minor/patch bumps are batched.
