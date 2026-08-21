@@ -116,7 +116,7 @@ class UserServiceImpl(
                 // edit carries the stored values forward in update(), so an unrelated profile change never
                 // wipes an enrolled admin's secret.
                 totpSecret = if (role != Role.ADMIN) null else domainObject.totpSecret,
-                totpEnabled = if (role != Role.ADMIN) false else (domainObject.totpEnabled ?: false),
+                totpEnabled = role == Role.ADMIN && (domainObject.totpEnabled ?: false),
                 password = null
             )
         )

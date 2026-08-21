@@ -32,8 +32,8 @@ class EventSourcedWriter(
 ) {
     /**
      * Creates (no id) or updates (id present) a domain object. On create it assigns a new id and both
-     * timestamps; on update it loads the current row (a missing one throws [NotFoundException]
-     * [de.seuhd.campuscoffee.domain.exceptions.NotFoundException]), keeps its `createdAt`, and sets a new
+     * timestamps; on update it loads the current row (a missing one throws `NotFoundException`), keeps its
+     * `createdAt`, and sets a new
      * `updatedAt`. Returns the projected row, read back through [getById].
      *
      * @param domain the domain object to create (no id) or update (id present)
@@ -63,8 +63,8 @@ class EventSourcedWriter(
     }
 
     /**
-     * Deletes a domain object. Loads it first (a missing one throws [NotFoundException]
-     * [de.seuhd.campuscoffee.domain.exceptions.NotFoundException], matching the relational adapter), then
+     * Deletes a domain object. Loads it first (a missing one throws `NotFoundException`, matching the
+     * relational adapter), then
      * appends the DELETE event and projects the removal (a still-referenced row throws
      * [DeletionConflictException][de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException]).
      *

@@ -14,7 +14,7 @@ import tools.jackson.databind.module.SimpleModule
 import tools.jackson.module.kotlin.KotlinModule
 
 /**
- * The Jackson mapper for the event log. The same mapper builds the event [body] map and, via Hibernate's
+ * The Jackson mapper for the event log. The same mapper builds the event `body` map and, via Hibernate's
  * `hibernate.type.json_format_mapper`, serializes that map into the `jsonb` column and reads it back, so a
  * value stored in a body reads back as the same value. It uses Jackson version 3 (the major Spring
  * Framework 7 ships), which renders `java.time` as ISO-8601 strings by default, so the timestamps survive
@@ -35,7 +35,7 @@ import tools.jackson.module.kotlin.KotlinModule
  *   it ever reaches the model), so it is safe in the append-only log and must **not** be added to
  *   [UserSecretsMixin]: excluding it would null the column on the next projection and break 2FA.
  * - an [Expense] is flattened to its buyer's id (`buyerUserId`) and a [Payment] to its user's id
- *   (`userId`, written as JSON null for a pure kitty adjustment), for the same reason. A [CoffeePrice] has
+ *   (`userId`, written as JSON null for a pure kitty adjustment), for the same reason. A `CoffeePrice` has
  *   no references, so it needs no custom serializer and is written field for field.
  *
  * It is a singleton rather than a Spring `ObjectMapper` bean, with its event-specific serializers and

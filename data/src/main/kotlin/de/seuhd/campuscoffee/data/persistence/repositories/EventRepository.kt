@@ -33,7 +33,7 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
      * newest first, for reading an entity's history from the log. A native query because the match is on
      * the `jsonb` body's `id` (indexed by `idx_events_body_id`), which JPQL cannot express.
      *
-     * @param entityType the entity type label (the [LoggedEntityType] label stored in `entity_type`)
+     * @param entityType the entity type label (the `LoggedEntityType` label stored in `entity_type`)
      * @param bodyId     the domain object's id as it appears in the body (its string form)
      * @param limit      the maximum number of events to return
      * @param offset     the number of events to skip from the newest (for paging)
@@ -55,7 +55,7 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
      * Returns every event of the given type in append order, for reading a whole stream (e.g. the price
      * history, or one side of the kitty history).
      *
-     * @param entityType the entity type label (the [LoggedEntityType] label)
+     * @param entityType the entity type label (the `LoggedEntityType` label)
      */
     fun findByEntityTypeOrderBySeqAsc(entityType: String): List<EventEntity>
 
@@ -112,14 +112,14 @@ interface EventRepository : JpaRepository<EventEntity, UUID> {
     /**
      * Whether the log already holds at least one event for the given domain type, so the import can skip it.
      *
-     * @param entityType the entity type label (the [LoggedEntityType] label stored in `entity_type`)
+     * @param entityType the entity type label (the `LoggedEntityType` label stored in `entity_type`)
      */
     fun existsByEntityType(entityType: String): Boolean
 
     /**
      * Removes every event for the given domain type, when clearing that type's data.
      *
-     * @param entityType the entity type label (the [LoggedEntityType] label stored in `entity_type`)
+     * @param entityType the entity type label (the `LoggedEntityType` label stored in `entity_type`)
      */
     fun deleteByEntityType(entityType: String)
 }
