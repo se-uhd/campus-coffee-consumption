@@ -9,6 +9,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Dependabot no longer proposes a TypeScript version Angular cannot accept. Angular 22 declares
+  `peer typescript@">=6.0 <6.1"`, which admits only the 6.0 line, so a minor bump breaks `npm ci` with
+  ERESOLVE just as a major does. Both are now held back and only patches flow, where previously only majors
+  were held and a 6.1 release would have reproduced the failure.
 - The Docker image build no longer fails intermittently on GitHub API rate limiting. It resolves the JDK and
   Gradle through the GitHub releases API, whose anonymous quota is keyed on the runner's IP and shared by
   every job, so a busy day failed the build with a 403 that reads as a broken build but is only throttling.
