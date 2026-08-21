@@ -1,8 +1,18 @@
 name: Build CampusCoffeeConsumption
 
 on:
+  # One run per change. This used to fire on every branch push AND on pull requests, so a pull request ran
+  # `build`, `docker-build`, and `e2e-fast` twice over: two full Gradle builds, two image builds, two
+  # Playwright runs, for one change. Unlike the Qodana pair the two runs agreed, so it cost time rather than
+  # correctness, but it doubled the external calls (Maven Central, the GitHub releases API, container
+  # registries) that rate-limited several jobs on a busy day.
+  #
+  # Keeping the pull-request trigger rather than the push one is deliberate: a pull_request run builds the
+  # MERGE of the branch and main, so the gate tests what merging would actually produce, and fork pull
+  # requests stay covered. Push then only needs to cover main, for anything landed outside a pull request.
+  # A branch with no pull request open is no longer built; open the pull request to get it.
   push:
-    branches: [ "**" ] # every branch
+    branches: [ "main" ]
 
   pull_request:
     branches: [ "main" ]
