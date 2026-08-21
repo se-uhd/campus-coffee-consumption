@@ -63,20 +63,23 @@ updates:
       # this by hand when the project itself moves to the next Node LTS.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
-      # Keep TypeScript inside the range Angular accepts. @angular/build 22 declares a
-      # `peer typescript@">=6.0 <6.1"`, so a TypeScript major (7.x) does not just risk type errors, it makes
-      # `npm ci` fail outright with ERESOLVE and takes every job down with it. Only majors are ignored, so
-      # patch releases inside the accepted range still arrive normally.
+      # Keep TypeScript inside the range Angular accepts. @angular/build and @angular/compiler-cli 22 both
+      # declare `peer typescript@">=6.0 <6.1"`, which admits exactly ONE TypeScript minor line, so anything
+      # above a patch is incompatible: 6.1 is as far outside that range as 7.0. A version outside it does not
+      # just risk type errors, it makes `npm ci` fail outright with ERESOLVE and takes every job down with
+      # it, which is how the TypeScript 7 bump was caught. Majors AND minors are therefore both held, leaving
+      # patch releases (6.0.x) to flow normally, which are the only ones the peer range accepts.
       #
       # THIS RULE EXPIRES. It encodes the peer range of the Angular release the SPA is on today, not a
-      # standing preference. When the SPA moves to an Angular release whose peer range accepts the next
-      # TypeScript major, bump Angular and TypeScript together in one hand-written change and DELETE this
-      # rule: left in place it would silently hold TypeScript back on an Angular that already accepts the
-      # newer one, and the symptom (nothing happens) is invisible. Unlike the Kotlin/detekt and Qodana pins
-      # this pair has no CI guard, because npm enforces the peer range itself and an ERESOLVE failure is
-      # impossible to miss.
+      # standing preference. Angular widens that range on its own schedule, so when the SPA moves to an
+      # Angular release accepting a newer TypeScript line, bump Angular and TypeScript together in one
+      # hand-written change and DELETE this rule: left in place it would silently hold TypeScript back on an
+      # Angular that already accepts the newer one, and the symptom (nothing happens) is invisible. Read the
+      # new range off the peer declaration rather than assuming, since it moves by one minor at a time.
+      # Unlike the Kotlin/detekt and Qodana pins this pair has no CI guard, because npm enforces the peer
+      # range itself and an ERESOLVE failure is impossible to miss.
       - dependency-name: "typescript"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   # Dockerfile base images. Only the build-stage jdxcode/mise image is bumped here; its version is the
   # mise tool version, independent of the bundled JDK. The runtime stage's eclipse-temurin tag is the
