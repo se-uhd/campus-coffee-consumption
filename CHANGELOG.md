@@ -9,6 +9,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Qodana now reaches the same verdict on a pull request as it does on main. The scan ran twice per branch
+  and the two runs disagreed: the action analyzes only a pull request's changed files by default, while a
+  push scan covers the whole project, so with `failThreshold: 0` a change that surfaced pre-existing
+  problems failed the push run while the pull-request run passed. A pull request could therefore read green
+  and still turn main red, which is what the 2026.2 linter bump ran into. Pull requests now scan the whole
+  project (`pr-mode: false`), and push is limited to main, which also halves the number of scans.
 - Dependabot no longer proposes a TypeScript version Angular cannot accept. Angular 22 declares
   `peer typescript@">=6.0 <6.1"`, which admits only the 6.0 line, so a minor bump breaks `npm ci` with
   ERESOLVE just as a major does. Both are now held back and only patches flow, where previously only majors
