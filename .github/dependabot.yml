@@ -63,6 +63,13 @@ updates:
       # this by hand when the project itself moves to the next Node LTS.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # Keep TypeScript inside the range Angular accepts. @angular/build 22 declares a
+      # `peer typescript@">=6.0 <6.1"`, so a TypeScript major (7.x) does not just risk type errors, it makes
+      # `npm ci` fail outright with ERESOLVE and takes every job down with it. TypeScript moves to the next
+      # major together with Angular, never ahead of it, so bump this by hand when the SPA moves to an
+      # Angular release whose peer range accepts it.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   # Dockerfile base images. Only the build-stage jdxcode/mise image is bumped here; its version is the
   # mise tool version, independent of the bundled JDK. The runtime stage's eclipse-temurin tag is the

@@ -15,7 +15,7 @@ import kotlin.reflect.KClass
  * discriminator. Each constant pairs the persisted [label] (the string stored in the column) with its
  * domain [domainClass].
  *
- * Having an enum rather than a bare string buys two things: the [ReadModelProjector]'s dispatch is a `when`
+ * Having an enum rather than a bare string buys two things: the `ReadModelProjector`'s dispatch is a `when`
  * over these constants, so the compiler forces a projection branch for every type (a new logged entity
  * cannot be forgotten), and the label/class mapping lives in one place. The [label] is written out
  * explicitly and decoupled from the constant name, so renaming a Kotlin class or enum constant never
