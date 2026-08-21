@@ -260,6 +260,10 @@ that fail *silently* (a command that should match prints nothing, which reads as
   `gradle/libs.versions.toml`. The convention plugins resolve it for the Gradle toolchain and the Kotlin
   `jvmTarget`; `mise.toml` and the Dockerfile runtime image pin the same major by hand.
   `scripts/check-toolchain-versions.sh` (a CI step) fails the build if they drift.
+- **Kotlin and detekt move together.** The same `scripts/check-toolchain-versions.sh` reads the Kotlin
+  release the pinned detekt was built against from detekt's published Gradle module metadata and fails the
+  build when it differs from the catalog's `kotlin` entry, so the pair cannot drift (see **Format, Lint, and
+  Static Analysis** below).
 - **The runtimes stay on LTS releases.** That same `scripts/check-toolchain-versions.sh` also validates the
   pinned **Node** major (`mise.toml`, the source of truth) against the official Node release schedule, so a
   non-LTS line is rejected in CI: both an odd "Current" major (e.g. 25, never LTS) and an even-but-not-yet
@@ -285,8 +289,13 @@ the fixes with:
 gradle ktlintFormat
 ```
 
-Static analysis runs via detekt (`dev.detekt`, pinned at `2.0.0-alpha.5`; detekt 2.0 alphas require the exact
-Kotlin version they were built against, which is why Kotlin is pinned at 2.4.0). It is wired into `check`,
+Static analysis runs via detekt (`dev.detekt`, pinned at `2.0.0-alpha.6`; detekt 2.0 alphas require the exact
+Kotlin version they were built against, which is why Kotlin is pinned at 2.4.10). **Bump the two together,
+by hand.** A lone Kotlin bump makes every detekt task fail with "detekt was compiled with Kotlin X but is
+currently running with Y", so a Dependabot rule ignores the Kotlin coordinates (Dependabot cannot pair them
+itself: it never offers detekt's alpha-to-alpha updates), and the third check in
+`scripts/check-toolchain-versions.sh` fails CI if the pinned pair drifts apart. Drop both once detekt 2.0 is
+stable and no longer pins an exact Kotlin. It is wired into `check`,
 so `gradle build` and CI fail on findings. A per-module `detekt-baseline.xml` grandfathers pre-existing
 findings; regenerate it with `gradle detektBaseline`.
 

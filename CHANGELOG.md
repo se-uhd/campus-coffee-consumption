@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Kotlin and detekt are now kept in lockstep. A detekt 2.0 alpha only runs against the exact Kotlin release
+  it was compiled with, so an automated Kotlin-only bump broke every detekt task and with it the build.
+  Dependabot no longer proposes Kotlin on its own (it cannot pair the two itself, because it never offers
+  detekt's alpha-to-alpha updates), and `scripts/check-toolchain-versions.sh` gained a third check that
+  reads the Kotlin release the pinned detekt was built against from detekt's published module metadata and
+  fails CI if it differs from the pinned Kotlin. Both are temporary and go away once detekt 2.0 is stable.
+
 ## [1.0.0] - 2026-07-13
 
 ### Added
