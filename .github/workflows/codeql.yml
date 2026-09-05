@@ -1,0 +1,58 @@
+# CodeQL: GitHub's own semantic code scanner, run as a SEPARATE workflow from build.yml for the same reason
+# Qodana and Semgrep are. It is the deepest of the three: it compiles the code into a queryable database and
+# follows data across files and calls, so it catches a tainted value reaching a sink several hops from where
+# it entered, which the linters (one file at a time) and Semgrep (syntactic patterns) cannot see.
+#
+# Free here because the repository is public. It was not an option while the repository was private, since
+# code scanning on a private repository needs GitHub Advanced Security; the note in qodana.yml about SARIF
+# uploads being rejected dates from then.
+#
+# `build-mode: none` for both languages: CodeQL analyzes the sources directly rather than observing a build,
+# so this job needs no JDK, no Gradle and no npm install, and cannot be broken by a build change. It is the
+# supported mode for Kotlin and TypeScript and keeps the job to a few minutes.
+name: CodeQL
+
+on:
+  # Matches the other scanners: every pull request is the gate, whatever branch it targets, and push covers
+  # main for anything landed outside one. The weekly run exists because CodeQL's queries are updated
+  # independently of this repository, so a new query can find something in code that has not changed.
+  pull_request:
+  push:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 4 * * 1' # 04:00 UTC every Monday
+  workflow_dispatch: {} # allow manual runs
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # publish the findings to the repository's Security tab
+      actions: read
+    strategy:
+      fail-fast: false # one language's failure should not hide the other's findings
+      matrix:
+        include:
+          - language: java-kotlin # the Gradle modules: domain, api, data, application
+          - language: javascript-typescript # the Angular SPA and the Playwright suite
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false # no step pushes back to the repository
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}

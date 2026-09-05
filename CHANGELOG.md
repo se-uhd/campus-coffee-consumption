@@ -9,6 +9,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- CodeQL scans both languages in CI. It is the deepest of the three scanners: it builds a queryable database
+  from the sources and follows data across files and calls, so it can see a tainted value reaching a sink
+  several hops from where it entered, which the linters (a file at a time) and Semgrep (syntactic patterns)
+  cannot. It became available when the repository went public; code scanning on a private repository needs
+  GitHub Advanced Security, which is why the earlier Qodana notes record SARIF uploads being rejected. Both
+  languages run in `build-mode: none`, so the job analyzes the sources directly and needs no JDK, Gradle or
+  npm install.
 - The Playwright suite now gates accessibility. `angular-eslint`'s template rules read the template source,
   so they see neither the markup Material composes at runtime nor anything that depends on computed style or
   on state a component reaches only after loading. An axe-core pass over nine rendered pages closes that gap,
