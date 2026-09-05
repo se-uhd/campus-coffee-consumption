@@ -5,6 +5,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The Tomcat override now reaches every place that imports the Spring Boot BOM. It was applied in the
+  convention plugin only, but the coverage module imports the same BOM independently, so its aggregation
+  configuration kept resolving the vulnerable 11.0.24 and republishing it to the dependency graph. Nothing
+  shipped was affected, since that module only aggregates coverage reports, but the three critical
+  advisories stayed open against the repository, which would have buried the next real alert. The pinned
+  version moved to the version catalog so both places read one value, and the toolchain guard reads it from
+  there: deleting that entry breaks both references, so the override cannot be half-removed.
+
 ## [1.1.3] - 2026-09-05
 
 ### Security

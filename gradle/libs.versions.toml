@@ -6,6 +6,12 @@
 # major, and scripts/check-toolchain-versions.sh (run in CI) fails the build if they drift.
 java = "25"
 spring-boot = "4.1.1"
+# TEMPORARY override of the Tomcat that the Spring Boot BOM manages, applied wherever that BOM is imported.
+# Boot 4.1.1 brings 11.0.24, which carries three critical authentication and authorization bypasses in the
+# embedded server (GHSA-9xv2-5v5q-p794, GHSA-gcx9-497g-6cp6, GHSA-h3x4-894j-xpx5), all fixed in 11.0.25.
+# The fifth check in scripts/check-toolchain-versions.sh fails the build once a Boot release catches up,
+# naming what to delete.
+tomcat = "11.0.25"
 junit = "6.1.3"
 springdoc = "3.1.0"
 mapstruct = "1.6.3"

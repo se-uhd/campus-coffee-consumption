@@ -13,6 +13,12 @@ repositories {
     mavenCentral()
 }
 
+// The same temporary Tomcat override the convention plugin applies (see the catalog's `tomcat` entry).
+// This module imports the BOM itself rather than through those conventions, so without this line its
+// aggregation configuration keeps resolving the vulnerable 11.0.24 and republishing it to the dependency
+// graph, which holds the advisories open even though nothing shipped is affected.
+extra["tomcat.version"] = libs.versions.tomcat.get()
+
 dependencyManagement {
     imports {
         mavenBom("org.springframework.boot:spring-boot-dependencies:${libs.versions.spring.boot.get()}")
