@@ -16,10 +16,10 @@
 #     Kotlin it was built against in its Gradle module metadata, so the pair is checked against the real
 #     artifact instead of a hand-maintained table. A Dependabot rule stops Kotlin being bumped on its own
 #     (.github/dependabot.yml); this catches a hand edit that moves one without the other.
-#  4. The Qodana linters match the Qodana action. qodana-action refuses a linter image from a different
-#     Qodana release, and dependabot bumps the action (a `uses:` reference) but not the linter tags in
-#     qodana.yaml and frontend/qodana.yaml (plain strings in a config it does not parse), so the pins drift
-#     apart on their own. Compares the pins only; no network.
+#  4. The Qodana linter matches the Qodana action. qodana-action refuses a linter image from a different
+#     Qodana release, and dependabot bumps the action (a `uses:` reference) but not the linter tag in
+#     qodana.yaml (a plain string in a config it does not parse), so the pins drift apart on their own.
+#     Compares the pins only; no network.
 #
 # Run locally or in CI; emits GitHub Actions error annotations on mismatch.
 set -euo pipefail
@@ -129,8 +129,8 @@ fi
 
 # The qodana-action refuses to run a linter image from a different Qodana release ("non-compatible Qodana
 # linter ... with the current CLI"). Dependabot bumps the action, because it is a `uses:` reference it
-# parses, but not the linter tags in the two qodana.yaml files, which are plain strings in a config it does
-# not read. So the action moves on its own and the pins silently drift apart; this check catches that.
+# parses, but not the linter tag in qodana.yaml, which is a plain string in a config it does not read. So
+# the action moves on its own and the two pins silently drift apart; this check catches that.
 # Purely local: it compares the pins, so no network is involved.
 action_versions=$(sed -n 's|.*uses: *JetBrains/qodana-action@v\([0-9][^[:space:]]*\).*|\1|p' .github/workflows/qodana.yml | sort -u)
 [ -n "$action_versions" ] || fail "could not read the qodana-action version from .github/workflows/qodana.yml"
@@ -144,14 +144,8 @@ action_release=$(printf '%s' "$action_versions" | cut -d. -f1,2)
 jvm_linter=$(sed -n 's|^linter: *jetbrains/qodana-jvm-community:\(.*\)$|\1|p' qodana.yaml)
 [ -n "$jvm_linter" ] || fail "could not read the JVM linter tag from qodana.yaml"
 
-js_linter=$(sed -n 's|^linter: *jetbrains/qodana-js:\(.*\)$|\1|p' frontend/qodana.yaml)
-[ -n "$js_linter" ] || fail "could not read the JS linter tag from frontend/qodana.yaml"
-
-echo "Qodana release: action=$action_versions jvm-linter=$jvm_linter js-linter=$js_linter"
+echo "Qodana release: action=$action_versions jvm-linter=$jvm_linter"
 
 [ "$jvm_linter" = "$action_release" ] ||
   fail "qodana.yaml pins the JVM linter at $jvm_linter but qodana-action is $action_versions (Qodana $action_release); bump the linter tag to $action_release"
-[ "$js_linter" = "$action_release" ] ||
-  fail "frontend/qodana.yaml pins the JS linter at $js_linter but qodana-action is $action_versions (Qodana $action_release); bump the linter tag to $action_release"
-
 echo "Qodana linters match the action (Qodana $action_release)."

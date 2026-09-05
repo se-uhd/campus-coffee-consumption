@@ -9,6 +9,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- The Angular SPA no longer has a Qodana job, which could not run and was failing every scan of main.
+  Qodana analyzes JavaScript and TypeScript only through its `qodana-js` linter, which JetBrains licenses
+  under Ultimate; none of the Community linters covers JS/TS. The job therefore died at the Qodana Cloud
+  license check before it inspected a single file, and because a pull request had passed it earlier under
+  the previous license, main went red on the next push with no code change behind it. The job,
+  `frontend/qodana.yaml`, and the toolchain guard's JS-linter pin check are removed, leaving the backend
+  `qodana` job (tokenless, on the Community JVM linter) as the only Qodana scan. The SPA keeps the
+  angular-eslint, typescript-eslint, Stylelint, and Knip gate that `npm run lint` runs, which `gradle
+  check` enforces through the `frontendLint` task. Restoring the scan means an Ultimate license and a
+  revert of this change.
 - Qodana now reaches the same verdict on a pull request as it does on main. The scan ran twice per branch
   and the two runs disagreed: the action analyzes only a pull request's changed files by default, while a
   push scan covers the whole project, so with `failThreshold: 0` a change that surfaced pre-existing

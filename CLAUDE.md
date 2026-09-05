@@ -740,11 +740,12 @@ keep conventional camelCase names.
   Angular Material 22, `HttpClient`) on **TypeScript 6** and **Node 24** for the frontend. Unit tests run on
   **Vitest** (not Karma/Jasmine); end-to-end tests on **Playwright**.
 - **angular-eslint + Prettier + Stylelint + Knip** for frontend static analysis, all wired into
-  `gradle check`; **Qodana** (a JVM job and a JS/TS job) in CI on top of ktlint/detekt. The two linter
-  images (`qodana.yaml`, `frontend/qodana.yaml`) are pinned to the same Qodana release as
-  `JetBrains/qodana-action` in the workflow, because the action refuses a linter from a different release.
-  Dependabot bumps the action but not the linter tags, so bump those by hand; the fourth check in
-  `scripts/check-toolchain-versions.sh` fails CI if the three drift apart.
+  `gradle check`; **Qodana** (a JVM job only) in CI on top of ktlint/detekt. Qodana covers JS/TS solely
+  through its Ultimate-licensed `qodana-js` linter, so under this project's Community license the SPA has
+  no Qodana job and is covered by the eslint/stylelint gate alone. The linter image (`qodana.yaml`) is
+  pinned to the same Qodana release as `JetBrains/qodana-action` in the workflow, because the action
+  refuses a linter from a different release. Dependabot bumps the action but not the linter tag, so bump
+  that by hand; the fourth check in `scripts/check-toolchain-versions.sh` fails CI if the two drift apart.
 
 ## Authentication and Authorization
 
