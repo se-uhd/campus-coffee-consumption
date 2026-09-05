@@ -5,6 +5,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The dependency submission workflow resolves a Gradle version that exists. It passed the pin read out of
+  `mise.toml` straight to the action, but that pin is a prefix (`9.5`) which mise resolves to the newest
+  matching release, while the action needs an exact one and rejected it with "Gradle version 9.5 does not
+  exist". It now asks the Gradle mise installed what version it is, which keeps mise the single source of
+  truth and always yields a real release.
+
 ## [1.1.1] - 2026-09-05
 
 ### Added

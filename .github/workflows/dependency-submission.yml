@@ -37,11 +37,13 @@ jobs:
       # which insists on either a wrapper or an explicit version, so mise's copy goes unused here.
       - uses: jdx/mise-action@v4
 
-      # mise.toml stays the single source of truth for the Gradle version rather than the workflow pinning a
-      # second copy that could drift from it.
-      - name: Read the pinned Gradle version
+      # Ask the Gradle mise just installed what it actually is, rather than reading mise.toml. The pin there
+      # is a prefix ("9.5"), which mise resolves to the newest matching release, but the action below needs
+      # an exact one and rejects a prefix with "Gradle version 9.5 does not exist". This keeps mise the
+      # single source of truth while always yielding a real release.
+      - name: Resolve the exact Gradle version
         id: gradle
-        run: echo "version=$(sed -n "s/^gradle *= *'\([^']*\)'.*/\1/p" mise.toml)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(gradle --version | awk '/^Gradle /{print $2}')" >> "$GITHUB_OUTPUT"
 
       - name: Resolve and submit the dependency graph
         uses: gradle/actions/dependency-submission@v4
