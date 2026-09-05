@@ -7,6 +7,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- The SPA's ESLint gate is now type-aware, and SonarJS joins it. The config extended typescript-eslint's
+  syntax-only rule sets, which structurally cannot see a defect that depends on a type, so every rule
+  needing the compiler was off: a promise dropped on the floor, an `async` function passed where a void
+  callback was expected, an `any` flowing into a typed parameter. It now extends `recommendedTypeChecked`
+  and `stylisticTypeChecked` plus `eslint-plugin-sonarjs`. Fixing what that surfaced typed the confirm
+  dialog's `open()` generics (its `afterClosed()` was `any` at four call sites), narrowed the euro-amount
+  validator's `control.value`, typed two decrypted payloads in the auth spec, replaced seven `async` test
+  mocks that never awaited with `Promise.resolve`, flattened a nested ternary, and dropped eight redundant
+  type assertions.
+- Semgrep OSS scans the whole tree in CI as its own workflow, matching the `p/typescript`, `p/javascript`,
+  `p/security-audit`, and `p/secrets` packs. It is the free CLI: no account, no token, and nothing uploaded.
+  Where the linters reason about one file at a time, it matches taint and misuse patterns across both the
+  Kotlin backend and the SPA. The tree is clean today, so it lands as a blocking gate.
+
 ### Fixed
 
 - The Angular SPA no longer has a Qodana job, which could not run and was failing every scan of main.

@@ -1,0 +1,60 @@
+# Semgrep OSS: pattern-based static analysis, run as a SEPARATE workflow from build.yml for the same reason
+# Qodana is. It complements the linters rather than repeating them: ESLint and detekt reason about one file's
+# syntax and types, while Semgrep matches taint and misuse patterns (a secret committed as a literal, an
+# injection sink reached from user input) across the whole tree, in both the Kotlin backend and the Angular
+# SPA. It is the free OSS CLI, so no account, no token, and no upload to Semgrep's platform.
+#
+# The rule packs are fetched from Semgrep's registry at run time. That keeps them current without a bump
+# commit, but it also means a newly published rule can turn this job red on a commit that changed nothing.
+# It is a blocking gate (`--error`) because the tree is clean today; if registry drift ever becomes noisy,
+# pin the packs by vendoring the rules under .semgrep/ and pointing --config at that directory instead.
+name: Semgrep
+
+on:
+  # Mirrors qodana.yml: pull requests are the gate, and push covers main for anything landed outside a PR.
+  pull_request:
+    branches: [ "main" ]
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: {} # allow manual runs
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    # The official image ships the CLI and its analyzers, so no Python or pip setup is needed here.
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false # no step pushes back to the repository
+
+      - name: Semgrep scan
+        # p/typescript and p/javascript cover the SPA; p/security-audit adds the cross-language security
+        # patterns (the Kotlin backend included) and p/secrets catches a credential committed as a literal.
+        # `--error` makes any finding fail the job. The excludes skip build output and dependencies, which
+        # are not ours to fix and which would dominate the scan time.
+        run: |
+          semgrep scan \
+            --config p/typescript \
+            --config p/javascript \
+            --config p/security-audit \
+            --config p/secrets \
+            --error \
+            --sarif --output semgrep.sarif \
+            --exclude node_modules \
+            --exclude build \
+            --exclude dist \
+            --exclude .angular
+
+      - name: Upload Semgrep SARIF as an artifact
+        # `if: always()` so a run that fails the gate still leaves the report to inspect, mirroring Qodana.
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
+          if-no-files-found: warn

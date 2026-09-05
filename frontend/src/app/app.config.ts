@@ -1,6 +1,10 @@
 import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
+// provideAnimationsAsync (and the synchronous provideAnimations) were both deprecated in Angular 20.2,
+// but Material still requires an animations provider and ships no drop-in replacement. Revisit when that
+// migration lands.
+// eslint-disable-next-line sonarjs/deprecation
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 
@@ -13,6 +17,7 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(withXhr(), withInterceptors([authInterceptor])),
+    // eslint-disable-next-line sonarjs/deprecation -- see the import above
     provideAnimationsAsync(),
     // Outline appearance app-wide: a bordered field with a transparent fill, so inputs read cleanly on the
     // white cards. (The default "fill" appearance picks up the red-tinted primary-container, which made the

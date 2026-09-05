@@ -55,6 +55,9 @@ export class AdminSelectionService {
    * @returns the effective selected user id (the param, or the admin's own account as the default)
    */
   selectFromParam(userId: string | null): string {
+    // Deliberate: `?user=` in the URL yields an empty string, which means "no selection" here just as null
+    // does, and must fall back to the admin's own id. `??` would keep the empty string and select nobody.
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const effective = userId || this.ownId;
     this.selectedUserId.set(effective);
     return effective;

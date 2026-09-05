@@ -30,7 +30,10 @@ import { UserService } from '../../services/user.service';
 import { AdminUserService, UserRow } from '../../services/admin-user.service';
 import { NotificationService } from '../../services/notification.service';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
-import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
+import {
+  ConfirmDialogComponent,
+  ConfirmDialogData
+} from '../../components/confirm-dialog/confirm-dialog.component';
 import { EurosPipe } from '../../pipes/euros.pipe';
 import { formatEuros } from '../../util/money';
 import { triggerDownload } from '../../util/download';
@@ -535,6 +538,9 @@ export class AdminUsersComponent {
     // the sort is case-insensitive, and 'balance' sorts by balanceCents. 'count' and 'role' already match
     // their row property, but are handled explicitly so the accessor is exhaustive over the sortable columns
     // (and 'count' returns a number, so it sorts numerically rather than as text).
+    // MatTableDataSource types this accessor as returning `string | number`, and that is the point:
+    // 'count' sorts numerically, the rest as text.
+    // eslint-disable-next-line sonarjs/function-return-type
     this.dataSource.sortingDataAccessor = (row, id) => {
       switch (id) {
         case 'name':
@@ -657,7 +663,7 @@ export class AdminUsersComponent {
     if (deactivating && row.balanceCents < 0) {
       const goToDeposit = await firstValueFrom(
         this.dialog
-          .open(ConfirmDialogComponent, {
+          .open<ConfirmDialogComponent, ConfirmDialogData, boolean>(ConfirmDialogComponent, {
             data: {
               title: 'Settle the balance first',
               message: `${row.fullName} still owes ${formatEuros(-row.balanceCents)} to the coffee fund. Record a deposit to settle their balance before you can deactivate them.`,
@@ -719,7 +725,7 @@ export class AdminUsersComponent {
   async rotate(user: UserDto): Promise<void> {
     const confirmed = await firstValueFrom(
       this.dialog
-        .open(ConfirmDialogComponent, {
+        .open<ConfirmDialogComponent, ConfirmDialogData, boolean>(ConfirmDialogComponent, {
           data: {
             title: 'Rotate the link?',
             message: `Rotate ${user.loginName}'s coffee link? The current wall QR code stops working.`,
@@ -777,7 +783,7 @@ export class AdminUsersComponent {
   async remove(user: UserDto): Promise<void> {
     const confirmed = await firstValueFrom(
       this.dialog
-        .open(ConfirmDialogComponent, {
+        .open<ConfirmDialogComponent, ConfirmDialogData, boolean>(ConfirmDialogComponent, {
           data: {
             title: 'Delete this user',
             message: `Delete ${user.loginName}? This cannot be undone.`,
@@ -804,6 +810,6 @@ export class AdminUsersComponent {
   }
 
   private emptyDraft(): UserDto {
-    return { loginName: '', emailAddress: '', firstName: '', lastName: '', role: 'USER' as Role };
+    return { loginName: '', emailAddress: '', firstName: '', lastName: '', role: 'USER' };
   }
 }
