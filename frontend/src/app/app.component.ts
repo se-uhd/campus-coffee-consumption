@@ -20,7 +20,11 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (navigating()) {
-      <mat-progress-bar class="cc-nav-progress" mode="indeterminate"></mat-progress-bar>
+      <mat-progress-bar
+        class="cc-nav-progress"
+        mode="indeterminate"
+        aria-label="Loading page"
+      ></mat-progress-bar>
     }
     <router-outlet></router-outlet>
   `,

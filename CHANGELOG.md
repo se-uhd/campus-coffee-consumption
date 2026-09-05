@@ -9,6 +9,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The Playwright suite now gates accessibility. `angular-eslint`'s template rules read the template source,
+  so they see neither the markup Material composes at runtime nor anything that depends on computed style or
+  on state a component reaches only after loading. An axe-core pass over nine rendered pages closes that gap,
+  scoped to the WCAG 2.1 A and AA success criteria so it gates conformance rather than advice. It found two
+  real defects on its first run: the activity list rendered its "Nothing to show." paragraph as a direct
+  child of the `<ul>`, which breaks the list semantics a screen reader announces, and all ten indeterminate
+  progress bars were unnamed, so a screen reader announced a busy indicator with no idea what was loading.
+- Layer rules for the SPA, the frontend counterpart to the backend's ArchUnit tests. The directories under
+  `src/app` already formed a clean one-way hierarchy, verified by walking every import: no page imports
+  another page, no service reaches into view code, and nothing imports the generated `api/` except the
+  `models.ts` barrel. Six `no-restricted-imports` rules pin that shape so it cannot erode silently, each one
+  verified against a deliberately violating file. The core rule expresses this directly for one flat
+  directory per layer, so it needs no plugin.
+
 - The SPA's ESLint gate is now type-aware, and SonarJS joins it. The config extended typescript-eslint's
   syntax-only rule sets, which structurally cannot see a defect that depends on a type, so every rule
   needing the compiler was off: a promise dropped on the floor, an `async` function passed where a void
@@ -24,6 +38,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Kotlin backend and the SPA. The tree is clean today, so it lands as a blocking gate.
 
 ### Fixed
+
+- Two Kotlin compiler session marker files were tracked in git, so every Gradle build deleted them and left
+  the working tree dirty. They are untracked and `.kotlin/` is ignored.
+- Refreshed the frontend lockfile to clear eight advisories in transitive development dependencies. None of
+  them shipped: the production tree audits clean, so the exposure was build-time only.
 
 - The Angular SPA no longer has a Qodana job, which could not run and was failing every scan of main.
   Qodana analyzes JavaScript and TypeScript only through its `qodana-js` linter, which JetBrains licenses

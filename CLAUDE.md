@@ -523,6 +523,19 @@ and two `||` fallbacks deliberately treat an empty string as absent, which `??` 
 option is `no-misused-promises`'s `checksVoidReturn: { inheritedMethods: false }`, because Angular's
 lifecycle interfaces declare `ngOnInit(): void` and an `async ngOnInit` is the framework's own pattern.
 
+The same config carries **layer rules** for the SPA, the frontend counterpart to the backend's ArchUnit
+tests: view code may depend downward (a page on a component, a component on a service) but never upward or
+sideways, no page imports another page, and only `models.ts` imports the generated `api/`. They are six
+`no-restricted-imports` entries rather than a boundaries plugin, because one flat directory per layer is
+stated directly by a path pattern. Each file set lists every restriction that applies to it: two config
+blocks matching the same file **override** rather than merge this rule.
+
+**Accessibility is gated by the e2e suite**, not the linter. `frontend/e2e/a11y.spec.ts` runs axe-core over
+nine rendered pages, scoped to the WCAG 2.1 A and AA tags (the full rule set also carries best-practice
+rules that are advisory, not conformance failures). This catches what `templateAccessibility` structurally
+cannot: markup Material composes at runtime, computed-style problems such as contrast, and state a component
+only reaches after loading. Widen the tags to ratchet it.
+
 **Semgrep OSS** (`.github/workflows/semgrep.yml`) runs as its own CI workflow, not part of `gradle check`:
 the free CLI, no account and no upload, matching the `p/typescript`, `p/javascript`, `p/security-audit`, and
 `p/secrets` registry packs across the whole tree. It complements the linters, which reason about one file at

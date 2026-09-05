@@ -49,7 +49,7 @@ const PAGE_SIZE = 20;
     <cc-app-header [home]="'/admin'" title="Kitty" icon="savings"></cc-app-header>
 
     @if (loading()) {
-      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+      <mat-progress-bar mode="indeterminate" aria-label="Loading kitty"></mat-progress-bar>
     }
 
     <div class="page">

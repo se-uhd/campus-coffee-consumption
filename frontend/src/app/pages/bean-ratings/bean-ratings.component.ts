@@ -80,7 +80,7 @@ type BeanSortKey = 'RATING' | 'NAME' | 'VOTES';
     </cc-app-header>
 
     @if (loading()) {
-      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+      <mat-progress-bar mode="indeterminate" aria-label="Loading bean ratings"></mat-progress-bar>
     }
 
     <!-- One shared gradient for the half-filled bean: a hard 50% stop, red on the left and gray on the right,

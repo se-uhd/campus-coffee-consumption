@@ -54,57 +54,60 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS' | 'RATINGS';
       </mat-button-toggle-group>
     }
 
-    <ul class="cc-activity">
-      @for (entry of visibleEntries(); track entry.id) {
-        <li class="cc-entry" [title]="tooltipFor(entry)">
-          <mat-icon class="cc-entry-icon">{{ iconFor(entry.type) }}</mat-icon>
-          <div class="cc-entry-body">
-            <div class="cc-activity-title">
-              <span>{{ labelFor(entry.type) }}</span>
-              @if (entry.type === 'RATING') {
-                <!-- a rating moves no money: show the value out of five instead of an amount -->
-                <span class="amount cc-rating-value">{{ entry.ratingValue }}/5</span>
-              } @else if (showsExpenseTotal(entry)) {
-                <!-- a user's split purchase: show the full purchase total, broken down below -->
-                <span class="amount">+{{ expenseTotal(entry) }}</span>
-              } @else {
-                <span class="amount" [class.warn]="entry.amountCents < 0">{{
-                  signed(entry.amountCents)
-                }}</span>
-              }
-            </div>
-            <div class="muted">
-              {{ entry.createdAt | utcDate | date: 'short' }} · {{ entry.createdBy | actor }}
-              @if (entry.note) {
-                · {{ entry.note }}
-              }
-            </div>
-            @if (entry.type !== 'RATING') {
-              <div class="muted">
-                new balance {{ entry.runningBalanceCents | euros }}
-                @if (entry.count != null) {
-                  · total {{ entry.count }} cups
-                  @if (deltaLabel(entry); as dl) {
-                    ({{ dl }})
-                  }
-                }
-                @if (entry.weightGrams != null) {
-                  · {{ entry.weightGrams }} g
-                }
-                @if (hasKittySplit(entry)) {
-                  · <mat-icon class="cc-split-glyph">person</mat-icon> {{ splitPrivate(entry) }} +
-                  <mat-icon class="cc-split-glyph">savings</mat-icon> {{ splitKitty(entry) }}
+    @if (visibleEntries().length > 0) {
+      <ul class="cc-activity">
+        @for (entry of visibleEntries(); track entry.id) {
+          <li class="cc-entry" [title]="tooltipFor(entry)">
+            <mat-icon class="cc-entry-icon">{{ iconFor(entry.type) }}</mat-icon>
+            <div class="cc-entry-body">
+              <div class="cc-activity-title">
+                <span>{{ labelFor(entry.type) }}</span>
+                @if (entry.type === 'RATING') {
+                  <!-- a rating moves no money: show the value out of five instead of an amount -->
+                  <span class="amount cc-rating-value">{{ entry.ratingValue }}/5</span>
+                } @else if (showsExpenseTotal(entry)) {
+                  <!-- a user's split purchase: show the full purchase total, broken down below -->
+                  <span class="amount">+{{ expenseTotal(entry) }}</span>
+                } @else {
+                  <span class="amount" [class.warn]="entry.amountCents < 0">{{
+                    signed(entry.amountCents)
+                  }}</span>
                 }
               </div>
-            } @else {
-              <div class="muted">{{ ratingDetail(entry) }}</div>
-            }
-          </div>
-        </li>
-      } @empty {
-        <p class="muted">Nothing to show.</p>
-      }
-    </ul>
+              <div class="muted">
+                {{ entry.createdAt | utcDate | date: 'short' }} · {{ entry.createdBy | actor }}
+                @if (entry.note) {
+                  · {{ entry.note }}
+                }
+              </div>
+              @if (entry.type !== 'RATING') {
+                <div class="muted">
+                  new balance {{ entry.runningBalanceCents | euros }}
+                  @if (entry.count != null) {
+                    · total {{ entry.count }} cups
+                    @if (deltaLabel(entry); as dl) {
+                      ({{ dl }})
+                    }
+                  }
+                  @if (entry.weightGrams != null) {
+                    · {{ entry.weightGrams }} g
+                  }
+                  @if (hasKittySplit(entry)) {
+                    · <mat-icon class="cc-split-glyph">person</mat-icon> {{ splitPrivate(entry) }} +
+                    <mat-icon class="cc-split-glyph">savings</mat-icon> {{ splitKitty(entry) }}
+                  }
+                </div>
+              } @else {
+                <div class="muted">{{ ratingDetail(entry) }}</div>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    } @else {
+      <!-- kept outside the <ul>: a non-<li> child breaks the list semantics screen readers rely on -->
+      <p class="muted">Nothing to show.</p>
+    }
 
     @if (canLoadMore()) {
       <div class="cc-activity-more">

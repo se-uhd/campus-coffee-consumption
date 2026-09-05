@@ -83,7 +83,7 @@ import { Role, UserDto } from '../../models';
     <cc-app-header [home]="'/admin'" title="Users" icon="group"></cc-app-header>
 
     @if (loading()) {
-      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+      <mat-progress-bar mode="indeterminate" aria-label="Loading users"></mat-progress-bar>
     }
 
     <div class="page">
