@@ -31,7 +31,9 @@ export class EuroAmountDirective implements Validator {
    */
   validate(control: AbstractControl): ValidationErrors | null {
     // the example is irrelevant here (only the non-null-ness decides validity); the field shows its own
-    return euroInputError(control.value, '', this.ccEuroAmount === 'allow-negative') == null
+    // AbstractControl.value is `any` by Angular's typing; narrow it once here to what euroInputError takes
+    const value = control.value as string | null | undefined;
+    return euroInputError(value, '', this.ccEuroAmount === 'allow-negative') == null
       ? null
       : { euroAmount: true };
   }

@@ -444,7 +444,8 @@ export class AdminActivityComponent implements OnInit {
   detail(row: GlobalActivityEntryDto): string | null {
     if (row.count != null) {
       const delta = row.delta;
-      const suffix = delta != null ? ` (${delta > 0 ? '+' : ''}${delta})` : '';
+      const sign = delta != null && delta > 0 ? '+' : '';
+      const suffix = delta != null ? ` (${sign}${delta})` : '';
       return `${row.count} cups${suffix}`;
     }
     if (row.priceAmountCents != null) {

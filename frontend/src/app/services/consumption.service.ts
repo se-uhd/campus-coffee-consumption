@@ -26,6 +26,8 @@ export class ConsumptionService {
   /** Overrides a user's total to an absolute value with an optional note (edit mode, admin). */
   overrideForUser(userId: string, total: number, note?: string): Promise<ConsumptionDto> {
     // an untouched (empty) note records null, matching the expense paths, rather than an empty string
+    // Deliberate, per the comment above: `??` would send the empty string instead of omitting the note.
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const body: ConsumptionOverrideDto = { total, note: note || undefined };
     return firstValueFrom(this.http.put<ConsumptionDto>(`/api/users/${userId}/consumption`, body));
   }

@@ -12,8 +12,10 @@ import { AuthService } from './auth.service';
 const mocks = vi.hoisted(() => ({
   capturedPlaintext: { value: undefined as Uint8Array | undefined },
   setHeader: vi.fn(),
-  encrypt: vi.fn<(key: unknown) => Promise<string>>(async () => 'compact.jwe.value'),
-  importJWK: vi.fn<(jwk: unknown, alg: unknown) => Promise<unknown>>(async () => ({ kind: 'public-key' }))
+  encrypt: vi.fn<(key: unknown) => Promise<string>>(() => Promise.resolve('compact.jwe.value')),
+  importJWK: vi.fn<(jwk: unknown, alg: unknown) => Promise<unknown>>(() =>
+    Promise.resolve({ kind: 'public-key' })
+  )
 }));
 
 vi.mock('jose', () => ({
@@ -78,7 +80,12 @@ describe('AuthService', () => {
     // the bytes handed to the encrypter are exactly the credentials JSON (so the credentials are what is
     // encrypted, not sent in the clear), plus a fresh `iat` for the backend's replay-freshness check. With no
     // code supplied, the payload carries no `totp` field.
-    const encrypted = JSON.parse(new TextDecoder().decode(mocks.capturedPlaintext.value));
+    const encrypted = JSON.parse(new TextDecoder().decode(mocks.capturedPlaintext.value)) as {
+      loginName: string;
+      password: string;
+      totp?: string;
+      iat?: number;
+    };
     expect(encrypted).toMatchObject({ loginName: 'jane_doe', password: 's3cret-pw' });
     expect(encrypted.totp).toBeUndefined();
     expect(typeof encrypted.iat).toBe('number');
@@ -101,7 +108,12 @@ describe('AuthService', () => {
 
     // the code rides inside the ciphertext, never as a plaintext request field
     expect(tokenReq.request.body).toEqual({ encryptedPayload: 'compact.jwe.value' });
-    const encrypted = JSON.parse(new TextDecoder().decode(mocks.capturedPlaintext.value));
+    const encrypted = JSON.parse(new TextDecoder().decode(mocks.capturedPlaintext.value)) as {
+      loginName: string;
+      password: string;
+      totp?: string;
+      iat?: number;
+    };
     expect(encrypted).toMatchObject({ loginName: 'jane_doe', password: 's3cret-pw', totp: '123456' });
 
     // a pending admin's response asks the SPA to route them to enrollment

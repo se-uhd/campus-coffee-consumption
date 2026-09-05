@@ -32,7 +32,10 @@ import { AdminSelectionService } from '../../services/admin-selection.service';
 import { EurosPipe } from '../../pipes/euros.pipe';
 import { UtcDatePipe } from '../../pipes/utc-date.pipe';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
-import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog.component';
+import {
+  ConfirmDialogComponent,
+  ConfirmDialogData
+} from '../../components/confirm-dialog/confirm-dialog.component';
 import { UserSelectComponent } from '../../components/user-select/user-select.component';
 import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import { AdminExpenseDto, CoffeeBeanDto, ExpenseDto, ExpenseType, UserDto } from '../../models';
@@ -546,7 +549,7 @@ export class AdminExpensesComponent implements OnInit {
   async remove(expense: ExpenseDto): Promise<void> {
     const confirmed = await firstValueFrom(
       this.dialog
-        .open(ConfirmDialogComponent, {
+        .open<ConfirmDialogComponent, ConfirmDialogData, boolean>(ConfirmDialogComponent, {
           data: {
             title: 'Delete this purchase',
             message: `Delete the ${formatEuros(expense.amountCents)} purchase? This cannot be undone.`,

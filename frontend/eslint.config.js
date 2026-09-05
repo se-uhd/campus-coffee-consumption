@@ -8,6 +8,7 @@ const eslint = require('@eslint/js');
 const { defineConfig } = require('eslint/config');
 const tseslint = require('typescript-eslint');
 const angular = require('angular-eslint');
+const sonarjs = require('eslint-plugin-sonarjs');
 const prettier = require('eslint-config-prettier');
 
 module.exports = defineConfig([
@@ -16,14 +17,31 @@ module.exports = defineConfig([
     // openapi-generator and re-exported through src/app/models.ts, not hand-written, so the app's
     // stylistic rules do not apply), and the Playwright e2e suite (linted by its own
     // tsconfig/Playwright, not part of the Angular app graph) are out of scope for the app lint.
-    ignores: ['dist/**', 'node_modules/**', '.angular/**', 'out-tsc/**', 'e2e/**', 'src/app/api/**'],
+    // playwright.config.ts joins e2e/** here: it belongs to the Playwright suite, not the Angular app
+    // graph, so it is typed by the e2e tooling (it reads process.env, which the app's tsconfig does not
+    // type) rather than by the app's tsconfig.
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      '.angular/**',
+      'out-tsc/**',
+      'e2e/**',
+      'playwright.config.ts',
+      'src/app/api/**',
+    ],
   },
   {
     files: ['**/*.ts'],
     extends: [
       eslint.configs.recommended,
-      tseslint.configs.recommended,
-      tseslint.configs.stylistic,
+      // The type-checked variants: these rule sets ask the TypeScript compiler for type information, which
+      // is what catches the defects the syntax-only sets structurally cannot see (a floating promise, an
+      // `async` handler passed where a void callback is expected, a condition that is always truthy).
+      tseslint.configs.recommendedTypeChecked,
+      tseslint.configs.stylisticTypeChecked,
+      // SonarJS contributes bug-detection and complexity rules (duplicated branches, identical sub-
+      // expressions, cognitive complexity) on top of the above.
+      sonarjs.configs.recommended,
       angular.configs.tsRecommended,
     ],
     processor: angular.processInlineTemplates,
@@ -51,6 +69,40 @@ module.exports = defineConfig([
       // adopted an OnPush-everywhere policy, so this recommended-set rule is turned off rather than forcing
       // an architecture migration. Revisit if the app moves to OnPush/signals.
       '@angular-eslint/prefer-on-push-component-change-detection': 'off',
+      // Angular's lifecycle interfaces declare `ngOnInit(): void`, so an `async ngOnInit` is a promise
+      // returned where the interface says void. That is the framework's own documented pattern: Angular
+      // calls the hook and ignores the result, and each of ours awaits a loader that handles its own
+      // errors. Only the inherited-method case is exempted; the checks that catch a genuine mistake (an
+      // async function passed as a void callback, or assigned to a void-returning property) stay on.
+      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { inheritedMethods: false } }],
+    },
+  },
+  {
+    // Type information for the app sources. `projectService` resolves each file against the nearest
+    // tsconfig, which is the root tsconfig.json; that config has no `include`, so it matches every source
+    // file, including one nothing imports yet, and a component created but not yet routed still lints
+    // instead of failing to parse. (Naming tsconfig.app.json here would not: it builds its program from
+    // the main.ts import graph, so an unreferenced file would belong to no project.) Specs are excluded
+    // because they need a different project, set in the next block; parserOptions from two matching
+    // blocks merge, and `project` alongside `projectService` is rejected.
+    files: ['**/*.ts'],
+    ignores: ['**/*.spec.ts'],
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: __dirname },
+    },
+  },
+  {
+    // Specs need tsconfig.spec.json specifically: it is the only project that pulls in `vitest/globals`,
+    // so it is what types `describe`/`it`/`expect`. Left to the nearest-tsconfig rule above they would
+    // resolve against the root config, every `expect(...)` would be `any`, and the type-checked rules
+    // would report the entire test suite as unsafe calls and member accesses.
+    files: ['**/*.spec.ts'],
+    languageOptions: {
+      parserOptions: { project: ['./tsconfig.spec.json'], tsconfigRootDir: __dirname },
+    },
+    rules: {
+      // Test fixtures use obvious throwaway credentials on purpose; flagging them adds no security value.
+      'sonarjs/no-hardcoded-passwords': 'off',
     },
   },
   {
@@ -62,6 +114,12 @@ module.exports = defineConfig([
       // semantics. Mirrors typescript-eslint's eqeqeq `{ null: 'ignore' }`.
       '@angular-eslint/template/eqeqeq': ['error', { allowNullOrUndefined: true }],
     },
+  },
+  {
+    // This config file itself is the only JavaScript in the project and is not part of any tsconfig, so the
+    // type-checked rules above cannot run on it; turn them off here rather than widening the tsconfig.
+    files: ['**/*.js'],
+    extends: [tseslint.configs.disableTypeChecked],
   },
   // Keep this last: disables any ESLint rules that would conflict with Prettier's formatting.
   prettier,

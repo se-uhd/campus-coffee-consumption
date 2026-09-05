@@ -467,9 +467,9 @@ export class ProfileComponent implements OnInit {
     this.busy.set(true);
     try {
       const updated = await this.persistProfile(this.profile, {
-        firstName: this.profile.firstName!,
-        lastName: this.profile.lastName!,
-        emailAddress: this.profile.emailAddress!,
+        firstName: this.profile.firstName,
+        lastName: this.profile.lastName,
+        emailAddress: this.profile.emailAddress,
         summaryPanel: this.profile.summaryPanel ?? 'BALANCE'
       });
       // the admin PUT response may omit `capabilityUrl` (it is assembled, not a stored field), which would
@@ -505,7 +505,7 @@ export class ProfileComponent implements OnInit {
     return this.adminMode
       ? this.userService.update(p.id!, {
           id: p.id,
-          loginName: p.loginName!,
+          loginName: p.loginName,
           firstName: fields.firstName,
           lastName: fields.lastName,
           emailAddress: fields.emailAddress,
@@ -549,9 +549,9 @@ export class ProfileComponent implements OnInit {
     this.busy.set(true);
     try {
       await this.persistProfile(target, {
-        firstName: target.firstName!,
-        lastName: target.lastName!,
-        emailAddress: target.emailAddress!,
+        firstName: target.firstName,
+        lastName: target.lastName,
+        emailAddress: target.emailAddress,
         summaryPanel: panel
       });
       if (this.profile === target) {

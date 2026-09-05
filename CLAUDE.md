@@ -500,6 +500,36 @@ cd frontend && npm start
 and is bound to `check`, so `gradle build` and CI fail on a lint violation. **Prettier** (`npm run format` /
 `format:check`) and **Knip** (`npm run knip`, dead-code/unused-dependency detection) round out the toolset.
 
+The ESLint gate is **type-aware**: `eslint.config.js` extends typescript-eslint's `recommendedTypeChecked`
+and `stylisticTypeChecked` rather than the syntax-only sets, so the rules that need the compiler are live
+(`no-floating-promises`, `no-misused-promises`, `await-thenable`, the `no-unsafe-*` family), plus
+**eslint-plugin-sonarjs** for bug-detection and complexity rules. Type-aware linting needs each file to
+belong to a TypeScript project, and the config wires that in two blocks that must not overlap:
+
+- App sources use `projectService: true`, which resolves a file against the nearest tsconfig, the root
+  `tsconfig.json`. That config has no `include`, so it matches every source file, and a component created
+  but not yet imported anywhere still lints instead of failing to parse. Naming `tsconfig.app.json` here
+  would not: it builds its program from the `main.ts` import graph, so an unreferenced file belongs to no
+  project and ESLint reports a parse error on it.
+- Specs (`**/*.spec.ts`) are excluded from that block and given `project: ['./tsconfig.spec.json']`,
+  the only project that pulls in `vitest/globals`. Without it `describe`/`it`/`expect` resolve to `any` and
+  the type-checked rules report the whole suite as unsafe calls. The two blocks must stay disjoint:
+  parserOptions from every matching block merge, and `project` alongside `projectService` is an error.
+
+A handful of rules are opted out **per line, with the reason in a comment beside it** rather than switched
+off globally: Angular's `CanActivateFn` legitimately returns `boolean | UrlTree`, `MatTableDataSource`'s
+sorting accessor returns `string | number`, `provideAnimationsAsync` is deprecated with no replacement yet,
+and two `||` fallbacks deliberately treat an empty string as absent, which `??` would not. The one global
+option is `no-misused-promises`'s `checksVoidReturn: { inheritedMethods: false }`, because Angular's
+lifecycle interfaces declare `ngOnInit(): void` and an `async ngOnInit` is the framework's own pattern.
+
+**Semgrep OSS** (`.github/workflows/semgrep.yml`) runs as its own CI workflow, not part of `gradle check`:
+the free CLI, no account and no upload, matching the `p/typescript`, `p/javascript`, `p/security-audit`, and
+`p/secrets` registry packs across the whole tree. It complements the linters, which reason about one file at
+a time, by matching taint and misuse patterns (a committed secret, an injection sink) across both the Kotlin
+backend and the SPA. Its packs are fetched from the registry per run, so a newly published rule can turn the
+job red on a commit that changed nothing; vendor the rules under `.semgrep/` if that ever gets noisy.
+
 **OpenAPI → frontend-DTO codegen.** The TypeScript request/response DTOs are generated from the backend
 OpenAPI spec, not written by hand. The `generateFrontendDtos` Gradle task runs
 `scripts/generate-frontend-dtos.sh`, which generates into `frontend/src/app/api/model/` and is **hash-skip**
@@ -739,8 +769,9 @@ keep conventional camelCase names.
 - **Angular 22** (standalone components, signal `input()`/`output()` and `computed`, `@defer`/`@let`,
   Angular Material 22, `HttpClient`) on **TypeScript 6** and **Node 24** for the frontend. Unit tests run on
   **Vitest** (not Karma/Jasmine); end-to-end tests on **Playwright**.
-- **angular-eslint + Prettier + Stylelint + Knip** for frontend static analysis, all wired into
-  `gradle check`; **Qodana** (a JVM job only) in CI on top of ktlint/detekt. Qodana covers JS/TS solely
+- **angular-eslint + type-aware typescript-eslint + eslint-plugin-sonarjs + Prettier + Stylelint + Knip**
+  for frontend static analysis, all wired into `gradle check`; **Semgrep OSS** and **Qodana** (a JVM job
+  only) as their own CI workflows on top of ktlint/detekt. Qodana covers JS/TS solely
   through its Ultimate-licensed `qodana-js` linter, so under this project's Community license the SPA has
   no Qodana job and is covered by the eslint/stylelint gate alone. The linter image (`qodana.yaml`) is
   pinned to the same Qodana release as `JetBrains/qodana-action` in the workflow, because the action
