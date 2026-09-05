@@ -7,9 +7,12 @@
 # code scanning on a private repository needs GitHub Advanced Security; the note in qodana.yml about SARIF
 # uploads being rejected dates from then.
 #
-# `build-mode: none` for both languages: CodeQL analyzes the sources directly rather than observing a build,
-# so this job needs no JDK, no Gradle and no npm install, and cannot be broken by a build change. It is the
-# supported mode for Kotlin and TypeScript and keeps the job to a few minutes.
+# The two languages need different build modes. TypeScript analyzes from source (`none`), so that half needs
+# no npm install. Kotlin does not: CodeQL builds its database from compiled output, and `none` fails outright
+# with "detected code written in Java/Kotlin but could not process any of it". Nor does autobuild work here,
+# because it looks for ./gradlew and this project has no wrapper (mise provisions Gradle). So the JVM half
+# uses `manual`: mise supplies the toolchain and one `gradle classes` compiles every module for CodeQL to
+# read. Tests are not compiled, since only main sources are analyzed.
 name: CodeQL
 
 on:
@@ -39,18 +42,30 @@ jobs:
       matrix:
         include:
           - language: java-kotlin # the Gradle modules: domain, api, data, application
+            build-mode: manual
           - language: javascript-typescript # the Angular SPA and the Playwright suite
+            build-mode: none
 
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false # no step pushes back to the repository
 
+      # Only the manual (JVM) build needs a toolchain; the TypeScript half analyzes from source.
+      - uses: jdx/mise-action@v4
+        if: matrix.build-mode == 'manual'
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-          build-mode: none
+          build-mode: ${{ matrix.build-mode }}
+
+      # `classes` compiles the main sources of every module (kapt included, so the generated MapStruct
+      # mappers are analyzed too) without building the SPA, running tests, or producing a jar.
+      - name: Compile for CodeQL
+        if: matrix.build-mode == 'manual'
+        run: gradle classes
 
       - name: Analyze
         uses: github/codeql-action/analyze@v4
