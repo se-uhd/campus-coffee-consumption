@@ -27,6 +27,7 @@ import { AdminSelectionService } from '../../services/admin-selection.service';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { UserSelectComponent } from '../../components/user-select/user-select.component';
 import { SummaryPanel, UserDto } from '../../models';
+import { withLoading } from '../../util/loading';
 
 /**
  * The authenticated user's own profile, shared by a user (reached via `/login/:token/profile`, served
@@ -407,27 +408,26 @@ export class ProfileComponent implements OnInit {
    * drives which user's details and QR are shown.
    */
   async load(): Promise<void> {
-    this.loading.set(true);
-    this.loadError.set('');
     this.loadedId = this.selectedId();
-    try {
-      this.profile = this.adminMode
-        ? await this.userService.get(this.selectedId())
-        : await this.profileService.get();
-      // the profile is an ngModel target reassigned after an await, so mark this OnPush view for check
-      this.cdr.markForCheck();
-      // a fresh load leaves edit mode, so the read-only view shows the just-loaded values
-      this.editing.set(false);
-      const blob = this.adminMode
-        ? await this.userService.qrBlob(this.profile.id!)
-        : await this.profileService.qrBlob();
-      this.revokeQr();
-      this.qrObjectUrl.set(URL.createObjectURL(blob));
-    } catch {
-      this.loadError.set('Could not load the profile. The link may be invalid.');
-    } finally {
-      this.loading.set(false);
-    }
+    await withLoading(
+      this.loading,
+      this.loadError,
+      'Could not load the profile. The link may be invalid.',
+      async () => {
+        this.profile = this.adminMode
+          ? await this.userService.get(this.selectedId())
+          : await this.profileService.get();
+        // the profile is an ngModel target reassigned after an await, so mark this OnPush view for check
+        this.cdr.markForCheck();
+        // a fresh load leaves edit mode, so the read-only view shows the just-loaded values
+        this.editing.set(false);
+        const blob = this.adminMode
+          ? await this.userService.qrBlob(this.profile.id!)
+          : await this.profileService.qrBlob();
+        this.revokeQr();
+        this.qrObjectUrl.set(URL.createObjectURL(blob));
+      }
+    );
   }
 
   /** Enters edit mode, snapshotting the loaded values so Cancel can revert to them. */

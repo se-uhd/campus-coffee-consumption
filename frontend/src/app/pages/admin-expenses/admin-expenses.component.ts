@@ -40,6 +40,7 @@ import { UserSelectComponent } from '../../components/user-select/user-select.co
 import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import { AdminExpenseDto, CoffeeBeanDto, ExpenseDto, ExpenseType, UserDto } from '../../models';
 import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../util/money';
+import { withLoading } from '../../util/loading';
 
 /**
  * Admin expenses page: records a bean purchase for a selected user with the explicit kitty/private split
@@ -379,16 +380,10 @@ export class AdminExpensesComponent implements OnInit {
 
   /** Loads the users and the selected user's purchases; surfaces a retryable error on failure. */
   async reload(): Promise<void> {
-    this.loading.set(true);
-    this.loadError.set('');
-    try {
+    await withLoading(this.loading, this.loadError, 'Could not load the expenses.', async () => {
       await this.selection.loadUsersAndSelection(this.userService, this.route, this.users, this.selectedId);
       await this.loadPurchases();
-    } catch {
-      this.loadError.set('Could not load the expenses.');
-    } finally {
-      this.loading.set(false);
-    }
+    });
   }
 
   /**

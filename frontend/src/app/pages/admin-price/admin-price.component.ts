@@ -17,6 +17,7 @@ import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import { PriceChangeDto } from '../../models';
 import { euroInputError, toCents } from '../../util/money';
 import { ActorPipe } from '../../pipes/actor.pipe';
+import { withLoading } from '../../util/loading';
 
 /**
  * Admin price page: shows the current price (the newest history entry) and the full price history, and lets
@@ -137,15 +138,9 @@ export class AdminPriceComponent implements OnInit {
 
   /** Loads the price history; surfaces a retryable error on failure. */
   async reload(): Promise<void> {
-    this.loading.set(true);
-    this.loadError.set('');
-    try {
+    await withLoading(this.loading, this.loadError, 'Could not load the price history.', async () => {
       this.history.set(await this.priceService.history());
-    } catch {
-      this.loadError.set('Could not load the price history.');
-    } finally {
-      this.loading.set(false);
-    }
+    });
   }
 
   /** The current price (the newest history entry), or zero cents when no price is set yet. */

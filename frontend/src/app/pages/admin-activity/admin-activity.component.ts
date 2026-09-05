@@ -21,6 +21,7 @@ import { loadActivityPage } from '../../util/activity';
 import { triggerDownload } from '../../util/download';
 import { formatEuros } from '../../util/money';
 import { TruncationTooltipDirective } from '../../directives/truncation-tooltip.directive';
+import { withLoading } from '../../util/loading';
 
 /** The page size for one activity page; "Load more" appends another page of this size. */
 const ACTIVITY_PAGE_SIZE = 25;
@@ -380,19 +381,13 @@ export class AdminActivityComponent implements OnInit {
 
   /** Loads the first page of the global activity feed; surfaces a retryable error. */
   async loadFirst(): Promise<void> {
-    this.loading.set(true);
-    this.loadError.set('');
-    try {
+    await withLoading(this.loading, this.loadError, 'Could not load the activity.', async () => {
       const { entries, hasMore } = await loadActivityPage([], ACTIVITY_PAGE_SIZE, (limit, offset) =>
         this.accounting.allActivity(limit, offset)
       );
       this.entries.set(entries);
       this.hasMore.set(hasMore);
-    } catch {
-      this.loadError.set('Could not load the activity.');
-    } finally {
-      this.loading.set(false);
-    }
+    });
   }
 
   /** Appends the next page of the global activity feed (incremental "Load more" server paging on the full feed). */

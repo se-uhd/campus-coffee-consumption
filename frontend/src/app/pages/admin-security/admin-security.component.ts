@@ -19,6 +19,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { TwoFactorService } from '../../services/two-factor.service';
 import { NotificationService } from '../../services/notification.service';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
+import { withLoading } from '../../util/loading';
 
 /**
  * Admin two-factor (TOTP) settings. A not-yet-enrolled admin starts setup (the server generates a secret,
@@ -177,15 +178,9 @@ export class AdminSecurityComponent implements OnInit {
 
   /** Loads the current enrollment status; surfaces a retryable error on failure. */
   async reload(): Promise<void> {
-    this.loading.set(true);
-    this.loadError.set('');
-    try {
+    await withLoading(this.loading, this.loadError, 'Could not load your two-factor settings.', async () => {
       this.enrolled.set(await this.twoFactor.isEnrolled());
-    } catch {
-      this.loadError.set('Could not load your two-factor settings.');
-    } finally {
-      this.loading.set(false);
-    }
+    });
   }
 
   /** Begins setup: stores the pending secret server-side and renders the QR and manual key. */
