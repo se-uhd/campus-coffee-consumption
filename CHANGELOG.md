@@ -5,6 +5,24 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- Tomcat is pinned to 11.0.25, ahead of what Spring Boot manages. Spring Boot 4.1.1 brings Tomcat 11.0.24,
+  which carries three critical advisories, all of them authentication or authorization bypasses in the
+  embedded server the admin login runs on: GHSA-9xv2-5v5q-p794 (the DIGEST authenticator, capture-replay),
+  GHSA-gcx9-497g-6cp6 (improper access control) and GHSA-h3x4-894j-xpx5 (FORM authentication). All three are
+  fixed in 11.0.25, a patch release in the same line, and 4.1.1 is the newest Spring Boot, so waiting would
+  leave the bypasses open for as long as it takes the next release to ship.
+- The override is temporary and cannot be forgotten. A fifth check in `scripts/check-toolchain-versions.sh`
+  reads the Tomcat that the pinned Spring Boot actually manages, from the published BOM, and fails the build
+  once it reaches or passes the override, saying to delete it. With no override present the check skips, so
+  removing the one line is all that is ever needed.
+- These were found by the dependency graph submitted in 1.1.2. The backend had no dependency alerting at all
+  before it; the JVM half of the tree raised 19 alerts the moment it was indexed, of which this is the one
+  that reaches production. The rest sit in build tooling or on versions already newer than the fix.
+
 ## [1.1.2] - 2026-09-05
 
 ### Fixed
