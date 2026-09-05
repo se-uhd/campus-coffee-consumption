@@ -20,6 +20,12 @@
 #     Qodana release, and dependabot bumps the action (a `uses:` reference) but not the linter tag in
 #     qodana.yaml (a plain string in a config it does not parse), so the pins drift apart on their own.
 #     Compares the pins only; no network.
+#  5. The temporary Tomcat override is still needed. Spring Boot 4.1.1 manages a Tomcat with three critical
+#     authentication-bypass advisories, so java-conventions.gradle.kts pins a newer one through a project
+#     property. An override like that is exactly the kind of thing that outlives its reason silently, so this
+#     compares it against the Tomcat the pinned Spring Boot actually manages and fails once the BOM has
+#     caught up, telling you to delete it. Skips silently when no override is present, so removing it is all
+#     that is needed. Reads the BOM from Maven Central.
 #
 # Run locally or in CI; emits GitHub Actions error annotations on mismatch.
 set -euo pipefail
@@ -149,3 +155,33 @@ echo "Qodana release: action=$action_versions jvm-linter=$jvm_linter"
 [ "$jvm_linter" = "$action_release" ] ||
   fail "qodana.yaml pins the JVM linter at $jvm_linter but qodana-action is $action_versions (Qodana $action_release); bump the linter tag to $action_release"
 echo "Qodana linters match the action (Qodana $action_release)."
+
+# --- 5. the temporary Tomcat override ------------------------------------------------------------------
+conventions=build-logic/src/main/kotlin/de/seuhd/campuscoffee/java-conventions.gradle.kts
+tomcat_override=$(sed -n 's|^extra\["tomcat.version"\] = "\(.*\)"$|\1|p' "$conventions")
+
+if [ -z "$tomcat_override" ]; then
+  echo "No Tomcat override in place; nothing to check."
+else
+  boot_version=$(sed -n 's|^spring-boot = "\(.*\)"$|\1|p' gradle/libs.versions.toml)
+  [ -n "$boot_version" ] || fail "could not read the spring-boot version from gradle/libs.versions.toml"
+
+  bom_url="https://repo1.maven.org/maven2/org/springframework/boot/spring-boot-dependencies/$boot_version/spring-boot-dependencies-$boot_version.pom"
+  bom=$(curl -fsSL --max-time 20 "$bom_url" 2>/dev/null || true)
+  if [ -z "$bom" ]; then
+    # Offline or Maven Central unreachable: skip rather than fail, matching the other network checks.
+    echo "Could not fetch the Spring Boot BOM; skipping the Tomcat override check."
+  else
+    bom_tomcat=$(printf '%s' "$bom" | sed -n 's|.*<tomcat\.version>\([^<]*\)</tomcat\.version>.*|\1|p' | head -1)
+    [ -n "$bom_tomcat" ] || fail "could not read <tomcat.version> from $bom_url"
+
+    echo "Tomcat: override=$tomcat_override spring-boot-$boot_version manages=$bom_tomcat"
+
+    # The override earns its place only while it is strictly newer than what the BOM manages.
+    oldest=$(printf '%s\n%s\n' "$tomcat_override" "$bom_tomcat" | sort -V | head -1)
+    if [ "$bom_tomcat" = "$tomcat_override" ] || [ "$oldest" = "$tomcat_override" ]; then
+      fail "Spring Boot $boot_version now manages Tomcat $bom_tomcat, which is not older than the override $tomcat_override; delete the extra[\"tomcat.version\"] line in $conventions and this check"
+    fi
+    echo "The Tomcat override is still newer than the BOM; keep it."
+  fi
+fi

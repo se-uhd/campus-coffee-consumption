@@ -39,6 +39,21 @@ tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-parameters")
 }
 
+// TEMPORARY Tomcat override. Spring Boot 4.1.1 manages Tomcat 11.0.24, which carries three critical
+// advisories, all of them authentication or authorization bypasses in the embedded server this app's admin
+// login runs on: GHSA-9xv2-5v5q-p794 (DIGEST authenticator, capture-replay), GHSA-gcx9-497g-6cp6 (improper
+// access control) and GHSA-h3x4-894j-xpx5 (FORM authentication). All three are fixed in 11.0.25, a patch
+// release within the same Tomcat line.
+//
+// It is set as a project property rather than through the BOM import's `bomProperty`, because
+// io.spring.dependency-management substitutes a project property whose name matches a BOM property, and it
+// must be assigned before the import below for that substitution to happen.
+//
+// This lasts only until a Spring Boot release manages 11.0.25 or newer. The fifth check in
+// scripts/check-toolchain-versions.sh compares the override against the BOM on every build and fails once
+// the BOM has caught up, so it cannot outlive its reason unnoticed; delete this line when it tells you to.
+extra["tomcat.version"] = "11.0.25"
+
 dependencyManagement {
     imports {
         mavenBom("org.springframework.boot:spring-boot-dependencies:${libs.findVersion("spring-boot").get().requiredVersion}")
