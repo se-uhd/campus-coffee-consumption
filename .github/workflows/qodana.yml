@@ -52,7 +52,7 @@ jobs:
           persist-credentials: false # no step pushes back to the repository
 
       - name: Qodana Scan
-        uses: JetBrains/qodana-action@v2026.2.0
+        uses: JetBrains/qodana-action@v2026.2.1
         with:
           # Scan the whole project on a pull request too, not just its changed files (the action's default).
           # A diff-only scan cannot see a problem this change surfaces elsewhere, so with failThreshold: 0 it
