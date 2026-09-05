@@ -50,6 +50,9 @@ target/
 ##########
 .gradle/
 build/
+# Kotlin compiler daemon session markers, written under the project root by every Gradle build. Two of
+# these were tracked, so any build deleted them and left the working tree dirty.
+.kotlin/
 # Gradle is provisioned via mise, not a wrapper; ignore IDE-generated wrapper files.
 gradlew
 gradlew.bat
