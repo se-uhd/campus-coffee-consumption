@@ -7,6 +7,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- The Gradle dependency graph is submitted to GitHub, so a vulnerable JVM dependency can raise an alert.
+  The graph held only the npm tree and the workflow actions, because those are what GitHub can parse from a
+  manifest unaided; the Kotlin backend was absent entirely, so no alert could ever fire for it. Dependabot's
+  version updates were never affected, since they read `libs.versions.toml` directly; what was missing is
+  security alerting, in particular for a transitive dependency that no version bump happens to move.
+  GitHub's own automatic submission cannot do this here, as it probes `./gradlew` and then `gradle`, and
+  this project has no wrapper by design and no Gradle on a bare runner's PATH. The workflow reads the pinned
+  Gradle version out of `mise.toml`, so nothing pins a second copy that could drift.
+
 ### Fixed
 
 - CodeQL analyzes the Kotlin modules again. The job ran both languages in `build-mode: none`, which reads
