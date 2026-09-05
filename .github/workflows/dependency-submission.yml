@@ -1,0 +1,51 @@
+# Submits the Gradle dependency graph, so GitHub can alert on a vulnerable JVM dependency.
+#
+# Without this the graph holds only what GitHub can parse from a manifest on its own, which here is the npm
+# tree and the workflow actions: the Kotlin backend is absent entirely, so no Dependabot alert can ever fire
+# for it. Dependabot's VERSION updates are unaffected either way, since those read libs.versions.toml
+# directly; what is missing without a graph is security alerting, in particular for a transitive dependency
+# that no version bump happens to move.
+#
+# GitHub's own "Automatic Dependency Submission" cannot do this here: it probes `./gradlew help` and then
+# `gradle help`, and this project has no wrapper by design (mise provisions Gradle) and no Gradle on a bare
+# runner's PATH. Its failure output says to check in a workflow instead, which is this file.
+name: Dependency submission
+
+on:
+  # main only. A snapshot describes the dependencies of a ref, so submitting from pull request branches
+  # would write throwaway states into the graph that alerts are then raised against.
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: {} # allow manual runs
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    permissions:
+      # Wider than the scanners need, and unavoidable: submitting a snapshot is a write to the repository's
+      # dependency graph. Nothing else in this job writes anything.
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false # the snapshot is posted with the job token, not with git credentials
+
+      # Supplies the Java toolchain the build resolves against. Gradle itself comes from the action below,
+      # which insists on either a wrapper or an explicit version, so mise's copy goes unused here.
+      - uses: jdx/mise-action@v4
+
+      # mise.toml stays the single source of truth for the Gradle version rather than the workflow pinning a
+      # second copy that could drift from it.
+      - name: Read the pinned Gradle version
+        id: gradle
+        run: echo "version=$(sed -n "s/^gradle *= *'\([^']*\)'.*/\1/p" mise.toml)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve and submit the dependency graph
+        uses: gradle/actions/dependency-submission@v4
+        with:
+          # Given a version, the action downloads that Gradle and uses it, which is what lets a project
+          # without a wrapper use this action at all.
+          gradle-version: ${{ steps.gradle.outputs.version }}
