@@ -26,8 +26,10 @@ on:
   # So: pull requests are the gate (with pr-mode disabled below, so they scan everything a push would), and
   # push covers main directly for anything landed outside a PR. A branch with no pull request open is no
   # longer scanned, which is the deliberate trade for halving the scan count; open the PR to get it.
+  # The pull-request trigger is deliberately NOT filtered by base branch. Filtering it to `main` silently
+  # skips a pull request stacked on another branch: no job runs, and the pull request reports "no checks"
+  # rather than a failure, which reads as fine. Every pull request is gated, whatever it targets.
   pull_request:
-    branches: [ "main" ]
   push:
     branches: [ "main" ]
   workflow_dispatch: {} # allow manual runs
