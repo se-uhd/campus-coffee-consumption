@@ -24,6 +24,7 @@ import { NotificationService } from '../../services/notification.service';
 import { UtcDatePipe } from '../../pipes/utc-date.pipe';
 import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { CoffeeBeanDto, CoffeeBeanRatingsDto } from '../../models';
+import { withLoading } from '../../util/loading';
 
 /** The five rating positions, so the template can render one bean icon per position. */
 const RATING_POSITIONS = [1, 2, 3, 4, 5];
@@ -512,20 +513,14 @@ export class BeanRatingsComponent implements OnInit {
 
   /** Loads the ratings and (for the merge target list) the selectable beans; surfaces a retryable error. */
   async reload(): Promise<void> {
-    this.loading.set(true);
-    this.loadError.set('');
-    try {
+    await withLoading(this.loading, this.loadError, 'Could not load the ratings.', async () => {
       const [ratings, beans] = await Promise.all([
         this.beanService.ratings(),
         this.beanService.listSelectable()
       ]);
       this.ratings.set(ratings);
       this.beans.set(beans);
-    } catch {
-      this.loadError.set('Could not load the ratings.');
-    } finally {
-      this.loading.set(false);
-    }
+    });
   }
 
   /**

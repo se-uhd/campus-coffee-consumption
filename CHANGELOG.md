@@ -37,6 +37,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Where the linters reason about one file at a time, it matches taint and misuse patterns across both the
   Kotlin backend and the SPA. The tree is clean today, so it lands as a blocking gate.
 
+### Changed
+
+- The landing page gave up its two largest self-contained controls. It carried the expense form and the bean
+  rating prompt inline, which is most of why it had grown past eleven hundred lines: the markup, the fields,
+  their validation and their styles all sat beside the page's own loading, paging and admin-selection logic.
+  Both are now components (`cc-expense-form` and `cc-bean-rating-input`) that own their fields and emit a
+  value only once it validates, so the page decides what recording or rating means (a user acts on their own
+  cup, an admin on the viewed user's) without repeating any input handling. The page is 18% smaller and each
+  control is readable on its own.
+- Loading a page is no longer nine lines of bookkeeping per page. Eight pages each opened with the same
+  shape: raise a loading flag, clear the previous error, fetch, report one message on failure, and lower the
+  flag either way, with only the fetch differing. That is now `withLoading` in `util`, so a page states the
+  message and the fetch and nothing else, and no copy can forget the `finally` that clears the flag. The two
+  pages that genuinely differ keep their own handling: the login page branches on a rate-limit response, and
+  the users page takes its error state from the service that caches its rows.
+
 ### Fixed
 
 - Two Kotlin compiler session marker files were tracked in git, so every Gradle build deleted them and left

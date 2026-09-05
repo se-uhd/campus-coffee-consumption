@@ -18,6 +18,7 @@ import { EuroAmountDirective } from '../../directives/euro-amount.directive';
 import { KittyDto, ActivityEntryDto, UserDto } from '../../models';
 import { euroInputError, toCents } from '../../util/money';
 import { loadActivityPage } from '../../util/activity';
+import { withLoading } from '../../util/loading';
 
 /** The page size for one kitty-history page; "Load more" appends another page of this size. */
 const PAGE_SIZE = 20;
@@ -219,19 +220,13 @@ export class AdminKittyComponent implements OnInit {
 
   /** Loads the users and the first page of the kitty history; surfaces a retryable error on failure. */
   async reload(): Promise<void> {
-    this.loading.set(true);
-    this.loadError.set('');
-    try {
+    await withLoading(this.loading, this.loadError, 'Could not load the kitty.', async () => {
       this.users.set(await this.userService.list());
       const kitty = await this.kittyService.history(PAGE_SIZE + 1, 0);
       this.kitty.set(kitty);
       this.entries.set(kitty.entries.slice(0, PAGE_SIZE));
       this.hasMore.set(kitty.entries.length > PAGE_SIZE);
-    } catch {
-      this.loadError.set('Could not load the kitty.');
-    } finally {
-      this.loading.set(false);
-    }
+    });
   }
 
   /** Appends the next page of the kitty history. */

@@ -530,6 +530,11 @@ sideways, no page imports another page, and only `models.ts` imports the generat
 stated directly by a path pattern. Each file set lists every restriction that applies to it: two config
 blocks matching the same file **override** rather than merge this rule.
 
+**A page's initial load goes through `withLoading`** (`frontend/src/app/util/loading.ts`), which raises the
+loading flag, clears the previous error, reports one message if the load throws, and lowers the flag either
+way. New pages use it rather than repeating that `try`/`catch`/`finally` shape; a page whose failure handling
+genuinely differs (the login page branches on a 429) keeps its own.
+
 **Accessibility is gated by the e2e suite**, not the linter. `frontend/e2e/a11y.spec.ts` runs axe-core over
 nine rendered pages, scoped to the WCAG 2.1 A and AA tags (the full rule set also carries best-practice
 rules that are advisory, not conformance failures). This catches what `templateAccessibility` structurally
