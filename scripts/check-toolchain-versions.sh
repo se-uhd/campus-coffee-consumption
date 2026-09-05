@@ -22,7 +22,8 @@
 #     Compares the pins only; no network.
 #  5. The temporary Tomcat override is still needed. Spring Boot 4.1.1 manages a Tomcat with three critical
 #     authentication-bypass advisories, so java-conventions.gradle.kts pins a newer one through a project
-#     property. An override like that is exactly the kind of thing that outlives its reason silently, so this
+#     property, pinned once in the catalog and read by both places that import the BOM. An override like
+#     that is exactly the kind of thing that outlives its reason silently, so this
 #     compares it against the Tomcat the pinned Spring Boot actually manages and fails once the BOM has
 #     caught up, telling you to delete it. Skips silently when no override is present, so removing it is all
 #     that is needed. Reads the BOM from Maven Central.
@@ -157,8 +158,10 @@ echo "Qodana release: action=$action_versions jvm-linter=$jvm_linter"
 echo "Qodana linters match the action (Qodana $action_release)."
 
 # --- 5. the temporary Tomcat override ------------------------------------------------------------------
-conventions=build-logic/src/main/kotlin/de/seuhd/campuscoffee/java-conventions.gradle.kts
-tomcat_override=$(sed -n 's|^extra\["tomcat.version"\] = "\(.*\)"$|\1|p' "$conventions")
+# The pin lives in the catalog, because two places import the Spring Boot BOM (the convention plugin and
+# the coverage module) and both must override it identically. Deleting the catalog entry breaks both
+# references, so the override cannot be half-removed.
+tomcat_override=$(sed -n 's|^tomcat = "\(.*\)"$|\1|p' gradle/libs.versions.toml)
 
 if [ -z "$tomcat_override" ]; then
   echo "No Tomcat override in place; nothing to check."
@@ -180,7 +183,7 @@ else
     # The override earns its place only while it is strictly newer than what the BOM manages.
     oldest=$(printf '%s\n%s\n' "$tomcat_override" "$bom_tomcat" | sort -V | head -1)
     if [ "$bom_tomcat" = "$tomcat_override" ] || [ "$oldest" = "$tomcat_override" ]; then
-      fail "Spring Boot $boot_version now manages Tomcat $bom_tomcat, which is not older than the override $tomcat_override; delete the extra[\"tomcat.version\"] line in $conventions and this check"
+      fail "Spring Boot $boot_version now manages Tomcat $bom_tomcat, which is not older than the override $tomcat_override; delete the catalog's tomcat entry, the two extra[\"tomcat.version\"] lines that read it, and this check"
     fi
     echo "The Tomcat override is still newer than the BOM; keep it."
   fi

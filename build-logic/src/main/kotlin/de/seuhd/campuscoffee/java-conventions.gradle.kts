@@ -49,10 +49,13 @@ tasks.withType<JavaCompile>().configureEach {
 // io.spring.dependency-management substitutes a project property whose name matches a BOM property, and it
 // must be assigned before the import below for that substitution to happen.
 //
+// The version lives in the catalog, because the coverage module imports the same BOM separately and needs
+// the identical override; a second literal here would have drifted from it.
+//
 // This lasts only until a Spring Boot release manages 11.0.25 or newer. The fifth check in
 // scripts/check-toolchain-versions.sh compares the override against the BOM on every build and fails once
 // the BOM has caught up, so it cannot outlive its reason unnoticed; delete this line when it tells you to.
-extra["tomcat.version"] = "11.0.25"
+extra["tomcat.version"] = libs.findVersion("tomcat").get().requiredVersion
 
 dependencyManagement {
     imports {
