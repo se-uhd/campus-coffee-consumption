@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- CodeQL analyzes the Kotlin modules again. The job ran both languages in `build-mode: none`, which reads
+  sources directly. That works for TypeScript but not for Kotlin, where CodeQL builds its database from
+  compiled output and fails outright with "detected code written in Java/Kotlin but could not process any of
+  it". Autobuild is no alternative here, since it looks for `./gradlew` and this project has no wrapper. The
+  JVM half now uses `manual`, where mise supplies the toolchain and one `gradle classes` compiles every
+  module. The TypeScript half is unchanged and was passing throughout.
+
 ## [1.1.0] - 2026-09-05
 
 ### Added
