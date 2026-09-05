@@ -46,7 +46,7 @@ jobs:
         run: echo "version=$(gradle --version | awk '/^Gradle /{print $2}')" >> "$GITHUB_OUTPUT"
 
       - name: Resolve and submit the dependency graph
-        uses: gradle/actions/dependency-submission@v4
+        uses: gradle/actions/dependency-submission@v6
         with:
           # Given a version, the action downloads that Gradle and uses it, which is what lets a project
           # without a wrapper use this action at all.
