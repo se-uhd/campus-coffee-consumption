@@ -45,7 +45,7 @@ import { ActorPipe } from '../../pipes/actor.pipe';
     <cc-app-header [home]="'/admin'" title="Price" icon="sell"></cc-app-header>
 
     @if (loading()) {
-      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+      <mat-progress-bar mode="indeterminate" aria-label="Loading price"></mat-progress-bar>
     }
 
     <div class="page">

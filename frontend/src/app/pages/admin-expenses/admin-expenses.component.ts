@@ -80,7 +80,7 @@ import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../u
     ></cc-app-header>
 
     @if (loading()) {
-      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+      <mat-progress-bar mode="indeterminate" aria-label="Loading purchases"></mat-progress-bar>
     }
 
     <div class="page">

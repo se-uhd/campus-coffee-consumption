@@ -59,7 +59,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE' | 'RATI
     <cc-app-header [home]="'/admin'" title="Activity" icon="receipt_long"></cc-app-header>
 
     @if (loading()) {
-      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+      <mat-progress-bar mode="indeterminate" aria-label="Loading activity"></mat-progress-bar>
     }
 
     <div class="page">

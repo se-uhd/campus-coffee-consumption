@@ -50,7 +50,7 @@ import { AppHeaderComponent } from '../../components/app-header/app-header.compo
     ></cc-app-header>
 
     @if (loading()) {
-      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+      <mat-progress-bar mode="indeterminate" aria-label="Loading security settings"></mat-progress-bar>
     }
 
     <div class="page">
