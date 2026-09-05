@@ -27,8 +27,8 @@ module.exports = defineConfig([
       'out-tsc/**',
       'e2e/**',
       'playwright.config.ts',
-      'src/app/api/**',
-    ],
+      'src/app/api/**'
+    ]
   },
   {
     files: ['**/*.ts'],
@@ -42,7 +42,7 @@ module.exports = defineConfig([
       // SonarJS contributes bug-detection and complexity rules (duplicated branches, identical sub-
       // expressions, cognitive complexity) on top of the above.
       sonarjs.configs.recommended,
-      angular.configs.tsRecommended,
+      angular.configs.tsRecommended
     ],
     processor: angular.processInlineTemplates,
     rules: {
@@ -51,16 +51,16 @@ module.exports = defineConfig([
         {
           type: 'attribute',
           prefix: 'cc',
-          style: 'camelCase',
-        },
+          style: 'camelCase'
+        }
       ],
       '@angular-eslint/component-selector': [
         'error',
         {
           type: 'element',
           prefix: 'cc',
-          style: 'kebab-case',
-        },
+          style: 'kebab-case'
+        }
       ],
       // The team keeps constructor dependency injection as the default; do NOT push the inject() function.
       // (angular-eslint enables this in its recommended set as of v22; we opt back out deliberately.)
@@ -74,8 +74,8 @@ module.exports = defineConfig([
       // calls the hook and ignores the result, and each of ours awaits a loader that handles its own
       // errors. Only the inherited-method case is exempted; the checks that catch a genuine mistake (an
       // async function passed as a void callback, or assigned to a void-returning property) stay on.
-      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { inheritedMethods: false } }],
-    },
+      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { inheritedMethods: false } }]
+    }
   },
   {
     // Type information for the app sources. `projectService` resolves each file against the nearest
@@ -88,8 +88,8 @@ module.exports = defineConfig([
     files: ['**/*.ts'],
     ignores: ['**/*.spec.ts'],
     languageOptions: {
-      parserOptions: { projectService: true, tsconfigRootDir: __dirname },
-    },
+      parserOptions: { projectService: true, tsconfigRootDir: __dirname }
+    }
   },
   {
     // Specs need tsconfig.spec.json specifically: it is the only project that pulls in `vitest/globals`,
@@ -98,12 +98,12 @@ module.exports = defineConfig([
     // would report the entire test suite as unsafe calls and member accesses.
     files: ['**/*.spec.ts'],
     languageOptions: {
-      parserOptions: { project: ['./tsconfig.spec.json'], tsconfigRootDir: __dirname },
+      parserOptions: { project: ['./tsconfig.spec.json'], tsconfigRootDir: __dirname }
     },
     rules: {
       // Test fixtures use obvious throwaway credentials on purpose; flagging them adds no security value.
-      'sonarjs/no-hardcoded-passwords': 'off',
-    },
+      'sonarjs/no-hardcoded-passwords': 'off'
+    }
   },
   {
     files: ['**/*.html'],
@@ -112,15 +112,129 @@ module.exports = defineConfig([
       // Keep strict equality, but allow the idiomatic `x == null` / `x != null` nullish check (which
       // intentionally matches both null and undefined); turning those into `===`/`!==` would change
       // semantics. Mirrors typescript-eslint's eqeqeq `{ null: 'ignore' }`.
-      '@angular-eslint/template/eqeqeq': ['error', { allowNullOrUndefined: true }],
-    },
+      '@angular-eslint/template/eqeqeq': ['error', { allowNullOrUndefined: true }]
+    }
   },
   {
     // This config file itself is the only JavaScript in the project and is not part of any tsconfig, so the
     // type-checked rules above cannot run on it; turn them off here rather than widening the tsconfig.
     files: ['**/*.js'],
-    extends: [tseslint.configs.disableTypeChecked],
+    extends: [tseslint.configs.disableTypeChecked]
+  },
+  // Layer rules for the SPA, the frontend counterpart to the backend's ArchUnit tests. The directories
+  // under src/app already form a clean hierarchy, and these pin that shape so it cannot erode silently:
+  // view code may depend downward (a page on a component, a component on a service) but never upward or
+  // sideways. Expressed with the core no-restricted-imports rather than a boundaries plugin because the
+  // layering is one flat directory per layer, which a path pattern states directly and with no extra
+  // dependency. One rule per file set, and each set lists every restriction that applies to it: two config
+  // blocks matching the same file would override rather than merge this rule.
+  {
+    // Services and the route/HTTP hooks hold no view code, so nothing that renders is importable.
+    files: ['src/app/services/**', 'src/app/guards/**', 'src/app/resolvers/**', 'src/app/interceptors/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/pages/**', '**/components/**', '**/directives/**', '**/pipes/**'],
+              message: 'Services and route hooks must not import view code. Invert the dependency.'
+            },
+            {
+              group: ['**/api/**'],
+              message: 'Import the generated DTOs from models.ts, not from api/ directly.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    // util is pure: no Angular, no services, only other helpers and the shared types.
+    files: ['src/app/util/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/pages/**', '**/components/**', '**/services/**', '**/directives/**', '**/pipes/**'],
+              message: 'util must stay pure: no Angular, no services, no view code.'
+            },
+            {
+              group: ['**/api/**'],
+              message: 'Import the generated DTOs from models.ts, not from api/ directly.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    // Pipes and directives are leaf view helpers over pure functions.
+    files: ['src/app/pipes/**', 'src/app/directives/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/pages/**', '**/components/**', '**/services/**'],
+              message: 'A pipe or directive is a leaf: depend on util and the shared types only.'
+            },
+            {
+              group: ['**/api/**'],
+              message: 'Import the generated DTOs from models.ts, not from api/ directly.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    // A component is reusable, so it stays below the pages and never reaches back up into one.
+    files: ['src/app/components/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/pages/**'],
+              message: 'A component must not import a page. Pass the data in through an input instead.'
+            },
+            {
+              group: ['**/api/**'],
+              message: 'Import the generated DTOs from models.ts, not from api/ directly.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    // A page never imports another page, which keeps the routes independent of each other. Matched by
+    // regex rather than glob: a sibling page is exactly one directory up ('../admin-users/...'), while a
+    // page's legitimate imports of shared code go two or more up ('../../services/...').
+    files: ['src/app/pages/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^\\.\\./(?!\\.\\./)[^/]+/',
+              message: 'A page must not import another page. Move the shared piece into components/ or util/.'
+            },
+            {
+              group: ['**/api/**'],
+              message: 'Import the generated DTOs from models.ts, not from api/ directly.'
+            }
+          ]
+        }
+      ]
+    }
   },
   // Keep this last: disables any ESLint rules that would conflict with Prettier's formatting.
-  prettier,
+  prettier
 ]);
