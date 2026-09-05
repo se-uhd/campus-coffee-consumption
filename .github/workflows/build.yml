@@ -14,8 +14,10 @@ on:
   push:
     branches: [ "main" ]
 
+  # The pull-request trigger is deliberately NOT filtered by base branch. Filtering it to `main` silently
+  # skips a pull request stacked on another branch: no job runs, and the pull request reports "no checks"
+  # rather than a failure, which reads as fine. Every pull request is gated, whatever it targets.
   pull_request:
-    branches: [ "main" ]
 
   # The heavyweight browser jobs run nightly, not on every push: the full-coverage e2e (source-mapped SPA,
   # V8 instrumentation, the monocart teardown; the `e2e` job) and the prod-profile CSP smoke (`e2e-prod-csp`).

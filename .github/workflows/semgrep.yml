@@ -12,8 +12,10 @@ name: Semgrep
 
 on:
   # Mirrors qodana.yml: pull requests are the gate, and push covers main for anything landed outside a PR.
+  # The pull-request trigger is deliberately NOT filtered by base branch. Filtering it to `main` silently
+  # skips a pull request stacked on another branch: no job runs, and the pull request reports "no checks"
+  # rather than a failure, which reads as fine. Every pull request is gated, whatever it targets.
   pull_request:
-    branches: [ "main" ]
   push:
     branches: [ "main" ]
   workflow_dispatch: {} # allow manual runs

@@ -55,11 +55,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Every pull request is gated again, whatever branch it targets. All three workflows filtered their
+  pull-request trigger to `main`, so a pull request stacked on another branch ran no jobs at all and
+  reported "no checks" rather than a failure, which reads as benign. The filter is gone; `push` stays
+  limited to `main`, so the number of runs per change is unchanged.
 - Two Kotlin compiler session marker files were tracked in git, so every Gradle build deleted them and left
   the working tree dirty. They are untracked and `.kotlin/` is ignored.
 - Refreshed the frontend lockfile to clear eight advisories in transitive development dependencies. None of
   them shipped: the production tree audits clean, so the exposure was build-time only.
-
 - The Angular SPA no longer has a Qodana job, which could not run and was failing every scan of main.
   Qodana analyzes JavaScript and TypeScript only through its `qodana-js` linter, which JetBrains licenses
   under Ultimate; none of the Community linters covers JS/TS. The job therefore died at the Qodana Cloud
