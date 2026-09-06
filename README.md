@@ -76,6 +76,8 @@ Event sourcing is the only persistence model. See `CLAUDE.md` for the full archi
 - **Java 25** and **Gradle 9.5**, provisioned via [mise](https://mise.jdx.dev/) (`mise.toml`; no Gradle wrapper).
 - **Node 24** (for the frontend), also provisioned via mise.
 - **Docker**: for a local PostgreSQL database in the `dev` profile and for the Testcontainers-based tests.
+- **OpenTofu**, also from mise, only to deploy: it applies the cloud setup in `infra/` (see Production
+  deployment below). Nothing in the local build or the tests needs it.
 
 ## Running locally
 

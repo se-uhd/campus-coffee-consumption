@@ -256,6 +256,9 @@ that fail *silently* (a command that should match prints nothing, which reads as
   (CI uses `jdx/mise-action`). The build pins a **Java 25 toolchain with no auto-download**, so a
   JDK 25 must be present on the machine (mise supplies it).
 - Node 24 (an LTS) is provisioned via `mise.toml` for the frontend build, lint, and tests.
+- OpenTofu is provisioned via `mise.toml` too, and is needed only to deploy (it applies the cloud setup in
+  `infra/`); the build and the tests never call it. `scripts/deploy.sh` falls back to `mise exec` when the
+  shell's PATH has no `tofu`, so a plain shell can deploy.
 - The Java major version has a **single source of truth**: the `java` entry in
   `gradle/libs.versions.toml`. The convention plugins resolve it for the Gradle toolchain and the Kotlin
   `jvmTarget`; `mise.toml` and the Dockerfile runtime image pin the same major by hand.
@@ -604,8 +607,9 @@ See `doc/adr/001-where-the-production-database-runs.md`.
 ### Dependency Updates
 
 Dependencies and tools are kept current automatically:
-- **Dependabot** (`.github/dependabot.yml`) opens weekly PRs for the GitHub Actions and the Gradle
-  dependencies and plugins (resolved from the `libs.versions.toml` catalog).
+- **Dependabot** (`.github/dependabot.yml`) opens weekly PRs for the GitHub Actions, the Gradle
+  dependencies and plugins (resolved from the `libs.versions.toml` catalog), the frontend npm packages, the
+  Dockerfile base images, and the OpenTofu provider pinned in `infra/.terraform.lock.hcl`.
 - A weekly **`mise-outdated`** workflow opens or updates an issue when the mise-managed tools fall behind.
 
 ## Development Workflow
