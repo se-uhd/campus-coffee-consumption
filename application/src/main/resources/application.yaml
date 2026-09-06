@@ -147,12 +147,13 @@ spring:
     # role that owns only this schema, not the Cloud SQL master `postgres` user. Provision it once with
     # scripts/sql/create-app-role.sql. Override with DB_USERNAME if the role is named differently.
     username: ${DB_USERNAME:campus_coffee_app}
-    password: ${DB_PASSWORD} # supplied from Secret Manager (see scripts/deploy-cloudrun.sh and deploy.env.example)
+    password: ${DB_PASSWORD} # supplied from Secret Manager (see scripts/deploy.sh and deploy.env.example)
     hikari:
-      # Cap the pool well under db-g1-small's modest max_connections. A zero-downtime rolling deploy runs the
-      # old and new Cloud Run revisions together briefly, each holding its own pool, and the service can scale
-      # to several instances (--max-instances), so a small per-instance cap keeps the combined connection count
-      # within the instance limit. This low-traffic app needs far fewer than 5 connections per instance anyway.
+      # Cap the pool well under the Cloud SQL instance's max_connections (25 on db-f1-micro, 3 of them reserved
+      # for superusers). A zero-downtime rolling deploy runs the old and new Cloud Run revisions together
+      # briefly, each holding its own pool, and the service scales to max_instances (2, declared in
+      # infra/variables.tf and used by infra/run.tf), so the worst case is 2 x 2 x 5 = 20 connections. This low-traffic app needs far fewer
+      # than 5 connections per instance anyway. Raise the instance cap only together with the database tier.
       maximum-pool-size: 5
   lifecycle:
     # Drain in-flight requests on a Cloud Run SIGTERM before the context closes.

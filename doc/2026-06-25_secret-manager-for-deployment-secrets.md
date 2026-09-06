@@ -6,9 +6,10 @@ Date: 2026-06-25
 
 The production secrets are **authored locally in `deploy.prod.env`** (gitignored, the source of truth) and
 **synced into Google Secret Manager** by the deploy. The running Cloud Run service reads them from Secret
-Manager, bound as environment variables with `--set-secrets`. So the operator keeps a convenient editable copy
-on their machine, while the runtime gets Secret Manager's encryption at rest, access audit, and versioning, and
-no secret value rides in the git history or the build context.
+Manager, bound as environment variables by the deploy (since 2026-09-06 by the OpenTofu definition in
+`infra/run.tf`, before that with `--set-secrets` on `gcloud run deploy`). So the operator keeps a convenient
+editable copy on their machine, while the runtime gets Secret Manager's encryption at rest, access audit,
+and versioning, and no secret value rides in the git history or the build context.
 
 The secrets, their Secret Manager names, and where their values come from:
 
@@ -18,8 +19,10 @@ The secrets, their Secret Manager names, and where their values come from:
 | `LOGIN_PRIVATE_KEY_PEM`     | `login-key`                | `deploy.prod.env` (synced on deploy) |
 | `DB_PASSWORD`               | `db-app-password`          | `deploy.prod.env` (synced on deploy) |
 | `BOOTSTRAP_ADMIN_PASSWORD`  | `bootstrap-admin-password` | `deploy.prod.env` (synced on deploy) |
+| `TOTP_ENCRYPTION_KEY`       | `totp-encryption-key`      | `deploy.prod.env` (synced on deploy) |
 
-The same `deploy.prod.env` also holds the **non-secret** config, passed to the service with `--set-env-vars`:
+The same `deploy.prod.env` also holds the **non-secret** config, set on the service as plain environment
+variables (since 2026-09-06 exported to OpenTofu as `TF_VAR_*`, before that passed with `--set-env-vars`):
 `CAMPUS_COFFEE_APP_BASE_URL`, `DB_USERNAME`, and the bootstrap-admin identity (`BOOTSTRAP_ADMIN_LOGIN` /
 `_EMAIL` / `_FIRST_NAME` / `_LAST_NAME`).
 
@@ -56,14 +59,25 @@ Cloud Run / Cloud SQL deploy regardless; swapping the secret source (to a `.env`
 
 ## IAM and operations
 
-- The Cloud Run runtime service account needs `roles/secretmanager.secretAccessor` (to read the secrets) in
-  addition to `roles/cloudsql.client` (to connect through the socket factory).
-- `scripts/deploy-cloudrun.sh` syncs the secrets from `deploy.prod.env` on every deploy: it creates each
-  Secret Manager secret if missing, and adds a new version only when the local value has changed, then binds
-  `:latest` onto the service.
+- The service runs as the dedicated runtime service account `campus-coffee-run` (declared in
+  `infra/iam.tf`), which holds `roles/secretmanager.secretAccessor` on each of the five secrets and
+  `roles/cloudsql.client` (to connect through the socket factory), nothing else.
+- `scripts/deploy.sh` syncs the secrets from `deploy.prod.env` on every deploy: it creates each Secret
+  Manager secret if missing, and adds a new version only when the local value has changed. The OpenTofu
+  definition in `infra/` owns the secret containers and binds each one onto the service by name and version number. It never
+  sees a secret value (since 2026-09-06, `doc/adr/002-declarative-cloud-setup.md`). Before that, the previous
+  script, `scripts/deploy-cloudrun.sh`, bound them with `gcloud run deploy --set-secrets`.
 - The login key is stored as a normal multi-line PEM. `LoginEncryptionConfig` turns any literal `\n` into
   newlines, so a real multi-line PEM (the Secret Manager form) and a single line with `\n` separators both
   parse. It must be the same key on every instance (a client may fetch the public key from one instance and
   post the ciphertext to another), which one shared Secret Manager secret satisfies.
-- Rotate a secret by adding a new version (`gcloud secrets versions add <name> --data-file=-`) and
-  redeploying so the revision picks up `:latest`.
+- Rotate a secret by changing its value in `deploy.prod.env` and running `scripts/deploy.sh`: the sync adds
+  the Secret Manager version and the apply pins the service to it, so the rotation is a visible template
+  change that creates a revision. A version added out of band with `gcloud secrets versions add` is not what
+  the service reads, and the next deploy pins whatever `deploy.prod.env` holds. `DB_PASSWORD` additionally
+  needs the database role changed in the same window. The README has the runbook.
+- The service is pinned to one version per secret, but the runtime identity may read any enabled version of
+  those secrets. `scripts/deploy.sh` therefore disables the superseded versions after a successful apply, so
+  a compromised app process cannot read historical values. Disabling is reversible
+  (`gcloud secrets versions enable <version> --secret=<name>`), which is what routing traffic back to an
+  older revision needs.

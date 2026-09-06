@@ -291,3 +291,44 @@ jobs:
         run: docker build --build-arg MISE_GITHUB_TOKEN="$GITHUB_TOKEN" -t campus-coffee-consumption:ci .
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Format-check and validate the OpenTofu definition of the cloud setup (infra/), and refuse a committed
+  # state file that is not encrypted. No cloud credentials: nothing is planned or applied here, that happens
+  # from the operator's machine through scripts/deploy.sh (see doc/adr/002-declarative-cloud-setup.md).
+  infra-validate:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' # the nightly schedule runs only the heavyweight e2e jobs
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: jdx/mise-action@v4
+        with:
+          install_args: opentofu # only the tool this job needs, not the JDK, Gradle, and Node
+
+      - name: Check formatting
+        run: tofu -chdir=infra fmt -check -diff
+
+      # The provider is a ~150 MB download that every run would otherwise repeat; the lock file pins it, so
+      # its hash is the cache key.
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/tofu-plugin-cache
+          key: tofu-providers-${{ runner.os }}-${{ hashFiles('infra/.terraform.lock.hcl') }}
+
+      # In a copy without the state files: even with -backend=false, init opens a local state that is
+      # present, and the committed one is encrypted, which init cannot read without the passphrase.
+      - name: Validate
+        run: |
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          work="$(mktemp -d)"
+          cp infra/*.tf infra/.terraform.lock.hcl "$work"
+          tofu -chdir="$work" init -backend=false -input=false
+          tofu -chdir="$work" validate
+        env:
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/tofu-plugin-cache
+
+      - name: Refuse a plain-text state file
+        run: ./scripts/check-state-encrypted.sh

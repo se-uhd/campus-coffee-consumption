@@ -9,10 +9,13 @@ build
 .idea
 *.iml
 doc
+# The OpenTofu definition of the cloud setup is not an image input.
+infra
 *.log
 # Match .gitignore's deploy*.env wildcard: keep every deploy env file (deploy.env, deploy.prod.env, ...) out
-# of the build context that `gcloud run deploy --source` uploads to Cloud Build. Secrets now live in Secret
-# Manager, but these files must never enter the image regardless.
+# of the image build context (.gcloudignore decides what `gcloud builds submit` uploads to Cloud Build; this
+# file trims the docker build inside it and a local `docker build`). Secrets live in Secret Manager, but these
+# files must never enter the image regardless.
 deploy*.env
 .env
 # Host-generated frontend dirs (the Gradle build runs npm itself, so none of these are inputs). node_modules

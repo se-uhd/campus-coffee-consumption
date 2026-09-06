@@ -584,6 +584,23 @@ Run with Docker Compose (the Compose file defaults `DB_HOST` to `localhost` for 
 docker compose down && DB_HOST=db docker compose up
 ```
 
+### Production deployment
+
+The cloud setup (APIs, the image repository, the dedicated runtime service account and its two roles, the
+Secret Manager secret containers, the Cloud SQL instance, the Cloud Run service, an optional uptime check) is
+defined declaratively in `infra/` with **OpenTofu** (via mise). See `doc/adr/002-declarative-cloud-setup.md`.
+`scripts/deploy.sh` reads the gitignored `deploy.prod.env`, syncs the five secret versions into Secret
+Manager (no secret value passes through OpenTofu), builds and pushes the image with Cloud Build, and runs
+`tofu apply` (the service is pinned to the image digest and the secrets' version numbers, so every
+deploy and every rotation creates a revision, and `scripts/deploy.sh --plan` is the drift check without a
+build). The image build runs as a dedicated `campus-coffee-build` service account with three narrow
+grants. The state `infra/terraform.tfstate` is committed, encrypted with `STATE_PASSPHRASE`
+(`infra/encryption.tf`, and CI's `infra-validate` job rejects a plain-text state), and `infra/imports.tf`
+re-adopts the resources if it is lost (all but the monitoring trio, whose ids are server-generated). Commit the state after every apply. Never change the deployed
+resources by hand or with `gcloud run deploy`. The next plan shows such a change as drift. The production database is
+Cloud SQL `db-f1-micro` (25 connections), so Cloud Run is capped at 2 instances (`infra/variables.tf`).
+See `doc/adr/001-where-the-production-database-runs.md`.
+
 ### Dependency Updates
 
 Dependencies and tools are kept current automatically:
@@ -609,6 +626,11 @@ as a first-class step at both ends (not an afterthought):
    the build green.
 5. **Deploy.** Only after the second review: cut the release (version bump, changelog, tag) and deploy (see
    **Versioning and Releases** and the deploy notes in `README.md`).
+
+A decision worth recording (tooling, hosting, a cost trade-off) goes into `doc/adr/` as an architecture
+decision record (ADR): `NNN-meaningful-name.md`, following `doc/adr/template.md` (Decision Metadata, Context,
+Considered Options with their implications, Decision(s), Consequences), kept short. The dated documents in
+`doc/` are design records of a change; an ADR records a choice between options.
 
 A green build is necessary but not sufficient: The second review exists precisely to find what the tests do
 not. Scale the review depth to the change (a small fix needs a light pass; a feature or refactor warrants a

@@ -1,0 +1,14 @@
+# What `gcloud builds submit` (scripts/deploy.sh) uploads as the build context. The Dockerfile builds the app
+# from source, so the same things .dockerignore excludes are not needed, and the deploy env files and the
+# OpenTofu state must never be uploaded.
+#!include:.gitignore
+.git
+doc
+infra
+frontend/node_modules
+frontend/dist
+frontend/.angular
+frontend/coverage
+frontend/coverage-e2e
+frontend/playwright-report
+frontend/test-results

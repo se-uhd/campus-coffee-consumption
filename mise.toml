@@ -3,4 +3,5 @@ java = 'temurin-25'
 gradle = '9.5'
 node = '24' # builds the Angular frontend (the Gradle node integration uses this node); Angular 22 requires Node >= 22.22.3 / >= 24.15.0
 gcloud = 'latest'
+opentofu = '1.12' # defines the cloud setup in infra/ (see doc/adr/002-declarative-cloud-setup.md); the Dockerfile skips it
 python = '3.13' # required by some gcloud components

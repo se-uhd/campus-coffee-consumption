@@ -1,0 +1,26 @@
+# Not used by scripts/deploy.sh, which exports the same values from deploy.prod.env as TF_VAR_* variables.
+# Copy to terraform.tfvars (gitignored) only to run tofu by hand. Such a run also needs a credential the
+# provider accepts and the image the service actually runs, or the plan wants to change it:
+#   export GOOGLE_OAUTH_ACCESS_TOKEN="$(gcloud auth print-access-token)"   # valid for one hour
+#   tofu -chdir=infra output -raw image                                    # the value for `image` below
+# `scripts/deploy.sh --plan` does all of that already and is the supported way to see drift.
+project                    = "your-project-id"
+region                     = "your-region"
+sql_instance               = "your-instance"
+sql_zone                   = "your-region-a"
+image                      = "your-region-docker.pkg.dev/your-project-id/campus-coffee/app:tag"
+base_url                   = "https://your-service-url.run.app"
+db_username                = "campus_coffee_app"
+bootstrap_admin_login      = "admin"
+bootstrap_admin_email      = "admin@se.uni-heidelberg.de"
+bootstrap_admin_first_name = "Bootstrap"
+bootstrap_admin_last_name  = "Admin"
+alert_email                = "you@example.org"
+secret_versions = {
+  jwt-secret               = "1"
+  login-key                = "1"
+  db-app-password          = "1"
+  bootstrap-admin-password = "1"
+  totp-encryption-key      = "1"
+}
+state_passphrase           = "REPLACE_ME_with_at_least_16_random_characters"

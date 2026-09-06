@@ -1,0 +1,12 @@
+# Provider binaries and the lock of a local run; the committed .terraform.lock.hcl pins the provider.
+.terraform/
+# Variable files carry the deploy identifiers and the state passphrase.
+*.tfvars
+*.tfvars.json
+!terraform.tfvars.example
+# Plan files (encrypted, but throwaway), the state OpenTofu leaves behind when a state write fails, and the
+# lock file of a running command, which names the operator's user, host, and checkout path.
+*.tfplan
+errored.tfstate
+.terraform.tfstate.lock.info
+# terraform.tfstate and terraform.tfstate.backup are committed: they are encrypted (see encryption.tf).

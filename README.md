@@ -219,47 +219,138 @@ the acceptance tests. The frontend uses **Vitest** for unit tests (`cd frontend 
   SPA imports them through `frontend/src/app/models.ts`; do not hand-edit the generated `api/model/`
   directory.
 
-## Production deployment (Cloud Run + Cloud SQL)
+## Production deployment (Cloud Run + Cloud SQL, defined with OpenTofu)
 
 The whole app ships as **one Cloud Run image**: the Angular SPA is bundled into the backend's `static/`
 resources, so the browser loads the app and calls `/api` under one origin (no CORS in prod).
 
-The prod profile connects to a **Cloud SQL for PostgreSQL 18** instance (its connection name supplied per
-deployment via the `CLOUD_SQL_INSTANCE` environment variable) via the **Cloud SQL Java connector**,
-which does TLS and IAM auth itself (no authorized-networks or client-cert setup). The non-secret connection
-details are baked into the prod profile; the DB password, `JWT_SECRET`, the login-encryption private key
-(`LOGIN_PRIVATE_KEY_PEM`), and the bootstrap-admin credentials are supplied as environment variables.
-Fixtures are off in prod; instead, a **bootstrap admin** is created on first startup from
+The prod profile connects to a **Cloud SQL for PostgreSQL 18** instance (tier `db-f1-micro`, see
+`doc/adr/001-where-the-production-database-runs.md`) through the **Cloud SQL Java connector**, which does
+Transport Layer Security (TLS) and Identity and Access Management (IAM) auth itself, as the least-privilege
+role `campus_coffee_app` (provisioned once, see the notes below).
+Fixtures are off in prod. A **bootstrap admin** is created on first startup from
 `campus-coffee.bootstrap-admin.*` when no admin exists.
 
+**The cloud setup is defined declaratively in `infra/`** with OpenTofu (`doc/adr/002-declarative-cloud-setup.md`):
+the enabled APIs, the image repository, a dedicated runtime service account with exactly the two roles the
+app needs (`roles/cloudsql.client`, and `roles/secretmanager.secretAccessor` on its five secrets), the Secret
+Manager secret containers, the Cloud SQL instance (with deletion protection), the Cloud Run service, and an
+optional uptime check with an email alert. The state file `infra/terraform.tfstate` is committed to git,
+encrypted with `STATE_PASSPHRASE` from `deploy.prod.env` (`infra/encryption.tf`). It holds no secret, only
+the deploy identifiers, which is why it is encrypted. `infra/imports.tf` re-adopts the resources if the
+state or the passphrase is ever lost (all but the uptime check, its channel, and its alert, whose ids are
+server-generated, so the plan creates a new check, channel, and alert, and the previous three are deleted by hand).
+
 **Secrets are authored in `deploy.prod.env` and synced into Google Secret Manager.** The gitignored
-`deploy.prod.env` is the local source of truth for the four secrets (`JWT_SECRET`, `LOGIN_PRIVATE_KEY_PEM`,
-`DB_PASSWORD`, `BOOTSTRAP_ADMIN_PASSWORD`) and the non-secret config. `scripts/deploy-cloudrun.sh` reads it,
-syncs each secret into Secret Manager (creating it, or adding a new version when the value changes), and binds
-them onto the service from Secret Manager with `--set-secrets`; the non-secret config
-(`CAMPUS_COFFEE_APP_BASE_URL`, `DB_USERNAME`, the non-secret `BOOTSTRAP_ADMIN_*` identity) is passed with
-`--set-env-vars`. So the editable copy stays on the operator's machine while the runtime reads the secrets from
-Secret Manager (encryption at rest, access audit, versioning), and no secret rides in the build context. The
-cloud deploy uses `gcloud run deploy` rather than `gcloud beta run compose up`, because compose up cannot bind
-a Secret Manager secret as an environment variable. See
+`deploy.prod.env` is the local source of truth for the five secrets (`JWT_SECRET`, `LOGIN_PRIVATE_KEY_PEM`,
+`TOTP_ENCRYPTION_KEY`, `DB_PASSWORD`, `BOOTSTRAP_ADMIN_PASSWORD`), the state passphrase, and the non-secret
+config. `scripts/deploy.sh` reads it, syncs each secret into Secret Manager (creating it, or adding a new
+version when the value changes), builds and pushes the image with Cloud Build, and runs `tofu apply`, which
+binds the secrets onto the service by name and version number and passes the non-secret config as
+environment variables. No secret value passes through OpenTofu or its state. See
 `doc/2026-06-25_secret-manager-for-deployment-secrets.md`.
 
+Deploy:
+
+```shell
+scripts/deploy.sh          # prints the plan and asks before applying; --yes skips the question
+git add infra/terraform.tfstate infra/terraform.tfstate.backup infra/.terraform.lock.hcl && git commit   # after every apply
+```
+
 Deploy notes:
-- One-time: enable the APIs (`gcloud services enable run.googleapis.com cloudbuild.googleapis.com
-  secretmanager.googleapis.com artifactregistry.googleapis.com sqladmin.googleapis.com`) and grant the Cloud
-  Run runtime service account both `roles/cloudsql.client` (to connect through the socket factory) and
-  `roles/secretmanager.secretAccessor` (to read the secrets). The socket factory uses the Cloud SQL Admin API
-  and IAM, so no `--add-cloudsql-instances` mount is needed.
-- The Secret Manager secrets are `jwt-secret`, `login-key`, `db-app-password`, and `bootstrap-admin-password`;
-  `LOGIN_PRIVATE_KEY_PEM` is a PKCS#8 RSA private key (at least 2048 bits), a normal multi-line PEM. The same
-  login key must be present on every instance, so it is one Secret Manager secret every instance reads.
-  `CAMPUS_COFFEE_APP_BASE_URL` is the deployed HTTPS origin (used to build the capability URLs);
-  `scripts/deploy-cloudrun.sh` resolves it and writes it back to `deploy.prod.env` on the first deploy.
-- The `com.google.cloud.sql:postgres-socket-factory` runtime dependency (named by the prod datasource URL)
-  is already declared in `application/build.gradle.kts`.
+- One-time: `gcloud auth login`, then copy `deploy.env.example` to `deploy.prod.env` and fill it in
+  (`gcloud` and `opentofu` come from `mise.toml`, and the project comes from `GCP_PROJECT` there). OpenTofu
+  authenticates with the gcloud login's access token, so no application-default credentials are needed.
+- `CAMPUS_COFFEE_APP_BASE_URL` is the deployed https origin (used to build the capability URLs). On a fresh
+  project deploy once with a placeholder, read the URL from the deploy's `Service URL` line, put it into
+  `deploy.prod.env`, and deploy again.
+- Cloud Run is capped at 2 instances (`max_instances` in `infra/variables.tf`) because `db-f1-micro` allows
+  25 connections and the app holds 5 per instance across two revisions during a deployment. Raise the cap
+  only together with the database tier.
+- The image build runs as the dedicated `campus-coffee-build` service account (`infra/iam.tf`: log writer
+  on the project, writer on the image repository, object user on the project's Cloud Build bucket). The
+  default compute service account, which the build ran as before with `roles/editor`, and the legacy Cloud
+  Build account, which held the builder role, need no role any more. Their bindings were removed by hand on
+  2026-09-06. Project IAM is additive, so the definition does not remove roles it does not declare: review
+  the project's members now and then with `gcloud projects get-iam-policy <project>
+  --flatten='bindings[].members' --format='value(bindings.members,bindings.role)'`.
+- The service is pinned to the image digest and to the secrets' version numbers, so a rebuild and a secret
+  rotation both create a revision. `scripts/deploy.sh --plan` is the drift check without a build.
+- Do not change the service, the instance, the secrets' IAM, or the identities by hand or with
+  `gcloud run deploy`. The next `tofu plan` shows the drift and the next apply reverts it. Secret versions
+  are the exception. Writing them is the script's job.
 
 After deploying, verify `/actuator/health`, the admin login, and a capability URL scan against the deployed
 origin.
+
+### The database role
+
+The instance's `postgres` user is its administrator, and the app runs as the least-privilege role
+`campus_coffee_app`. Provision it once, in this order, so the password is recorded before it is used:
+
+1. Generate the password with `scripts/generate-password.sh` and put it into `deploy.prod.env` as
+   `DB_PASSWORD`, replacing the placeholder line rather than adding a second one: the deploy script reads
+   the first occurrence of a key and refuses to run when a key appears twice.
+2. Create the role as `postgres` through the Cloud SQL Auth Proxy:
+   `psql "host=127.0.0.1 port=5432 user=postgres dbname=postgres" -v ON_ERROR_STOP=1 -v app_password="$(grep '^DB_PASSWORD=' deploy.prod.env | cut -d= -f2-)" -f scripts/sql/create-app-role.sql`.
+3. If Flyway ever ran as `postgres` (it did until 2026-09-06), transfer the tables and sequences it created
+   to the app role. Otherwise a later `ALTER TABLE` migration fails with "must be owner". The transfer is
+   `GRANT campus_coffee_app TO postgres;` then `ALTER TABLE public.<table> OWNER TO campus_coffee_app` for
+   each table and `ALTER SEQUENCE` for each sequence still owned by `postgres` (a `DO` block over
+   `pg_tables` and `pg_sequences` does it in one go, and the `public` schema keeps its owner). Verify with
+   `SELECT tablename, tableowner FROM pg_tables WHERE schemaname = 'public'`.
+4. Set `DB_USERNAME=campus_coffee_app` in `deploy.prod.env` and deploy. Keep the `postgres` password as
+   `DB_SUPERUSER_PASSWORD`, used by hand as the administrator and never bound to the app.
+
+### Rotating a secret
+
+Change the value in `deploy.prod.env` and run `scripts/deploy.sh`. The sync adds a Secret Manager version,
+the apply pins the service to it, and the new revision serves it. A version added by hand with
+`gcloud secrets versions add` is not what the service reads: the next deploy pins whatever
+`deploy.prod.env` holds. After a successful apply the script disables the superseded versions, so a
+compromised app process cannot read historical values. Re-enable one with
+`gcloud secrets versions enable <version> --secret=<name>` if traffic ever has to go back to an older
+revision.
+
+`DB_PASSWORD` is the exception, because the database has to change with it. Do it in one window:
+
+1. Put the new password (from `scripts/generate-password.sh`) into `deploy.prod.env`.
+2. Run `scripts/deploy.sh` **without** `--yes` and let it stop at the plan prompt. The image is built and
+   the new secret version exists at that point, but nothing is deployed yet.
+3. In another shell, through the Cloud SQL Auth Proxy as `postgres`, run
+   `ALTER ROLE campus_coffee_app PASSWORD '<new password>'` (the instance's password policy in
+   `infra/sql.tf` applies). Connections that are already open keep working.
+4. Confirm the apply. The window in which the old revision cannot open new connections is seconds.
+
+### Recovering a lost state or passphrase
+
+The committed state is unreadable without `STATE_PASSPHRASE`, and `infra/imports.tf` exists for exactly
+this case:
+
+1. `git rm infra/terraform.tfstate infra/terraform.tfstate.backup && git commit`.
+2. `scripts/deploy.sh --plan`. The import blocks re-adopt every resource, so the plan should show 28
+   imports, nothing destroyed or replaced, and only three additions: the uptime check, its notification
+   channel, and its alert policy, whose ids are server-generated and so cannot be imported by name. It also
+   shows six in-place changes, which are expected: `deletion_protection` on the five secrets and
+   `deletion_policy` on the image repository are client-side settings that the cloud API does not store, so
+   a fresh import reads them as unset and the apply puts the guards back.
+3. `scripts/deploy.sh`, then delete the three orphaned monitoring resources in the console (the ones not in
+   the new state), and commit the new state.
+
+### A fresh project
+
+The definition adopts an existing setup: a plan fails when a resource named by an import block does not
+exist. To stand up a new project, remove every import block in `infra/imports.tf` except the ones for the
+enabled APIs and the Secret Manager secrets (that is: the Cloud SQL instance, the Cloud Run service and its
+public invoker binding, the image repository, both service accounts, and all of their IAM members), and
+before the first deploy:
+
+1. Enable the APIs and create the Cloud SQL instance and its database.
+2. Create the Cloud Build staging bucket: `gcloud storage buckets create gs://<project>_cloudbuild
+   --location=US`. It is not part of the definition on purpose: Cloud Build creates and shares it across the
+   whole project as a US multi-region bucket, so declaring it with this deployment's region would replace it
+   and destroy the build logs.
+3. Run `scripts/deploy.sh`, provision the database role as above, and put the import blocks back.
 
 ## License
 

@@ -10,10 +10,10 @@
 # Build stage: mise installs the JDK and Gradle from mise.toml.
 FROM jdxcode/mise:2026.9.1 AS build
 WORKDIR /app
-# Disable the gcloud/python entries in mise.toml. The build doesn't need them, and `mise exec` below
+# Disable the gcloud/python/opentofu entries in mise.toml. The build doesn't need them, and `mise exec` below
 # would otherwise auto-install gcloud, whose install script fails here (it needs python on PATH, but
 # mise installs dependencies in parallel).
-ENV MISE_DISABLE_TOOLS=gcloud,python
+ENV MISE_DISABLE_TOOLS=gcloud,python,opentofu
 # Copy mise.toml first so the install layer stays cached until a tool version changes.
 COPY mise.toml .
 # mise resolves the JDK and Gradle through the GitHub releases API, whose unauthenticated quota is keyed on
@@ -22,7 +22,7 @@ COPY mise.toml .
 # only throttling. A token raises the quota, so CI passes one in.
 #
 # It is deliberately OPTIONAL. The same Dockerfile builds the production image through Cloud Build
-# (`gcloud run deploy --source .`), which passes no token, as does a plain local `docker build`; both keep
+# (`gcloud builds submit`, run by scripts/deploy.sh), which passes no token, as does a plain local `docker build`; both keep
 # working exactly as before on the anonymous quota. An empty value is unset rather than exported, because an
 # empty Authorization header would be rejected outright instead of falling back to anonymous access.
 #

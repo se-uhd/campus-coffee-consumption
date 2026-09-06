@@ -5,7 +5,58 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] - 2026-09-06
+
+### Added
+
+- The cloud setup is defined declaratively in `infra/` with OpenTofu: the enabled APIs, an image repository,
+  a dedicated runtime service account with exactly the two roles the app needs, the Secret Manager secret
+  containers, the Cloud SQL instance (with deletion protection), the Cloud Run service, and an optional
+  uptime check with an email alert. `scripts/deploy.sh` syncs the secrets from `deploy.prod.env` exactly as
+  before, builds and pushes the image, and applies the definition. No secret value passes through OpenTofu.
+  The state file is committed to git encrypted with a passphrase from `deploy.prod.env`, and the import
+  blocks stay in the repository as the recovery path. A CI job format-checks and validates the definition and
+  refuses a plain-text state file. The options and the reasons are in
+  `doc/adr/002-declarative-cloud-setup.md`.
+- `deploy.prod.env` gains the keys the definition needs: `GCP_PROJECT`, `GCP_REGION`, `SQL_INSTANCE`,
+  `SQL_ZONE`, and `STATE_PASSPHRASE` are required, `ALERT_EMAIL` (empty means no uptime check) and
+  `DB_SUPERUSER_PASSWORD` are optional. `deploy.env.example` documents each of them, and the deploy script
+  refuses to run when one is missing, empty, or listed twice.
+- Architecture decision records live in `doc/adr/`, following `doc/adr/template.md`. The first two record
+  where the production database runs and the declarative cloud setup.
+
+### Changed
+
+- The production Cloud SQL instance was downsized from `db-g1-small` to `db-f1-micro` on 2026-09-06, about
+  a third of the cost, with managed backups and point-in-time recovery kept. Its connection limit is 25, so
+  the Cloud Run service is capped at 2 instances (5 pooled connections each, two revisions overlapping
+  during a deployment). Running Postgres as a Docker container on a small virtual machine was designed and
+  turned out not to be cheaper. It is kept as a fallback in `doc/future-features.md`. See
+  `doc/adr/001-where-the-production-database-runs.md`.
+- The production image is built by Cloud Build as a dedicated `campus-coffee-build` service account (log
+  writer, writer on the image repository, object user on the Cloud Build bucket) instead of the default
+  compute service account with Editor. The service is pinned to the image digest and to the secrets'
+  version numbers, so a rebuild and a secret rotation both create a revision.
+
+### Removed
+
+- `scripts/deploy-cloudrun.sh` and the `CLOUD_SQL_INSTANCE` key of `deploy.prod.env` (the connection name
+  is derived from `GCP_PROJECT`, `GCP_REGION`, and `SQL_INSTANCE`).
+
+### Security
+
+- The Cloud Run service runs as a dedicated service account with `roles/cloudsql.client` and
+  `roles/secretmanager.secretAccessor` on its five secrets, instead of the default compute service account,
+  which held `roles/editor` on the whole project. That account's project-level roles are removed, as is the
+  builder role of the legacy Cloud Build account, which no longer runs anything.
+- A deploy disables the superseded versions of each secret once the new revision is serving. The service
+  reads one pinned version, but the runtime identity could read every enabled one, so a compromised app
+  process could otherwise read historical values. Disabling is reversible, which is what routing traffic
+  back to an older revision needs.
+- The app connects to the database as the least-privilege role `campus_coffee_app` instead of the `postgres`
+  superuser. The role that the 0.5.0 notes and the docs described had never been provisioned in production.
+  It now is, with the ownership of the existing tables transferred to it so that later migrations keep
+  working. The docs say how to provision it.
 
 ### Fixed
 
@@ -1309,6 +1360,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[1.2.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v1.2.0
 [1.1.3]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v1.1.3
 [1.1.2]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v1.1.2
 [1.1.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v1.1.1

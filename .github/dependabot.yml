@@ -1,5 +1,5 @@
 # Dependabot keeps the GitHub Actions, Gradle (Kotlin/Java) dependencies, the frontend npm dependencies,
-# and the Dockerfile base images current. Most backend versions live in the gradle/libs.versions.toml
+# the Dockerfile base images, and the OpenTofu provider in infra/ current. Most backend versions live in the gradle/libs.versions.toml
 # catalog, which the gradle ecosystem updates (BOM-managed dependencies without an explicit version
 # follow the Spring Boot BOM and are not bumped here); the frontend versions live in frontend/package.json.
 # Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
@@ -107,3 +107,11 @@ updates:
       interval: weekly
     ignore:
       - dependency-name: eclipse-temurin
+
+  # The Google provider pinned in infra/.terraform.lock.hcl (the OpenTofu definition of the cloud setup),
+  # resolved from the OpenTofu registry. A provider bump is applied from the operator's machine with
+  # scripts/deploy.sh.
+  - package-ecosystem: opentofu
+    directory: /infra
+    schedule:
+      interval: weekly

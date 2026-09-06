@@ -1,4 +1,5 @@
 # Dependabot has no mise ecosystem, so this checks the mise-managed tools (the JDK, Gradle, gcloud, node,
+# opentofu,
 # and python pinned in mise.toml). Each week it runs `mise outdated` and files (or updates) an issue ONLY
 # when a tool's pin must be bumped by hand, i.e. the current pin no longer covers the newest release. A tool
 # whose newer version is already within its pin (a Node patch under the `24` major pin, or anything under

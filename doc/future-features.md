@@ -47,3 +47,29 @@ offer a member discount; each would extend `CoffeePrice` (or add a price dimensi
 
 Simple charts from the event log: cups per day/week, spend over time, the kitty balance trend, top
 contributors. The append-only log already holds everything needed; this is purely a read-side addition.
+
+## Self-hosted PostgreSQL on a virtual machine
+
+Deferred by `adr/001-where-the-production-database-runs.md`. A container is not cheaper than the downsized
+Cloud SQL instance, so it is only worth picking up if the bill does not drop as expected. The design, worked
+out on 2026-09-05:
+
+- The app stays on Cloud Run, because the `run.app` origin is printed in the wall QR codes.
+- A `postgres:18-alpine` container on an e2-micro virtual machine (VM) running Debian 13 and Docker Community Edition,
+  with a pd-balanced data disk bind-mounted at `/var/lib/postgresql`, the image's volume path since
+  PostgreSQL 18 (a mount at the older `/var/lib/postgresql/data` is silently ignored).
+- A static internal IP as `DB_HOST`, reached over Direct Virtual Private Cloud (VPC) egress through a
+  dedicated `/26` subnet whose address range is the only source the VM firewall admits on port 5432 (ingress
+  rules cannot match Cloud Run network tags).
+- SSH only through Google's Identity-Aware Proxy (IAP), and a
+  deny-all rule for everything else.
+- Transport Layer Security (TLS) enforced in `pg_hba.conf` for the app role only. The superuser cannot log in
+  over the network.
+- Secrets fetched from Secret Manager onto tmpfs at boot, never on the persistent disk.
+- Daily disk snapshots plus 6-hourly `pg_dump -Fc` to a bucket the VM can write but not delete, and a quarterly
+  restore drill that replays the event log into the read tables.
+- A restore that runs as the app role (otherwise later `ALTER TABLE` migrations fail on ownership), and a
+  cutover with `ALTER ROLE campus_coffee_app NOLOGIN` on Cloud SQL as the write freeze, a version-18
+  `pg_dump`, and a restore without `--clean` into the empty container.
+- The option costs about $13 a month and gives up point-in-time recovery and managed patching. With the
+  OpenTofu setup in place, the design would be a module in `infra/` rather than a shell script.
