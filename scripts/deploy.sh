@@ -179,6 +179,12 @@ if [ -n "$last_name" ]; then
   export TF_VAR_bootstrap_admin_last_name
 fi
 
+# Give the registry lookup room on a slow path. OpenTofu's default is 10 seconds, which a degraded route to
+# the registry's anycast addresses can exceed on every attempt (the symptom is "Failed to resolve provider
+# packages: context deadline exceeded", with the provider already cached or not). Raising it costs nothing on
+# a healthy network, where the lookup takes well under a second. Overridable for a caller who wants it lower.
+export TF_REGISTRY_CLIENT_TIMEOUT="${TF_REGISTRY_CLIENT_TIMEOUT:-120}"
+
 run_tofu -chdir=infra init -input=false >/dev/null
 
 if [ -n "$plan_only" ]; then
