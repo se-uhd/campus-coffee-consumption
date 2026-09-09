@@ -5,7 +5,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+### Security
+
+- The Gradle dependency graph submitted to GitHub now covers the runtime classpaths only, so an alert
+  describes the artifact that is deployed. Unscoped it resolved every configuration, Gradle's own buildscript
+  classpath included, which filled the alert list with the Kotlin plugin, kapt, detekt and their transitive
+  trees: 16 open alerts, four of them "high", and not one of them present in the running service, whose
+  jackson, logback and commons-lang3 were already newer than the version every advisory asked for. The
+  trade-off is stated in the workflow: a vulnerability reachable only while building is no longer alerted
+  here, which in this project was largely unactionable anyway, the one direct case being the Kotlin Gradle
+  plugin that detekt pins to an exact version.
+
+## [1.3.1] - 2026-09-09
 
 ### Added
 
@@ -1584,6 +1595,7 @@ with the consumption domain.
 - **Production deployment.** A `prod` profile targeting Cloud SQL for PostgreSQL 18 via the Cloud SQL Java
   connector, with a bootstrap-admin created on first startup (fixtures are off in production).
 
+[1.3.1]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v1.3.1
 [1.3.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v1.3.0
 [1.2.0]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v1.2.0
 [1.1.3]: https://github.com/se-uhd/campus-coffee-consumption/releases/tag/v1.1.3

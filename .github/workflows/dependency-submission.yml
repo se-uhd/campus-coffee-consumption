@@ -51,3 +51,19 @@ jobs:
           # Given a version, the action downloads that Gradle and uses it, which is what lets a project
           # without a wrapper use this action at all.
           gradle-version: ${{ steps.gradle.outputs.version }}
+          # Submit the runtime classpaths only, so an alert describes the artifact that is deployed.
+          #
+          # Unscoped, the action resolves every configuration, which includes Gradle's own buildscript
+          # classpath: the Kotlin plugin, kapt, detekt and their transitive trees. Those are not in the image
+          # and are usually far behind, so the alert list filled with them (16 open at once, four "high") and
+          # every one was a false alarm for the running service, whose jackson, logback and commons-lang3
+          # were all already newer than the version each advisory asked for. A list that is permanently red
+          # for reasons nobody can act on is a list nobody reads, which is the real cost.
+          #
+          # The trade-off is deliberate and worth stating: a vulnerability reachable only while building is
+          # no longer alerted here. It is a different risk class, remediated differently, and in this project
+          # largely unactionable, since those dependencies sit inside plugins the build does not name. The
+          # one direct case, the Kotlin Gradle plugin, is pinned to the exact version detekt 2.0.0-alpha.6
+          # was built against and cannot move until detekt publishes a newer alpha. CodeQL and Semgrep still
+          # scan the whole tree, and the npm graph GitHub parses on its own is untouched by this filter.
+          dependency-graph-include-configurations: '.*[rR]untimeClasspath'
