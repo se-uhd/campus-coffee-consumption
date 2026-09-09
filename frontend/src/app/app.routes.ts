@@ -35,8 +35,10 @@ void loadLanding().catch(() => undefined);
  * its children, so moving between pages of one audience no longer rebuilds the chrome. The user routes are
  * public (the capability token in the path is the credential); the admin routes are guarded by an admin JWT.
  * The matching backend `SinglePageAppController` serves `index.html` for these paths on a full page load so
- * deep links survive a refresh. Each page sets a human `title` (the default title strategy writes it to the
- * browser tab) and, on a subpage, the `headerTitle`/`headerIcon` its shell renders in the header bar.
+ * deep links survive a refresh, and a path it does not list reaches the catch-all below through the
+ * backend's `SinglePageAppShell`, which answers a browser's 404 with the shell. Each page sets a human
+ * `title` (the default title strategy writes it to the browser tab) and, on a subpage, the
+ * `headerTitle`/`headerIcon` its shell renders in the header bar.
  */
 export const routes: Routes = [
   {

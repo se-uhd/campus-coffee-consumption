@@ -10,9 +10,15 @@ import org.springframework.web.bind.annotation.GetMapping
  * The routes (`/login/:token` and its profile, the admin landing `/admin`, the other `/admin` pages such as
  * `/admin/login`, `/admin/users`, and `/admin/profile`) are handled by the Angular router in the browser;
  * on a full page load the server must still return the SPA shell for them rather than a 404. The root `/`
- * and any other path are redirected to `/admin` by the Angular router client-side once the shell loads. The
- * routes are listed explicitly so this never shadows the API paths, the actuator, the API docs, or a static
- * asset (which carries a file extension and is served directly).
+ * is redirected to `/admin` by the Angular router client-side once the shell loads. The routes are listed
+ * explicitly so this never shadows the API paths, the actuator, the API docs, or a static asset (which
+ * carries a file extension and is served directly).
+ *
+ * A path outside this list is not this controller's business: it is genuinely unknown, so it 404s, and
+ * [SinglePageAppShell] decides from there whether the 404 should carry the SPA shell (a browser navigating
+ * to a mistyped page, which then lands on the app's own not-found page) or the API's JSON body (an API
+ * client, a script, a missing asset). That split lives at the 404 rather than here because only there is it
+ * already known that nothing else matched, so it cannot shadow anything.
  *
  * It is deliberately in `api.app`, not `api.controller`: `ApiWebConfig` adds the `/api` base path to every
  * controller in the `api.controller` package, but this controller serves the non-`/api` SPA routes above

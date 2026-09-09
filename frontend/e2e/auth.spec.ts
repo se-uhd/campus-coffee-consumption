@@ -57,18 +57,38 @@ test.describe('auth and routing', () => {
     await expect(page).toHaveURL(/\/admin\/login$/);
   });
 
-  test('an unknown admin path shows the not-found page instead of the dashboard', async ({ page }) => {
-    // The catch-all deliberately does not redirect an unknown URL to /admin: a mistyped link would then look
-    // like a working one. The path is under /admin because that is the prefix the backend forwards to the
-    // SPA shell; a genuinely unknown top-level path never reaches the Angular router at all.
-    await page.goto('/admin/no-such-page');
+  test('an unknown path shows the not-found page instead of an error body', async ({ page }) => {
+    // A path the backend does not forward still 404s, but a navigating browser gets the SPA shell with it,
+    // so the reader lands on the app's own not-found page rather than on the API's JSON error document.
+    const response = await page.goto('/no-such-page');
 
-    await expect(page).toHaveURL(/\/admin\/no-such-page$/);
+    expect(response?.status(), 'the URL really does not exist, so the status stays honest').toBe(404);
+    await expect(page).toHaveURL(/\/no-such-page$/);
     await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
   });
 
+  test('an unknown API path answers with an error, never with the app shell', async ({ page }) => {
+    // The shell is for a browser looking for a page. A mistyped endpoint has to stay an error a client can
+    // act on, both for the client's own Accept and for a browser's.
+    await loginAsAdmin(page);
+
+    const asClient = await page.request.get('/api/no-such-endpoint');
+    expect(asClient.status()).toBe(404);
+    expect(asClient.headers()['content-type']).toContain('application/json');
+    expect(((await asClient.json()) as { errorCode: string }).errorCode).toBe('NotFound');
+
+    const asBrowser = await page.request.get('/api/no-such-endpoint', {
+      headers: { Accept: 'text/html,application/xhtml+xml' }
+    });
+
+    expect(asBrowser.status()).toBe(404);
+    expect(await asBrowser.text(), 'an API path must never be answered with the app').not.toContain(
+      '<cc-root>'
+    );
+  });
+
   test('the not-found page offers a link that reaches the sign-in', async ({ page }) => {
-    await page.goto('/admin/no-such-page');
+    await page.goto('/no-such-page');
 
     await page.getByRole('link', { name: 'Go to sign-in' }).click();
 

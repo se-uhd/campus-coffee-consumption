@@ -1,5 +1,6 @@
 package de.seuhd.campuscoffee.api.exceptions
 
+import de.seuhd.campuscoffee.api.app.SinglePageAppShell
 import de.seuhd.campuscoffee.domain.exceptions.ConcurrentUpdateException
 import de.seuhd.campuscoffee.domain.exceptions.ConflictException
 import de.seuhd.campuscoffee.domain.exceptions.DeletionConflictException
@@ -13,6 +14,7 @@ import jakarta.validation.ConstraintViolationException
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.HttpStatusCode
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.AuthenticationException
 import org.springframework.web.bind.MethodArgumentNotValidException
@@ -33,7 +35,9 @@ import java.time.LocalDateTime
  * as [ErrorResponse]. Domain exceptions are mapped explicitly below.
  */
 @ControllerAdvice
-class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
+class GlobalExceptionHandler(
+    private val singlePageAppShell: SinglePageAppShell
+) : ResponseEntityExceptionHandler() {
     /**
      * Unified handler for the mapped domain exceptions, returning the HTTP status configured for the
      * exception type and falling back to the generic handler for anything unmapped.
@@ -209,10 +213,14 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
     }
 
     /**
-     * Renders the 404 for an unmapped path as a clean [ErrorResponse]. Spring raises
-     * [NoResourceFoundException] when no handler (or static resource) matches the request; the base class
-     * would surface its framework wording ("No static resource ...") and class name, so this overrides it
-     * with a neutral `NotFound` code and an endpoint-oriented message.
+     * Answers a request that matched no handler and no static resource.
+     *
+     * A browser navigating to an unknown page is served the single-page app's shell, so it lands on the
+     * app's own not-found page rather than on an error body it cannot read; the status stays 404, because
+     * the URL really does not exist. Everything else gets a clean [ErrorResponse]: Spring raises
+     * [NoResourceFoundException] here, and the base class would surface its framework wording
+     * ("No static resource ...") and class name, so this overrides it with a neutral `NotFound` code and an
+     * endpoint-oriented message.
      */
     override fun handleNoResourceFoundException(
         ex: NoResourceFoundException,
@@ -221,6 +229,17 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         request: WebRequest
     ): ResponseEntity<Any>? {
         val path = extractPath(request)
+        // A browser navigating to an unknown page gets the SPA, which routes to its own not-found page; an
+        // API client, a script and a missing asset keep the JSON body. See SinglePageAppShell.
+        val shell = singlePageAppShell.shellFor(path, request.getHeader(HttpHeaders.ACCEPT))
+        if (shell != null) {
+            log.debug { "Serving the single-page app shell for $path" }
+            return ResponseEntity
+                .status(status)
+                .headers(headers)
+                .contentType(MediaType.TEXT_HTML)
+                .body(shell)
+        }
         log.warn { "No endpoint mapped for $path" }
         val body: Any = errorBody(ex, status, request, "No endpoint found for '$path'.", errorCode = "NotFound")
         return ResponseEntity.status(status).headers(headers).body(body)

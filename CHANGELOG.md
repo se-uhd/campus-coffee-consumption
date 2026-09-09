@@ -30,6 +30,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   chips writing the filter and the table reading the filtered view, which a spec driving the signal directly
   would miss; pointing the table at the unfiltered rows turns it red.
 
+### Fixed
+
+- A mistyped or stale link now reaches the app's own not-found page instead of an error document. The
+  backend forwards only `/`, `/admin/**` and `/login/**` to the single-page app, so every other path ended
+  at the API's JSON 404 and a visitor saw `{"errorCode":"NotFound", ...}` in the browser window. The new
+  `SinglePageAppShell` answers that 404 with the app's entry document when, and only when, the request is a
+  browser navigating to a page: not a backend path, so a mistyped endpoint still answers an API client in
+  the format it asked for; not a path with a file extension, so a missing script stays an error rather than
+  becoming HTML the browser cannot parse as the asset it wanted; and only for a client that asked for HTML
+  specifically, which a navigating browser does and `fetch`, `curl` and an image request do not. The status
+  stays 404, because the URL genuinely does not exist and the page the app routes to says so. The decision
+  sits at the 404 rather than in the forwarding controller because only there is it already known that
+  neither a handler nor a static file matched, so it cannot shadow either. A build with no bundled app (a
+  bare `gradle test`) has no shell and keeps the JSON.
+
 ### Changed
 
 - `CHANGELOG.md`, `README.md`, `CLAUDE.md` and `INSTRUCTOR.md` are Prettier-formatted, and the build now

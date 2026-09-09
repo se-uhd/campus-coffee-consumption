@@ -1,10 +1,12 @@
 package de.seuhd.campuscoffee.api.exceptions
 
+import de.seuhd.campuscoffee.api.app.SinglePageAppShell
 import de.seuhd.campuscoffee.domain.exceptions.NotFoundException
 import de.seuhd.campuscoffee.domain.model.User
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
+import org.springframework.core.io.DefaultResourceLoader
 import org.springframework.http.HttpStatus
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.security.authentication.BadCredentialsException
@@ -19,7 +21,8 @@ import java.util.UUID
  * the generic fallback for an unmapped exception, and a request that is not a [ServletWebRequest].
  */
 class GlobalExceptionHandlerTest {
-    private val handler = GlobalExceptionHandler()
+    // a backend-only resource loader: no bundled SPA, so every unmatched path keeps the JSON body
+    private val handler = GlobalExceptionHandler(SinglePageAppShell(DefaultResourceLoader()))
 
     @Test
     fun `handleAuthenticationException returns 401 with the request path`() {
