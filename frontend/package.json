@@ -46,7 +46,7 @@
     "@playwright/test": "^1.62.1",
     "@types/node": "^24.13.3",
     "@types/pngjs": "^6.0.5",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.0",
     "angular-eslint": "22.2.0",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
