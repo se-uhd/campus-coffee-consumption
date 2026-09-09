@@ -62,6 +62,22 @@ updates:
       # this by hand when the project itself moves to the next Node LTS.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # Keep Vitest on the major Angular's own test builder accepts. The SPA runs its unit tests through
+      # `@angular/build:unit-test` with the vitest runner, and @angular/build 22 declares
+      # `peerOptional vitest@"^4.0.8"`, so a vitest 5 is refused before a single test runs: `npm ci` fails
+      # with ERESOLVE and takes the build, the Docker build and the e2e job down with it. The two packages
+      # are also pinned to each other exactly (`@vitest/coverage-v8@x.y.z` peers `vitest@x.y.z`), so
+      # Dependabot's one-package-per-PR majors could never resolve even together, which is how the vitest 5
+      # pair was caught. Minor and patch updates are untouched and keep flowing through the group above.
+      #
+      # THIS RULE EXPIRES, like the TypeScript one below it. Delete it when the SPA moves to an Angular
+      # release whose @angular/build accepts the newer vitest, and bump Angular and both vitest packages
+      # together in one hand-written change. Read the accepted range off the peer declaration rather than
+      # assuming it widened.
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/coverage-v8"
+        update-types: ["version-update:semver-major"]
       # Keep TypeScript inside the range Angular accepts. @angular/build and @angular/compiler-cli 22 both
       # declare `peer typescript@">=6.0 <6.1"`, which admits exactly ONE TypeScript minor line, so anything
       # above a patch is incompatible: 6.1 is as far outside that range as 7.0. A version outside it does not
