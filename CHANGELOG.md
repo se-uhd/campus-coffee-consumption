@@ -7,6 +7,29 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Specs for the four pages that had none. `login` (8), `admin-price` (12) and `admin-activity` (17) each got
+  a Vitest spec; `not-found` has an empty class and a static template, so there is no line a component spec
+  could gate and it is covered end to end instead. Every test was checked by breaking the production line it
+  covers: 58 single-line mutations, all caught, and no test that caught nothing.
+
+  - `login`: the code sent only when one was typed, where each of the two sign-in outcomes lands, and the
+    one distinction the page may draw, a rate limit apart from every other failure, which all share a
+    message that says nothing about which half of the credentials was wrong.
+  - `admin-price`: the typed euro string reaching the server as integer cents and nothing reaching it when
+    that string is not a price, zero accepted as free coffee, the field held until the change is stored, and
+    a failed reload after a stored price not reported as a failed save.
+  - `admin-activity`: pages appending rather than replacing, the peeked row deciding whether more remain,
+    the filter buckets each row type falls into, the row detail for a cup total and a price change, and the
+    CSV download offering the whole feed rather than the rows on screen.
+
+- End-to-end coverage for the three things those specs cannot reach: the not-found page and its sign-in
+  link, a mistyped coffee link keeping its own invalid-link state instead of falling through to the 404, and
+  the activity filter chips actually narrowing the table. The last one gates the wiring at both ends, the
+  chips writing the filter and the table reading the filtered view, which a spec driving the signal directly
+  would miss; pointing the table at the unfiltered rows turns it red.
+
 ### Changed
 
 - `CHANGELOG.md`, `README.md`, `CLAUDE.md` and `INSTRUCTOR.md` are Prettier-formatted, and the build now

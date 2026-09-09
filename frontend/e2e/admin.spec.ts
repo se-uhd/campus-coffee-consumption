@@ -398,6 +398,36 @@ test.describe('admin flow', () => {
     await recordExpenseInActivity(page, '250', '4.20');
   });
 
+  // The activity filter is a client-side narrowing of rows the server already sent, so the only thing that
+  // can go wrong is the wiring: the chips writing the filter, and the table reading the filtered view. A
+  // unit spec drives the signal directly and would stay green with either end disconnected.
+  test('the activity filter chips narrow the table to the chosen type', async ({ page }) => {
+    // the reset leaves only the seeded price, so the feed needs a second type before a filter can narrow it
+    await api.post('/api/consumption', {
+      headers: { 'X-Capability-Token': USER_TOKENS.maxmustermann }
+    });
+    await loginAsAdmin(page);
+    await page.goto('/admin/activity');
+
+    const rows = page.locator('.cc-activity-table tbody tr');
+    await expect(rows).toHaveCount(2);
+    const all = await rows.count();
+
+    const chip = (label: string) =>
+      page.locator('.cc-activity-filter mat-button-toggle').filter({ hasText: label });
+
+    await chip('Price').click();
+    await expect(chip('Price')).toHaveClass(/mat-button-toggle-checked/);
+
+    const prices = await rows.count();
+    expect(prices, 'a single type must show fewer rows than every type').toBeLessThan(all);
+    await expect(rows.getByText('Price change').first()).toBeVisible();
+
+    await chip('All').click();
+
+    await expect(rows).toHaveCount(all);
+  });
+
   // The landing-panel preference is on the shared profile, so an admin can set it for any user from
   // /admin/profile; the selected user's landing then honors the choice in the admin's own view too.
   test('an admin sets a user landing panel to Cups from the admin profile', async ({ page }) => {
