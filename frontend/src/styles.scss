@@ -377,6 +377,34 @@ mat-card.card h2:last-child {
 // screen before its data is. It is a flat hairline block: it holds no text, nothing focusable, and does not
 // animate (a pulsing skeleton is motion the reduce-motion rule would only have to undo). Every use is
 // aria-hidden: it names nothing, so a screen reader must never meet it.
+// The activity list's row layout. Global rather than scoped to the list component, because the cold-load
+// placeholder draws the same rows and must not reach that component to get them (see
+// ActivityPlaceholderComponent). One definition, two renderers.
+.cc-activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+// A compact activity row: the type icon beside a tight stack of the title, the date/author, and the running
+// balance. The 8px block padding separates entries (16px between rows) while the small body gap keeps one
+// entry's three lines tight (Material's 3-line list item spread them across a fixed 88px height, which read
+// as loose).
+.cc-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.cc-entry-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .cc-placeholder {
   display: inline-block;
   background: var(--cc-hairline);

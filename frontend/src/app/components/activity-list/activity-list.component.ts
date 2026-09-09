@@ -11,6 +11,7 @@ import { ActivityEntryDto, ActivityEntryType } from '../../models';
 import { formatEuros } from '../../util/money';
 import { activityIcon, activityLabel } from '../../util/activity-type';
 import { ActorPipe } from '../../pipes/actor.pipe';
+import { ActivityPlaceholderComponent } from './activity-placeholder.component';
 
 /** The client-side filter buckets for the activity list. */
 type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS' | 'RATINGS';
@@ -27,6 +28,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS' | 'RATINGS';
 @Component({
   selector: 'cc-activity-list',
   imports: [
+    ActivityPlaceholderComponent,
     DatePipe,
     FormsModule,
     MatIconModule,
@@ -55,20 +57,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS' | 'RATINGS';
     }
 
     @if (pending()) {
-      <!-- The list's own shape while its rows are still on their way. It is never "Nothing to show.": that
-           is a statement about the data, and it is wrong until the data is in. -->
-      <ul class="cc-activity" aria-hidden="true">
-        @for (row of placeholderRows; track row) {
-          <li class="cc-entry">
-            <span class="cc-placeholder cc-placeholder--icon"></span>
-            <div class="cc-entry-body">
-              <span class="cc-placeholder cc-placeholder--line"></span>
-              <span class="cc-placeholder cc-placeholder--subline"></span>
-              <span class="cc-placeholder cc-placeholder--subline"></span>
-            </div>
-          </li>
-        }
-      </ul>
+      <cc-activity-placeholder />
     } @else if (visibleEntries().length > 0) {
       <ul class="cc-activity">
         @for (entry of visibleEntries(); track entry.id) {
@@ -149,35 +138,10 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS' | 'RATINGS';
         flex: 1 1 0;
       }
 
-      .cc-activity {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-      }
-
-      /* A compact activity row: the type icon beside a tight stack of the title, the date/author, and the
-         running balance. The 8px block padding separates entries (16px between rows) while the small body
-         gap keeps one entry's three lines tight (Material's 3-line list item spread them across a fixed
-         88px height, which read as loose). */
-      .cc-entry {
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 8px 0;
-      }
-
       .cc-entry-icon {
         flex: 0 0 auto;
         margin-top: 2px;
         color: var(--cc-ink-muted);
-      }
-
-      .cc-entry-body {
-        flex: 1 1 auto;
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
       }
 
       .cc-activity-title {
@@ -226,9 +190,6 @@ export class ActivityListComponent {
    * has seen yet.
    */
   readonly pending = input(false);
-
-  /** How many placeholder rows the pending state renders; a list's worth, not the real (unknown) count. */
-  readonly placeholderRows = [1, 2, 3];
 
   /** Whether to show a "Load more" button below the list (the parent has another page to fetch). */
   readonly canLoadMore = input(false);

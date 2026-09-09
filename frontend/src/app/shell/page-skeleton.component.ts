@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, DOCUMENT, inject } from '@angular/core';
-import { ActivityListComponent } from '../components/activity-list/activity-list.component';
+import { ActivityPlaceholderComponent } from '../components/activity-list/activity-placeholder.component';
 
 /** The URL prefix of the user audience, the one shape the skeleton can tell apart before any route exists. */
 const USER_PATH_PREFIX = '/login/';
@@ -22,7 +22,7 @@ const USER_PATH_PREFIX = '/login/';
  */
 @Component({
   selector: 'cc-page-skeleton',
-  imports: [ActivityListComponent],
+  imports: [ActivityPlaceholderComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div aria-hidden="true">
@@ -56,7 +56,7 @@ const USER_PATH_PREFIX = '/login/';
 
         <div class="card">
           <span class="cc-placeholder cc-placeholder--line"></span>
-          <cc-activity-list [pending]="true"></cc-activity-list>
+          <cc-activity-placeholder />
         </div>
       </div>
     </div>

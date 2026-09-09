@@ -7,6 +7,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The cold-load skeleton no longer reaches the real activity list to draw its placeholder rows, which cuts
+  the initial bundle from 762.65 kB to 593.00 kB (170.94 kB to 140.50 kB transferred) and puts it back under
+  its 650 kB budget. The root component is in the initial bundle, so everything it can reach is too; through
+  the skeleton it reached the activity list, and with it the four Angular Material modules that list needs
+  once it has rows. The skeleton only ever showed that list's loading shape, which is a dozen plain spans
+  and uses no Material at all. That shape is now its own component, which both the skeleton and the list
+  render, and the three layout rules behind it moved to the global stylesheet, so the rows still have one
+  definition.
+
 ### Added
 
 - Vitest specs for the three untested pages that carry logic, 59 tests in all. Each one was checked by
