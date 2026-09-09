@@ -266,6 +266,16 @@ val frontendFormatCheck by tasks.registering(NpmTask::class) {
         rootProject.file("frontend/.prettierrc.json"),
         rootProject.file("frontend/.prettierignore")
     )
+    // The format:check script also covers the repository's own root documents (`../*.md` in the npm script),
+    // so they are inputs too. Without them a commit that touches only CHANGELOG.md would find this task up to
+    // date and skip the very check it exists to run. The generated slop report is gitignored, and Prettier
+    // ignores it by name, so it is not an input either.
+    inputs.files(
+        rootProject.fileTree(rootProject.projectDir) {
+            include("*.md")
+            exclude("ai-slop-report.md")
+        }
+    )
     val marker = layout.buildDirectory.file("frontend-format-check.marker")
     outputs.file(marker)
     doLast { marker.get().asFile.writeText("ok") }

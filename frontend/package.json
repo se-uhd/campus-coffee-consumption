@@ -16,8 +16,8 @@
     "e2e:coverage": "PW_COVERAGE=1 playwright test",
     "lint": "ng lint && npm run lint:css",
     "lint:css": "stylelint \"src/**/*.scss\" --ignore-path .stylelintignore",
-    "format": "prettier --write \"**/*.{ts,html,scss,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,html,scss,json,md}\"",
+    "format": "prettier --write \"**/*.{ts,html,scss,json,md}\" \"../*.md\"",
+    "format:check": "prettier --check \"**/*.{ts,html,scss,json,md}\" \"../*.md\"",
     "knip": "knip"
   },
   "private": true,

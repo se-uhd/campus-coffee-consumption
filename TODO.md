@@ -4,8 +4,9 @@ Outstanding work, most urgent first. Each item says what to do, not what happene
 
 ## 1. Push
 
-Eight commits are unpushed, plus the `v1.3.0` tag. `40a0a69` was already unpushed before this work started;
-the rest were written locally and exist nowhere else.
+The whole of `main` since `ad9ddc1` is unpushed, plus the `v1.3.0` tag. `40a0a69` was already unpushed before
+this work started; the rest were written locally and exist nowhere else. `git log --oneline origin/main..HEAD`
+lists them.
 
 ```shell
 git push origin main && git push origin v1.3.0
@@ -26,10 +27,3 @@ delegation rather than gate anything. Leave them alone unless one of them grows 
 Hold every new test to the standard the current suite meets: revert the production line it covers, confirm
 the test goes red, restore. A test that stays green with its subject broken is worse than no test, because a
 review over a green suite counts it as coverage.
-
-## 4. Known cosmetic gaps, fix only if they bother you
-
-- The root `CHANGELOG.md` is not Prettier-formatted and never has been. The `format:check` glob runs from
-  `frontend/`, so the file is outside the gate. Reformatting it produces a large unrelated diff.
-- `npm run knip` prints one configuration hint: `src/main.ts  knip.json  Remove redundant entry pattern`.
-  It is a hint, not an error, and predates this work.

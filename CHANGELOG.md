@@ -9,6 +9,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `CHANGELOG.md`, `README.md`, `CLAUDE.md` and `INSTRUCTOR.md` are Prettier-formatted, and the build now
+  checks them. The `format:check` script runs from `frontend/` and its glob stopped there, so nothing above
+  that directory was checked; it now takes `../*.md` too, and the Gradle task lists those files as inputs so
+  it re-runs when one of them changes. Formatting found one real problem: twelve paragraphs wrapped an
+  inline code span across a line break, which Prettier rewrites into a continuation line at column zero,
+  detaching the text from the list item it belongs to. Those are rewrapped so the break falls outside the
+  span. Every document is word for word what it was; the rest of the diff is padded table separators and
+  emphasis markers changed from asterisks to underscores.
+- `knip.json` no longer lists `src/main.ts` as an entry point. Knip infers it from `angular.json`, so the
+  entry was redundant and Knip said so on every run. `npm run knip` is now silent.
+
 - The cold-load skeleton no longer reaches the real activity list to draw its placeholder rows, which cuts
   the initial bundle from 762.65 kB to 593.00 kB (170.94 kB to 140.50 kB transferred) and puts it back under
   its 650 kB budget. The root component is in the initial bundle, so everything it can reach is too; through
@@ -54,20 +65,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Every transition it walks, in both viewports, before and after (a row that lists two values gives the
   outward transition first, then the way back):
 
-  | transition | before | after |
-  | --- | --- | --- |
-  | admin sign-in to the dashboard | moves | stable |
-  | dashboard to Users, and back | stable, moves | stable |
-  | dashboard to Activity, and back | moves | stable |
-  | dashboard to Expenses, and back | moves | stable |
-  | dashboard to Kitty, and back | moves | stable |
-  | dashboard to Price, and back | moves | stable |
-  | dashboard to Ratings, and back | moves | stable |
-  | dashboard to Security, and back | stable, moves | stable |
-  | dashboard to Profile, and back | moves | stable |
-  | user landing to Ratings, and back | moves | stable |
-  | user landing to Profile, and back | moves | stable |
-  | switching the viewed user | moves | stable |
+  | transition                        | before        | after  |
+  | --------------------------------- | ------------- | ------ |
+  | admin sign-in to the dashboard    | moves         | stable |
+  | dashboard to Users, and back      | stable, moves | stable |
+  | dashboard to Activity, and back   | moves         | stable |
+  | dashboard to Expenses, and back   | moves         | stable |
+  | dashboard to Kitty, and back      | moves         | stable |
+  | dashboard to Price, and back      | moves         | stable |
+  | dashboard to Ratings, and back    | moves         | stable |
+  | dashboard to Security, and back   | stable, moves | stable |
+  | dashboard to Profile, and back    | moves         | stable |
+  | user landing to Ratings, and back | moves         | stable |
+  | user landing to Profile, and back | moves         | stable |
+  | switching the viewed user         | moves         | stable |
 
   The two that were already stable were stable for narrow reasons: Users is the one page that already had a
   route resolver, and Security only because its enrollment status happened to be cached from the sign-in.
@@ -358,16 +369,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the working tree dirty. They are untracked and `.kotlin/` is ignored.
 - Refreshed the frontend lockfile to clear eight advisories in transitive development dependencies. None of
   them shipped: the production tree audits clean, so the exposure was build-time only.
-- The Angular SPA no longer has a Qodana job, which could not run and was failing every scan of main.
-  Qodana analyzes JavaScript and TypeScript only through its `qodana-js` linter, which JetBrains licenses
-  under Ultimate; none of the Community linters covers JS/TS. The job therefore died at the Qodana Cloud
-  license check before it inspected a single file, and because a pull request had passed it earlier under
-  the previous license, main went red on the next push with no code change behind it. The job,
-  `frontend/qodana.yaml`, and the toolchain guard's JS-linter pin check are removed, leaving the backend
-  `qodana` job (tokenless, on the Community JVM linter) as the only Qodana scan. The SPA keeps the
-  angular-eslint, typescript-eslint, Stylelint, and Knip gate that `npm run lint` runs, which `gradle
-  check` enforces through the `frontendLint` task. Restoring the scan means an Ultimate license and a
-  revert of this change.
+- The Angular SPA no longer has a Qodana job, which could not run and was failing every scan of main. Qodana
+  analyzes JavaScript and TypeScript only through its `qodana-js` linter, which JetBrains licenses under
+  Ultimate; none of the Community linters covers JS/TS. The job therefore died at the Qodana Cloud license
+  check before it inspected a single file, and because a pull request had passed it earlier under the previous
+  license, main went red on the next push with no code change behind it. The job, `frontend/qodana.yaml`, and
+  the toolchain guard's JS-linter pin check are removed, leaving the backend `qodana` job (tokenless, on the
+  Community JVM linter) as the only Qodana scan. The SPA keeps the angular-eslint, typescript-eslint,
+  Stylelint, and Knip gate that `npm run lint` runs, which `gradle check` enforces through the `frontendLint`
+  task. Restoring the scan means an Ultimate license and a revert of this change.
 - Qodana now reaches the same verdict on a pull request as it does on main. The scan ran twice per branch
   and the two runs disagreed: the action analyzes only a pull request's changed files by default, while a
   push scan covers the whole project, so with `failThreshold: 0` a change that surfaced pre-existing
@@ -818,10 +828,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Deploy to Cloud Run with `gcloud run deploy --source . --set-secrets` instead of `gcloud beta run compose
-  up`. Compose up cannot bind a Secret Manager secret as an environment variable, so the cloud deploy moved
-  to `gcloud run deploy` (it still builds the image from the `Dockerfile` via Cloud Build). The secrets and
-  non-secret config are read from `deploy.prod.env` and passed via `--set-secrets` / `--set-env-vars`.
+- Deploy to Cloud Run with `gcloud run deploy --source . --set-secrets` instead of
+  `gcloud beta run compose up`. Compose up cannot bind a Secret Manager secret as an environment variable, so
+  the cloud deploy moved to `gcloud run deploy` (it still builds the image from the `Dockerfile` via Cloud
+  Build). The secrets and non-secret config are read from `deploy.prod.env` and passed via `--set-secrets` /
+  `--set-env-vars`.
 - Silence the JDK 25 build/test log warnings: pass `--sun-misc-unsafe-memory-access=allow` and
   `--enable-native-access=ALL-UNNAMED` to the forked test JVMs (the `java-conventions` and
   `detekt-rules-conventions` plugins) and add the native-access flag to the Gradle daemon (`gradle.properties`),
@@ -840,13 +851,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- Fix the production UI rendering unstyled under the Content-Security-Policy. Angular's production build inlined
-  critical CSS and loaded the full stylesheet asynchronously through an inline `onload="this.media='all'"`
-  handler, which the strict `script-src 'self'` policy blocks, so the stylesheet stayed `media="print"` and the
-  Angular Material theme and page layout never applied on screen (the dev e2e missed it: the CSP and the
-  critical-CSS optimization are prod-only). Disable critical-CSS inlining (`optimization.styles.inlineCritical:
-  false` in `frontend/angular.json`), so the build emits a plain render-blocking stylesheet link with no inline
-  JS, keeping the CSP strict.
+- Fix the production UI rendering unstyled under the Content-Security-Policy. Angular's production build
+  inlined critical CSS and loaded the full stylesheet asynchronously through an inline
+  `onload="this.media='all'"` handler, which the strict `script-src 'self'` policy blocks, so the stylesheet
+  stayed `media="print"` and the Angular Material theme and page layout never applied on screen (the dev e2e
+  missed it: the CSP and the critical-CSS optimization are prod-only). Disable critical-CSS inlining
+  (`optimization.styles.inlineCritical: false` in `frontend/angular.json`), so the build emits a plain
+  render-blocking stylesheet link with no inline JS, keeping the CSP strict.
 
 ### Security
 
@@ -1430,7 +1441,7 @@ machinery. See `doc/2026-06-21_pricing-expenses-kitty-and-the-unified-ledger.md`
 - **Communal kitty and settlements** (`Payment`), admin-managed and event-sourced. A settlement records a
   member paying money in (credits their balance, feeds the kitty); a kitty adjustment changes the kitty
   alone (an initial float or a correction). Endpoints: `POST /api/payments/settlement`,
-  `POST /api/payments/adjustment`, `GET /api/kitty/ledger` (admin). Members see only the kitty *balance*,
+  `POST /api/payments/adjustment`, `GET /api/kitty/ledger` (admin). Members see only the kitty _balance_,
   in their summary.
 - **Per-member balance** (a prepaid-card figure: negative means the member owes the fund), valuing each cup
   at the price in effect when it was consumed. The valuation is an "as-of" join over the event log keyed on

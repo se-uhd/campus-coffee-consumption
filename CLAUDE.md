@@ -14,8 +14,8 @@ just drank (a score from 1 to 5, within the same grace window), and record their
 shared **bean catalog**. Their landing shows either the money **balance** or pure **cup stats** (cups today,
 this week, and since their first cup), a per-user **summary-panel** preference. Admins create and manage
 users, set the price, record expenses and kitty deposits, correct anyone's count, and curate the bean catalog
-(rename and merge beans). An expense is **typed**: a *beans* purchase (a catalog bean plus a weight) or an
-*other* group outlay (filters, milk, repairs). Settling up is a **deposit** (real money paid into the kitty);
+(rename and merge beans). An expense is **typed**: a _beans_ purchase (a catalog bean plus a weight) or an
+_other_ group outlay (filters, milk, repairs). Settling up is a **deposit** (real money paid into the kitty);
 there is no reset. Every change (consumptions, prices, expenses, payments, bean-catalog edits, and ratings)
 is recorded in an append-only **event log**, the only persistence model, from which a **unified activity
 feed** (coffees, purchases, deposits, and ratings, the money entries carrying a running balance) is read.
@@ -32,6 +32,7 @@ The project uses a **multi-module Gradle structure** (Kotlin DSL) with four modu
 frontend.
 
 ### Module Dependencies
+
 - **domain**: Core business logic, domain models, and port interfaces. It depends on Bean Validation and, by design, on Spring (`@Service`/`@Component`/`@Transactional`/`@Value`/slf4j and `spring-tx`); it does not depend on the api, data, or application layers.
 - **api**: REST API layer: controllers, data transfer objects (DTOs), DTO mappers, and the inbound web security (the Spring Security filter chain, the capability-token filter, the `UserDetailsService`, the JSON Web Token (JWT) config, and the public base-url guard) (depends on: domain).
 - **data**: Data layer with JPA entities, repositories, the event sourcing machinery, and the QR/capability token adapters (depends on: domain).
@@ -39,6 +40,7 @@ frontend.
 - **frontend**: the Angular single-page application (SPA), a sibling of the modules, built by Gradle and bundled into the application's `static/` resources.
 
 ### Layer Rules (Enforced by ArchUnit)
+
 From `application/src/test/kotlin/de/seuhd/campuscoffee/tests/architecture/ArchitectureTests.kt`:
 
 - **api** layer may only be accessed by **application**.
@@ -55,6 +57,7 @@ The domain defines **port interfaces** that adapters implement:
 - **SPI (service provider interface) / infrastructure ports** (`domain/src/main/kotlin/de/seuhd/campuscoffee/domain/ports/system/`): `IdGeneratorService`, `CapabilityTokenGeneratorService`, `QrCodeService` (the single QR port: a high-resolution PNG **and** the printable PDF grid), `StartupTaskService`, and the request-scoped `ActorProviderService`. Concrete classes are not ports and live in `domain/.../model/`: `ChangeNoteContext` (the change-note metadata holder) and `LabeledQrCode` (a QR-grid cell, `QrCodeService`'s parameter type).
 
 Service **implementations**:
+
 - API services in `domain/src/main/kotlin/de/seuhd/campuscoffee/domain/implementation/` (`UserServiceImpl`, `CoffeeConsumptionServiceImpl`, `CoffeePriceServiceImpl`, `ExpenseServiceImpl`, `PaymentServiceImpl`, `CoffeeBeanServiceImpl`, `CoffeeRatingServiceImpl`, `AccountingServiceImpl`, `ActivityServiceImpl`).
 - Data services (`*DataServiceImpl`, including the read-side `ActivityDataServiceImpl`/`ConsumptionHistoryDataServiceImpl`) and the event-sourced decorators (`EventSourced*DataService`) in `data/.../implementations/`; the technology adapters (`QrCodeServiceImpl`, `PasswordHasherServiceImpl`, `CapabilityTokenGeneratorServiceImpl`, `IdGeneratorServiceImpl`) in `data/.../system/`; the Postgres advisory-lock `BalanceLockServiceImpl`, the `ConstraintMapping`, and the event-body jsonb serialization (`EventJsonMapper` with the `EventSourcingHibernateConfiguration` that pins it onto Hibernate) in `data/.../persistence/`; the event-log write support (`EventAppender`, `ReadModelProjector`, `EventSourcedWriter`, `EventsToDataRunner`) in `data/.../persistence/events/`; and the read-model projection (`BalanceDataServiceImpl` behind the `BalanceProjectionMaintainer` interface, plus the `EventReducer` and its `EventProjection`/`EventProjectionType`/`PricePoint`/`EventReducerUtil`) in `data/.../persistence/projection/`. The event-row discriminators `ChangeType` and `LoggedEntityType` live beside `EventEntity` in `data/.../persistence/entities/`.
 
@@ -62,7 +65,7 @@ Service **implementations**:
 
 Follow these in new code (enforced by review):
 
-- **A cross-module interface is a port, named `*Service` (or `*DataService` for a data-layer port), and its implementation is `<Port>Impl`.** "Cross-module" means the interface is defined in one module and *implemented or consumed in another*: the domain API services are consumed by `api` (`UserService`/`UserServiceImpl`); the domain data ports are implemented by `data` (`UserDataService`/`UserDataServiceImpl`); the SPI ports are implemented by `data` (`QrCodeService`/`QrCodeServiceImpl`, `IdGeneratorService`/`IdGeneratorServiceImpl`). An interface defined, implemented, **and** used entirely within one module is free-named.
+- **A cross-module interface is a port, named `*Service` (or `*DataService` for a data-layer port), and its implementation is `<Port>Impl`.** "Cross-module" means the interface is defined in one module and _implemented or consumed in another_: the domain API services are consumed by `api` (`UserService`/`UserServiceImpl`); the domain data ports are implemented by `data` (`UserDataService`/`UserDataServiceImpl`); the SPI ports are implemented by `data` (`QrCodeService`/`QrCodeServiceImpl`, `IdGeneratorService`/`IdGeneratorServiceImpl`). An interface defined, implemented, **and** used entirely within one module is free-named.
 - **An implementation name never leaks a library or vendor.** A single-impl port's adapter is `<Port>Impl`, never `ZxingQrCodeService` / `PostgresBalanceLock` / `BCryptPasswordHasher`. When a port genuinely has several implementations, name them by behavior/role, not the library: the `EventSourced*` decorators that wrap the relational `*DataServiceImpl`, and the `StartupTaskService` loaders.
 - **A concrete class is not a port:** it keeps a plain descriptive name and stays out of `ports/` (e.g. `ChangeNoteContext`, a request-scoped holder, lives in `domain/.../model/`).
 - **Utility helpers are `*Util`:** a file (or class) of pure, stateless functions with no injected dependencies (`ReadUtil`, `EventReducerUtil`). This differs from a package of injected collaborator beans (the controllers' `api/support` package): those are wired `@Component`s, not free functions, so they are not `*Util`.
@@ -71,7 +74,7 @@ Follow these in new code (enforced by review):
 - **Frontend Angular services are `*Service`** (`AdminUserService`, `AdminSelectionService`), including the stateful signal-holding singletons. No `*Store` (an NgRx idiom this app does not use).
 - **Depend on the port, never the implementation.** Production code injects and references the interface/port, not a `*Impl`. The ArchUnit test `production code depends on ports, never on Impl types` enforces this; its source set is the non-`*Impl` classes (the `*Impl` adapters themselves are excluded as sources, because each extends a base `*Impl` such as `CrudDataServiceImpl`, an inheritance edge the rule cannot single out). There is no exemption for the `EventSourced*` decorators: each injects its relational delegate as the **port** and pins it to the relational bean with `@param:Qualifier(<Impl>.BEAN_NAME)` (a `const val` on the relational adapter's companion, also its `@Service` bean name). Injecting the bare port would otherwise resolve to the `@Primary` decorator itself and self-loop; the qualifier breaks that. Because `BEAN_NAME` is a compile-time constant, the qualifier inlines to a string literal and leaves no bytecode reference to the `*Impl`, so the decorators obey this rule like any other class. When a collaborator has no port yet (e.g. a data-internal projection-maintenance operation), introduce a small interface for it (`BalanceProjectionMaintainer`) rather than depending on the class.
 
-Package layout reflecting the above: `domain/ports/{api,data,system}/`; `data/{implementations (the `*DataServiceImpl` and the event-sourced decorators), system (technology adapters), mapper (the MapStruct entity mappers), configuration (`IdGeneratorConfiguration`, `RepositoryConfiguration`, `EventContextConfiguration`, and the `@ConfigurationProperties`), persistence (entities incl. the `ChangeType`/`LoggedEntityType` discriminators, repositories, events (the event-log write support), projection (the balance projection + the `EventReducer`), the advisory-lock impl, `ConstraintMapping`)}`; `api/{app (the SPA-forwarding controller), support (controller-delegate helper beans), controller, dtos, mapper, security, openapi, configuration, exceptions}`.
+Package layout reflecting the above: `domain/ports/{api,data,system}/`; `data/{implementations (the `*DataServiceImpl` and the event-sourced decorators), system (technology adapters), mapper (the MapStruct entity mappers), configuration (`IdGeneratorConfiguration`, `RepositoryConfiguration`, `EventContextConfiguration`, and the `@ConfigurationProperties`), persistence (entities incl. the `ChangeType`/`LoggedEntityType`discriminators, repositories, events (the event-log write support), projection (the balance projection + the`EventReducer`), the advisory-lock impl, `ConstraintMapping`)}`; `api/{app (the SPA-forwarding controller), support (controller-delegate helper beans), controller, dtos, mapper, security, openapi, configuration, exceptions}`.
 
 ### Event Sourcing Is the Only Persistence Model
 
@@ -140,8 +143,8 @@ expense, or payment is each a plain `upsert` of the relevant entity with its new
 decorator records as a full-state event, identical to how a review's approval count advanced. The services
 expose:
 
-- `CoffeeConsumptionService.applyDelta(userId, delta, actingUser)` and `setTotal(userId, total, note,
-  actingUser)` (the admin absolute count correction; no separate reset).
+- `CoffeeConsumptionService.applyDelta(userId, delta, actingUser)` and
+  `setTotal(userId, total, note, actingUser)` (the admin absolute count correction; no separate reset).
 - `CoffeePriceService` sets the global price (the first write creates the singleton, later writes update it
   in place; no fixed sentinel id, no special insert path).
 - `ExpenseService` records and corrects **typed** expenses: a `BEANS` purchase (a catalog bean, resolved or
@@ -236,11 +239,12 @@ Domain-specific controllers/services extend these base classes (e.g., `UserContr
 ### Shell environment (macOS, zsh, BSD tools)
 
 The shell is **zsh on macOS** with **BSD** command-line tools, not bash/GNU. The differences bite in ways
-that fail *silently* (a command that should match prints nothing, which reads as a false "clean" result):
+that fail _silently_ (a command that should match prints nothing, which reads as a false "clean" result):
 
-- **zsh does not word-split unquoted parameter expansions.** `FLAGS="--include=*.md --include=*.kt"; grep
-  $FLAGS .` passes the whole string as one argument, so grep matches nothing. Use an array and quote-splat
-  it (`FLAGS=(--include='*.md' --include='*.kt'); grep "${FLAGS[@]}" .`), or write the flags inline.
+- **zsh does not word-split unquoted parameter expansions.**
+  `FLAGS="--include=*.md --include=*.kt"; grep $FLAGS .` passes the whole string as one argument, so grep
+  matches nothing. Use an array and quote-splat it
+  (`FLAGS=(--include='*.md' --include='*.kt'); grep "${FLAGS[@]}" .`), or write the flags inline.
 - **BSD tools differ from GNU.** `sed -i` needs an explicit backup suffix (`sed -i '' 's/a/b/g' file`). BSD
   `grep -E` handles `\b` (word boundary) unreliably, so `\bword\b` can match nothing; use `grep -w`, a plain
   pattern, or `git grep`. `grep -P` (PCRE) is unavailable.
@@ -251,7 +255,8 @@ that fail *silently* (a command that should match prints nothing, which reads as
   for a string you know exists; a silent zsh/BSD quirk once made a spelling scan report clean when it was not.
 
 ### Prerequisites
-- Docker daemon must be running to use a database in the `dev` profile or to run the tests that use *Testcontainers*.
+
+- Docker daemon must be running to use a database in the `dev` profile or to run the tests that use _Testcontainers_.
 - Java 25 and Gradle 9.5, provisioned via `mise.toml` (no Gradle wrapper). Run Gradle through mise
   (CI uses `jdx/mise-action`). The build pins a **Java 25 toolchain with no auto-download**, so a
   JDK 25 must be present on the machine (mise supplies it).
@@ -330,6 +335,7 @@ the Angular dev server (`cd frontend && npm start`), which serves on its own por
 backend on `:8081`.
 
 The `dev` profile:
+
 - Serves on **`:8081`** (not the conventional `:8080`) so a local run does not collide with another app on
   `:8080`; set via `server.port: ${SERVER_PORT:8081}` in the dev block of `application.yaml` (override with
   `SERVER_PORT`). The Docker Compose container pins `SERVER_PORT=8080`, and prod listens on `:8080`.
@@ -373,6 +379,7 @@ and the API still look same-origin to the browser and no Cross-Origin Resource S
    (`-PskipFrontendBuild` makes `stageFrontendForBootRun` stage only whatever is already in
    `frontend/dist`, so the backend comes up serving the API; the SPA you actually use is the dev server's.
    Drop the flag if you also want the bundled SPA on `:8081` as a fallback.)
+
 3. In a second terminal, start the **Angular dev server** (proxying `/api` to `:8081`):
 
    ```shell
@@ -435,32 +442,30 @@ gradle :domain:test --tests "CoffeeConsumptionServiceTest.decrementing a count a
 ### Code Coverage and Mutation Testing
 
 - **Coverage (JaCoCo)**: the `coverage` subproject (the `jacoco-report-aggregation` plugin) aggregates
-  execution data from all modules into one report at
-  `coverage/build/reports/jacoco/testCodeCoverageReport/`. Aggregation is required because
-  `domain`/`api`/`data` are largely covered by the `application` system and acceptance tests. `gradle
-  build` enforces the gate via the `coverageGate` task (a `JacocoCoverageVerification` in
-  `coverage/build.gradle.kts`, wired into `check`); raise the minimums as coverage grows, never lower them
-  to make a build pass.
+  execution data from all modules into one report at `coverage/build/reports/jacoco/testCodeCoverageReport/`.
+  Aggregation is required because `domain`/`api`/`data` are largely covered by the `application` system and
+  acceptance tests. `gradle build` enforces the gate via the `coverageGate` task (a
+  `JacocoCoverageVerification` in `coverage/build.gradle.kts`, wired into `check`); raise the minimums as
+  coverage grows, never lower them to make a build pass.
 - **Mutation testing (PITest)**: opt-in and local via the `-Pmutation` property and the per-module
   `pitest` task (e.g., `gradle :domain:pitest -Pmutation`). The `application` cross-module run
   (`gradle :application:pitest -Pmutation`) additionally mutates `api.*`/`data.*` against the system and
   acceptance tests. The generated `*MapperImpl` classes are excluded, mirroring the JaCoCo gate.
-- **"Both" coverage, the e2e run feeds both gates.** The Playwright e2e contributes coverage to *both*
+- **"Both" coverage, the e2e run feeds both gates.** The Playwright e2e contributes coverage to _both_
   sides:
   - **Backend (JVM) e2e coverage merged into the JaCoCo gate.** `gradle :coverage:runE2eCoverage`
     (`scripts/run-e2e-coverage.sh`) builds the source-mapped SPA + jar, launches it under the JaCoCo agent
     (`-javaagent:…=destfile=coverage/build/jacoco/e2e.exec,output=file,append=false`) on the dev profile
-    against PostgreSQL on `:5433`, waits for `/actuator/health`, runs the e2e (`PW_COVERAGE=1 npm run
-    e2e`), then SIGTERMs the app so the agent flushes `e2e.exec`. The aggregate report and `coverageGate`
-    in `coverage/build.gradle.kts` add `coverage/build/jacoco/e2e.exec` to their `executionData` *when it
-    exists*, so an e2e run's HTTP traffic counts toward the same gate; a plain `gradle build` (no
-    `e2e.exec`) degrades to the in-JVM coverage alone. The agent jar is resolved from the `jacocoAgentJar`
-    configuration. The task is opt-in (not wired into `check`) because it is orchestration-heavy and needs
-    a running Postgres + Playwright's chromium. After it runs, `gradle :coverage:coverageGate` folds
-    `e2e.exec` in.
+    against PostgreSQL on `:5433`, waits for `/actuator/health`, runs the e2e (`PW_COVERAGE=1 npm run e2e`),
+    then SIGTERMs the app so the agent flushes `e2e.exec`. The aggregate report and `coverageGate` in
+    `coverage/build.gradle.kts` add `coverage/build/jacoco/e2e.exec` to their `executionData` _when it
+    exists_, so an e2e run's HTTP traffic counts toward the same gate; a plain `gradle build` (no `e2e.exec`)
+    degrades to the in-JVM coverage alone. The agent jar is resolved from the `jacocoAgentJar` configuration.
+    The task is opt-in (not wired into `check`) because it is orchestration-heavy and needs a running Postgres
+    - Playwright's chromium. After it runs, `gradle :coverage:coverageGate` folds `e2e.exec` in.
   - **Frontend unit coverage (Vitest).** `npm run test:coverage` (the `coverage` configuration of the
     Angular `@angular/build:unit-test` builder, `@vitest/coverage-v8`) writes lcov + HTML + text-summary
-    under `frontend/coverage/`. The thresholds in `angular.json` are a deliberately *low floor*
+    under `frontend/coverage/`. The thresholds in `angular.json` are a deliberately _low floor_
     (statements/functions/lines 1%, branches 0%): the suite is a single service spec (~1% of the app), so
     the floor only guards against a regression to zero, not a real coverage target. Raise it as the unit
     suite grows.
@@ -589,11 +594,11 @@ Refresh with `gradle :application:refreshOpenApiSpec`, which boots the app on a 
 database, recaptures the spec, and regenerates the DTOs in one step (it replaces the old manual `curl`
 refresh; the committed spec no longer carries a release-coupled version).
 
-**Frontend tests and coverage** (run via mise's Node): `npm test` (Vitest unit tests), `npm run
-test:coverage` (the same with a coverage report under `frontend/coverage/`), `npm run e2e` (Playwright
-against an already-running app on `:8081`, the suite in `frontend/e2e/`), and `PW_COVERAGE=1 npm run e2e`
-(the e2e with browser V8 coverage written to `frontend/coverage-e2e/`). See **Code Coverage and Mutation
-Testing** for how the e2e also feeds the backend JaCoCo gate.
+**Frontend tests and coverage** (run via mise's Node): `npm test` (Vitest unit tests), `npm run test:coverage`
+(the same with a coverage report under `frontend/coverage/`), `npm run e2e` (Playwright against an
+already-running app on `:8081`, the suite in `frontend/e2e/`), and `PW_COVERAGE=1 npm run e2e` (the e2e with
+browser V8 coverage written to `frontend/coverage-e2e/`). See **Code Coverage and Mutation Testing** for how
+the e2e also feeds the backend JaCoCo gate.
 
 ### Docker
 
@@ -630,6 +635,7 @@ See `doc/adr/001-where-the-production-database-runs.md`.
 ### Dependency Updates
 
 Dependencies and tools are kept current automatically:
+
 - **Dependabot** (`.github/dependabot.yml`) opens weekly PRs for the GitHub Actions, the Gradle
   dependencies and plugins (resolved from the `libs.versions.toml` catalog), the frontend npm packages, the
   Dockerfile base images, and the OpenTofu provider pinned in `infra/.terraform.lock.hcl`.
@@ -674,9 +680,10 @@ The project follows [Semantic Versioning](https://semver.org/) and keeps a [Keep
   `project.version`). The newest `## [x.y.z]` release header in `CHANGELOG.md` must equal it, enforced by
   `scripts/check-version-sync.sh`, a `build.yml` CI step that fails the build on drift.
 - **Every released version is tagged.** Create an annotated git tag `vX.Y.Z` on the release commit (the one
-  that sets the version and adds the changelog entry) and push it: `git tag -a vX.Y.Z -m "vX.Y.Z" && git
-  push origin vX.Y.Z`. Add the matching `[x.y.z]: …/releases/tag/vX.Y.Z` link reference at the bottom of
-  `CHANGELOG.md`. No workflow triggers on tags, so pushing a tag does not run CI.
+  that sets the version and adds the changelog entry) and push it:
+  `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`. Add the matching `[x.y.z]: …/releases/tag/vX.Y.Z`
+  link reference at the bottom of `CHANGELOG.md`. No workflow triggers on tags, so pushing a tag does not run
+  CI.
 
 ## Commit Messages
 
@@ -685,7 +692,7 @@ access to your working notes or any review document) must understand the change 
 
 - **No ephemeral or internal references.** Never cite review-finding IDs (`review M13`, `H1-H3`, `L20-L27`),
   ticket shorthands, batch numbers, or any artifact that does not live in the repository. They mean nothing
-  to a future reader and are noise; describe *what* changed and *why* in plain words instead.
+  to a future reader and are noise; describe _what_ changed and _why_ in plain words instead.
 - A concise imperative subject line, then a body that explains the why and any non-obvious decisions. Group
   related work into a few cohesive commits rather than many tiny ones keyed to an external checklist.
 - End every commit message with the `Co-Authored-By:` trailer (see the harness instructions).
@@ -702,6 +709,7 @@ tables together as one cohesive read-model unit), plus the later `ALTER`s that r
 columns to an existing one (V9, V11). The incremental index/version migrations were folded into
 their table's create before the first production deployment, so each table is defined in one place (there is
 no deployed database whose checksums this would break; from here the migrations are append-only, see below).
+
 - `V1__create_users_table.sql`: `users` (uuid PK, timestamps, `login_name` unique, `email_address` unique,
   `first_name`, `last_name`, a single `role` column (`USER`/`ADMIN`, no `user_roles` table), `active`,
   `password_hash` nullable, `capability_token` unique, and `version` for optimistic locking).
@@ -912,8 +920,7 @@ controllers map paths relative to the resource.
 - `POST /consumption` (no body): add one coffee, returns the summary.
 - `POST /consumption/cancel`: undo the most recent un-canceled own coffee within the grace period (nothing
   to undo / past the grace period → 409).
-- `PUT  /consumption/rating` `{ beanId, value }`: rate the bean of the most recent coffee (a score from 1 to
-  5) while it is still within the grace window; a repeat updates the one vote. Returns the summary.
+- `PUT  /consumption/rating` `{ beanId, value }`: rate the bean of the most recent coffee (a score from 1 to 5) while it is still within the grace window; a repeat updates the one vote. Returns the summary.
 - `GET  /activity?limit=20&offset=0`: own unified activity feed (coffees, own purchases, deposits) newest-first,
   each entry with a running balance.
 - `POST /expenses` `{ expenseType, beanName?, weightGrams?, amountCents, note? }`: record an own expense
@@ -946,6 +953,7 @@ its cost is `O(log size)` per request rather than `O(page)`. This is fine at SE@
 subject login is resolved from the log's own `User` events so a hard-deleted user's rows stay classified and
 labeled, and the unpaged CSV export fails with a clear 409 above a generous row cap rather than silently
 truncating its running balances or exhausting heap.
+
 - `GET /users/{id}/link`, `POST /users/{id}/link/rotate`, `GET /users/{id}/qr.png` (downloads as
   `<loginName>.png`, transparent background).
 - `GET /users/qr.zip`: a streamed ZIP of every active user's QR code as `<loginName>.png` (capped at 1000
@@ -976,6 +984,7 @@ truncating its running balances or exhausting heap.
 - `GET/PUT/DELETE /dev/data` (dev profile only): report counts / seed fixtures / clear.
 
 Notes on semantics:
+
 - `/consumption` is the change log; the running `total` is a derived field in the response. Paths name
   resources, not verbs; there is no `/increment`, `/decrement`, `/reset`, or `/transactions`. The HTTP
   method carries the semantics: `GET` reads (safe), user `POST /consumption` adds one coffee
@@ -1064,6 +1073,7 @@ fixtures are off, so the bootstrap step creates the admin (and `DevDemoDataLoade
 ### Error Handling
 
 Domain exceptions in `domain/.../exceptions/`:
+
 - `NotFoundException`: Entity not found (404).
 - `DuplicationException`: Duplicate unique fields (409).
 - `ValidationException`: Malformed input / business rule violation (400), e.g. a `delta` other than `±1`, a count correction below zero, or an expense whose split does not sum to its total.

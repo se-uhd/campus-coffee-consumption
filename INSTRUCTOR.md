@@ -51,7 +51,7 @@ Open these three files side by side so the audience sees the same type in three 
 
    ```typescript
    export interface PriceUpdateDto {
-       amountCents: number;
+     amountCents: number;
    }
    ```
 
@@ -146,11 +146,12 @@ any frontend file. It needs Docker running (the refresh boots a throwaway Postgr
 
 ### The test that detects drift
 
-Explain why nobody can skip step 2. A test, `DevSystemTests."the committed OpenAPI spec matches the live
-spec"`, asserts that the committed spec matches the live app: it compares `frontend/src-gen/api-docs.json`
-against the running app's `GET /api/api-docs` (ignoring `info.version` and the server URL). If you change a
-backend DTO but do not refresh the spec, that test fails and so does `gradle build`. So the generated
-frontend types are always current, and `refreshOpenApiSpec` is the only command you run to update them.
+Explain why nobody can skip step 2. A test,
+`DevSystemTests."the committed OpenAPI spec matches the live spec"`, asserts that the committed spec matches
+the live app: it compares `frontend/src-gen/api-docs.json` against the running app's `GET /api/api-docs`
+(ignoring `info.version` and the server URL). If you change a backend DTO but do not refresh the spec, that
+test fails and so does `gradle build`. So the generated frontend types are always current, and
+`refreshOpenApiSpec` is the only command you run to update them.
 
 **In one line:** the backend Kotlin DTOs are the single source of truth. The OpenAPI spec is captured from
 the live app, the TypeScript DTOs are generated from that spec, and a test that fails the build when they

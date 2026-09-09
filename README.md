@@ -7,7 +7,7 @@ the wall**: a secret per-user **capability link**. Scanning it opens a small mob
 they add a coffee, **undo** a recent one within a grace period, **rate** the beans they just drank (1 to 5),
 record their own bean purchases against a shared **bean catalog**, and see either their **balance** or their
 **cup stats** (a per-user landing preference). Admins create and manage users, set the price, record
-**typed** expenses (a *beans* purchase or an *other* group outlay) and kitty deposits, correct anyone's
+**typed** expenses (a _beans_ purchase or an _other_ group outlay) and kitty deposits, correct anyone's
 count, and curate the bean catalog (rename and merge beans). Settling up records a **deposit** (real money
 into the kitty); there is no reset. Every change is recorded in an append-only **event log**, from which a
 **unified activity feed** (coffees, purchases, deposits, and ratings, the money entries with a running
@@ -33,8 +33,8 @@ Angular 22 single-page application (SPA) frontend, derived from the CampusCoffee
   travels as plaintext, and the cookie keeps the token out of JavaScript's reach (a cross-site scripting (XSS) attack cannot steal it). An
   admin manages users (create, edit, deactivate, change
   role, view and rotate capability links, download any user's QR or all of them as a ZIP or printable PDF
-  sheet), sets the global price, records **typed** expenses (a *beans* purchase against the catalog or an
-  *other* group outlay) with a private/kitty split and kitty deposits and adjustments, corrects any user's
+  sheet), sets the global price, records **typed** expenses (a _beans_ purchase against the catalog or an
+  _other_ group outlay) with a private/kitty split and kitty deposits and adjustments, corrects any user's
   count, curates the **bean catalog** (rename and merge beans), and reviews the kitty history, the bean
   ratings, and a per-user overview. There is no reset: settling up is a deposit, and a count change is a
   correction (optionally with a note).
@@ -114,7 +114,7 @@ repeatable), each with a coffee consumption at zero. The credentials live in
 `domain/src/main/kotlin/de/seuhd/campuscoffee/domain/tests/TestFixtures.kt`:
 
 | Login           | Role  | Capability token (user login)                  |
-|-----------------|-------|------------------------------------------------|
+| --------------- | ----- | ---------------------------------------------- |
 | `jane_doe`      | ADMIN | `Rh7tK2pXmQ9vL4nB8cD1eF6gH3jZ0sW5yAuToN2kEac`  |
 | `maxmustermann` | USER  | `Pq3wE9rT5yU1iO7pA2sD8fG4hJ6kL0zXcVbN3mM1nBqe` |
 | `student2023`   | USER  | `Zx1cV7bN3mA9sD5fG2hJ8kL4qW0eR6tYuIoP1lK7jHzx` |
@@ -260,6 +260,7 @@ git add infra/terraform.tfstate infra/terraform.tfstate.backup infra/.terraform.
 ```
 
 Deploy notes:
+
 - One-time: `gcloud auth login`, then copy `deploy.env.example` to `deploy.prod.env` and fill it in
   (`gcloud` and `opentofu` come from `mise.toml`, and the project comes from `GCP_PROJECT` there). OpenTofu
   authenticates with the gcloud login's access token, so no application-default credentials are needed.
@@ -269,13 +270,13 @@ Deploy notes:
 - Cloud Run is capped at 2 instances (`max_instances` in `infra/variables.tf`) because `db-f1-micro` allows
   25 connections and the app holds 5 per instance across two revisions during a deployment. Raise the cap
   only together with the database tier.
-- The image build runs as the dedicated `campus-coffee-build` service account (`infra/iam.tf`: log writer
-  on the project, writer on the image repository, object user on the project's Cloud Build bucket). The
-  default compute service account, which the build ran as before with `roles/editor`, and the legacy Cloud
-  Build account, which held the builder role, need no role any more. Their bindings were removed by hand on
-  2026-09-06. Project IAM is additive, so the definition does not remove roles it does not declare: review
-  the project's members now and then with `gcloud projects get-iam-policy <project>
-  --flatten='bindings[].members' --format='value(bindings.members,bindings.role)'`.
+- The image build runs as the dedicated `campus-coffee-build` service account (`infra/iam.tf`: log writer on
+  the project, writer on the image repository, object user on the project's Cloud Build bucket). The default
+  compute service account, which the build ran as before with `roles/editor`, and the legacy Cloud Build
+  account, which held the builder role, need no role any more. Their bindings were removed by hand on
+  2026-09-06. Project IAM is additive, so the definition does not remove roles it does not declare: review the
+  project's members now and then with
+  `gcloud projects get-iam-policy <project> --flatten='bindings[].members' --format='value(bindings.members,bindings.role)'`.
 - The service is pinned to the image digest and to the secrets' version numbers, so a rebuild and a secret
   rotation both create a revision. `scripts/deploy.sh --plan` is the drift check without a build.
 - Do not change the service, the instance, the secrets' IAM, or the identities by hand or with
@@ -348,10 +349,10 @@ public invoker binding, the image repository, both service accounts, and all of 
 before the first deploy:
 
 1. Enable the APIs and create the Cloud SQL instance and its database.
-2. Create the Cloud Build staging bucket: `gcloud storage buckets create gs://<project>_cloudbuild
-   --location=US`. It is not part of the definition on purpose: Cloud Build creates and shares it across the
-   whole project as a US multi-region bucket, so declaring it with this deployment's region would replace it
-   and destroy the build logs.
+2. Create the Cloud Build staging bucket:
+   `gcloud storage buckets create gs://<project>_cloudbuild --location=US`. It is not part of the definition
+   on purpose: Cloud Build creates and shares it across the whole project as a US multi-region bucket, so
+   declaring it with this deployment's region would replace it and destroy the build logs.
 3. Run `scripts/deploy.sh`, provision the database role as above, and put the import blocks back.
 
 ## License
