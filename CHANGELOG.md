@@ -5,6 +5,24 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Vitest specs for the three untested pages that carry logic, 59 tests in all. Each one was checked by
+  breaking the production line it covers and confirming it goes red: 81 single-line mutations across the
+  three pages, every one of them caught, and no test that catches nothing.
+
+  - `admin-security` (14): the three-state enrollment status, the object-URL lifecycle behind the setup QR
+    code, the server's own reason for a refused code, and one request per tap for each of enrol, activate
+    and deactivate.
+  - `bean-ratings` (22): the three sort orders and the half-bean rounding, the rename and merge editors
+    acting on the bean whose editor is open rather than on a row position, the merge direction, and a
+    catalog re-read that fails without taking the loaded rows down with it.
+  - `profile` (23): the guards that keep one user's save, panel change or retried profile off another
+    user's page after a switch, the coffee link and landing-panel preference surviving a save, and Cancel
+    reverting from a snapshot the form cannot edit in place.
+
 ## [1.3.0] - 2026-09-09
 
 ### Added
