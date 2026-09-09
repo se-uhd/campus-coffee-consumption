@@ -16,6 +16,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   here, which in this project was largely unactionable anyway, the one direct case being the Kotlin Gradle
   plugin that detekt pins to an exact version.
 
+## [Unreleased]
+
+### Security
+
+- The dependency-graph filter now names exactly what ships: the `:application` project's
+  `runtimeClasspath`, which already carries the other three modules and every transitive dependency of the
+  four. The first attempt matched `.*RuntimeClasspath`, which also caught `testRuntimeClasspath` and left two
+  alerts standing for a commons-lang3 that only tests use, and it had no project filter, so `:build-logic`
+  contributed the Kotlin Gradle plugin through a production classpath of its own. Anchoring the
+  configuration name and pinning the project closes both.
+
 ## [1.3.1] - 2026-09-09
 
 ### Added

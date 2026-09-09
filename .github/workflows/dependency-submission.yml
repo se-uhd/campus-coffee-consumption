@@ -66,4 +66,12 @@ jobs:
           # one direct case, the Kotlin Gradle plugin, is pinned to the exact version detekt 2.0.0-alpha.6
           # was built against and cannot move until detekt publishes a newer alpha. CodeQL and Semgrep still
           # scan the whole tree, and the npm graph GitHub parses on its own is untouched by this filter.
-          dependency-graph-include-configurations: '.*[rR]untimeClasspath'
+          #
+          # The pair below is exactly "what ships": the boot jar is :application, and its runtimeClasspath
+          # already carries :domain, :api, :data and every transitive dependency of the four. The project
+          # filter is needed as well as the configuration one, because :build-logic (the convention plugins)
+          # has a production runtimeClasspath of its own that holds the Kotlin Gradle plugin, and the
+          # configuration name has to be anchored because `.*RuntimeClasspath` also matches
+          # testRuntimeClasspath, which is how an old commons-lang3 used only by tests raised an alert.
+          dependency-graph-include-projects: '^:application$'
+          dependency-graph-include-configurations: '^runtimeClasspath$'
