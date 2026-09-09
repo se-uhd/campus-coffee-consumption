@@ -127,6 +127,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A bean created by recording a purchase appears in the bean autocomplete again, and a catalog read that
   failed is retried rather than remembered as done.
 - The bean ratings page keeps the rows it loaded when only the shared catalog re-read fails.
+- Recording a purchase twice is no longer possible by deleting another one while the first save is still
+  running. The row actions are disabled for the duration, and a delete no longer re-enables the save
+  button it shares its busy state with.
+- A refused purchase shows the reason the server gave (a kitty portion that would overdraw the fund, or an
+  attempt to move a purchase to a different buyer) instead of always asking whether the shares sum to the
+  total, which they usually did.
+- Switching user while a purchase is saving no longer clears the form the admin has started for the newly
+  selected user. The purchase is still recorded against the user it was entered for.
+- A bean purchase needs a weight above zero, which is what the server requires. Zero passed the form's own
+  check, so it could be submitted and then failed with a message about the split.
+- A bean created by recording a purchase on the purchases page appears in that page's own autocomplete and
+  in the rating dropdown, as one created on the landing already did.
 - The "Signed in as" banner comes back after a successful retry of a failed landing load.
 - Signing in clears every cache the previous admin left behind, not just signing out. The shared caches
   outlive an admin whenever the sign-in form is reached without signing out, which the browser Back button

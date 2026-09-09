@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
+import { HttpErrorResponse } from '@angular/common/http';
 import { of } from 'rxjs';
 import { AdminExpensesComponent } from './admin-expenses.component';
 import { AdminSelectionService } from '../../services/admin-selection.service';
@@ -40,6 +41,9 @@ describe('AdminExpensesComponent', () => {
   let adminDelete: Mock;
   let adminList: Mock;
   let dialogOpen: Mock;
+  let beanRefresh: Mock;
+  let notifyError: Mock;
+  let errorWithServerReason: Mock;
 
   /**
    * Creates the page for one subject and lets its effects settle, so the form is pinned to that user before
@@ -68,6 +72,9 @@ describe('AdminExpensesComponent', () => {
     adminDelete = vi.fn().mockResolvedValue(undefined);
     adminList = vi.fn().mockResolvedValue([]);
     dialogOpen = vi.fn().mockReturnValue({ afterClosed: () => of(true) });
+    beanRefresh = vi.fn().mockResolvedValue(undefined);
+    notifyError = vi.fn();
+    errorWithServerReason = vi.fn();
 
     TestBed.configureTestingModule({
       providers: [
@@ -80,9 +87,16 @@ describe('AdminExpensesComponent', () => {
         },
         {
           provide: BeanService,
-          useValue: { selectable: () => [], ensureLoaded: vi.fn().mockResolvedValue(undefined) }
+          useValue: {
+            selectable: () => [],
+            ensureLoaded: vi.fn().mockResolvedValue(undefined),
+            refresh: beanRefresh
+          }
         },
-        { provide: NotificationService, useValue: { success: vi.fn(), error: vi.fn() } },
+        {
+          provide: NotificationService,
+          useValue: { success: vi.fn(), error: notifyError, errorWithServerReason }
+        },
         {
           provide: UserService,
           useValue: {
@@ -185,5 +199,105 @@ describe('AdminExpensesComponent', () => {
     await component.remove(expenseDto('e1'));
 
     expect(adminDelete).not.toHaveBeenCalled();
+  });
+  it('reports the server own reason for a refused save, not the split message', async () => {
+    // The kitty-overdraw conflict and the refusal to move a purchase to another buyer both carry a precise
+    // reason. Showing the split fallback over either tells the admin to check arithmetic that is right.
+    await build('user-a');
+    fillForm();
+    const refusal = new HttpErrorResponse({
+      status: 409,
+      error: { message: "This expense's kitty portion would make the kitty balance negative." }
+    });
+    adminCreate.mockRejectedValue(refusal);
+
+    await component.save();
+
+    expect(errorWithServerReason).toHaveBeenCalledWith(refusal, expect.any(String));
+    expect(notifyError, 'the fallback must not be able to hide the server reason').not.toHaveBeenCalled();
+  });
+
+  it('leaves the form the admin has begun for the new user alone when a save was in flight', async () => {
+    // The picker and the fields stay live during a save, and production scales to zero, so a slow save
+    // overlapping a switch is ordinary. Clearing the form then throws away input for a different user.
+    await build('user-a');
+    fillForm();
+    let releaseCreate = (): void => undefined;
+    adminCreate.mockReturnValue(
+      new Promise<void>((resolve) => {
+        releaseCreate = resolve;
+      })
+    );
+
+    const pending = component.save();
+    component.selectedId.set('user-b');
+    component.amountEuros = '9.99';
+    releaseCreate();
+    await pending;
+
+    expect(adminCreate).toHaveBeenCalledWith('user-a', expect.objectContaining({ amountCents: 700 }));
+    expect(component.amountEuros, 'the new user form must survive the previous save').toBe('9.99');
+  });
+
+  it('refuses a bean purchase with no weight, which the backend requires to be positive', async () => {
+    // Angular's required validator counts 0 as present, so the button stays enabled and the entry reaches
+    // the server, which rejects it.
+    await build('user-a');
+    fillForm();
+    component.weightGrams = 0;
+
+    await component.save();
+
+    expect(adminCreate).not.toHaveBeenCalled();
+    expect(component.error()).toBe('Enter the beans and a whole-gram weight.');
+  });
+
+  it('refreshes the shared bean catalog when a purchase names a bean', async () => {
+    // The name resolve-or-creates a catalog bean, which this page's autocomplete and the rating dropdown
+    // both read from the shared catalog.
+    await build('user-a');
+    fillForm();
+
+    await component.save();
+
+    expect(beanRefresh).toHaveBeenCalled();
+  });
+
+  it('leaves the shared catalog alone for an outlay that names no bean', async () => {
+    await build('user-a');
+    fillForm();
+    component.expenseType = 'OTHER';
+    component.beanName = '';
+    component.weightGrams = null;
+
+    await component.save();
+
+    expect(adminCreate).toHaveBeenCalled();
+    expect(beanRefresh).not.toHaveBeenCalled();
+  });
+
+  it('does not let a delete finishing mid-save re-open the save button', async () => {
+    // `busy` is shared, and remove()'s finally lowers it. Without a guard the save button re-enables while
+    // the create is still in flight, and a second click records the purchase twice: real money, twice.
+    await build('user-a');
+    fillForm();
+    let releaseCreate = (): void => undefined;
+    adminCreate.mockReturnValue(
+      new Promise<void>((resolve) => {
+        releaseCreate = resolve;
+      })
+    );
+
+    const saving = component.save();
+    await component.remove(expenseDto('e1'));
+    // deliberately not awaited: without the guard this second save starts its own request, and awaiting it
+    // would hang the test rather than fail it
+    const second = component.save();
+
+    releaseCreate();
+    await saving;
+    await second;
+
+    expect(adminCreate, 'a delete must not re-open a save that is still running').toHaveBeenCalledTimes(1);
   });
 });

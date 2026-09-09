@@ -126,7 +126,7 @@ import { withLoading } from '../../util/loading';
                 <input
                   matInput
                   type="number"
-                  min="0"
+                  min="1"
                   step="1"
                   name="weight"
                   #weightModel="ngModel"
@@ -252,6 +252,7 @@ import { withLoading } from '../../util/loading';
                   <button
                     mat-icon-button
                     (click)="edit(expense)"
+                    [disabled]="busy()"
                     aria-label="Correct purchase"
                     matTooltip="Correct this purchase"
                   >
@@ -261,6 +262,7 @@ import { withLoading } from '../../util/loading';
                     mat-icon-button
                     color="warn"
                     (click)="remove(expense)"
+                    [disabled]="busy()"
                     aria-label="Delete purchase"
                     matTooltip="Delete this purchase"
                   >
@@ -455,19 +457,38 @@ export class AdminExpensesComponent {
     if (!request) {
       return;
     }
+    // pinned before the request so the clean-up below can tell whether the admin has moved on since
+    const subjectId = this.selectedId();
     this.busy.set(true);
     try {
       if (this.editingId()) {
-        await this.expenseService.adminUpdate(this.selectedId(), this.editingId()!, request);
+        await this.expenseService.adminUpdate(subjectId, this.editingId()!, request);
         this.notifications.success('Purchase corrected.');
       } else {
-        await this.expenseService.adminCreate(this.selectedId(), request);
+        await this.expenseService.adminCreate(subjectId, request);
         this.notifications.success('Purchase recorded.');
+      }
+      // A typed bean name resolve-or-creates a catalog bean server-side, and the catalog is shared with this
+      // page's own autocomplete and the rating dropdown, so it has to learn about the new bean. The landing
+      // does the same after its own purchase.
+      if (request.beanName) {
+        void this.beanService.refresh().catch(() => undefined);
+      }
+      if (subjectId !== this.selectedId()) {
+        // The admin switched user while this was in flight. The write is done and reported, but the form on
+        // screen now belongs to the newly-selected user, so it is not ours to clear.
+        return;
       }
       this.resetForm();
       await this.loadPurchases();
     } catch (error) {
-      this.notifications.error(error, 'Could not save the purchase (do the shares sum to the total?).');
+      // The two failures an admin actually hits carry a precise reason: the kitty-overdraw conflict and the
+      // refusal to move a purchase to another buyer. Showing the split fallback over either of those tells
+      // them to check arithmetic that is already right.
+      this.notifications.errorWithServerReason(
+        error,
+        'Could not save the purchase (do the shares sum to the total?).'
+      );
     } finally {
       this.busy.set(false);
     }
@@ -489,7 +510,9 @@ export class AdminExpensesComponent {
       if (
         !this.beanName.trim() ||
         this.weightGrams == null ||
-        this.weightGrams < 0 ||
+        // the backend requires a positive weight; accepting 0 here only produced a 400 the admin could not
+        // explain from what was on screen
+        this.weightGrams <= 0 ||
         !Number.isInteger(this.weightGrams)
       ) {
         this.error.set('Enter the beans and a whole-gram weight.');
@@ -539,7 +562,10 @@ export class AdminExpensesComponent {
         })
         .afterClosed()
     );
-    if (!confirmed) {
+    // `busy` is shared with save(), and this handler's `finally` lowers it: without this check a delete that
+    // finished during a save would re-enable the save button mid-request, and a second click would record
+    // the purchase twice.
+    if (!confirmed || this.busy()) {
       return;
     }
     this.busy.set(true);
@@ -552,7 +578,7 @@ export class AdminExpensesComponent {
       this.notifications.success('Purchase deleted.');
       await this.loadPurchases();
     } catch (error) {
-      this.notifications.error(error, 'Could not delete the purchase.');
+      this.notifications.errorWithServerReason(error, 'Could not delete the purchase.');
     } finally {
       this.busy.set(false);
     }
