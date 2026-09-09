@@ -85,6 +85,34 @@ describe('AdminUserService', () => {
     ]);
   });
 
+  it('reset drops the cached rows, so the next session does not inherit this one', async () => {
+    // The service is a root singleton, so without this the next admin's table would open on the previous
+    // admin's users. Sign-out and sign-in both call it.
+    userList.mockResolvedValue([userDto('u1', { active: true })]);
+    overview.mockResolvedValue([balance('u1', 2, -100)]);
+    await service.ensureLoaded();
+    expect(service.rows()).not.toBeNull();
+
+    service.reset();
+
+    expect(service.rows()).toBeNull();
+  });
+
+  it('reset drops a load already in flight, so it cannot repopulate the next session', async () => {
+    const users = deferred<UserDto[]>();
+    const balances = deferred<UserBalanceDto[]>();
+    userList.mockReturnValueOnce(users.promise);
+    overview.mockReturnValueOnce(balances.promise);
+    const pending = service.ensureLoaded();
+
+    service.reset();
+    users.resolve([userDto('u1', { active: true })]);
+    balances.resolve([balance('u1', 2, -100)]);
+    await pending;
+
+    expect(service.rows(), 'a load the session outlived must not land').toBeNull();
+  });
+
   it('when reopened returns the cached rows immediately and revalidates in the background', async () => {
     userList.mockResolvedValueOnce([userDto('u1', { active: true })]);
     overview.mockResolvedValueOnce([balance('u1', 1, 0)]);

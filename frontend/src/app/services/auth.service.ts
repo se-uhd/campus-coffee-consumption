@@ -2,6 +2,8 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AdminSelectionService } from './admin-selection.service';
+import { AdminUserService } from './admin-user.service';
+import { BeanService } from './bean.service';
 import { TwoFactorService } from './two-factor.service';
 import { PublicKeyDto, TokenRequestDto, TokenResponseDto } from '../models';
 
@@ -21,6 +23,8 @@ export class AuthService {
   constructor(
     private readonly http: HttpClient,
     private readonly selection: AdminSelectionService,
+    private readonly adminUsers: AdminUserService,
+    private readonly beans: BeanService,
     private readonly twoFactor: TwoFactorService
   ) {}
 
@@ -36,6 +40,16 @@ export class AuthService {
     };
     const response = await firstValueFrom(this.http.post<TokenResponseDto>('/api/auth/token', request));
     localStorage.setItem(AuthService.SESSION_KEY, '1');
+    // A sign-in must start from nothing cached, not only a sign-out. These are root singletons, and the app
+    // reaches this form with them intact whenever it gets here without passing through logout. The browser
+    // Back button does exactly that on its own: the login route has no guard and signing in pushes rather
+    // than replaces, so one Back lands on the form again as an in-document navigation with every cache
+    // alive. The one that matters is the recorded own-account id, which an admin page with no `?user=`
+    // resolves its subject to, so the next admin would open on the previous admin's account and book
+    // coffees and money there.
+    this.selection.reset();
+    this.adminUsers.reset();
+    this.beans.reset();
     this.twoFactor.setEnrolled(!response.enrollmentRequired);
     return response.enrollmentRequired;
   }
@@ -66,13 +80,17 @@ export class AuthService {
   }
 
   /**
-   * Signs the admin out: clears the local marker and the shared admin selection immediately, then clears the
+   * Signs the admin out: clears the local marker and every piece of cached session state (the shared admin
+   * selection, the user directory and the users table, the bean catalog, the enrollment status) immediately,
+   * then clears the
    * httpOnly cookie server-side (the SPA cannot clear it itself). A failed logout call is ignored so the UI
    * is always signed out regardless.
    */
   async logout(): Promise<void> {
     localStorage.removeItem(AuthService.SESSION_KEY);
     this.selection.reset();
+    this.adminUsers.reset();
+    this.beans.reset();
     this.twoFactor.reset();
     try {
       await firstValueFrom(this.http.post('/api/auth/logout', {}));

@@ -5,6 +5,140 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- A layout-stability gate over the SPA (`frontend/e2e/layout-stability.spec.ts`). It walks every page
+  transition in both audiences at a desktop and a phone viewport, captures the destination at its first
+  painted frame and again once everything it asked for has landed, and fails when the two differ. To reach
+  the first frame it holds the requests the newly-activated page issued itself rather than delaying the
+  capture, which is what makes the assertion mean something against a local backend. On top of the diff it
+  gates what a screenshot cannot see:
+
+  - the shell keeps its header across a navigation and rebuilds it only when the audience changes;
+  - opening the admin profile fetches the user and their code exactly once each;
+  - a cold visit shows a header bar from the first frame and never moves it;
+  - a landing loaded inside the rating grace window arrives ready to rate;
+  - switching user abandons an open correction, edit or purchase form and shows the new user's own data.
+
+  Every transition it walks, in both viewports, before and after (a row that lists two values gives the
+  outward transition first, then the way back):
+
+  | transition | before | after |
+  | --- | --- | --- |
+  | admin sign-in to the dashboard | moves | stable |
+  | dashboard to Users, and back | stable, moves | stable |
+  | dashboard to Activity, and back | moves | stable |
+  | dashboard to Expenses, and back | moves | stable |
+  | dashboard to Kitty, and back | moves | stable |
+  | dashboard to Price, and back | moves | stable |
+  | dashboard to Ratings, and back | moves | stable |
+  | dashboard to Security, and back | stable, moves | stable |
+  | dashboard to Profile, and back | moves | stable |
+  | user landing to Ratings, and back | moves | stable |
+  | user landing to Profile, and back | moves | stable |
+  | switching the viewed user | moves | stable |
+
+  The two that were already stable were stable for narrow reasons: Users is the one page that already had a
+  route resolver, and Security only because its enrollment status happened to be cached from the sign-in.
+
+### Changed
+
+- The SPA shows one loading indicator instead of two. The per-page progress bar sat in the document flow
+  between the header and the content, so mounting and unmounting it shoved every page down four pixels and
+  snapped it back on each load, on all nine pages. The remaining bar is the fixed one at the very top of the
+  window, and it now appears only when a load is still running after 200ms and then stays for at least
+  150ms, so a fast load shows nothing and a bar that does appear never blinks. Router navigations raise it,
+  as does a Retry from an error card. A post-mutation refresh deliberately does not, since the save already
+  showed its own button spinner and confirmation.
+- The scrollbar track is always reserved, so moving between a page that scrolls and one that does not can no
+  longer shift the centered content column sideways.
+- Every large display figure (e.g., the coffee count, a balance, the price) uses tabular figures, so it keeps its
+  width as the number changes.
+- The header logo is served at the size it is displayed at (264x108 instead of 2048x838, 23KB instead of
+  115KB) and is loaded eagerly at high priority, so the app chrome no longer paints without it.
+- A value that has not arrived yet reserves the space it will occupy instead of showing a stand-in figure.
+  The coffee
+  count, the price and the kitty balance show a placeholder rather than an ellipsis, a dash or a fake
+  0.00 EUR; the activity and kitty lists show placeholder rows rather than "Nothing to show.", which was a
+  claim about data nobody had read yet; and the profile's QR slot keeps its full height while the code is
+  fetched, so the code arriving changes pixels and not layout.
+- The security page no longer tells an enrolled admin to set up two-factor authentication and then correct
+  itself. The enrollment status is a single three-state value (i.e., unknown, enrolled, not enrolled) held in one
+  place, and the page is not shown until it is known.
+- The admin user picker no longer paints an empty " ()" before the selected user resolves.
+- The header is no longer rebuilt on every navigation. Each audience now has a shell route that owns the
+  header and holds a router outlet for its pages, so moving between pages keeps the same header, its icons
+  and the logo instead of destroying and recreating them. The admin navigation cluster stays on the landing,
+  where it has the room, and a subpage shows the back arrow and its own title as before.
+- Every admin subpage's back arrow now carries the selected user back to the landing. Until now the landing
+  carried it forward to every subpage except Users, but only Expenses, Profile and Ratings carried it back,
+  so returning from Price, Kitty, Activity or Security silently dropped the selection.
+- The bean-ratings rename/merge switch moved out of the header and next to the Sort control, above the list
+  it acts on.
+- A cold visit shows the app's own header and a page-shaped placeholder from the first frame instead of a
+  bare background, which on a scanned QR link used to last for a guard, a data load and a lazy chunk in
+  sequence. The header bar it draws is the real one, so the top of the window does not move when the app
+  replaces it.
+- Navigating scrolls to the top of the new page instead of keeping the position of the one being left, and
+  the browser Back button restores the position it left.
+- The landing chunk is fetched as soon as the app's routes are known, and the remaining pages are fetched in
+  the background once the first page has rendered.
+- Every page's data is loaded before the page appears, not after. A page used to be created empty and then
+  fill in, which is what made the count, the balances, the lists and the forms all move a moment after the
+  page arrived. Now a route resolver fetches what the page needs, the router holds the page you are on until
+  it is there, and the new page is created already holding it. A slow load shows the progress bar over the
+  page you are still reading rather than an empty destination. A failed load shows the page's own retry
+  card.
+- Switching the viewed user on an admin page is one atomic change instead of a sequence. The count, the
+  balances, the activity, the purchases and the open forms all move to the new user together, an open
+  correction form closes, and the picker the reader just used is still in front of them.
+- The user directory and the bean catalog are read once and shared instead of being fetched again by every
+  page that shows them. Five pages were each asking for the list of users and three for the bean catalog; now
+  the first page to need one waits for it and every later page has it already, with a refresh happening
+  behind the reader. Renaming or merging a bean refreshes the catalog inside the service, so no caller can
+  forget to, and a bean created since the catalog was last read (a purchase or rating by somebody else) is
+  fetched once when a control actually needs it. Both are cleared on sign-out, and when a capability link
+  turns out to have been rotated.
+
+### Fixed
+
+- Retrying a failed page load keeps the error card on screen until the content that replaces it exists,
+  instead of clearing the error first and showing an empty page in between.
+- A bean catalog that cannot be read no longer takes the whole landing down with it. The catalog fills the
+  rating dropdown; a failed read used to report "your link may be invalid" on a link that works, and block
+  the +1 with it.
+- The kitty page reports a user directory it could not read, instead of opening with an empty deposit
+  dropdown and no way to retry.
+- Renaming or merging a bean is no longer reported as having failed when only the follow-up catalog read
+  did. The rename has committed by then.
+- The users table no longer says "No users yet." while a retry is still fetching them.
+- Signing out clears the cached users table along with the rest of the session's state, so a load already
+  in flight cannot push the previous admin's users into the next session.
+- Retry on the admin profile works. It discarded its own result and then removed the error card, leaving an
+  empty page.
+- Retry on the kitty page reloads the user directory, not only the balance, so it can recover from the
+  failure that produced the error card rather than clearing it and leaving an unusable deposit form.
+- A page whose data fails to load twice in a row now reports the second failure. It could keep showing what
+  a Retry in between had put on screen, including another user's figures.
+- The loading indicator no longer comes down over work that is still running when a navigation is skipped
+  (an admin re-picking the user they are already viewing).
+- A bean created by recording a purchase appears in the bean autocomplete again, and a catalog read that
+  failed is retried rather than remembered as done.
+- The bean ratings page keeps the rows it loaded when only the shared catalog re-read fails.
+- The "Signed in as" banner comes back after a successful retry of a failed landing load.
+- Signing in clears every cache the previous admin left behind, not just signing out. The shared caches
+  outlive an admin whenever the sign-in form is reached without signing out, which the browser Back button
+  does on its own: the admin landing then resolved its subject to the previous admin's account, so the new
+  admin saw that account's cups, balance and activity, and a coffee, a purchase or a correction booked
+  there.
+- An admin page with no user in its address resolves to the admin who is signed in now, rather than to a
+  cached one. Clearing the caches on sign-in covers only the tab that signs in; a second admin signing in
+  elsewhere in the same browser left the first tab serving the previous admin's account, and the session
+  cookie is shared, so a coffee or a correction from that tab booked on the wrong account. A page whose
+  address names a user is unaffected and still answers from the cache.
+
 ## [1.2.0] - 2026-09-06
 
 ### Added

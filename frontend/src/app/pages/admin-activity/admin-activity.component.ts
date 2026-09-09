@@ -1,4 +1,4 @@
-import { Component, computed, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, input, linkedSignal, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -7,14 +7,14 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AccountingService } from '../../services/accounting.service';
 import { NotificationService } from '../../services/notification.service';
-import { AppHeaderComponent } from '../../components/app-header/app-header.component';
+import { PageLoadingService } from '../../services/page-loading.service';
 import { EurosPipe } from '../../pipes/euros.pipe';
 import { UtcDatePipe } from '../../pipes/utc-date.pipe';
 import { GlobalActivityEntryDto, ActivityEntryType } from '../../models';
+import { GlobalActivityPageData, GLOBAL_ACTIVITY_PAGE_SIZE } from '../../resolvers/admin-page.resolvers';
 import { activityIcon, activityLabel } from '../../util/activity-type';
 import { ActorPipe } from '../../pipes/actor.pipe';
 import { loadActivityPage } from '../../util/activity';
@@ -22,9 +22,7 @@ import { triggerDownload } from '../../util/download';
 import { formatEuros } from '../../util/money';
 import { TruncationTooltipDirective } from '../../directives/truncation-tooltip.directive';
 import { withLoading } from '../../util/loading';
-
-/** The page size for one activity page; "Load more" appends another page of this size. */
-const ACTIVITY_PAGE_SIZE = 25;
+import { Preload } from '../../util/preload';
 
 /** The client-side filter buckets for the global activity table. */
 type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE' | 'RATINGS';
@@ -36,6 +34,8 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE' | 'RATI
  * expense moves both). A client-side type filter hides rows without changing the server-computed running
  * balances, and a "Download CSV" button exports the full feed (the whole dataset, not just the loaded rows).
  * The table reuses the users page's responsive scroll container; on a narrow screen it scrolls horizontally.
+ *
+ * The first page of the feed is preloaded by the route resolver, so the table opens populated.
  */
 @Component({
   selector: 'cc-admin-activity',
@@ -48,26 +48,18 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE' | 'RATI
     MatIconModule,
     MatTableModule,
     MatTooltipModule,
-    MatProgressBarModule,
     MatProgressSpinnerModule,
     EurosPipe,
     UtcDatePipe,
     ActorPipe,
-    AppHeaderComponent,
     TruncationTooltipDirective
   ],
   template: `
-    <cc-app-header [home]="'/admin'" title="Activity" icon="receipt_long"></cc-app-header>
-
-    @if (loading()) {
-      <mat-progress-bar mode="indeterminate" aria-label="Loading activity"></mat-progress-bar>
-    }
-
     <div class="page">
       @if (loadError()) {
         <mat-card class="card">
           <p class="warn">{{ loadError() }}</p>
-          <button mat-stroked-button (click)="loadFirst()">Retry</button>
+          <button mat-stroked-button (click)="retry()" [disabled]="busy()">Retry</button>
         </mat-card>
       } @else {
         <mat-card class="card">
@@ -230,7 +222,7 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE' | 'RATI
                 </button>
               </div>
             }
-          } @else if (!loading()) {
+          } @else {
             <p class="muted">No activity yet.</p>
           }
         </mat-card>
@@ -348,11 +340,28 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'EXPENSES' | 'MONEY' | 'PRICE' | 'RATI
     `
   ]
 })
-export class AdminActivityComponent implements OnInit {
+export class AdminActivityComponent {
+  /**
+   * The page's preloaded payload, from the route resolver; its value is null when the load failed. Every
+   * signal below reads it directly, never through a shared `computed`, which would not notify when two
+   * consecutive resolves both fail (see the landing for the same note).
+   */
+  readonly globalActivity = input<Preload<GlobalActivityPageData> | null>(null);
+
   readonly columns = ['when', 'type', 'subject', 'actor', 'user', 'kitty'];
 
   /** The loaded rows (newest first), accumulated by "Load more". */
-  readonly entries = signal<GlobalActivityEntryDto[]>([]);
+  readonly entries = linkedSignal<GlobalActivityEntryDto[]>(
+    () => this.globalActivity()?.value?.entries ?? []
+  );
+
+  /** Whether the server has more rows beyond the loaded ones. */
+  readonly hasMore = linkedSignal(() => this.globalActivity()?.value?.hasMore ?? false);
+
+  /** The page's retryable load error; the resolver reports a failed load as null, which is what this reads. */
+  readonly loadError = linkedSignal(() =>
+    (this.globalActivity()?.value ?? null) === null ? 'Could not load the activity.' : ''
+  );
 
   /** The active client-side filter bucket; bound to the toggle group. */
   readonly filter = signal<ActivityFilter>('ALL');
@@ -364,25 +373,25 @@ export class AdminActivityComponent implements OnInit {
     return filter === 'ALL' ? entries : entries.filter((row) => this.bucketOf(row.type) === filter);
   });
 
-  readonly loading = signal(false);
+  readonly busy = signal(false);
   readonly loadingMore = signal(false);
-  readonly loadError = signal('');
-  readonly hasMore = signal(false);
   readonly downloadingCsv = signal(false);
 
   constructor(
     private readonly accounting: AccountingService,
-    private readonly notifications: NotificationService
+    private readonly notifications: NotificationService,
+    private readonly pageLoading: PageLoadingService
   ) {}
 
-  async ngOnInit(): Promise<void> {
-    await this.loadFirst();
+  /** Retries a failed load from the error card; the only page-owned action that raises the loading indicator. */
+  async retry(): Promise<void> {
+    await this.pageLoading.track(() => this.loadFirst());
   }
 
-  /** Loads the first page of the global activity feed; surfaces a retryable error. */
+  /** Re-reads the first page of the global activity feed; surfaces a retryable error. */
   async loadFirst(): Promise<void> {
-    await withLoading(this.loading, this.loadError, 'Could not load the activity.', async () => {
-      const { entries, hasMore } = await loadActivityPage([], ACTIVITY_PAGE_SIZE, (limit, offset) =>
+    await withLoading(this.busy, this.loadError, 'Could not load the activity.', async () => {
+      const { entries, hasMore } = await loadActivityPage([], GLOBAL_ACTIVITY_PAGE_SIZE, (limit, offset) =>
         this.accounting.allActivity(limit, offset)
       );
       this.entries.set(entries);
@@ -396,7 +405,7 @@ export class AdminActivityComponent implements OnInit {
     try {
       const { entries, hasMore } = await loadActivityPage(
         this.entries(),
-        ACTIVITY_PAGE_SIZE,
+        GLOBAL_ACTIVITY_PAGE_SIZE,
         (limit, offset) => this.accounting.allActivity(limit, offset)
       );
       this.entries.set(entries);

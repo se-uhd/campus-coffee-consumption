@@ -539,13 +539,16 @@ test.describe('admin user-selection history', () => {
     await expect(page).toHaveURL(/\/admin\?user=([0-9a-f-]+)$/);
     const userId = new URL(page.url()).searchParams.get('user');
 
-    // navigating to the expenses page preserves the selected user in the URL
-    await page.getByRole('link', { name: 'Expenses' }).click();
-    await expect(page).toHaveURL(new RegExp(`/admin/expenses\\?user=${userId}$`));
+    // Every subpage carries the selection, out and back. Expenses is the page that already did so before
+    // the shell took the header over; Price, Kitty and Activity are the ones that used to drop it on the way
+    // back, so walking only Expenses would prove nothing about the fix.
+    for (const subpage of ['Expenses', 'Price', 'Kitty', 'Activity'] as const) {
+      await page.getByRole('link', { name: subpage }).click();
+      await expect(page).toHaveURL(new RegExp(`/admin/${subpage.toLowerCase()}\\?user=${userId}$`));
 
-    // the back arrow returns to the landing carrying the same user
-    await page.getByRole('link', { name: 'Back' }).click();
-    await expect(page).toHaveURL(new RegExp(`/admin\\?user=${userId}$`));
+      await page.getByRole('link', { name: 'Back' }).click();
+      await expect(page).toHaveURL(new RegExp(`/admin\\?user=${userId}$`));
+    }
   });
 
   test('"View profile" deep-links the user into /admin/profile?user= and Back returns to the list', async ({

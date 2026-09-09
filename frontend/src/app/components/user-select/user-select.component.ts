@@ -24,10 +24,14 @@ import { UserDto } from '../../models';
         [disabled]="disabled()"
       >
         <mat-select-trigger>
-          @if (isOwn(selectedId())) {
-            <mat-icon class="cc-own-icon">person</mat-icon>
+          <!-- Nothing at all until the selected user is resolved: rendering the interpolations against an
+               unresolved user paints a bare " ()" that the real name then replaces. -->
+          @if (selectedUser(); as user) {
+            @if (isOwn(selectedId())) {
+              <mat-icon class="cc-own-icon">person</mat-icon>
+            }
+            {{ user.loginName }} ({{ user.firstName }} {{ user.lastName }})
           }
-          {{ selectedUser()?.loginName }} ({{ selectedUser()?.firstName }} {{ selectedUser()?.lastName }})
         </mat-select-trigger>
         @for (user of users(); track user.id) {
           <mat-option [value]="user.id">

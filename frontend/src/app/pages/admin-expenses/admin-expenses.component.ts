@@ -1,13 +1,12 @@
 import {
   Component,
-  DestroyRef,
-  inject,
-  OnInit,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
+  effect,
+  input,
+  linkedSignal,
   signal
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -20,26 +19,27 @@ import { MatInputModule } from '@angular/material/input';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
-import { UserService } from '../../services/user.service';
 import { ExpenseService } from '../../services/expense.service';
 import { BeanService } from '../../services/bean.service';
 import { NotificationService } from '../../services/notification.service';
 import { AdminSelectionService } from '../../services/admin-selection.service';
+import { PageLoadingService } from '../../services/page-loading.service';
 import { EurosPipe } from '../../pipes/euros.pipe';
 import { UtcDatePipe } from '../../pipes/utc-date.pipe';
-import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import {
   ConfirmDialogComponent,
   ConfirmDialogData
 } from '../../components/confirm-dialog/confirm-dialog.component';
 import { UserSelectComponent } from '../../components/user-select/user-select.component';
 import { EuroAmountDirective } from '../../directives/euro-amount.directive';
-import { AdminExpenseDto, CoffeeBeanDto, ExpenseDto, ExpenseType, UserDto } from '../../models';
+import { AdminExpenseDto, CoffeeBeanDto, ExpenseDto, ExpenseType } from '../../models';
+import { PurchasesPageData } from '../../resolvers/admin-page.resolvers';
+import { resolveAdminSubject } from '../../resolvers/admin-subject';
 import { centsToEuroString, euroInputError, formatEuros, toCents } from '../../util/money';
+import { Preload } from '../../util/preload';
 import { withLoading } from '../../util/loading';
 
 /**
@@ -48,6 +48,9 @@ import { withLoading } from '../../util/loading';
  * correct or delete each one by id. The buyer is fixed for the lifetime of a purchase: a correction keeps
  * the same user (the backend rejects changing a purchase's buyer), so the selector chooses whose purchases
  * to manage, not a reassignment target.
+ *
+ * The purchases are preloaded by the route resolver, and switching user re-resolves the same route, so the
+ * list, the selection and the form all move to the new user in one atomic update.
  */
 @Component({
   selector: 'cc-admin-expenses',
@@ -63,39 +66,26 @@ import { withLoading } from '../../util/loading';
     MatAutocompleteModule,
     MatButtonToggleModule,
     MatTooltipModule,
-    MatProgressBarModule,
     MatProgressSpinnerModule,
     MatDialogModule,
     EurosPipe,
     UtcDatePipe,
-    AppHeaderComponent,
     UserSelectComponent,
     EuroAmountDirective
   ],
   template: `
-    <cc-app-header
-      [home]="'/admin'"
-      queryParamsHandling="preserve"
-      title="Expenses"
-      icon="shopping_cart"
-    ></cc-app-header>
-
-    @if (loading()) {
-      <mat-progress-bar mode="indeterminate" aria-label="Loading purchases"></mat-progress-bar>
-    }
-
     <div class="page">
       @if (loadError()) {
         <mat-card class="card">
           <p class="warn">{{ loadError() }}</p>
-          <button mat-stroked-button (click)="reload()">Retry</button>
+          <button mat-stroked-button (click)="retry()" [disabled]="busy()">Retry</button>
         </mat-card>
       } @else {
         <mat-card class="card">
           <cc-user-select
-            [users]="users()"
+            [users]="selection.users()"
             [selectedId]="selectedId()"
-            [ownUserId]="selection.ownUserId"
+            [ownUserId]="selection.ownUserId()"
             (selectionChange)="onUserChange($event)"
           ></cc-user-select>
           @if (editingId()) {
@@ -301,50 +291,74 @@ import { withLoading } from '../../util/loading';
     `
   ]
 })
-export class AdminExpensesComponent implements OnInit {
+export class AdminExpensesComponent {
+  /**
+   * The page's preloaded payload, from the route resolver; its value is null when the load failed. Every
+   * signal below reads it directly, never through a shared `computed`, which would not notify when two
+   * consecutive resolves both fail (see the landing for the same note).
+   */
+  readonly purchasesPage = input<Preload<PurchasesPageData> | null>(null);
+
   /** Exposes the expense-type values to the template. */
   readonly expenseTypes = ExpenseType;
 
-  readonly users = signal<UserDto[]>([]);
-  readonly selectedId = signal('');
-  /** The user whose purchases are currently loaded, used to skip a redundant reload on a repeated param. */
-  private loadedId = '';
+  /** The id of the user whose purchases are shown. */
+  readonly selectedId = linkedSignal(() => this.purchasesPage()?.value?.subjectId ?? '');
+
+  /** That user's purchases; replaced in place after a creation, a correction or a deletion. */
+  readonly purchases = linkedSignal<ExpenseDto[]>(() => this.purchasesPage()?.value?.purchases ?? []);
+
+  /** The page's retryable load error; the resolver reports a failed load as null, which is what this reads. */
+  readonly loadError = linkedSignal(() =>
+    (this.purchasesPage()?.value ?? null) === null ? 'Could not load the expenses.' : ''
+  );
+
   /** Whether this outlay is a bean purchase (BEANS, with a bean and weight) or another outlay (OTHER). */
   expenseType: ExpenseType = ExpenseType.Beans;
   /** The bean name for a BEANS outlay (an existing name or a new one). */
   beanName = '';
-  /** The selectable beans for the bean-name autocomplete. */
-  readonly beanOptions = signal<CoffeeBeanDto[]>([]);
   weightGrams: number | null = null;
   amountEuros = '';
   privateEuros = '';
   kittyEuros = '';
   note = '';
   readonly editingId = signal<string | null>(null);
-  readonly purchases = signal<ExpenseDto[]>([]);
   readonly busy = signal(false);
-  readonly loading = signal(false);
-  readonly loadError = signal('');
   readonly error = signal('');
 
-  private readonly destroyRef = inject(DestroyRef);
+  /**
+   * The user the form is currently about. A save refuses when this no longer matches the selection, because
+   * the backend cannot catch it: creating a purchase takes its buyer from the path, so it would book the
+   * purchase on the wrong user with no error.
+   */
+  private formSubjectId = '';
 
   constructor(
-    private readonly userService: UserService,
     private readonly expenseService: ExpenseService,
-    private readonly beanService: BeanService,
+    // read by the template: the catalog behind the bean-name autocomplete
+    readonly beanService: BeanService,
     private readonly notifications: NotificationService,
     private readonly dialog: MatDialog,
     private readonly router: Router,
     private readonly route: ActivatedRoute,
     private readonly cdr: ChangeDetectorRef,
+    private readonly pageLoading: PageLoadingService,
     readonly selection: AdminSelectionService
-  ) {}
+  ) {
+    effect(() => {
+      // Switching user abandons whatever the form held: it was about somebody else, and a correction in
+      // progress must not be saved against the newly-selected account.
+      const id = this.selectedId();
+      this.resetForm();
+      this.error.set('');
+      this.formSubjectId = id;
+    });
+  }
 
   /** The selectable beans whose name contains the current bean-name input (case-insensitive). */
   filteredBeans(): CoffeeBeanDto[] {
     const query = this.beanName.trim().toLowerCase();
-    const beans = this.beanOptions();
+    const beans = this.beanService.selectable();
     return query ? beans.filter((bean) => bean.name.toLowerCase().includes(query)) : beans;
   }
 
@@ -363,25 +377,26 @@ export class AdminExpensesComponent implements OnInit {
     return euroInputError(this.kittyEuros, '8.50');
   }
 
-  async ngOnInit(): Promise<void> {
-    // the bean-name autocomplete options (a best-effort read that never blocks the page)
-    this.loadBeans();
-    await this.reload();
-    // The URL is the source of truth for the selected user: follow the `user` query param (so the
-    // browser Back/Forward buttons, which change it, re-select and reload the user's purchases). Skip the
-    // initial emission's reload while the user list is still loading (the param is applied in `reload`).
-    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-      if (this.loading() || this.loadError()) {
-        return;
-      }
-      void this.applySelectionFromUrl(params.get('user'));
-    });
+  /** Retries a failed load from the error card; the only page-owned action that raises the loading indicator. */
+  async retry(): Promise<void> {
+    await this.pageLoading.track(() => this.reload());
   }
 
-  /** Loads the users and the selected user's purchases; surfaces a retryable error on failure. */
+  /**
+   * Reloads the selected user's purchases. This is the recovery path, not the load path: the route resolver
+   * does the loading. The subject is derived from the route rather than from {@link selectedId}, which is
+   * empty when the resolver returned nothing to link it to.
+   */
   async reload(): Promise<void> {
-    await withLoading(this.loading, this.loadError, 'Could not load the expenses.', async () => {
-      await this.selection.loadUsersAndSelection(this.userService, this.route, this.users, this.selectedId);
+    await withLoading(this.busy, this.loadError, 'Could not load the expenses.', async () => {
+      const subjectId = await resolveAdminSubject(
+        this.selection,
+        this.route.snapshot.queryParamMap.get('user')
+      );
+      this.selectedId.set(subjectId);
+      if (!subjectId) {
+        throw new Error('the user directory is unavailable');
+      }
       await this.loadPurchases();
     });
   }
@@ -398,35 +413,12 @@ export class AdminExpensesComponent implements OnInit {
     await this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { user: userId },
-      queryParamsHandling: 'merge'
+      queryParamsHandling: 'merge',
+      // The same page with a new subject, not a new page: the router must not scroll to the top as if it
+      // were one. Where the reader actually ends up is then decided by the control they used (Material
+      // restores focus to the picker, which brings it back into view), not by the navigation.
+      scroll: 'manual'
     });
-  }
-
-  /**
-   * Selects the user named by the URL's `user` param (or the admin's own account when it is absent),
-   * resets the form, and reloads the user's purchases, unless that user's purchases are already loaded,
-   * so a redundant re-emission of the same param does not reload. `loadedId` (the user actually loaded) is
-   * the guard, not the bound `selectedId` (which the dropdown already advanced before navigating).
-   *
-   * @param userId the value of the `user` query param, or null when it is absent
-   */
-  private async applySelectionFromUrl(userId: string | null): Promise<void> {
-    const effective = this.selection.selectFromParam(userId);
-    if (effective === this.loadedId) {
-      this.selectedId.set(effective);
-      return;
-    }
-    this.selectedId.set(effective);
-    this.cancelEdit();
-    // unlike `reload()`, this post-navigation load runs outside a try/catch boundary (the queryParamMap
-    // subscription only `void`s it), so a failed load for the navigated-to user would silently keep the
-    // previous user's purchases on screen; surface it as a retryable error instead (matching profile)
-    try {
-      await this.loadPurchases();
-    } catch (error) {
-      this.loadError.set('Could not load that user.');
-      this.notifications.error(error, 'Could not load that user.');
-    }
   }
 
   /**
@@ -440,7 +432,6 @@ export class AdminExpensesComponent implements OnInit {
       this.purchases.set([]);
       return;
     }
-    this.loadedId = requestedId;
     const purchases = await this.expenseService.adminList(requestedId);
     if (requestedId !== this.selectedId()) {
       return;
@@ -455,6 +446,11 @@ export class AdminExpensesComponent implements OnInit {
       return;
     }
     this.error.set('');
+    if (this.formSubjectId !== this.selectedId()) {
+      // the form was filled for somebody else; abandon it rather than book this purchase on the wrong user
+      this.resetForm();
+      return;
+    }
     const request = this.buildRequest();
     if (!request) {
       return;
@@ -527,17 +523,6 @@ export class AdminExpensesComponent implements OnInit {
     this.privateEuros = centsToEuroString(expense.privateAmountCents);
     this.kittyEuros = centsToEuroString(expense.kittyAmountCents);
     this.note = expense.note ?? '';
-  }
-
-  /** Loads the selectable beans for the autocomplete (best effort). */
-  private loadBeans(): void {
-    this.beanService
-      .listSelectable()
-      .then((beans) => {
-        this.beanOptions.set(beans);
-        this.cdr.markForCheck();
-      })
-      .catch(() => undefined);
   }
 
   /** Deletes a purchase by id, gated behind a confirmation. */

@@ -1,5 +1,6 @@
 import { APIRequestContext, Page, expect, request } from '@playwright/test';
 import { CompactEncrypt, importJWK } from 'jose';
+import { createHmac, randomBytes } from 'node:crypto';
 
 /**
  * Shared constants and helpers for the end-to-end specs. The credentials and capability tokens are the
@@ -255,4 +256,129 @@ export async function deleteUsers(api: APIRequestContext, token: string, ids: st
       .delete(`/api/users/${id}`, { headers: { Authorization: `Bearer ${token}` } })
       .catch(() => undefined);
   }
+}
+
+/**
+ * The instant the dev profile pins the TOTP clock to (`campus-coffee.totp.fixed-clock-epoch-second`), so a
+ * code computed here matches the one the backend expects. Dev also disables the code-reuse guard, so the
+ * same code may be presented more than once.
+ */
+const TOTP_FIXED_EPOCH_SECOND = 1735732800;
+
+/** Decodes a base32 (RFC 4648, unpadded) secret as the backend's generator does. */
+function base32Decode(secret: string): Buffer {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const character of secret.replace(/=+$/, '').toUpperCase()) {
+    const value = alphabet.indexOf(character);
+    if (value < 0) {
+      throw new Error(`not a base32 character: ${character}`);
+    }
+    bits += value.toString(2).padStart(5, '0');
+  }
+  const bytes: number[] = [];
+  for (let at = 0; at + 8 <= bits.length; at += 8) {
+    bytes.push(parseInt(bits.slice(at, at + 8), 2));
+  }
+  return Buffer.from(bytes);
+}
+
+/**
+ * The RFC 6238 code for a base32 secret at the dev profile's pinned instant: HMAC-SHA1, a 30-second step and
+ * six digits, which are the defaults the backend's generator is built with.
+ *
+ * The fixture admin's code is a published constant precisely because the clock is pinned; an admin created
+ * by a test has its own secret, so its code has to be computed.
+ *
+ * @param base32Secret the enrollment secret the backend issued
+ * @returns the six-digit code the backend will accept
+ */
+export function totpCode(base32Secret: string): string {
+  const counter = Math.floor(TOTP_FIXED_EPOCH_SECOND / 30);
+  const counterBytes = Buffer.alloc(8);
+  counterBytes.writeBigInt64BE(BigInt(counter));
+  const digest = createHmac('sha1', base32Decode(base32Secret)).update(counterBytes).digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  const truncated =
+    ((digest[offset] & 0x7f) << 24) |
+    ((digest[offset + 1] & 0xff) << 16) |
+    ((digest[offset + 2] & 0xff) << 8) |
+    (digest[offset + 3] & 0xff);
+  return (truncated % 1_000_000).toString().padStart(6, '0');
+}
+
+/** A second admin created for a test, with the credentials needed to sign in as them. */
+export interface TestAdmin {
+  readonly id: string;
+  readonly loginName: string;
+  readonly password: string;
+  /** Their own enrollment secret, so their sign-in code can be computed (it is not the fixture constant). */
+  readonly secret: string;
+}
+
+/**
+ * Creates a second admin and completes their two-factor enrollment, so they can reach the admin landing
+ * rather than being routed to the enrollment page on their first sign-in.
+ *
+ * The password is generated rather than fixed: it only has to satisfy the policy (at least 24 characters
+ * with a lowercase letter, an uppercase letter and a digit) and live for the length of the test.
+ *
+ * @param api a Playwright request context bound to the app base URL
+ * @param token an existing admin's JWT, used to create the account
+ * @returns the new admin's id and sign-in credentials
+ */
+export async function createEnrolledAdmin(api: APIRequestContext, token: string): Promise<TestAdmin> {
+  const suffix = randomBytes(6).toString('hex');
+  const loginName = `${E2E_PAGE_USER_PREFIX}admin_${suffix}`;
+  const password = `Aa1${randomBytes(24).toString('base64url')}`;
+
+  const created = await api.post('/api/users', {
+    headers: { Authorization: `Bearer ${token}` },
+    data: {
+      loginName,
+      emailAddress: `${loginName}@example.com`,
+      firstName: 'Second',
+      lastName: 'Admin',
+      role: 'ADMIN',
+      password
+    }
+  });
+  expect(created.ok(), `creating a second admin should succeed, got ${await created.text()}`).toBeTruthy();
+  const id = ((await created.json()) as { id: string }).id;
+
+  // sign in once without a code to obtain the session the enrollment endpoints need
+  const encryptedPayload = await encryptCredentials(api, loginName, password);
+  const session = await api.post('/api/auth/token', { data: { encryptedPayload } });
+  expect(session.ok(), `the second admin should be able to sign in, got ${session.status()}`).toBeTruthy();
+  const ownToken = ((await session.json()) as { token: string }).token;
+  const auth = { Authorization: `Bearer ${ownToken}` };
+
+  const enrollment = await api.post('/api/users/me/totp/enroll', { headers: auth, data: {} });
+  expect(enrollment.ok(), `enrollment should start, got ${enrollment.status()}`).toBeTruthy();
+  const secret = ((await enrollment.json()) as { secret: string }).secret;
+
+  const activation = await api.post('/api/users/me/totp/activate', {
+    headers: auth,
+    data: { code: totpCode(secret) }
+  });
+  expect(
+    activation.ok(),
+    `activation should succeed with a computed code, got ${activation.status()} ${await activation.text()}`
+  ).toBeTruthy();
+
+  return { id, loginName, password, secret };
+}
+
+/**
+ * Signs in through the real login form as an admin other than the fixture one, and waits for the landing.
+ *
+ * @param page the Playwright page
+ * @param admin the admin to sign in as
+ */
+export async function signInAs(page: Page, admin: TestAdmin): Promise<void> {
+  await page.goto('/admin/login');
+  await page.getByLabel('Login name').fill(admin.loginName);
+  await page.getByLabel('Password').fill(admin.password);
+  await page.getByLabel('Authenticator code').fill(totpCode(admin.secret));
+  await page.getByRole('button', { name: 'Sign in' }).click();
 }

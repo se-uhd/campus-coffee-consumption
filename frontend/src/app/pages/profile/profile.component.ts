@@ -2,12 +2,13 @@ import {
   Component,
   DestroyRef,
   inject,
-  OnInit,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
+  computed,
+  input,
+  linkedSignal,
   signal
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -16,18 +17,20 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { ProfileService } from '../../services/profile.service';
 import { UserService } from '../../services/user.service';
-import { CapabilityTokenService } from '../../services/capability-token.service';
 import { NotificationService } from '../../services/notification.service';
 import { AdminSelectionService } from '../../services/admin-selection.service';
-import { AppHeaderComponent } from '../../components/app-header/app-header.component';
+import { PageLoadingService } from '../../services/page-loading.service';
 import { UserSelectComponent } from '../../components/user-select/user-select.component';
 import { SummaryPanel, UserDto } from '../../models';
+import { resolveAdminSubject } from '../../resolvers/admin-subject';
+import { ProfilePageData } from '../../resolvers/profile.resolver';
 import { withLoading } from '../../util/loading';
+import { Preload } from '../../util/preload';
+import { PageAudience } from '../../util/page-audience';
 
 /**
  * The authenticated user's own profile, shared by a user (reached via `/login/:token/profile`, served
@@ -35,7 +38,12 @@ import { withLoading } from '../../util/loading';
  * name and email, shows the capability link ("your coffee link") with the sharing-risk note, and offers the
  * QR download. It also edits the landing-panel preference (Balance / Cups) for the subject user, on both the
  * user's own profile and an admin viewing any user. The QR is fetched as a blob so the auth header is
- * attached, then shown via an object URL, which is revoked on destroy to avoid a leak.
+ * attached, then shown via an object URL, which is revoked when it is replaced and on destroy.
+ *
+ * The details and the code are preloaded together by the route resolver, in parallel rather than one after
+ * the other, so the card is complete on its first frame instead of waiting on an image download. The view
+ * state below is derived from that resolved input, which is also what makes the admin's user switch atomic:
+ * the route re-resolves and the details, the code and the edit state all move to the new user at once.
  */
 @Component({
   selector: 'cc-profile',
@@ -47,31 +55,18 @@ import { withLoading } from '../../util/loading';
     MatButtonModule,
     MatIconModule,
     MatTooltipModule,
-    MatProgressBarModule,
     MatProgressSpinnerModule,
     MatButtonToggleModule,
-    AppHeaderComponent,
     UserSelectComponent
   ],
   template: `
-    <cc-app-header
-      [home]="backLink"
-      [queryParamsHandling]="adminMode ? 'preserve' : ''"
-      title="Profile"
-      icon="person"
-    ></cc-app-header>
-
-    @if (loading()) {
-      <mat-progress-bar mode="indeterminate" aria-label="Loading profile"></mat-progress-bar>
-    }
-
     <div class="page">
-      @if (adminMode && !loadError()) {
+      @if (adminMode() && !loadError()) {
         <mat-card class="card">
           <cc-user-select
-            [users]="users()"
+            [users]="selection.users()"
             [selectedId]="selectedId()"
-            [ownUserId]="selection.ownUserId"
+            [ownUserId]="selection.ownUserId()"
             (selectionChange)="onUserChange($event)"
           ></cc-user-select>
         </mat-card>
@@ -79,12 +74,12 @@ import { withLoading } from '../../util/loading';
       @if (loadError()) {
         <mat-card class="card">
           <p class="warn">{{ loadError() }}</p>
-          <button mat-stroked-button (click)="load()">Retry</button>
+          <button mat-stroked-button (click)="retry()" [disabled]="busy()">Retry</button>
         </mat-card>
-      } @else if (profile) {
+      } @else if (profile(); as p) {
         <mat-card class="card">
           <div class="row">
-            <h2>{{ ownProfile ? 'Your details' : 'User details' }}</h2>
+            <h2>{{ ownProfile() ? 'Your details' : 'User details' }}</h2>
             <span class="spacer"></span>
             @if (!editing()) {
               <button
@@ -101,11 +96,11 @@ import { withLoading } from '../../util/loading';
           @if (!editing()) {
             <dl class="cc-details">
               <dt class="muted">First name</dt>
-              <dd>{{ profile.firstName }}</dd>
+              <dd>{{ p.firstName }}</dd>
               <dt class="muted">Last name</dt>
-              <dd>{{ profile.lastName }}</dd>
+              <dd>{{ p.lastName }}</dd>
               <dt class="muted">Email</dt>
-              <dd class="break-word">{{ profile.emailAddress }}</dd>
+              <dd class="break-word">{{ p.emailAddress }}</dd>
               <!-- The landing-panel preference sits in the details grid so its "Show" label lines up with the
                    field labels and its toggle starts at the value column. It is a live switch (saved on flip
                    via onPanelChange), shown here in the read-only details; the pencil's edit mode is name/email
@@ -114,7 +109,7 @@ import { withLoading } from '../../util/loading';
               <dd>
                 <mat-button-toggle-group
                   class="cc-panel-toggle"
-                  [ngModel]="profile.summaryPanel ?? 'BALANCE'"
+                  [ngModel]="p.summaryPanel ?? 'BALANCE'"
                   (ngModelChange)="onPanelChange($event)"
                   [ngModelOptions]="{ standalone: true }"
                   [disabled]="busy()"
@@ -133,7 +128,7 @@ import { withLoading } from '../../util/loading';
                   matInput
                   name="firstName"
                   #firstNameModel="ngModel"
-                  [(ngModel)]="profile.firstName"
+                  [(ngModel)]="p.firstName"
                   required
                 />
                 @if (firstNameModel.invalid && firstNameModel.touched) {
@@ -142,13 +137,7 @@ import { withLoading } from '../../util/loading';
               </mat-form-field>
               <mat-form-field class="full-width">
                 <mat-label>Last name</mat-label>
-                <input
-                  matInput
-                  name="lastName"
-                  #lastNameModel="ngModel"
-                  [(ngModel)]="profile.lastName"
-                  required
-                />
+                <input matInput name="lastName" #lastNameModel="ngModel" [(ngModel)]="p.lastName" required />
                 @if (lastNameModel.invalid && lastNameModel.touched) {
                   <mat-error>A last name is required.</mat-error>
                 }
@@ -159,7 +148,7 @@ import { withLoading } from '../../util/loading';
                   matInput
                   name="emailAddress"
                   #emailModel="ngModel"
-                  [(ngModel)]="profile.emailAddress"
+                  [(ngModel)]="p.emailAddress"
                   type="email"
                   email
                   required
@@ -183,8 +172,8 @@ import { withLoading } from '../../util/loading';
         </mat-card>
 
         <mat-card class="card">
-          <h2>{{ ownProfile ? 'Your coffee link' : 'Coffee link' }}</h2>
-          @if (ownProfile) {
+          <h2>{{ ownProfile() ? 'Your coffee link' : 'Coffee link' }}</h2>
+          @if (ownProfile()) {
             <p class="warn">
               Anyone with this link can act as you: record coffees and expenses, undo recent coffees, edit
               your profile, and see your balance. Do not share it or post it publicly.
@@ -195,25 +184,23 @@ import { withLoading } from '../../util/loading';
               edit their profile, and see their balance. Do not share it or post it publicly.
             </p>
           }
-          <p class="muted break-word">{{ profile.capabilityUrl }}</p>
-          @if (qrObjectUrl()) {
-            @defer (on viewport) {
-              <div class="cc-qr">
-                <img [src]="qrObjectUrl()" alt="Coffee QR code" class="cc-qr-img" />
-                <a
-                  mat-stroked-button
-                  [href]="qrObjectUrl()"
-                  [attr.download]="profile.loginName + '.png'"
-                  aria-label="Download QR code"
-                  matTooltip="Download your coffee QR code"
-                >
-                  <mat-icon>download</mat-icon>
-                  Download
-                </a>
-              </div>
-            } @placeholder {
-              <div class="cc-qr cc-qr-placeholder"></div>
-            }
+          <p class="muted break-word">{{ p.capabilityUrl }}</p>
+          @if (qrObjectUrl(); as url) {
+            <div class="cc-qr">
+              <img [src]="url" alt="Coffee QR code" class="cc-qr-img" />
+              <a
+                mat-stroked-button
+                [href]="url"
+                [attr.download]="p.loginName + '.png'"
+                aria-label="Download QR code"
+                matTooltip="Download your coffee QR code"
+              >
+                <mat-icon>download</mat-icon>
+                Download
+              </a>
+            </div>
+          } @else {
+            <div class="cc-qr" aria-hidden="true"></div>
           }
         </mat-card>
       }
@@ -222,24 +209,21 @@ import { withLoading } from '../../util/loading';
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
+      /* The slot keeps its height whether or not the code is there yet: the 192px image, the 16px gap, and
+         the Download button's own height. So the arriving code changes pixels, never geometry. */
       .cc-qr {
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 16px;
         margin-top: 8px;
+        min-height: calc(192px + 16px + var(--mat-button-outlined-container-height, 40px));
       }
 
       .cc-qr-img {
         width: 192px;
         height: 192px;
         border-radius: 16px;
-      }
-
-      /* Reserve the QR's footprint so the @defer (on viewport) placeholder has a size to observe and the
-         layout does not jump when the deferred block swaps in. */
-      .cc-qr-placeholder {
-        min-height: 240px;
       }
 
       .cc-details {
@@ -284,27 +268,65 @@ import { withLoading } from '../../util/loading';
     `
   ]
 })
-export class ProfileComponent implements OnInit {
-  profile: UserDto | null = null;
-  readonly qrObjectUrl = signal<string | null>(null);
-  backLink: unknown[] = ['/admin'];
-  readonly busy = signal(false);
-  readonly loading = signal(false);
-  readonly loadError = signal('');
-  /** Whether the details section is in edit mode; read-only by default. */
-  readonly editing = signal(false);
-  /** True for the admin route (`/admin/profile`); false for the user route (`/login/:token/profile`). */
-  adminMode = false;
-  /** The users an admin may switch between (admin mode only); empty in user mode. */
-  readonly users = signal<UserDto[]>([]);
-  /** The id of the user the admin is currently viewing (admin mode only). */
-  readonly selectedId = signal('');
+export class ProfileComponent {
+  /** The page's preloaded payload, bound from the route resolver; its value is null when the load failed. */
+  readonly profilePage = input<Preload<ProfilePageData> | null>(null);
 
-  /** The user whose profile is currently loaded, used to skip a redundant reload on a repeated param. */
-  private loadedId = '';
+  /** Which audience this route serves, from the route data rather than inferred from the URL. */
+  readonly audience = input<PageAudience>('USER');
+
+  /** True on the admin route (`/admin/profile`); false on the user route (`/login/:token/profile`). */
+  readonly adminMode = computed(() => this.audience() === 'ADMIN');
+
+  /** The payload currently shown, replaced in place by a Retry. */
+  readonly page = linkedSignal<ProfilePageData | null>(() => this.profilePage()?.value ?? null);
+
+  /** The profile being shown and edited; the form mutates it and Save replaces it. */
+  readonly profile = linkedSignal<UserDto | null>(() => this.page()?.profile ?? null);
+
+  /** The id of the user being viewed (admin mode only). */
+  readonly selectedId = linkedSignal(() => this.page()?.subjectId ?? '');
+
+  /**
+   * The QR's object URL, created from the loaded blob and released when it is replaced. Deriving it from the
+   * payload means it exists on the first render, and a user switch swaps the code in the same frame as the
+   * details rather than a moment later.
+   */
+  readonly qrObjectUrl = linkedSignal<ProfilePageData | null, string | null>({
+    source: this.page,
+    computation: (page, previous) => {
+      if (previous?.value) {
+        URL.revokeObjectURL(previous.value);
+      }
+      this.createdQrUrl = page ? URL.createObjectURL(page.qr) : null;
+      return this.createdQrUrl;
+    }
+  });
+
+  /** The page's retryable load error; a resolver that could not load reports null, which is what this reads. */
+  readonly loadError = linkedSignal(() =>
+    this.page() === null ? 'Could not load the profile. The link may be invalid.' : ''
+  );
+
+  /**
+   * Whether the details section is in edit mode; read-only by default. Linked on the subject, so switching
+   * user closes the form: without that, Cancel after a switch would write one user's name onto another's.
+   */
+  readonly editing = linkedSignal({ source: this.selectedId, computation: () => false });
+
+  readonly busy = signal(false);
+
+  /**
+   * Whether the admin is viewing their own account (so the page reads "Your …"). Always true in user mode;
+   * in admin mode it compares the shown subject with the admin's own account.
+   */
+  readonly ownProfile = computed(() => !this.adminMode() || this.selectedId() === this.selection.ownUserId());
 
   /** The values shown when edit mode was entered, so Cancel can revert the fields. */
   private loadedProfile: UserDto | null = null;
+
+  /** The object URL currently held, so it can be released on destroy without forcing the signal to compute. */
+  private createdQrUrl: string | null = null;
 
   private readonly destroyRef = inject(DestroyRef);
 
@@ -313,65 +335,69 @@ export class ProfileComponent implements OnInit {
     private readonly router: Router,
     private readonly profileService: ProfileService,
     private readonly userService: UserService,
-    private readonly capability: CapabilityTokenService,
     private readonly notifications: NotificationService,
     readonly selection: AdminSelectionService,
+    private readonly pageLoading: PageLoadingService,
     private readonly cdr: ChangeDetectorRef
   ) {
-    // Revoke the QR object URL when the component is destroyed to avoid leaking it (replaces ngOnDestroy).
-    this.destroyRef.onDestroy(() => this.revokeQr());
+    // Release the last object URL when the component is destroyed to avoid leaking it.
+    this.destroyRef.onDestroy(() => {
+      if (this.createdQrUrl) {
+        URL.revokeObjectURL(this.createdQrUrl);
+        this.createdQrUrl = null;
+      }
+    });
+  }
+
+  /** Retries a failed load from the error card; the only page-owned action that raises the loading indicator. */
+  async retry(): Promise<void> {
+    await this.pageLoading.track(() => this.refresh());
   }
 
   /**
-   * Whether the admin is viewing their own account (so the page reads "Your …"). Always true in user mode;
-   * in admin mode it tracks the shared user selection against the admin's own account.
+   * Reloads the profile and its code. This is the recovery path, not the load path: the route resolver does
+   * the loading. The subject is derived from the route rather than from {@link selectedId}, which is empty
+   * when the resolver returned nothing to link it to.
    */
-  get ownProfile(): boolean {
-    return !this.adminMode || this.selection.isOwnAccountSelected();
-  }
-
-  async ngOnInit(): Promise<void> {
-    const token = this.route.snapshot.paramMap.get('token');
-    this.adminMode = token === null;
-    this.backLink = this.adminMode ? ['/admin'] : ['/login', token];
-    // Register the user's capability token so the interceptor authenticates the user API calls. The
-    // landing page sets this when navigating in-app, but a direct deep link or a page refresh on this route
-    // lands here first with an empty token holder, so set it from the route as well.
-    if (token) {
-      this.capability.set(token);
-    }
-    if (this.adminMode) {
-      await this.initAdminSelection();
-      // The URL is the source of truth for the selected user: follow the `user` query param (so the
-      // browser Back/Forward buttons, which change it, re-select and reload the profile). Skip the initial
-      // emission's reload while the user list is still loading (`load` below handles the first paint).
-      this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-        if (this.loading() || this.loadError()) {
-          return;
+  async refresh(): Promise<void> {
+    await withLoading(
+      this.busy,
+      this.loadError,
+      'Could not load the profile. The link may be invalid.',
+      async () => {
+        if (this.adminMode()) {
+          const subjectId = await resolveAdminSubject(
+            this.selection,
+            this.route.snapshot.queryParamMap.get('user')
+          );
+          if (!subjectId) {
+            throw new Error('the user directory is unavailable');
+          }
+          // Pin the subject before the fetch. The guard below compares against this signal, and it is
+          // derived from the payload, which on the Retry path is still the failed one; without this write
+          // it would read empty and the guard would discard every successful retry.
+          this.selectedId.set(subjectId);
+          const [profile, qr] = await Promise.all([
+            this.userService.get(subjectId),
+            this.userService.qrBlob(subjectId)
+          ]);
+          // a switch during the fetch must not land this user's details on the newly-selected user's page
+          if (subjectId !== this.selectedId()) {
+            return;
+          }
+          this.page.set({ profile, qr, subjectId });
+        } else {
+          const [profile, qr] = await Promise.all([this.profileService.get(), this.profileService.qrBlob()]);
+          this.page.set({ profile, qr, subjectId: '' });
         }
-        void this.applySelectionFromUrl(params.get('user'));
-      });
-    }
-    await this.load();
-  }
-
-  /**
-   * Loads the user list and resolves the shared admin selection from the URL (see
-   * {@link AdminSelectionService.loadUsersAndSelection}), so a deep link or a refresh on
-   * `/admin/profile?user=<id>` lands on that user.
-   */
-  private async initAdminSelection(): Promise<void> {
-    try {
-      await this.selection.loadUsersAndSelection(this.userService, this.route, this.users, this.selectedId);
-    } catch {
-      // a failed user-list load leaves the selector empty; `load()` still surfaces a retryable error
-    }
+      }
+    );
   }
 
   /**
    * Pushes the newly-selected user onto the URL as the `user` query param (a history entry, so Back
-   * undoes the switch). The `queryParamMap` subscription then mirrors it into the shared selection and
-   * reloads the profile; the URL stays the source of truth.
+   * undoes the switch). The route then re-resolves and the new payload arrives as an input; the URL stays
+   * the source of truth.
    *
    * @param userId the user id picked in the selector
    */
@@ -380,60 +406,19 @@ export class ProfileComponent implements OnInit {
     await this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { user: userId },
-      queryParamsHandling: 'merge'
+      queryParamsHandling: 'merge',
+      // The same page with a new subject, not a new page: the router must not scroll to the top as if it
+      // were one. Where the reader actually ends up is then decided by the control they used (Material
+      // restores focus to the picker, which brings it back into view), not by the navigation.
+      scroll: 'manual'
     });
-  }
-
-  /**
-   * Selects the user named by the URL's `user` param (or the admin's own account when it is absent) and
-   * reloads the profile, unless that user's profile is already loaded, so a redundant re-emission of the
-   * same param does not reload. `loadedId` (the user actually loaded) is the guard, not the bound
-   * `selectedId` (which the dropdown already advanced before navigating).
-   *
-   * @param userId the value of the `user` query param, or null when it is absent
-   */
-  private async applySelectionFromUrl(userId: string | null): Promise<void> {
-    const effective = this.selection.selectFromParam(userId);
-    if (effective === this.loadedId) {
-      this.selectedId.set(effective);
-      return;
-    }
-    this.selectedId.set(effective);
-    await this.load();
-  }
-
-  /**
-   * Loads the profile and the QR. In user mode this is the user's own `/api/profile`. In admin mode it
-   * is the selected user by id (the admin's own account or any other user), so the shared selection
-   * drives which user's details and QR are shown.
-   */
-  async load(): Promise<void> {
-    this.loadedId = this.selectedId();
-    await withLoading(
-      this.loading,
-      this.loadError,
-      'Could not load the profile. The link may be invalid.',
-      async () => {
-        this.profile = this.adminMode
-          ? await this.userService.get(this.selectedId())
-          : await this.profileService.get();
-        // the profile is an ngModel target reassigned after an await, so mark this OnPush view for check
-        this.cdr.markForCheck();
-        // a fresh load leaves edit mode, so the read-only view shows the just-loaded values
-        this.editing.set(false);
-        const blob = this.adminMode
-          ? await this.userService.qrBlob(this.profile.id!)
-          : await this.profileService.qrBlob();
-        this.revokeQr();
-        this.qrObjectUrl.set(URL.createObjectURL(blob));
-      }
-    );
   }
 
   /** Enters edit mode, snapshotting the loaded values so Cancel can revert to them. */
   startEdit(): void {
-    if (this.profile) {
-      this.loadedProfile = { ...this.profile };
+    const profile = this.profile();
+    if (profile) {
+      this.loadedProfile = { ...profile };
     }
     this.editing.set(true);
   }
@@ -444,13 +429,15 @@ export class ProfileComponent implements OnInit {
    * revert is scoped to them.
    */
   cancelEdit(): void {
-    if (this.profile && this.loadedProfile) {
-      this.profile = {
-        ...this.profile,
-        firstName: this.loadedProfile.firstName,
-        lastName: this.loadedProfile.lastName,
-        emailAddress: this.loadedProfile.emailAddress
-      };
+    const profile = this.profile();
+    const loaded = this.loadedProfile;
+    if (profile && loaded) {
+      this.profile.set({
+        ...profile,
+        firstName: loaded.firstName,
+        lastName: loaded.lastName,
+        emailAddress: loaded.emailAddress
+      });
     }
     this.editing.set(false);
   }
@@ -458,25 +445,30 @@ export class ProfileComponent implements OnInit {
   /** Saves the edited name and email, then returns to the read-only view. */
   async save(): Promise<void> {
     // a fast double-tap fires two same-tick handlers before the [disabled] applies; ignore the re-entrant one
-    if (this.busy()) {
+    const target = this.profile();
+    if (this.busy() || !target) {
       return;
     }
-    if (!this.profile) {
-      return;
-    }
+    const subjectId = this.selectedId();
     this.busy.set(true);
     try {
-      const updated = await this.persistProfile(this.profile, {
-        firstName: this.profile.firstName,
-        lastName: this.profile.lastName,
-        emailAddress: this.profile.emailAddress,
-        summaryPanel: this.profile.summaryPanel ?? 'BALANCE'
+      const updated = await this.persistProfile(target, {
+        firstName: target.firstName,
+        lastName: target.lastName,
+        emailAddress: target.emailAddress,
+        summaryPanel: target.summaryPanel ?? 'BALANCE'
       });
       // the admin PUT response may omit `capabilityUrl` (it is assembled, not a stored field), which would
       // blank the "Coffee link"; keep the one already loaded when the response does not carry it
-      this.profile = { ...updated, capabilityUrl: updated.capabilityUrl ?? this.profile.capabilityUrl };
-      // the profile is an ngModel target reassigned after an await, so mark this OnPush view for check
-      this.cdr.markForCheck();
+      const saved = { ...updated, capabilityUrl: updated.capabilityUrl ?? target.capabilityUrl };
+      // the picker on every admin page reads the shared directory, so the new name shows there too
+      this.selection.adoptUser(saved);
+      // A switch during the request must not paint the saved user over the newly-selected one. The save
+      // itself still committed, and the directory above already carries it.
+      if (this.selectedId() !== subjectId) {
+        return;
+      }
+      this.profile.set(saved);
       this.editing.set(false);
       this.notifications.success('Profile saved.');
     } catch (error) {
@@ -502,7 +494,7 @@ export class ProfileComponent implements OnInit {
     p: UserDto,
     fields: { firstName: string; lastName: string; emailAddress: string; summaryPanel: SummaryPanel }
   ): Promise<UserDto> {
-    return this.adminMode
+    return this.adminMode()
       ? this.userService.update(p.id!, {
           id: p.id,
           loginName: p.loginName,
@@ -526,7 +518,7 @@ export class ProfileComponent implements OnInit {
    * flipped, without going through the name/email edit mode. The switch is shown only in that read-only view,
    * so the current profile already holds the last-saved name/email, which the flip re-sends unchanged with the
    * new panel (the endpoint takes the whole profile). The optimistic value and the on-failure revert are
-   * written to the profile captured at entry and applied only while it is still the shown profile, so a user
+   * written from the profile captured at entry and applied only while the subject has not changed, so a user
    * switch mid-request cannot repaint or toast over the newly-selected user.
    *
    * The flip shares the {@link busy} flag with {@link save}: the switch is hidden while editing, so the two
@@ -536,7 +528,7 @@ export class ProfileComponent implements OnInit {
    * @param panel the panel the user selected (`BALANCE` or `CUPS`)
    */
   async onPanelChange(panel: SummaryPanel): Promise<void> {
-    const target = this.profile;
+    const target = this.profile();
     // share `busy` with save(): a flip and a name/email save must not run at once (both PUT the whole profile)
     if (!target || this.busy()) {
       return;
@@ -545,7 +537,8 @@ export class ProfileComponent implements OnInit {
     if (panel === previous) {
       return;
     }
-    target.summaryPanel = panel;
+    const subjectId = this.selectedId();
+    this.profile.set({ ...target, summaryPanel: panel });
     this.busy.set(true);
     try {
       await this.persistProfile(target, {
@@ -554,27 +547,20 @@ export class ProfileComponent implements OnInit {
         emailAddress: target.emailAddress,
         summaryPanel: panel
       });
-      if (this.profile === target) {
+      if (this.selectedId() === subjectId) {
         const shown = panel === 'CUPS' ? 'coffee stats' : 'the balance';
         this.notifications.success(`Now showing ${shown} on the landing page.`);
       }
     } catch (error) {
-      if (this.profile === target) {
-        target.summaryPanel = previous;
-        this.cdr.markForCheck();
+      if (this.selectedId() === subjectId) {
+        const current = this.profile();
+        if (current) {
+          this.profile.set({ ...current, summaryPanel: previous });
+        }
         this.notifications.error(error, 'Could not update the landing page.');
       }
     } finally {
       this.busy.set(false);
-    }
-  }
-
-  /** Revokes the current QR object URL, if any, to avoid leaking it. */
-  private revokeQr(): void {
-    const url = this.qrObjectUrl();
-    if (url) {
-      URL.revokeObjectURL(url);
-      this.qrObjectUrl.set(null);
     }
   }
 }

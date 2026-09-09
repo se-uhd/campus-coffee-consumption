@@ -22,14 +22,13 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { UserService } from '../../services/user.service';
 import { AdminUserService, UserRow } from '../../services/admin-user.service';
 import { NotificationService } from '../../services/notification.service';
-import { AppHeaderComponent } from '../../components/app-header/app-header.component';
+import { PageLoadingService } from '../../services/page-loading.service';
 import {
   ConfirmDialogComponent,
   ConfirmDialogData
@@ -73,19 +72,11 @@ import { Role, UserDto } from '../../models';
     MatPaginatorModule,
     MatSortModule,
     MatTooltipModule,
-    MatProgressBarModule,
     MatProgressSpinnerModule,
     MatDialogModule,
-    EurosPipe,
-    AppHeaderComponent
+    EurosPipe
   ],
   template: `
-    <cc-app-header [home]="'/admin'" title="Users" icon="group"></cc-app-header>
-
-    @if (loading()) {
-      <mat-progress-bar mode="indeterminate" aria-label="Loading users"></mat-progress-bar>
-    }
-
     <div class="page">
       <mat-card class="card">
         <h2>Add a user</h2>
@@ -193,7 +184,7 @@ import { Role, UserDto } from '../../models';
       @if (loadError() && !hasRows()) {
         <mat-card class="card">
           <p class="warn">Could not load the users.</p>
-          <button mat-stroked-button (click)="reload()">Retry</button>
+          <button mat-stroked-button (click)="retry()" [disabled]="busy()">Retry</button>
         </mat-card>
       } @else {
         <mat-card class="card">
@@ -362,7 +353,9 @@ import { Role, UserDto } from '../../models';
               </table>
             </div>
             <mat-paginator [pageSize]="10" [pageSizeOptions]="[10, 25, 50]"></mat-paginator>
-          } @else if (!loading()) {
+          } @else if (!busy()) {
+            <!-- only once nothing is in flight: a retry clears the error flag before it has rows, and
+                 "No users yet." in that window is a claim about data that is still being fetched -->
             <p class="muted">No users yet.</p>
           }
         </mat-card>
@@ -498,7 +491,6 @@ export class AdminUsersComponent {
   readonly busy = signal(false);
   readonly downloadingAll = signal(false);
   readonly downloadingAllPdf = signal(false);
-  readonly loading = signal(false);
 
   /** The retryable load-error flag, owned by the cache (a failed preload lands here, not a canceled route). */
   readonly loadError: Signal<boolean>;
@@ -527,6 +519,7 @@ export class AdminUsersComponent {
     private readonly router: Router,
     private readonly notifications: NotificationService,
     private readonly dialog: MatDialog,
+    private readonly pageLoading: PageLoadingService,
     private readonly cdr: ChangeDetectorRef
   ) {
     // These read the injected cache, so they are assigned here rather than in field initializers (which run
@@ -589,13 +582,18 @@ export class AdminUsersComponent {
     return row.user.id ?? row.loginName;
   }
 
+  /** Retries a failed load from the error card; the only page-owned action that raises the loading indicator. */
+  async retry(): Promise<void> {
+    await this.pageLoading.track(() => this.reload());
+  }
+
   /** Forces a fresh load of the users and the balance overview through the cache; surfaces a retryable error. */
   async reload(): Promise<void> {
-    this.loading.set(true);
+    this.busy.set(true);
     try {
       await this.adminUserService.reload();
     } finally {
-      this.loading.set(false);
+      this.busy.set(false);
     }
   }
 

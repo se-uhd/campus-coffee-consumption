@@ -1,35 +1,36 @@
-import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
-import {
-  RouterOutlet,
-  Router,
-  NavigationStart,
-  NavigationEnd,
-  NavigationCancel,
-  NavigationError
-} from '@angular/router';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { PageLoadingService } from './services/page-loading.service';
+import { PageSkeletonComponent } from './shell/page-skeleton.component';
 
 /**
- * Root component: a router outlet shell with a thin top progress bar shown while a navigation is in flight
- * (so a route that preloads its data via a resolver reads as feedback, not a freeze). Each page renders its
- * own header.
+ * Root component: a router outlet with the app's single loading indicator above it, and the cold-load
+ * skeleton in its place until the first route activates. The bar is `position: fixed`, so raising and
+ * lowering it moves nothing on the page underneath, and {@link PageLoadingService} owns when it is up.
+ * Each audience's header lives in its shell route, not here and not in the pages.
  */
 @Component({
   selector: 'cc-root',
-  imports: [RouterOutlet, MatProgressBarModule],
+  imports: [RouterOutlet, MatProgressBarModule, PageSkeletonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (navigating()) {
+    @if (pageLoading.visible()) {
       <mat-progress-bar
         class="cc-nav-progress"
         mode="indeterminate"
         aria-label="Loading page"
       ></mat-progress-bar>
     }
+    @if (!pageLoading.activated()) {
+      <cc-page-skeleton />
+    }
     <router-outlet></router-outlet>
   `,
   styles: [
     `
+      /* Out of the document flow, so the page below it never shifts when it appears or goes. Its 4px height
+         is Material's default and the layout-stability e2e clips exactly that strip out of its comparison. */
       .cc-nav-progress {
         position: fixed;
         inset: 0 0 auto 0;
@@ -39,23 +40,9 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
   ]
 })
 export class AppComponent {
-  private readonly router = inject(Router);
-
-  /** Whether a router navigation is currently in flight (drives the top progress bar). */
-  protected readonly navigating = signal(false);
-
-  constructor() {
-    // The app shell lives for the whole session, so this subscription needs no teardown.
-    this.router.events.subscribe((event) => {
-      if (event instanceof NavigationStart) {
-        this.navigating.set(true);
-      } else if (
-        event instanceof NavigationEnd ||
-        event instanceof NavigationCancel ||
-        event instanceof NavigationError
-      ) {
-        this.navigating.set(false);
-      }
-    });
-  }
+  /**
+   * @param pageLoading the app's single loading indicator, raised by router navigations and by a
+   *   user-initiated Retry, and the owner of whether the first route has activated yet
+   */
+  constructor(protected readonly pageLoading: PageLoadingService) {}
 }

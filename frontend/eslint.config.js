@@ -126,7 +126,10 @@ module.exports = defineConfig([
   // view code may depend downward (a page on a component, a component on a service) but never upward or
   // sideways. Expressed with the core no-restricted-imports rather than a boundaries plugin because the
   // layering is one flat directory per layer, which a path pattern states directly and with no extra
-  // dependency. One rule per file set, and each set lists every restriction that applies to it: two config
+  // dependency. The view blocks also forbid the progress-bar module outright: the app has exactly one
+  // loading indicator, and a page reaching for a second one is the flicker this repository spent four
+  // rounds of fixes on. The root component is the one legitimate user and is matched by none of these
+  // blocks. One rule per file set, and each set lists every restriction that applies to it: two config
   // blocks matching the same file would override rather than merge this rule.
   {
     // Services and the route/HTTP hooks hold no view code, so nothing that renders is importable.
@@ -137,7 +140,7 @@ module.exports = defineConfig([
         {
           patterns: [
             {
-              group: ['**/pages/**', '**/components/**', '**/directives/**', '**/pipes/**'],
+              group: ['**/pages/**', '**/components/**', '**/shell/**', '**/directives/**', '**/pipes/**'],
               message: 'Services and route hooks must not import view code. Invert the dependency.'
             },
             {
@@ -158,7 +161,14 @@ module.exports = defineConfig([
         {
           patterns: [
             {
-              group: ['**/pages/**', '**/components/**', '**/services/**', '**/directives/**', '**/pipes/**'],
+              group: [
+                '**/pages/**',
+                '**/components/**',
+                '**/shell/**',
+                '**/services/**',
+                '**/directives/**',
+                '**/pipes/**'
+              ],
               message: 'util must stay pure: no Angular, no services, no view code.'
             },
             {
@@ -179,7 +189,7 @@ module.exports = defineConfig([
         {
           patterns: [
             {
-              group: ['**/pages/**', '**/components/**', '**/services/**'],
+              group: ['**/pages/**', '**/components/**', '**/shell/**', '**/services/**'],
               message: 'A pipe or directive is a leaf: depend on util and the shared types only.'
             },
             {
@@ -198,10 +208,47 @@ module.exports = defineConfig([
       'no-restricted-imports': [
         'error',
         {
+          paths: [
+            {
+              name: '@angular/material/progress-bar',
+              message:
+                'The app has one loading indicator, rendered by the root component. Raise it through PageLoadingService rather than adding a bar to a page.'
+            }
+          ],
+          patterns: [
+            {
+              group: ['**/pages/**', '**/shell/**'],
+              message:
+                'A component must not import a page or a shell. Pass the data in through an input instead.'
+            },
+            {
+              group: ['**/api/**'],
+              message: 'Import the generated DTOs from models.ts, not from api/ directly.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    // A shell owns the chrome around a routed page and never the page itself: it reaches one only through
+    // the loadComponent entries in app.routes.ts, which are dynamic imports the router resolves.
+    files: ['src/app/shell/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@angular/material/progress-bar',
+              message:
+                'The app has one loading indicator, rendered by the root component. Raise it through PageLoadingService rather than adding a bar to a page.'
+            }
+          ],
           patterns: [
             {
               group: ['**/pages/**'],
-              message: 'A component must not import a page. Pass the data in through an input instead.'
+              message: 'A shell reaches a page only through loadComponent in app.routes.ts.'
             },
             {
               group: ['**/api/**'],
@@ -221,10 +268,21 @@ module.exports = defineConfig([
       'no-restricted-imports': [
         'error',
         {
+          paths: [
+            {
+              name: '@angular/material/progress-bar',
+              message:
+                'The app has one loading indicator, rendered by the root component. Raise it through PageLoadingService rather than adding a bar to a page.'
+            }
+          ],
           patterns: [
             {
               regex: '^\\.\\./(?!\\.\\./)[^/]+/',
               message: 'A page must not import another page. Move the shared piece into components/ or util/.'
+            },
+            {
+              group: ['**/shell/**'],
+              message: 'A page must not import its shell. The shell routes to the page, never the reverse.'
             },
             {
               group: ['**/api/**'],

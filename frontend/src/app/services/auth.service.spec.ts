@@ -3,6 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting, TestRequest } from '@angular/common/http/testing';
 import { AuthService } from './auth.service';
+import { AdminSelectionService } from './admin-selection.service';
+import { AdminUserService } from './admin-user.service';
+import { BeanService } from './bean.service';
+import { UserDto } from '../models';
 
 // jose is mocked: real WebCrypto is realm-fragile under jsdom, and the unit test's job is the service's
 // orchestration contract (fetch the key, encrypt the credentials, post only the ciphertext, store the
@@ -119,5 +123,54 @@ describe('AuthService', () => {
     // a pending admin's response asks the SPA to route them to enrollment
     tokenReq.flush({ token: 'jwt-123', enrollmentRequired: true });
     await expect(promise).resolves.toBe(true);
+  });
+  it('clears the previous session cached state on sign-in, so a second admin does not inherit the first identity', async () => {
+    // The caches are root singletons, so they outlive an admin whenever the app reaches this form without
+    // passing through logout (a sign-out in another tab clears only the shared localStorage marker, and the
+    // guard then routes this tab here with its caches intact). The own-account id is the one that matters:
+    // an admin page with no `?user=` resolves its subject to it.
+    const selection = TestBed.inject(AdminSelectionService);
+    selection.adoptUsers([{ id: 'admin-a', loginName: 'admin_a' } as UserDto]);
+    selection.setOwnUserId('admin-a');
+    expect(selection.selectFromParam(null)).toBe('admin-a');
+
+    const jwk = { kty: 'RSA', n: 'modulus', e: 'AQAB', alg: 'RSA-OAEP-256', use: 'enc', kid: 'k1' };
+    const promise = service.login('admin_b', 's3cret-pw');
+    (await waitForRequest(httpMock, '/api/auth/public-key')).flush(jwk);
+    (await waitForRequest(httpMock, '/api/auth/token')).flush({ token: 'jwt-b', enrollmentRequired: false });
+    await promise;
+
+    // nothing of admin A survives: the next page resolves its subject from a clean slate, not from A
+    expect(selection.selectFromParam(null)).toBe('');
+    expect(selection.users()).toEqual([]);
+  });
+
+  it('clears the bean catalog and the users table on sign-in too, not only the selection', async () => {
+    // All three caches are cleared on sign-out, so all three must be cleared on sign-in; asserting only the
+    // selection would let a later edit drop the other two, or add a fourth cache to sign-out alone.
+    const beans = TestBed.inject(BeanService);
+    const adminUsers = TestBed.inject(AdminUserService);
+
+    const warmBeans = beans.ensureLoaded();
+    (await waitForRequest(httpMock, '/api/beans')).flush([{ id: 'bean-1', name: 'Kenya AA' }]);
+    await warmBeans;
+
+    const warmUsers = adminUsers.ensureLoaded();
+    (await waitForRequest(httpMock, '/api/users')).flush([{ id: 'user-7', loginName: 'user_7' }]);
+    (await waitForRequest(httpMock, '/api/users/overview')).flush([]);
+    await warmUsers;
+
+    // both caches genuinely hold the previous admin's session data before the sign-in
+    expect(beans.selectable()).toHaveLength(1);
+    expect(adminUsers.rows()?.length).toBe(1);
+
+    const jwk = { kty: 'RSA', n: 'modulus', e: 'AQAB', alg: 'RSA-OAEP-256', use: 'enc', kid: 'k1' };
+    const promise = service.login('admin_b', 's3cret-pw');
+    (await waitForRequest(httpMock, '/api/auth/public-key')).flush(jwk);
+    (await waitForRequest(httpMock, '/api/auth/token')).flush({ token: 'jwt-b', enrollmentRequired: false });
+    await promise;
+
+    expect(beans.selectable(), 'the catalog must not carry into the next session').toEqual([]);
+    expect(adminUsers.rows(), 'the users table must not carry into the next session').toBeNull();
   });
 });

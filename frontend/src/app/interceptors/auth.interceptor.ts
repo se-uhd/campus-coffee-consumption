@@ -2,7 +2,10 @@ import { HttpErrorResponse, HttpInterceptorFn, HttpResponse } from '@angular/com
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, tap, throwError } from 'rxjs';
+import { AdminSelectionService } from '../services/admin-selection.service';
+import { AdminUserService } from '../services/admin-user.service';
 import { AuthService } from '../services/auth.service';
+import { BeanService } from '../services/bean.service';
 import { CapabilityTokenService } from '../services/capability-token.service';
 
 /** Admin endpoint prefixes, authenticated by the admin JWT in the httpOnly session cookie the browser sends. */
@@ -48,6 +51,9 @@ let redirectingToAdminLogin = false;
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const capability = inject(CapabilityTokenService);
+  const selection = inject(AdminSelectionService);
+  const adminUsers = inject(AdminUserService);
+  const beans = inject(BeanService);
   const router = inject(Router);
 
   if (ADMIN_PREFIXES.some((prefix) => req.url.startsWith(prefix))) {
@@ -85,6 +91,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           // (a user has no login form to redirect to; the page shows "your link may be invalid")
           if (error instanceof HttpErrorResponse && error.status === 401) {
             capability.clear();
+            // the credential that read them is gone, so the cached reference data belongs to nobody now
+            selection.reset();
+            adminUsers.reset();
+            beans.reset();
           }
           return throwError(() => error);
         })

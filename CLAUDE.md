@@ -527,16 +527,39 @@ option is `no-misused-promises`'s `checksVoidReturn: { inheritedMethods: false }
 lifecycle interfaces declare `ngOnInit(): void` and an `async ngOnInit` is the framework's own pattern.
 
 The same config carries **layer rules** for the SPA, the frontend counterpart to the backend's ArchUnit
-tests: view code may depend downward (a page on a component, a component on a service) but never upward or
-sideways, no page imports another page, and only `models.ts` imports the generated `api/`. They are six
-`no-restricted-imports` entries rather than a boundaries plugin, because one flat directory per layer is
-stated directly by a path pattern. Each file set lists every restriction that applies to it: two config
-blocks matching the same file **override** rather than merge this rule.
+tests: view code may depend downward (a shell on a component, a page on a component, a component on a
+service) but never upward or sideways, no page imports another page or its shell, a shell reaches a page
+only through the `loadComponent` entries in `app.routes.ts`, and only `models.ts` imports the generated
+`api/`. They are `no-restricted-imports` entries rather than a boundaries plugin, because one flat directory
+per layer is stated directly by a path pattern. The same rule in the three view blocks (`pages/`,
+`components/`, `shell/`) also forbids `@angular/material/progress-bar` outright: the app has exactly one
+loading indicator, and `app.component.ts`, which none of those blocks match, is its only legitimate user. Each
+file set lists every restriction that applies to it: two config blocks matching the same file **override**
+rather than merge this rule.
 
-**A page's initial load goes through `withLoading`** (`frontend/src/app/util/loading.ts`), which raises the
-loading flag, clears the previous error, reports one message if the load throws, and lowers the flag either
-way. New pages use it rather than repeating that `try`/`catch`/`finally` shape; a page whose failure handling
-genuinely differs (the login page branches on a 429) keeps its own.
+**A page's initial data comes from a route resolver, not from `ngOnInit`.** Each route resolves what its
+page needs (`frontend/src/app/resolvers/`, through `util/preload.ts`, which turns a failed load into `null`
+rather than a rejection that would cancel the navigation), and the page takes it as a signal input and
+derives its view state from it with `linkedSignal`. A page therefore renders complete on its first frame,
+and an admin's user switch re-resolves the same route so the whole page moves to the new subject in one
+atomic input update. `withLoading` (`frontend/src/app/util/loading.ts`) covers what is left: the Retry from
+an error card and the refresh after a mutation. It raises the page's busy flag, reports one message if the
+load throws, clears the error only once the payload is in place, and lowers the flag either way. A page
+with different failure handling (the login page branches on a 429) keeps its own.
+
+**The header lives in a shell route, not in the pages.** `frontend/src/app/shell/` holds one shell component
+per audience, each rendering the shared header and a router outlet with its pages as children, so navigating
+within an audience does not rebuild the chrome. A page declares what the header should say through its route
+`data` (`headerTitle`, `headerIcon`) and which audience it serves (`audience`). The same directory holds the
+cold-load skeleton the root component shows until the first route activates.
+
+**The app has one loading indicator.** `PageLoadingService` owns it: router navigations raise it, and so
+does a user-initiated Retry through `track`. It appears only if the work outlives a short delay and then
+stays for a minimum, so a fast load shows no bar at all and the bar a slow load does show never blinks. A
+post-mutation refresh
+deliberately does not raise it. **Layout stability is gated by the e2e suite**
+(`frontend/e2e/layout-stability.spec.ts`), which walks every transition in both audiences at two viewports
+and fails when a destination changes after it appears.
 
 **Accessibility is gated by the e2e suite**, not the linter. `frontend/e2e/a11y.spec.ts` runs axe-core over
 nine rendered pages, scoped to the WCAG 2.1 A and AA tags (the full rule set also carries best-practice

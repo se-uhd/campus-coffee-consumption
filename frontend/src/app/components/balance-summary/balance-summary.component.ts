@@ -8,17 +8,20 @@ import { SummaryPanel } from '../../models';
 /**
  * A shared, presentational summary block reused by the user and admin landing pages so the top looks
  * identical for both: a big coffee count with the per-cup price, then a second card. The second card is the
- * money panel (the signed personal balance and the kitty) by default, or, when [panel] is `CUPS`, a same-sized
+ * money panel (the signed personal balance and the kitty) by default, or, when [panel] is `CUPS`, a
  * coffee-stats panel (cups today, this week, and since the first cup). Money is always rendered via
  * `EurosPipe`; the balance is signed (negative shown in red). Action buttons (the +1 hero, the admin +/-
  * controls) are projected in via `<ng-content>` so each page keeps its own controls.
+ *
+ * It is purely a view of a summary the page already has: it has no loading state of its own, and its caller
+ * renders it only once that summary is in hand.
  */
 @Component({
   selector: 'cc-balance-summary',
   imports: [MatCardModule, EurosPipe, UtcDatePipe, DatePipe],
   template: `
     <mat-card class="card cc-count-card">
-      <div class="display">{{ loading() ? '…' : (count() ?? '-') }}</div>
+      <div class="display">{{ count() ?? '-' }}</div>
       <div class="muted">cups ({{ priceCents() ?? 0 | euros }} each)</div>
       <div class="cc-count-actions">
         <ng-content></ng-content>
@@ -26,46 +29,46 @@ import { SummaryPanel } from '../../models';
       <ng-content select="[extra]"></ng-content>
     </mat-card>
 
-    @if (showBalance()) {
-      @if (panel() === 'CUPS') {
-        <mat-card class="card">
-          @if (firstCupAt()) {
-            <div class="row">
-              <span>Today</span>
-              <span class="spacer"></span>
-              <strong class="cc-amount cc-amount--balance">{{ cupsToday() ?? 0 }}</strong>
-            </div>
-            <div class="row cc-kitty-row">
-              <span class="muted">This week</span>
-              <span class="spacer"></span>
-              <span class="muted cc-amount">{{ cupsThisWeek() ?? 0 }}</span>
-            </div>
-            <div class="row cc-kitty-row">
-              <span class="muted">Since {{ firstCupAt() | utcDate | date: 'd MMMM y' }}</span>
-              <span class="spacer"></span>
-              <span class="muted cc-amount">{{ count() ?? 0 }}</span>
-            </div>
-          } @else {
-            <p class="muted cc-no-cups">No cups yet.</p>
-          }
-        </mat-card>
-      } @else {
-        @let balance = balanceCents() ?? 0;
-        <mat-card class="card">
+    <!-- Which second card, decided by the panel preference alone. It is never mixed with a load flag: the
+         page renders this component only once its summary is in hand, so there is no third state to show. -->
+    @if (panel() === 'CUPS') {
+      <mat-card class="card">
+        @if (firstCupAt()) {
           <div class="row">
-            <span>Personal balance</span>
+            <span>Today</span>
             <span class="spacer"></span>
-            <strong class="cc-amount cc-amount--balance" [class.warn]="balance < 0">
-              {{ balance | euros: true }}
-            </strong>
+            <strong class="cc-amount cc-amount--balance">{{ cupsToday() ?? 0 }}</strong>
           </div>
           <div class="row cc-kitty-row">
-            <span class="muted">Kitty balance</span>
+            <span class="muted">This week</span>
             <span class="spacer"></span>
-            <span class="muted cc-amount">{{ kittyBalanceCents() ?? 0 | euros }}</span>
+            <span class="muted cc-amount">{{ cupsThisWeek() ?? 0 }}</span>
           </div>
-        </mat-card>
-      }
+          <div class="row cc-kitty-row">
+            <span class="muted">Since {{ firstCupAt() | utcDate | date: 'd MMMM y' }}</span>
+            <span class="spacer"></span>
+            <span class="muted cc-amount">{{ count() ?? 0 }}</span>
+          </div>
+        } @else {
+          <p class="muted cc-no-cups">No cups yet.</p>
+        }
+      </mat-card>
+    } @else {
+      @let balance = balanceCents() ?? 0;
+      <mat-card class="card">
+        <div class="row">
+          <span>Personal balance</span>
+          <span class="spacer"></span>
+          <strong class="cc-amount cc-amount--balance" [class.warn]="balance < 0">
+            {{ balance | euros: true }}
+          </strong>
+        </div>
+        <div class="row cc-kitty-row">
+          <span class="muted">Kitty balance</span>
+          <span class="spacer"></span>
+          <span class="muted cc-amount">{{ kittyBalanceCents() ?? 0 | euros }}</span>
+        </div>
+      </mat-card>
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -141,9 +144,6 @@ export class BalanceSummaryComponent {
   /** The communal kitty balance in integer euro cents. */
   readonly kittyBalanceCents = input<number | null>(null);
 
-  /** Whether to render the second card at all (false during the initial load); [panel] picks which one. */
-  readonly showBalance = input(true);
-
   /** Which second card to render: the money panel (`BALANCE`, the default) or the cup-stats panel (`CUPS`). */
   readonly panel = input<SummaryPanel>('BALANCE');
 
@@ -155,7 +155,4 @@ export class BalanceSummaryComponent {
 
   /** Net cups since the start of the local day; for the cup-stats panel. */
   readonly cupsToday = input<number | null>(null);
-
-  /** Whether the page is still loading; the big figure shows a "…" placeholder instead of a fake "-"/0. */
-  readonly loading = input(false);
 }

@@ -100,6 +100,15 @@ $cc-theme: mat.define-theme(
 // Base elements
 // ---------------------------------------------------------------------------
 
+// Always reserve the scrollbar track, so moving between a page that scrolls and one that does not cannot
+// shift the centered 740px column sideways. This is `overflow-y: scroll` rather than `scrollbar-gutter:
+// stable`: Chromium reserves that gutter even where the scrollbar is an overlay (macOS, and the Playwright
+// chromium), which pulls the column off centre on every page; a permanently-shown scrollbar reserves the
+// classic gutter only on platforms that have one.
+html {
+  overflow-y: scroll;
+}
+
 html,
 body {
   margin: 0;
@@ -142,13 +151,53 @@ a {
 // forms and the mobile-first user landing) uses the same width. On a narrow phone the page is full-width
 // (the max-width does not bind); on a wide desktop the column is centered so it reads as an intentional
 // card column, not lost in a void.
-.page {
+@mixin page-column {
   max-width: 740px;
   margin: 0 auto;
   padding: 24px 16px 48px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.page {
+  @include page-column;
+}
+
+// The cold-load skeleton's column. It shares `.page`'s box through the mixin but deliberately not its
+// class: the layout-stability e2e anchors on `.page` to tell the outgoing page from the incoming one, and
+// a skeleton wearing that class would look like a page to it.
+.cc-skeleton-page {
+  @include page-column;
+}
+
+// The app's header bar, used by the header component, by the cold-load skeleton, and by the boot
+// placeholder in index.html. The metrics live here rather than in the component's encapsulated styles so
+// the three cannot drift and the bar does not move when one replaces another.
+.cc-header-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 8px 16px;
+  background: var(--cc-surface);
+  box-shadow:
+    0 1px 2px rgb(var(--cc-shadow-rgb), 0.06),
+    0 1px 6px rgb(var(--cc-shadow-rgb), 0.06);
+}
+
+// The logo's box inside that bar, shared for the same reason: the logo must not shift horizontally when the
+// real header replaces the boot placeholder.
+.cc-header-logo {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.cc-header-logo img {
+  display: block;
+  height: 36px;
+  width: auto;
 }
 
 // Cards: white surface, a soft elevation, and 16px vertical / 24px horizontal padding so the content has
@@ -289,6 +338,10 @@ mat-card.card h2:last-child {
   line-height: 1.05;
   letter-spacing: -0.02em;
   color: var(--cc-ink);
+
+  // Tabular figures, so a display number keeps its width as it changes (a count going 9 -> 10, a balance
+  // whose digits swap) and the surrounding layout cannot move with it.
+  font-variant-numeric: tabular-nums;
 }
 
 .display--md {
@@ -314,6 +367,70 @@ mat-card.card h2:last-child {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+// ---------------------------------------------------------------------------
+// Placeholders: reserved geometry, never content
+// ---------------------------------------------------------------------------
+
+// A placeholder stands in for a value that has not arrived yet, so the shape a page will have is already on
+// screen before its data is. It is a flat hairline block: it holds no text, nothing focusable, and does not
+// animate (a pulsing skeleton is motion the reduce-motion rule would only have to undo). Every use is
+// aria-hidden: it names nothing, so a screen reader must never meet it.
+.cc-placeholder {
+  display: inline-block;
+  background: var(--cc-hairline);
+  border-radius: 8px;
+  vertical-align: middle;
+}
+
+// The two display-sized figures, the coffee count and a money amount. Their height stays well inside the
+// 4rem/1.05 line box of `.display`, so the block they sit in is exactly the height the real figure produces.
+.cc-placeholder--count {
+  width: 5rem;
+  height: 2.5rem;
+}
+
+.cc-placeholder--amount {
+  width: 9rem;
+  height: 2.5rem;
+}
+
+// A Material icon's fixed 24px box.
+.cc-placeholder--icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+// Text lines: one at the base font size (1rem / 1.5) and one at the muted size (0.875rem / 1.5). The
+// element is exactly one line box tall, so a stack of them measures like the real text, while the visible
+// bar inside it is thinner, which is what makes it read as a placeholder rather than a solid block.
+.cc-placeholder--line {
+  width: 45%;
+  height: 1.5rem;
+}
+
+.cc-placeholder--subline {
+  width: 70%;
+  height: 1.3125rem;
+}
+
+.cc-placeholder--line,
+.cc-placeholder--subline {
+  display: flex;
+  align-items: center;
+  background: none;
+}
+
+.cc-placeholder--line::before,
+.cc-placeholder--subline::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 0.75rem;
+  border-radius: 6px;
+  background: var(--cc-hairline);
 }
 
 // ---------------------------------------------------------------------------

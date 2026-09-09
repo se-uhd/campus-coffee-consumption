@@ -1,16 +1,15 @@
 import {
   Component,
-  DestroyRef,
-  inject,
-  OnInit,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
+  computed,
+  input,
+  linkedSignal,
   signal,
   viewChild
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -19,21 +18,17 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { AuthService } from '../../services/auth.service';
-import { CapabilityTokenService } from '../../services/capability-token.service';
+import { ProfileService } from '../../services/profile.service';
 import { SummaryService } from '../../services/summary.service';
 import { BeanService } from '../../services/bean.service';
-import { ProfileService } from '../../services/profile.service';
-import { UserService } from '../../services/user.service';
 import { ConsumptionService } from '../../services/consumption.service';
 import { ExpenseService } from '../../services/expense.service';
 import { AccountingService } from '../../services/accounting.service';
 import { NotificationService } from '../../services/notification.service';
 import { AdminSelectionService } from '../../services/admin-selection.service';
+import { PageLoadingService } from '../../services/page-loading.service';
 import { ActivityListComponent } from '../../components/activity-list/activity-list.component';
-import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { BalanceSummaryComponent } from '../../components/balance-summary/balance-summary.component';
 import { CollapsibleCardComponent } from '../../components/collapsible-card/collapsible-card.component';
 import {
@@ -42,19 +37,13 @@ import {
 } from '../../components/bean-rating-input/bean-rating-input.component';
 import { ExpenseFormComponent, ExpenseFormValue } from '../../components/expense-form/expense-form.component';
 import { UserSelectComponent } from '../../components/user-select/user-select.component';
-import {
-  ActivityEntryDto,
-  AdminExpenseDto,
-  CoffeeBeanDto,
-  OwnExpenseDto,
-  UserDto,
-  UserSummaryDto
-} from '../../models';
+import { AdminExpenseDto, OwnExpenseDto, UserSummaryDto } from '../../models';
+import { resolveAdminSubject } from '../../resolvers/admin-subject';
+import { LandingData, LANDING_ACTIVITY_PAGE_SIZE } from '../../resolvers/landing.resolver';
 import { loadActivityPage } from '../../util/activity';
 import { withLoading } from '../../util/loading';
-
-/** The page size for one activity page; "Load more" appends another page of this size. */
-const ACTIVITY_PAGE_SIZE = 10;
+import { Preload } from '../../util/preload';
+import { PageAudience } from '../../util/page-audience';
 
 /** How many extra times to re-post a coffee after a concurrent-update 409 before surfacing the error. */
 const MAX_ADD_RETRIES = 4;
@@ -72,11 +61,16 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
  * count correction). Both modes are driven by one {@link UserSummaryDto} (the user's own `/summary`, or the
  * admin per-user `/users/{id}/summary`), so the money is always the server's authoritative figure; only the
  * displayed count moves optimistically before the response reconciles it.
+ *
+ * The page is created already holding that summary: the route resolver fetches it, so the first frame is the
+ * finished page rather than an empty frame that fills in. Every piece of view state below is therefore
+ * derived from the resolved input with `linkedSignal`, which also gives the admin's user switch its
+ * semantics for free: the route re-resolves, the input changes, and the count, the activity, the open
+ * correction form and the rating prompt all move to the new user in one atomic update.
  */
 @Component({
   selector: 'cc-coffee-landing',
   imports: [
-    RouterLink,
     FormsModule,
     MatCardModule,
     MatButtonModule,
@@ -85,126 +79,28 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
     MatInputModule,
     MatSelectModule,
     MatTooltipModule,
-    MatProgressBarModule,
     MatProgressSpinnerModule,
     ActivityListComponent,
-    AppHeaderComponent,
     BalanceSummaryComponent,
-    BeanRatingInputComponent,
     BeanRatingInputComponent,
     CollapsibleCardComponent,
     ExpenseFormComponent,
     UserSelectComponent
   ],
   template: `
-    <cc-app-header [home]="adminMode ? '/admin' : ['/login', token]">
-      @if (adminMode) {
-        <a mat-icon-button routerLink="/admin/users" aria-label="Manage users" matTooltip="Users">
-          <mat-icon>group</mat-icon>
-        </a>
-        <a
-          mat-icon-button
-          routerLink="/admin/activity"
-          queryParamsHandling="preserve"
-          aria-label="Activity"
-          matTooltip="Activity"
-        >
-          <mat-icon>receipt_long</mat-icon>
-        </a>
-        <a
-          mat-icon-button
-          routerLink="/admin/ratings"
-          queryParamsHandling="preserve"
-          aria-label="Ratings"
-          matTooltip="Ratings"
-        >
-          <mat-icon>leaderboard</mat-icon>
-        </a>
-        <a
-          mat-icon-button
-          routerLink="/admin/price"
-          queryParamsHandling="preserve"
-          aria-label="Price"
-          matTooltip="Price"
-        >
-          <mat-icon>sell</mat-icon>
-        </a>
-        <a
-          mat-icon-button
-          routerLink="/admin/expenses"
-          queryParamsHandling="preserve"
-          aria-label="Expenses"
-          matTooltip="Expenses"
-        >
-          <mat-icon>shopping_cart</mat-icon>
-        </a>
-        <a
-          mat-icon-button
-          routerLink="/admin/kitty"
-          queryParamsHandling="preserve"
-          aria-label="Kitty"
-          matTooltip="Kitty"
-        >
-          <mat-icon>savings</mat-icon>
-        </a>
-        <a
-          mat-icon-button
-          routerLink="/admin/profile"
-          queryParamsHandling="preserve"
-          aria-label="My profile"
-          matTooltip="My profile"
-        >
-          <mat-icon>person</mat-icon>
-        </a>
-        <a
-          mat-icon-button
-          routerLink="/admin/security"
-          queryParamsHandling="preserve"
-          aria-label="Security"
-          matTooltip="Security"
-        >
-          <mat-icon>security</mat-icon>
-        </a>
-        <button mat-icon-button (click)="logout()" aria-label="Sign out" matTooltip="Sign out">
-          <mat-icon>logout</mat-icon>
-        </button>
-      } @else {
-        <a
-          mat-icon-button
-          [routerLink]="['/login', token, 'ratings']"
-          aria-label="Ratings"
-          matTooltip="Ratings"
-        >
-          <mat-icon>leaderboard</mat-icon>
-        </a>
-        <a
-          mat-icon-button
-          [routerLink]="['/login', token, 'profile']"
-          aria-label="Profile"
-          matTooltip="Profile"
-        >
-          <mat-icon>person</mat-icon>
-        </a>
-      }
-    </cc-app-header>
-
-    @if (loading()) {
-      <mat-progress-bar mode="indeterminate" aria-label="Loading summary"></mat-progress-bar>
-    }
-
     <div class="page">
       @if (loadError()) {
         <mat-card class="card">
           <p class="warn">{{ loadError() }}</p>
-          <button mat-stroked-button (click)="reload()">Retry</button>
+          <button mat-stroked-button (click)="retry()" [disabled]="busy()">Retry</button>
         </mat-card>
-      } @else {
-        @if (adminMode) {
+      } @else if (summary(); as s) {
+        @if (adminMode()) {
           <mat-card class="card">
             <cc-user-select
-              [users]="users()"
+              [users]="selection.users()"
               [selectedId]="selectedId()"
-              [ownUserId]="selection.ownUserId"
+              [ownUserId]="selection.ownUserId()"
               (selectionChange)="onUserChange($event)"
             ></cc-user-select>
           </mat-card>
@@ -214,20 +110,17 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
           </p>
         }
 
-        @let s = summary();
         <cc-balance-summary
           [count]="displayCount()"
-          [priceCents]="s?.priceCents ?? null"
-          [balanceCents]="s?.balanceCents ?? null"
-          [kittyBalanceCents]="s?.kittyBalanceCents ?? null"
-          [showBalance]="s != null"
-          [panel]="s?.summaryPanel ?? 'BALANCE'"
-          [firstCupAt]="s?.firstCupAt ?? null"
-          [cupsThisWeek]="s?.cupsThisWeek ?? null"
-          [cupsToday]="s?.cupsToday ?? null"
-          [loading]="loading() && s == null"
+          [priceCents]="s.priceCents"
+          [balanceCents]="s.balanceCents"
+          [kittyBalanceCents]="s.kittyBalanceCents"
+          [panel]="s.summaryPanel ?? 'BALANCE'"
+          [firstCupAt]="s.firstCupAt ?? null"
+          [cupsThisWeek]="s.cupsThisWeek ?? null"
+          [cupsToday]="s.cupsToday ?? null"
         >
-          @if (adminMode) {
+          @if (adminMode()) {
             <button
               mat-fab
               class="cc-fab-neutral"
@@ -253,7 +146,7 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
               <mat-icon>add</mat-icon>
             }
           </button>
-          @if (adminMode) {
+          @if (adminMode()) {
             <button
               mat-fab
               class="cc-fab-neutral"
@@ -265,23 +158,23 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
             </button>
           }
           <div extra>
-            @if (s?.cancellable) {
+            @if (s.cancellable) {
               <div class="cc-undo">
                 <button mat-stroked-button (click)="undo()" [disabled]="busy()">
                   <mat-icon>undo</mat-icon> Undo last cup
                 </button>
               </div>
             }
-            @if (s?.ratingPrompt?.canRate) {
+            @if (s.ratingPrompt?.canRate) {
               <cc-bean-rating-input
-                [beans]="beanOptions()"
+                [beans]="beanService.selectable()"
                 [(beanId)]="ratingBeanId"
-                [value]="s?.ratingPrompt?.value ?? null"
+                [value]="s.ratingPrompt?.value ?? null"
                 [busy]="busy()"
                 (rated)="rate($event)"
               />
             }
-            @if (adminMode && editMode()) {
+            @if (adminMode() && editMode()) {
               <p class="muted cc-edit-hint">Set the user's total coffee count.</p>
               <form #correctionForm="ngForm" class="form-row cc-edit-total">
                 <mat-form-field>
@@ -319,7 +212,7 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
                 </button>
               </form>
             }
-            @if (adminMode && error()) {
+            @if (adminMode() && error()) {
               <p class="warn">{{ error() }}</p>
             }
           </div>
@@ -333,7 +226,7 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
           collapseTooltip="Hide the expense form"
         >
           <p class="muted cc-expense-intro">
-            @if (adminMode) {
+            @if (adminMode()) {
               Record a bean purchase (or another outlay) for this user; the full amount credits their balance.
               Use the Expenses page to record a kitty-funded purchase or to correct one.
             } @else {
@@ -341,7 +234,11 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
               your balance. Only an admin can correct or delete an expense, or record a kitty-funded one.
             }
           </p>
-          <cc-expense-form [beans]="beanOptions()" [busy]="busy()" (submitted)="recordExpense($event)" />
+          <cc-expense-form
+            [beans]="beanService.selectable()"
+            [busy]="busy()"
+            (submitted)="recordExpense($event)"
+          />
         </cc-collapsible-card>
 
         <mat-card class="card">
@@ -390,44 +287,82 @@ const ADD_RETRY_BASE_DELAY_MS = 40;
     `
   ]
 })
-export class CoffeeLandingComponent implements OnInit {
-  /** True for the admin route (`/admin`); false for the user route (`/login/:token`). */
-  adminMode = false;
-  /** The capability token (user mode only), held for the interceptor and the profile/header links. */
-  token = '';
+export class CoffeeLandingComponent {
+  /**
+   * The landing's preloaded payload, bound from the route resolver; its value is null when the load failed.
+   *
+   * Every signal below reads it directly rather than through a shared `computed`. A `computed` that yields
+   * null twice does not notify, which would put back exactly the collapse the wrapper exists to prevent: a
+   * page that repaired its own state with a Retry would keep showing it when the next resolve also failed.
+   */
+  readonly landing = input<Preload<LandingData> | null>(null);
 
-  /** The authoritative server summary (count, price, balance, kitty, cancellability, first activity page). */
-  readonly summary = signal<UserSummaryDto | null>(null);
-  /** The optimistically-displayed count; reconciled to the server count after every action. */
-  readonly displayCount = signal<number | null>(null);
-  /** The unified activity, paged via "Load more". */
-  readonly activity = signal<ActivityEntryDto[]>([]);
-  readonly busy = signal(false);
-  readonly loading = signal(false);
-  readonly loadingMore = signal(false);
-  readonly loadError = signal('');
-  readonly hasMore = signal(false);
+  /** Which audience this route serves, from the route data rather than inferred from the URL. */
+  readonly audience = input<PageAudience>('USER');
+
+  /** True on the admin route (`/admin`); false on the user route (`/login/:token`). */
+  readonly adminMode = computed(() => this.audience() === 'ADMIN');
+
+  /** The authoritative server summary; replaced in place by every mutation's response. */
+  readonly summary = linkedSignal<UserSummaryDto | null>(() => this.landing()?.value?.summary ?? null);
 
   /** The signed-in user's login (user mode only), shown in the "Signed in as" banner. */
-  readonly loginName = signal('');
+  readonly loginName = linkedSignal(() => this.landing()?.value?.loginName ?? '');
 
-  /** The users the admin may switch between (admin mode only); empty in user mode. */
-  readonly users = signal<UserDto[]>([]);
   /** The id of the user the admin is currently viewing (admin mode only). */
-  readonly selectedId = signal('');
-  /** The user whose data is currently loaded, to skip a redundant reload on a repeated `user` param. */
-  private loadedId = '';
-  /** Monotonic per-load token; a subject load applies its result only if it is still the newest load. */
-  private loadGeneration = 0;
-  /** Whether the count-correction form is open (admin mode only). */
-  readonly editMode = signal(false);
+  readonly selectedId = linkedSignal(() => this.landing()?.value?.subjectId ?? '');
+
+  /** The unified activity, paged via "Load more". */
+  readonly activity = linkedSignal(() => {
+    const summary = this.landing()?.value?.summary;
+    return summary ? summary.activity.slice(0, LANDING_ACTIVITY_PAGE_SIZE) : [];
+  });
+
+  /** Whether the server has more activity beyond the loaded page. */
+  readonly hasMore = linkedSignal(() => {
+    const summary = this.landing()?.value?.summary;
+    return summary ? summary.activity.length > LANDING_ACTIVITY_PAGE_SIZE : false;
+  });
+
+  /**
+   * The page's retryable load error. A resolver that could not load reports null, which is what this reads;
+   * a Retry then writes it directly.
+   */
+  readonly loadError = linkedSignal(() =>
+    (this.landing()?.value ?? null) === null ? this.loadFailureMessage() : ''
+  );
+
+  /** The optimistically-displayed count; every new summary reconciles it to the server's. */
+  readonly displayCount = linkedSignal<number | null>(() => this.summary()?.count ?? null);
+
+  /**
+   * The bean chosen in the rating prompt, preselected from the summary and bound into the control. Linked
+   * on the summary, not only assigned on load: a fresh summary inside the grace window must arrive with its
+   * suggested bean selected, or the rating buttons stay disabled on a prompt that looks ready.
+   */
+  readonly ratingBeanId = linkedSignal(() => this.summary()?.ratingPrompt?.defaultBeanId ?? '');
+
+  /**
+   * Whether the count-correction form is open (admin mode only). Linked on the selected user rather than on
+   * the resolved subject: the picker advances the selection at the moment of the pick, so the form closes
+   * then rather than when a cold backend finally answers.
+   */
+  readonly editMode = linkedSignal({ source: this.selectedId, computation: () => false });
+
+  /** A count-action error shown beneath the controls (admin mode only); cleared on a user switch. */
+  readonly error = linkedSignal({ source: this.selectedId, computation: () => '' });
+
+  readonly busy = signal(false);
+  readonly loadingMore = signal(false);
+
   newTotal = 0;
   note = '';
-  /** A count-action error shown beneath the controls (admin mode only). */
-  readonly error = signal('');
 
-  /** The bean chosen in the rating prompt, pre-selected from the summary and bound into the control. */
-  ratingBeanId = '';
+  /**
+   * The user the open correction form was opened for. Switching user closes the form through
+   * {@link editMode}, but a click already on its way must not apply one user's total to another's account.
+   */
+  private editSubjectId = '';
 
   /**
    * The expense form, present only while its card is open (the card destroys its content when it closes).
@@ -437,26 +372,28 @@ export class CoffeeLandingComponent implements OnInit {
 
   readonly showExpense = signal(false);
 
-  /** The selectable beans for the expense autocomplete and the rating dropdown. */
-  readonly beanOptions = signal<CoffeeBeanDto[]>([]);
-  private readonly destroyRef = inject(DestroyRef);
-
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
-    private readonly auth: AuthService,
-    private readonly capability: CapabilityTokenService,
     private readonly summaryService: SummaryService,
-    private readonly beanService: BeanService,
     private readonly profileService: ProfileService,
-    private readonly userService: UserService,
+    // read by the template: the catalog behind the rating dropdown and the expense autocomplete
+    readonly beanService: BeanService,
     private readonly consumptionService: ConsumptionService,
     private readonly expenseService: ExpenseService,
     private readonly accountingService: AccountingService,
     private readonly notifications: NotificationService,
     private readonly cdr: ChangeDetectorRef,
+    private readonly pageLoading: PageLoadingService,
     readonly selection: AdminSelectionService
   ) {}
+
+  /** What a failed load says: one audience has a link that may be invalid, the other does not. */
+  private loadFailureMessage(): string {
+    return this.adminMode()
+      ? 'Could not load the admin dashboard.'
+      : 'Could not load your coffee count. Your link may be invalid.';
+  }
 
   /**
    * The validation message for the admin "New total" count-correction field, or null when it is valid.
@@ -470,126 +407,62 @@ export class CoffeeLandingComponent implements OnInit {
     return null;
   }
 
-  async ngOnInit(): Promise<void> {
-    this.token = this.route.snapshot.paramMap.get('token') ?? '';
-    this.adminMode = this.token === '';
-    if (!this.adminMode) {
-      // Register the capability token so the interceptor authenticates the user API calls, and fetch the
-      // login name for the banner (a best-effort read that never blocks the landing).
-      this.capability.set(this.token);
-      this.profileService
-        .get()
-        .then((profile) => this.loginName.set(profile.loginName))
-        .catch(() => undefined);
-    }
-    // the bean options for the expense autocomplete and the rating dropdown (best effort, never blocks);
-    // this runs after the capability token is registered so the user-mode read is authenticated
-    this.loadBeans();
-    await this.reload();
-    if (this.adminMode) {
-      // The URL is the source of truth for the selected user: follow the `user` query param (so the browser
-      // Back/Forward buttons, which change it, re-select and reload). The first emission's load already ran
-      // in `reload`; the `loadedId` guard in `applySelectionFromUrl` skips loading the same user twice, and
-      // `loadSubject` discards a stale slower load. A selection made while the initial load is still in flight
-      // must NOT be dropped: guarding on `this.loading()` here silently lost a rapid user switch (e.g. picking
-      // a user right after sign-in, before the admin's own summary had finished loading), leaving the previous
-      // user's data on screen with no reload to correct it.
-      this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-        if (this.loadError()) {
+  /**
+   * Reloads the landing from scratch. This is the recovery path, not the load path: the route resolver does
+   * the loading. It is used by Retry and by the mutation handlers whose failure leaves the page unsure of
+   * its own state, and it deliberately does not raise the app's loading indicator, because a failed mutation
+   * already showed its own button spinner and message.
+   *
+   * The subject is derived from the route rather than from {@link selectedId}, which is empty on the Retry
+   * path (the resolver returned nothing to link it to), and because the user-mode endpoint answers 403 for
+   * an admin.
+   */
+  async refresh(): Promise<void> {
+    await withLoading(this.busy, this.loadError, this.loadFailureMessage(), async () => {
+      if (this.adminMode()) {
+        const subjectId = await resolveAdminSubject(
+          this.selection,
+          this.route.snapshot.queryParamMap.get('user')
+        );
+        this.selectedId.set(subjectId);
+        if (!subjectId) {
+          throw new Error('the user directory is unavailable');
+        }
+        const summary = await this.accountingService.userSummary(
+          subjectId,
+          LANDING_ACTIVITY_PAGE_SIZE + 1,
+          0
+        );
+        // a switch during the fetch must not land this user's summary on the newly-selected user's view
+        if (subjectId !== this.selectedId()) {
           return;
         }
-        void this.applySelectionFromUrl(params.get('user'));
-      });
-    }
-  }
-
-  /**
-   * Loads the landing. In user mode this is the user's own `/summary`. In admin mode it loads the user list
-   * and the shared selection (from the URL's `user` param), then the selected user's summary. The retry
-   * affordance calls this too; it surfaces a retryable error instead of throwing.
-   */
-  async reload(): Promise<void> {
-    await withLoading(
-      this.loading,
-      this.loadError,
-      this.adminMode
-        ? 'Could not load the admin dashboard.'
-        : 'Could not load your coffee count. Your link may be invalid.',
-      async () => {
-        if (this.adminMode) {
-          await this.selection.loadUsersAndSelection(
-            this.userService,
-            this.route,
-            this.users,
-            this.selectedId
+        this.adoptSummary(summary, true);
+      } else {
+        this.adoptSummary(await this.summaryService.getSummary(LANDING_ACTIVITY_PAGE_SIZE + 1, 0), true);
+        // The banner is linked to the resolved payload, which on this path is the failed one, so a
+        // successful retry would otherwise leave the page signed in as nobody. Best effort, as on load.
+        if (!this.loginName()) {
+          this.loginName.set(
+            await this.profileService
+              .get()
+              .then((p) => p.loginName)
+              .catch(() => '')
           );
-          await this.loadSubject();
-        } else {
-          this.applySummary(await this.summaryService.getSummary(ACTIVITY_PAGE_SIZE + 1, 0), true);
         }
       }
-    );
+    });
   }
 
-  /**
-   * Selects the user named by the URL's `user` param (or the admin's own account when it is absent) and
-   * reloads, unless that user's data is already loaded, so a Back/Forward that changes the param re-loads but
-   * a redundant re-emission of the same param does not. `loadedId` (the user actually loaded) is the guard,
-   * not the bound `selectedId` (which the dropdown already advanced before navigating).
-   *
-   * @param userId the value of the `user` query param, or null when it is absent
-   */
-  private async applySelectionFromUrl(userId: string | null): Promise<void> {
-    const effective = this.selection.selectFromParam(userId);
-    if (effective === this.loadedId) {
-      this.selectedId.set(effective);
-      return;
-    }
-    this.selectedId.set(effective);
-    this.editMode.set(false);
-    // unlike `reload()`, this post-navigation load runs outside a try/catch boundary (the queryParamMap
-    // subscription only `void`s it), so surface a failed load as a retryable error rather than silently
-    // leaving the previous user's data on screen
-    try {
-      await this.loadSubject();
-    } catch (error) {
-      this.loadError.set('Could not load that user.');
-      this.notifications.error(error, 'Could not load that user.');
-    }
-  }
-
-  /**
-   * Loads the selected user's summary (admin mode). The user id is captured up front so a slower earlier
-   * load, fired by a rapid user switch, discards its result instead of clobbering the current selection.
-   */
-  private async loadSubject(): Promise<void> {
-    const id = this.selectedId();
-    if (!id) {
-      return;
-    }
-    // Take a monotonic token for this load. If a newer load (a more recent selection) has started by the time
-    // this one resolves, discard this result so a slower earlier load cannot overwrite the newer user's
-    // summary. The plain `id !== selectedId()` check is not enough: the selection can flip away and back
-    // (a transient bare-URL emission during the switch), leaving `selectedId` equal to this load's `id` again
-    // while a newer load is already in flight. That let a stale summary land last and produced the split state
-    // an admin saw on a slow load (the count from one user, the balance from another).
-    const generation = ++this.loadGeneration;
-    this.error.set('');
-    const summary = await this.accountingService.userSummary(id, ACTIVITY_PAGE_SIZE + 1, 0);
-    if (generation !== this.loadGeneration) {
-      return;
-    }
-    // Record the loaded user only once its summary is actually applied, not at request time, so a discarded
-    // load never leaves `loadedId` pointing at a user whose data never reached the screen (which would make
-    // `applySelectionFromUrl`'s "already loaded" skip strand the landing on the previously shown account).
-    this.loadedId = id;
-    this.applySummary(summary, true);
+  /** Retries a failed load from the error card; the only page-owned action that raises the loading indicator. */
+  async retry(): Promise<void> {
+    await this.pageLoading.track(() => this.refresh());
   }
 
   /**
    * Pushes the newly-selected user onto the URL as the `user` query param (a history entry, so Back undoes
-   * the switch). The `queryParamMap` subscription then mirrors it into the shared selection and reloads; the
-   * URL stays the source of truth.
+   * the switch). The route then re-resolves and the new payload arrives as an input; the URL stays the
+   * source of truth.
    *
    * @param userId the user id picked in the selector
    */
@@ -598,7 +471,11 @@ export class CoffeeLandingComponent implements OnInit {
     await this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { user: userId },
-      queryParamsHandling: 'merge'
+      queryParamsHandling: 'merge',
+      // The same page with a new subject, not a new page: the router must not scroll to the top as if it
+      // were one. Where the reader actually ends up is then decided by the control they used (Material
+      // restores focus to the picker, which brings it back into view), not by the navigation.
+      scroll: 'manual'
     });
   }
 
@@ -609,13 +486,13 @@ export class CoffeeLandingComponent implements OnInit {
     try {
       const { entries, hasMore } = await loadActivityPage(
         this.activity(),
-        ACTIVITY_PAGE_SIZE,
+        LANDING_ACTIVITY_PAGE_SIZE,
         (limit, offset) =>
-          this.adminMode
+          this.adminMode()
             ? this.accountingService.userActivity(id, limit, offset)
             : this.summaryService.getActivity(limit, offset)
       );
-      if (this.adminMode && id !== this.selectedId()) {
+      if (this.adminMode() && id !== this.selectedId()) {
         return;
       }
       this.activity.set(entries);
@@ -640,14 +517,14 @@ export class CoffeeLandingComponent implements OnInit {
       this.displayCount.set(current + 1);
     }
     try {
-      if (this.adminMode) {
+      if (this.adminMode()) {
         await this.mutateSelectedThenRefresh(id, () => this.consumptionService.changeForUser(id, 1));
       } else {
-        this.applySummary(await this.addCoffeeWithRetry());
+        this.adoptSummary(await this.addCoffeeWithRetry());
       }
     } catch (error) {
       this.notifications.error(error, 'Could not record that coffee. Reloading.');
-      await this.reload();
+      await this.refresh();
     } finally {
       this.busy.set(false);
     }
@@ -697,7 +574,7 @@ export class CoffeeLandingComponent implements OnInit {
     } catch (error) {
       this.notifications.error(error, delta < 0 ? 'Count is already zero.' : 'Could not record that.');
       if (id === this.selectedId()) {
-        await this.loadSubject();
+        await this.refresh();
       }
     } finally {
       this.busy.set(false);
@@ -716,14 +593,14 @@ export class CoffeeLandingComponent implements OnInit {
       this.displayCount.set(current - 1);
     }
     try {
-      if (this.adminMode) {
+      if (this.adminMode()) {
         await this.mutateSelectedThenRefresh(id, () => this.consumptionService.cancelForUser(id));
       } else {
-        this.applySummary(await this.summaryService.cancelCoffee());
+        this.adoptSummary(await this.summaryService.cancelCoffee());
       }
     } catch (error) {
       this.notifications.error(error, 'That coffee can no longer be undone.');
-      await this.reload();
+      await this.refresh();
     } finally {
       this.busy.set(false);
     }
@@ -734,19 +611,26 @@ export class CoffeeLandingComponent implements OnInit {
     this.editMode.set(!this.editMode());
     if (this.editMode()) {
       this.newTotal = this.displayCount() ?? 0;
+      this.editSubjectId = this.selectedId();
     }
   }
 
   /**
    * Overrides the selected user's total to an absolute value (admin edit mode), then reconciles to the
-   * server summary. The user id is captured up front and committed only while it is still the current
-   * selection, so a user switch mid-request cannot apply one user's correction to another's view.
+   * server summary. It refuses outright when the selection has moved on since the form was opened, and the
+   * captured id is committed only while it is still the current selection, so neither a switch before the
+   * click nor one during the request can apply one user's correction to another's account.
    */
   async override(): Promise<void> {
     if (this.busy()) {
       return;
     }
     const id = this.selectedId();
+    if (this.editSubjectId !== id) {
+      // the form was opened for somebody else; close it rather than write this total anywhere
+      this.editMode.set(false);
+      return;
+    }
     this.error.set('');
     if (this.newTotalError() != null) {
       this.error.set('The total cannot be negative.');
@@ -780,7 +664,7 @@ export class CoffeeLandingComponent implements OnInit {
     this.busy.set(true);
     const id = this.selectedId();
     try {
-      if (this.adminMode) {
+      if (this.adminMode()) {
         // the landing form records a simple full-private purchase (the whole amount credits the user); the
         // Expenses page is where an admin records a kitty-funded split or corrects a purchase
         const request: AdminExpenseDto = {
@@ -795,12 +679,16 @@ export class CoffeeLandingComponent implements OnInit {
         await this.mutateSelectedThenRefresh(id, () => this.expenseService.adminCreate(id, request));
       } else {
         const request: OwnExpenseDto = { expenseType, beanName, weightGrams, amountCents, note };
-        this.applySummary(await this.summaryService.recordExpense(request));
+        this.adoptSummary(await this.summaryService.recordExpense(request));
+      }
+      // A bean name typed here may have created a bean. The summary's rating prompt names it only while
+      // there is a cup to rate, so refresh the catalog outright; otherwise the new bean would be missing
+      // from the autocomplete for the rest of the session.
+      if (beanName) {
+        void this.beanService.refresh().catch(() => undefined);
       }
       // clear the form before the card closes, which destroys it
       this.expenseForm()?.reset();
-      // a new bean name may have created a bean; refresh the options so it appears in the dropdowns
-      this.loadBeans();
       this.showExpense.set(false);
       this.notifications.success('Expense recorded.');
     } catch (error) {
@@ -811,8 +699,8 @@ export class CoffeeLandingComponent implements OnInit {
   }
 
   /**
-   * Rates the beans of the user's current cup (user mode only), then reconciles to the refreshed summary. A
-   * late rating (the grace window passed) surfaces as an error and reloads, matching the Undo affordance.
+   * Rates the beans of the user's current cup, then reconciles to the refreshed summary. A late rating (the
+   * grace window passed) surfaces as an error and reloads, matching the Undo affordance.
    *
    * @param rating the bean and score emitted by the rating control
    */
@@ -825,41 +713,24 @@ export class CoffeeLandingComponent implements OnInit {
     const alreadyRated = this.summary()?.ratingPrompt?.value != null;
     this.busy.set(true);
     try {
-      if (this.adminMode) {
+      if (this.adminMode()) {
         // an admin rates the viewed user's current cup on their behalf, then the summary is re-read
         const id = this.selectedId();
         await this.mutateSelectedThenRefresh(id, () =>
           this.consumptionService.rateForUser(id, beanId, value)
         );
       } else {
-        this.applySummary(await this.summaryService.rateCoffee(beanId, value));
+        this.adoptSummary(await this.summaryService.rateCoffee(beanId, value));
       }
       this.notifications.success(alreadyRated ? 'Rating updated.' : 'Thanks for rating!');
     } catch (error) {
       // surface the server's specific reason (no recent cup vs the grace window having passed) rather than a
       // generic message; fall back only if the response carries none
       this.notifications.errorWithServerReason(error, 'That coffee can no longer be rated.');
-      await this.reload();
+      await this.refresh();
     } finally {
       this.busy.set(false);
     }
-  }
-
-  /** Loads the selectable beans for the expense autocomplete and the rating dropdown (best effort). */
-  private loadBeans(): void {
-    this.beanService
-      .listSelectable()
-      .then((beans) => {
-        this.beanOptions.set(beans);
-        this.cdr.markForCheck();
-      })
-      .catch(() => undefined);
-  }
-
-  /** Signs the admin out and returns to login. */
-  logout(): void {
-    void this.auth.logout();
-    void this.router.navigate(['/admin/login']);
   }
 
   /**
@@ -876,48 +747,41 @@ export class CoffeeLandingComponent implements OnInit {
     if (id !== this.selectedId()) {
       return;
     }
-    const summary = await this.accountingService.userSummary(id, ACTIVITY_PAGE_SIZE + 1, 0);
+    const summary = await this.accountingService.userSummary(id, LANDING_ACTIVITY_PAGE_SIZE + 1, 0);
     // re-check after the refresh GET resolves too: a user switch during the in-flight fetch must not let this
-    // user's summary paint over the newly-selected user's view (mirrors the post-fetch guard in loadSubject)
+    // user's summary paint over the newly-selected user's view
     if (id !== this.selectedId()) {
       return;
     }
-    this.applySummary(summary, true);
+    this.adoptSummary(summary, true);
   }
 
   /**
-   * Adopts a server summary as the source of truth (the displayed count, the correction field, and the first
-   * activity page reconcile).
+   * Adopts a server summary as the source of truth. The count, the correction field and the rating prompt
+   * are linked to it, so they reconcile on their own; this sets the activity page and asks the catalog for
+   * the suggested bean, which a purchase or rating by somebody else may have created since it was read.
    *
    * @param summary the server summary to adopt
-   * @param peeked true when the summary was fetched with a one-row peek (`ACTIVITY_PAGE_SIZE + 1` activity
-   *   rows) so "Load more" reflects whether more remains; false for a user-mutation response, which bundles
-   *   the default-size first page and so falls back to the "page came back full" heuristic
+   * @param peeked true when the summary was fetched with a one-row peek (`LANDING_ACTIVITY_PAGE_SIZE + 1`
+   *   activity rows) so "Load more" reflects whether more remains; false for a user-mutation response, which
+   *   bundles the default-size first page and so falls back to the "page came back full" heuristic
    */
-  private applySummary(summary: UserSummaryDto, peeked = false): void {
+  private adoptSummary(summary: UserSummaryDto, peeked = false): void {
     this.summary.set(summary);
-    this.displayCount.set(summary.count);
-    // preselect the rating dropdown to the prompt's suggested bean (the current vote's bean, else the bean
-    // most recently rated by anyone, else the most recently purchased); a rating refresh returns the voted
-    // bean, so the selection stays in step
-    this.ratingBeanId = summary.ratingPrompt?.defaultBeanId ?? '';
-    // the suggested bean may have been created since the options were last loaded (a purchase or rating by
-    // another user in the meantime), so it can be missing from the dropdown, which would render the
-    // preselection blank; refresh the options when that happens so the suggested bean actually shows
-    if (this.ratingBeanId && !this.beanOptions().some((bean) => bean.id === this.ratingBeanId)) {
-      this.loadBeans();
-    }
+    // not awaited, and not worth an error: the summary is already on screen, and the catalog only fills
+    // the rating dropdown behind it
+    void this.beanService.ensureContains(summary.ratingPrompt?.defaultBeanId ?? '').catch(() => undefined);
     // keep the absolute-correction field in step with the count so opening Edit after a +/- does not pre-fill
     // a stale total that, if Set without retyping, would silently revert the change
     this.newTotal = summary.count;
     if (peeked) {
-      this.activity.set(summary.activity.slice(0, ACTIVITY_PAGE_SIZE));
-      this.hasMore.set(summary.activity.length > ACTIVITY_PAGE_SIZE);
+      this.activity.set(summary.activity.slice(0, LANDING_ACTIVITY_PAGE_SIZE));
+      this.hasMore.set(summary.activity.length > LANDING_ACTIVITY_PAGE_SIZE);
     } else {
       this.activity.set(summary.activity);
-      this.hasMore.set(summary.activity.length === ACTIVITY_PAGE_SIZE);
+      this.hasMore.set(summary.activity.length === LANDING_ACTIVITY_PAGE_SIZE);
     }
-    // the summary drives ngModel/count targets reassigned after an await, so mark this OnPush view for check
+    // the summary drives ngModel targets reassigned after an await, so mark this OnPush view for check
     this.cdr.markForCheck();
   }
 }

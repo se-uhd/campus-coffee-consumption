@@ -1,10 +1,11 @@
 import {
   Component,
-  OnInit,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   DestroyRef,
   inject,
+  input,
+  linkedSignal,
   signal
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -13,13 +14,13 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { TwoFactorService } from '../../services/two-factor.service';
 import { NotificationService } from '../../services/notification.service';
-import { AppHeaderComponent } from '../../components/app-header/app-header.component';
+import { PageLoadingService } from '../../services/page-loading.service';
 import { withLoading } from '../../util/loading';
+import { Preload } from '../../util/preload';
 
 /**
  * Admin two-factor (TOTP) settings. A not-yet-enrolled admin starts setup (the server generates a secret,
@@ -27,6 +28,9 @@ import { withLoading } from '../../util/loading';
  * current code to activate it (which upgrades their session to full admin). An enrolled admin sees that 2FA
  * is activated and can deactivate it (which returns them to setup on their next login). The QR is fetched as
  * a blob so the session cookie is sent, then shown via an object URL that is revoked on destroy.
+ *
+ * The enrollment status is preloaded by the route resolver, so the page never opens on the setup screen and
+ * corrects itself to "activated" a moment later.
  */
 @Component({
   selector: 'cc-admin-security',
@@ -36,31 +40,18 @@ import { withLoading } from '../../util/loading';
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
-    MatProgressBarModule,
     MatProgressSpinnerModule,
-    MatIconModule,
-    AppHeaderComponent
+    MatIconModule
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <cc-app-header
-      [home]="'/admin'"
-      title="Security"
-      icon="security"
-      [backDisabled]="!enrolled()"
-    ></cc-app-header>
-
-    @if (loading()) {
-      <mat-progress-bar mode="indeterminate" aria-label="Loading security settings"></mat-progress-bar>
-    }
-
     <div class="page">
       @if (loadError()) {
         <mat-card class="card">
           <p class="warn">{{ loadError() }}</p>
-          <button mat-stroked-button (click)="reload()">Retry</button>
+          <button mat-stroked-button (click)="retry()" [disabled]="busy()">Retry</button>
         </mat-card>
-      } @else if (enrolled()) {
+      } @else if (twoFactor.enrolled()) {
         <mat-card class="card">
           <h2>Two-factor authentication</h2>
           <p class="row">
@@ -151,35 +142,47 @@ import { withLoading } from '../../util/loading';
     `
   ]
 })
-export class AdminSecurityComponent implements OnInit {
-  readonly enrolled = signal(false);
+export class AdminSecurityComponent {
+  /**
+   * The enrollment status as the route resolver read it; null when that read failed. The value itself lives
+   * in {@link TwoFactorService}, which the template and the shell's back arrow both bind to, so this input
+   * exists to report whether the read succeeded.
+   */
+  readonly enrollment = input<Preload<boolean> | null>(null);
+
+  /** The page's retryable load error; the resolver reports a failed read as null, which is what this reads. */
+  readonly loadError = linkedSignal(() =>
+    (this.enrollment()?.value ?? null) === null ? 'Could not load your two-factor settings.' : ''
+  );
+
   readonly secret = signal('');
   readonly qrUrl = signal<string | null>(null);
   code = '';
   readonly codePattern = '\\d{6}';
   readonly busy = signal(false);
-  readonly loading = signal(false);
-  readonly loadError = signal('');
 
   private readonly destroyRef = inject(DestroyRef);
 
   constructor(
-    private readonly twoFactor: TwoFactorService,
+    readonly twoFactor: TwoFactorService,
     private readonly notifications: NotificationService,
     private readonly router: Router,
+    private readonly pageLoading: PageLoadingService,
     private readonly cdr: ChangeDetectorRef
   ) {
     this.destroyRef.onDestroy(() => this.revokeQr());
   }
 
-  async ngOnInit(): Promise<void> {
-    await this.reload();
+  /** Retries a failed read from the error card; the only page-owned action that raises the loading indicator. */
+  async retry(): Promise<void> {
+    await this.pageLoading.track(() => this.reload());
   }
 
-  /** Loads the current enrollment status; surfaces a retryable error on failure. */
+  /** Re-reads the current enrollment status; surfaces a retryable error on failure. */
   async reload(): Promise<void> {
-    await withLoading(this.loading, this.loadError, 'Could not load your two-factor settings.', async () => {
-      this.enrolled.set(await this.twoFactor.isEnrolled());
+    await withLoading(this.busy, this.loadError, 'Could not load your two-factor settings.', async () => {
+      // the service holds the status; reading it here is what populates it for the template
+      await this.twoFactor.isEnrolled();
     });
   }
 
@@ -228,7 +231,6 @@ export class AdminSecurityComponent implements OnInit {
     this.busy.set(true);
     try {
       await this.twoFactor.deactivate();
-      this.enrolled.set(false);
       this.notifications.success('Two-factor authentication deactivated.');
     } catch (error) {
       this.notifications.error(error, 'Could not deactivate two-factor authentication.');

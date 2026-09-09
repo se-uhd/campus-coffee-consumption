@@ -18,8 +18,21 @@
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <link rel="manifest" href="manifest.webmanifest" />
+    <!-- The one image in the app chrome. Preloaded here, outside <cc-root>, so the fetch survives Angular
+         clearing the root element's content at bootstrap. -->
+    <link rel="preload" as="image" href="/se-uhd-logo.png" fetchpriority="high" />
   </head>
   <body>
-    <cc-root></cc-root>
+    <cc-root>
+      <!-- What the window shows between the document arriving and the bundle running. It is the real header
+           bar, in the class that carries its metrics and the logo's own box, so the app's own header
+           replaces it without moving. Angular clears this when it bootstraps. The empty alt is deliberate:
+           the bar is decoration until the app names it. -->
+      <div class="cc-header-bar">
+        <span class="cc-header-logo">
+          <img src="/se-uhd-logo.png" alt="" width="88" height="36" />
+        </span>
+      </div>
+    </cc-root>
   </body>
 </html>

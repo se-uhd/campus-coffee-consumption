@@ -1,12 +1,12 @@
 import {
   Component,
-  OnInit,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   computed,
+  input,
+  linkedSignal,
   signal
 } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -17,14 +17,14 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { CapabilityTokenService } from '../../services/capability-token.service';
 import { BeanService } from '../../services/bean.service';
 import { NotificationService } from '../../services/notification.service';
+import { PageLoadingService } from '../../services/page-loading.service';
 import { UtcDatePipe } from '../../pipes/utc-date.pipe';
-import { AppHeaderComponent } from '../../components/app-header/app-header.component';
 import { CoffeeBeanDto, CoffeeBeanRatingsDto } from '../../models';
 import { withLoading } from '../../util/loading';
+import { Preload } from '../../util/preload';
+import { PageAudience } from '../../util/page-audience';
 
 /** The five rating positions, so the template can render one bean icon per position. */
 const RATING_POSITIONS = [1, 2, 3, 4, 5];
@@ -42,6 +42,8 @@ type BeanSortKey = 'RATING' | 'NAME' | 'VOTES';
  * votes. In ADMIN mode an edit mode reveals per-card actions to rename a bean inline or
  * merge one bean into another (its votes and purchases then count under the target). Reading the ratings is
  * open to any authenticated caller; the edit actions are admin-only.
+ *
+ * The table is preloaded by the route resolver, so the page opens on the list rather than on "No beans yet."
  */
 @Component({
   selector: 'cc-bean-ratings',
@@ -57,33 +59,9 @@ type BeanSortKey = 'RATING' | 'NAME' | 'VOTES';
     MatInputModule,
     MatSelectModule,
     MatTooltipModule,
-    MatProgressBarModule,
-    UtcDatePipe,
-    AppHeaderComponent
+    UtcDatePipe
   ],
   template: `
-    <cc-app-header
-      [home]="adminMode ? '/admin' : ['/login', token]"
-      [queryParamsHandling]="adminMode ? 'preserve' : ''"
-      title="Ratings"
-      icon="leaderboard"
-    >
-      @if (adminMode) {
-        <button
-          mat-icon-button
-          (click)="toggleEdit()"
-          [attr.aria-label]="editMode() ? 'Done editing' : 'Edit beans'"
-          [matTooltip]="editMode() ? 'Done editing' : 'Rename or merge beans'"
-        >
-          <mat-icon>{{ editMode() ? 'done' : 'edit' }}</mat-icon>
-        </button>
-      }
-    </cc-app-header>
-
-    @if (loading()) {
-      <mat-progress-bar mode="indeterminate" aria-label="Loading bean ratings"></mat-progress-bar>
-    }
-
     <!-- One shared gradient for the half-filled bean: a hard 50% stop, red on the left and gray on the right,
          referenced by every half bean via fill: url(#cc-bean-half-fill). -->
     <svg width="0" height="0" aria-hidden="true" class="cc-defs">
@@ -99,13 +77,28 @@ type BeanSortKey = 'RATING' | 'NAME' | 'VOTES';
       @if (loadError()) {
         <mat-card class="card">
           <p class="warn">{{ loadError() }}</p>
-          <button mat-stroked-button (click)="reload()">Retry</button>
+          <button mat-stroked-button (click)="retry()" [disabled]="busy()">Retry</button>
         </mat-card>
       } @else {
         <mat-card class="card">
           @if (hasRows()) {
             <div class="cc-sort">
-              <span id="cc-sort-label" class="cc-sort-label">Sort by</span>
+              <div class="row cc-sort-head">
+                <span id="cc-sort-label" class="cc-sort-label">Sort by</span>
+                <span class="spacer"></span>
+                <!-- The rename/merge switch sits with the list it acts on, not in the shared header: the
+                     header belongs to the shell now, and this control is about these rows. -->
+                @if (adminMode()) {
+                  <button
+                    mat-icon-button
+                    (click)="toggleEdit()"
+                    [attr.aria-label]="editMode() ? 'Done editing' : 'Edit beans'"
+                    [matTooltip]="editMode() ? 'Done editing' : 'Rename or merge beans'"
+                  >
+                    <mat-icon>{{ editMode() ? 'done' : 'edit' }}</mat-icon>
+                  </button>
+                }
+              </div>
               <mat-button-toggle-group
                 class="cc-sort-group"
                 aria-labelledby="cc-sort-label"
@@ -182,7 +175,7 @@ type BeanSortKey = 'RATING' | 'NAME' | 'VOTES';
                       </span>
                     } @else {
                       <span class="cc-bean-name">{{ row.name }}</span>
-                      @if (adminMode && editMode()) {
+                      @if (adminMode() && editMode()) {
                         <span class="cc-bean-actions">
                           <button
                             mat-icon-button
@@ -247,7 +240,7 @@ type BeanSortKey = 'RATING' | 'NAME' | 'VOTES';
                 </li>
               }
             </ul>
-          } @else if (!loading()) {
+          } @else {
             <p class="muted">No beans yet. Record a bean purchase to add one.</p>
           }
         </mat-card>
@@ -269,6 +262,20 @@ type BeanSortKey = 'RATING' | 'NAME' | 'VOTES';
       .cc-sort-label {
         color: var(--cc-ink-muted);
         font-size: 0.85rem;
+      }
+
+      /* The label row carries the admin edit switch on its right; the dense button keeps the row the height
+         the label alone had, so turning edit mode on and off does not resize the card. */
+      .cc-sort-head {
+        min-height: 36px;
+      }
+
+      .cc-sort-head button.mat-mdc-icon-button {
+        --mdc-icon-button-state-layer-size: 36px;
+
+        width: 36px;
+        height: 36px;
+        padding: 6px;
       }
 
       .cc-sort-group {
@@ -442,19 +449,30 @@ type BeanSortKey = 'RATING' | 'NAME' | 'VOTES';
     `
   ]
 })
-export class BeanRatingsComponent implements OnInit {
-  /** True for the admin route (`/admin/ratings`); false for the user route (`/login/:token/ratings`). */
-  adminMode = false;
-  /** The capability token (user mode only), registered so the interceptor authenticates the reads. */
-  token = '';
+export class BeanRatingsComponent {
+  /**
+   * The ratings table, from the route resolver; its value is null when the load failed. Both signals below
+   * read it directly, never through a shared `computed`, which would not notify when two consecutive
+   * resolves both fail (see the landing for the same note).
+   */
+  readonly beanRatings = input<Preload<CoffeeBeanRatingsDto[]> | null>(null);
+
+  /** Which audience this route serves, from the route data rather than inferred from the URL. */
+  readonly audience = input<PageAudience>('USER');
+
+  /** True on the admin route (`/admin/ratings`); false on the user route (`/login/:token/ratings`). */
+  readonly adminMode = computed(() => this.audience() === 'ADMIN');
 
   readonly ratingPositions = RATING_POSITIONS;
 
-  readonly ratings = signal<CoffeeBeanRatingsDto[]>([]);
-  /** The live beans, the merge-target options (admin edit mode). */
-  readonly beans = signal<CoffeeBeanDto[]>([]);
-  readonly loading = signal(false);
-  readonly loadError = signal('');
+  /** The rows on screen; replaced in place after a rename or a merge, and by a Retry. */
+  readonly ratings = linkedSignal<CoffeeBeanRatingsDto[]>(() => this.beanRatings()?.value ?? []);
+
+  /** The page's retryable load error; the resolver reports a failed load as null, which is what this reads. */
+  readonly loadError = linkedSignal(() =>
+    (this.beanRatings()?.value ?? null) === null ? 'Could not load the ratings.' : ''
+  );
+
   readonly busy = signal(false);
 
   /** The active sort key; the list re-sorts client-side (the backend returns the full list, best first). */
@@ -495,31 +513,33 @@ export class BeanRatingsComponent implements OnInit {
   });
 
   constructor(
-    private readonly route: ActivatedRoute,
-    private readonly capability: CapabilityTokenService,
     private readonly beanService: BeanService,
     private readonly notifications: NotificationService,
+    private readonly pageLoading: PageLoadingService,
     private readonly cdr: ChangeDetectorRef
   ) {}
 
-  async ngOnInit(): Promise<void> {
-    this.token = this.route.snapshot.paramMap.get('token') ?? '';
-    this.adminMode = this.token === '';
-    if (!this.adminMode) {
-      this.capability.set(this.token);
-    }
-    await this.reload();
+  /** Retries a failed load from the error card; the only page-owned action that raises the loading indicator. */
+  async retry(): Promise<void> {
+    await this.pageLoading.track(() => this.refresh());
   }
 
-  /** Loads the ratings and (for the merge target list) the selectable beans; surfaces a retryable error. */
-  async reload(): Promise<void> {
-    await withLoading(this.loading, this.loadError, 'Could not load the ratings.', async () => {
-      const [ratings, beans] = await Promise.all([
+  /**
+   * Loads the ratings and (for the merge target list) the selectable beans; surfaces a retryable error.
+   *
+   * It deliberately does not raise the app's loading indicator: it is also the post-mutation refresh, which
+   * already showed the saving button's own spinner and a success snackbar.
+   */
+  async refresh(): Promise<void> {
+    await withLoading(this.busy, this.loadError, 'Could not load the ratings.', async () => {
+      // The catalog behind the merge dropdown is shared, so refreshing it here keeps every page current.
+      // It is best effort: the rows are what this page shows, and a stale merge dropdown is not a reason
+      // to throw them away and report the page as unloadable.
+      const [ratings] = await Promise.all([
         this.beanService.ratings(),
-        this.beanService.listSelectable()
+        this.beanService.refresh().catch(() => undefined)
       ]);
       this.ratings.set(ratings);
-      this.beans.set(beans);
     });
   }
 
@@ -542,9 +562,9 @@ export class BeanRatingsComponent implements OnInit {
     return 'empty';
   }
 
-  /** The merge-target options for a bean: every live bean other than itself. */
+  /** The merge-target options for a bean: every live bean in the shared catalog other than itself. */
   mergeTargets(beanId: string): CoffeeBeanDto[] {
-    return this.beans().filter((bean) => bean.id !== beanId);
+    return this.beanService.selectable().filter((bean) => bean.id !== beanId);
   }
 
   /** Toggles the admin rename/merge affordances, closing any open card editor. */
@@ -570,7 +590,7 @@ export class BeanRatingsComponent implements OnInit {
     try {
       await this.beanService.rename(row.beanId, this.renameValue.trim());
       this.cancelRename();
-      await this.reload();
+      await this.refresh();
       this.notifications.success('Bean renamed.');
     } catch (error) {
       this.notifications.error(error, 'Could not rename the bean (is the name already taken?).');
@@ -602,7 +622,7 @@ export class BeanRatingsComponent implements OnInit {
     try {
       await this.beanService.merge(row.beanId, this.mergeTargetId);
       this.cancelMerge();
-      await this.reload();
+      await this.refresh();
       this.notifications.success('Beans merged.');
     } catch (error) {
       this.notifications.error(error, 'Could not merge the beans.');

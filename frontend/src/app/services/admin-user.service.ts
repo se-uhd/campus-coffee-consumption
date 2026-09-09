@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { UserService } from './user.service';
 import { AccountingService } from './accounting.service';
+import { AdminSelectionService } from './admin-selection.service';
 import { Role, UserBalanceDto, UserDto } from '../models';
 
 /**
@@ -23,23 +24,42 @@ export interface UserRow {
  * empty-then-fill flash) and so returning to the page repaints the last rows instantly while a background reload
  * revalidates them. It never throws: a failed load records a retryable error flag instead, so the resolver
  * can preload without ever canceling the navigation.
+ *
+ * It is the one place that reads `/api/users` for the admin: the users it fetches are pushed into
+ * {@link AdminSelectionService}, which the pickers on the other admin pages bind to.
  */
 @Injectable({ providedIn: 'root' })
 export class AdminUserService {
   constructor(
     private readonly userService: UserService,
-    private readonly accountingService: AccountingService
+    private readonly accountingService: AccountingService,
+    private readonly selection: AdminSelectionService
   ) {}
 
   private readonly rowsSignal = signal<UserRow[] | null>(null);
   private readonly errorSignal = signal(false);
   private inFlight: Promise<void> | null = null;
 
+  /** Bumped by {@link reset}, so a load in flight when the session ended drops its result. */
+  private generation = 0;
+
   /** The loaded user rows, or null until the first load resolves. */
   readonly rows = this.rowsSignal.asReadonly();
 
   /** Whether the most recent load failed (so the page can show a retry affordance). */
   readonly loadError = this.errorSignal.asReadonly();
+
+  /**
+   * Drops the cached rows, so the next admin session reads them again rather than inheriting this one's.
+   * A load already in flight is disowned too: without that it would land after the reset and push the
+   * previous session's users back into {@link AdminSelectionService}.
+   */
+  reset(): void {
+    this.generation++;
+    this.inFlight = null;
+    this.rowsSignal.set(null);
+    this.errorSignal.set(false);
+  }
 
   /**
    * Ensures the rows are loaded before the route activates. On a first visit it awaits the load (so the
@@ -96,14 +116,25 @@ export class AdminUserService {
 
   /** Fetches and stores the rows; records a retryable error instead of throwing, keeping any cached rows. */
   private async fetchRows(): Promise<void> {
+    const generation = this.generation;
     try {
       const [users, overview] = await Promise.all([
         this.userService.list(),
         this.accountingService.overview()
       ]);
+      if (generation !== this.generation) {
+        return;
+      }
       this.rowsSignal.set(this.mergeRows(users, overview));
+      // The same list the user picker needs. Pushing it there makes every reload this service already does
+      // (a creation, a role change, a link rotation, a deletion) keep the picker current for free, and means
+      // the two never issue separate requests for the same directory.
+      this.selection.adoptUsers(users);
       this.errorSignal.set(false);
     } catch {
+      if (generation !== this.generation) {
+        return;
+      }
       // Keep any cached rows visible; the page surfaces the error only when there are none to show.
       this.errorSignal.set(true);
     }

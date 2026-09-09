@@ -54,7 +54,22 @@ type ActivityFilter = 'ALL' | 'COFFEES' | 'PURCHASES' | 'PAYMENTS' | 'RATINGS';
       </mat-button-toggle-group>
     }
 
-    @if (visibleEntries().length > 0) {
+    @if (pending()) {
+      <!-- The list's own shape while its rows are still on their way. It is never "Nothing to show.": that
+           is a statement about the data, and it is wrong until the data is in. -->
+      <ul class="cc-activity" aria-hidden="true">
+        @for (row of placeholderRows; track row) {
+          <li class="cc-entry">
+            <span class="cc-placeholder cc-placeholder--icon"></span>
+            <div class="cc-entry-body">
+              <span class="cc-placeholder cc-placeholder--line"></span>
+              <span class="cc-placeholder cc-placeholder--subline"></span>
+              <span class="cc-placeholder cc-placeholder--subline"></span>
+            </div>
+          </li>
+        }
+      </ul>
+    } @else if (visibleEntries().length > 0) {
       <ul class="cc-activity">
         @for (entry of visibleEntries(); track entry.id) {
           <li class="cc-entry" [title]="tooltipFor(entry)">
@@ -204,6 +219,16 @@ export class ActivityListComponent {
 
   /** Whether to show the type filter toggle above the list. */
   readonly showFilter = input(false);
+
+  /**
+   * Whether the rows are still on their way. The list then renders placeholder rows in the same geometry a
+   * real row has, rather than the "Nothing to show." empty state, which would be a claim about data nobody
+   * has seen yet.
+   */
+  readonly pending = input(false);
+
+  /** How many placeholder rows the pending state renders; a list's worth, not the real (unknown) count. */
+  readonly placeholderRows = [1, 2, 3];
 
   /** Whether to show a "Load more" button below the list (the parent has another page to fetch). */
   readonly canLoadMore = input(false);

@@ -16,7 +16,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
   selector: 'cc-app-header',
   imports: [RouterLink, MatIconModule, MatButtonModule, MatTooltipModule, NgOptimizedImage],
   template: `
-    <header class="cc-header">
+    <header class="cc-header cc-header-bar">
       <span class="cc-header-leading">
         @if (title()) {
           @if (backDisabled()) {
@@ -41,7 +41,15 @@ import { MatTooltipModule } from '@angular/material/tooltip';
             [queryParamsHandling]="queryParamsHandling()"
             aria-label="Home"
           >
-            <img ngSrc="/se-uhd-logo.png" width="2048" height="838" alt="SE@UHD Software Engineering" />
+            <!-- The intrinsic size is a 3x render of the 88x36 slot; the priority flag marks it eager and
+                 high-priority, so the one image in the app chrome is never deferred. -->
+            <img
+              ngSrc="/se-uhd-logo.png"
+              width="264"
+              height="108"
+              priority
+              alt="SE@UHD Software Engineering"
+            />
           </a>
         }
       </span>
@@ -61,34 +69,15 @@ import { MatTooltipModule } from '@angular/material/tooltip';
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
+      /* Only the positioning context for the absolutely-centered title; the bar's own metrics come from the
+         global .cc-header-bar, shared with the cold-load skeleton and the boot placeholder. */
       .cc-header {
         position: relative;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 16px;
-        background: var(--cc-surface);
-        box-shadow:
-          0 1px 2px rgba(var(--cc-shadow-rgb), 0.06),
-          0 1px 6px rgba(var(--cc-shadow-rgb), 0.06);
-        min-height: 56px;
       }
 
       .cc-header-leading {
         display: inline-flex;
         align-items: center;
-      }
-
-      .cc-header-logo {
-        display: inline-flex;
-        align-items: center;
-        padding: 0 4px;
-      }
-
-      .cc-header-logo img {
-        height: 36px;
-        width: auto;
-        display: block;
       }
 
       .cc-header-title {

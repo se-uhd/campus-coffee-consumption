@@ -15,6 +15,13 @@ export class TwoFactorService {
   // null = unknown (not yet fetched this session); true/false = the cached enrollment status
   private readonly enrolledState = signal<boolean | null>(null);
 
+  /**
+   * The acting admin's enrollment status as it is currently known: `null` until it has been read, then
+   * `true` or `false`. A view binds this rather than keeping its own copy, so it can render an
+   * "unknown yet" state instead of guessing "not enrolled" and swapping to "activated" a moment later.
+   */
+  readonly enrolled = this.enrolledState.asReadonly();
+
   constructor(private readonly http: HttpClient) {}
 
   /** Records the enrollment status (called from the login flow and after activation). */
