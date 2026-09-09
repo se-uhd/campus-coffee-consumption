@@ -74,12 +74,11 @@ class SinglePageAppShell(
      * Whether [acceptHeader] asks for HTML specifically. A wildcard does not count: it is what a script, an
      * image and `curl` send, and answering those with a page would replace a clean 404 with markup.
      */
-    private fun wantsHtml(acceptHeader: String?): Boolean {
-        if (acceptHeader.isNullOrBlank()) {
-            return false
-        }
-        return runCatching { MediaType.parseMediaTypes(acceptHeader) }
-            .getOrDefault(emptyList())
-            .any { !it.equalsTypeAndSubtype(MediaType.ALL) && it.includes(MediaType.TEXT_HTML) }
-    }
+    private fun wantsHtml(acceptHeader: String?): Boolean =
+        // The null check is what smart-casts acceptHeader for the parse below. A blank header needs no check
+        // of its own: it parses to no media types at all, so it answers false through the same path.
+        acceptHeader != null &&
+            runCatching { MediaType.parseMediaTypes(acceptHeader) }
+                .getOrDefault(emptyList())
+                .any { !it.equalsTypeAndSubtype(MediaType.ALL) && it.includes(MediaType.TEXT_HTML) }
 }

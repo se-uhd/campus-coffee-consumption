@@ -313,7 +313,7 @@ jobs:
 
       # The provider is a ~150 MB download that every run would otherwise repeat; the lock file pins it, so
       # its hash is the cache key.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/tofu-plugin-cache
           key: tofu-providers-${{ runner.os }}-${{ hashFiles('infra/.terraform.lock.hcl') }}
