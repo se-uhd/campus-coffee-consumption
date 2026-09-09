@@ -13,7 +13,7 @@ spring-boot = "4.1.1"
 # naming what to delete.
 tomcat = "11.0.25"
 junit = "6.1.3"
-springdoc = "3.1.0"
+springdoc = "3.1.1"
 mapstruct = "1.6.3"
 # kotlin-logging: idiomatic Kotlin logging over SLF4J. Log calls take a lambda (built only when the level
 # is enabled) and the logger derives its name from the enclosing class.
