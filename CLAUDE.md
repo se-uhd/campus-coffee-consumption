@@ -640,6 +640,18 @@ Dependencies and tools are kept current automatically:
   dependencies and plugins (resolved from the `libs.versions.toml` catalog), the frontend npm packages, the
   Dockerfile base images, and the OpenTofu provider pinned in `infra/.terraform.lock.hcl`.
 - A weekly **`mise-outdated`** workflow opens or updates an issue when the mise-managed tools fall behind.
+- **GitHub's security alerts cover the deployed artifact, not the build.** The JVM dependency graph is
+  submitted by `.github/workflows/dependency-submission.yml` (GitHub cannot resolve it on its own: this
+  project has no Gradle wrapper), and that submission is filtered to `:application` at `^runtimeClasspath$`,
+  which is exactly the boot jar. So an alert means something is wrong in what runs in production. It also
+  means a vulnerability reachable only while building raises nothing here; the workflow states that
+  trade-off and why, and CodeQL and Semgrep still scan the whole tree. Widening the filter brings back
+  Gradle's own plugin classpath, which is where the sixteen unactionable alerts came from.
+- **Vitest is held on the major Angular's test builder accepts.** `@angular/build` declares
+  `peerOptional vitest@"^4.0.8"`, so a vitest 5 fails `npm ci` with ERESOLVE before a test runs; the two
+  vitest packages are also peer-pinned to each other exactly. A Dependabot rule ignores both majors, in the
+  same shape as the Kotlin and `@types/node` rules, and expires the same way: bump Angular and both vitest
+  packages together by hand once the builder accepts the newer one.
 
 ## Development Workflow
 
