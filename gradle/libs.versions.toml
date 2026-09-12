@@ -18,7 +18,7 @@ mapstruct = "1.6.3"
 # kotlin-logging: idiomatic Kotlin logging over SLF4J. Log calls take a lambda (built only when the level
 # is enabled) and the logger derives its name from the enclosing class.
 kotlin-logging = "8.0.4"
-cucumber = "7.34.7"
+cucumber = "7.34.8"
 archunit = "1.5.0"
 # ZXing for backend QR-code generation (the user capability URL codes); not in the Boot BOM.
 zxing = "3.5.4"
