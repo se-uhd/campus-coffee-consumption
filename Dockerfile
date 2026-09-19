@@ -8,7 +8,7 @@
 # there isn't.
 
 # Build stage: mise installs the JDK and Gradle from mise.toml.
-FROM jdxcode/mise:2026.9.2 AS build
+FROM jdxcode/mise:2026.9.10 AS build
 WORKDIR /app
 # Disable the gcloud/python/opentofu entries in mise.toml. The build doesn't need them, and `mise exec` below
 # would otherwise auto-install gcloud, whose install script fails here (it needs python on PATH, but
