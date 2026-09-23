@@ -270,6 +270,9 @@ Deploy notes:
 - Cloud Run is capped at 2 instances (`max_instances` in `infra/variables.tf`) because `db-f1-micro` allows
   25 connections and the app holds 5 per instance across two revisions during a deployment. Raise the cap
   only together with the database tier.
+- The uptime check also keeps one instance warm, so the service never scales to zero and no scan waits for a
+  20 to 30 second cold start, at no measurable cost. An empty `ALERT_EMAIL` removes the check and brings the
+  cold starts back. See `doc/adr/003-cloud-run-scale-to-zero.md`.
 - The image build runs as the dedicated `campus-coffee-build` service account (`infra/iam.tf`: log writer on
   the project, writer on the image repository, object user on the project's Cloud Build bucket). The default
   compute service account, which the build ran as before with `roles/editor`, and the legacy Cloud Build

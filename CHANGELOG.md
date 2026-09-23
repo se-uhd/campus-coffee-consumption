@@ -7,6 +7,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `doc/adr/003-cloud-run-scale-to-zero.md` records that the production service no longer scales to zero.
+  Since the uptime check went live on 2026-09-06, its probes keep one instance warm. That costs nothing
+  measurable, because request-based billing does not charge for an idle instance, and it ended the 20 to 30
+  second cold starts on the first scan after a quiet period. A minimum instance would have cost about $18 a
+  month. A deploy note in the README points to it, since an empty `ALERT_EMAIL` removes the check and
+  brings the cold starts back.
+
 ### Security
 
 - The dependency-graph filter now names exactly what ships: the `:application` project's
