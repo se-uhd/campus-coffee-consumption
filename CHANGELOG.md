@@ -5,17 +5,6 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### Security
-
-- The Gradle dependency graph submitted to GitHub now covers the runtime classpaths only, so an alert
-  describes the artifact that is deployed. Unscoped it resolved every configuration, Gradle's own buildscript
-  classpath included, which filled the alert list with the Kotlin plugin, kapt, detekt and their transitive
-  trees: 16 open alerts, four of them "high", and not one of them present in the running service, whose
-  jackson, logback and commons-lang3 were already newer than the version every advisory asked for. The
-  trade-off is stated in the workflow: a vulnerability reachable only while building is no longer alerted
-  here, which in this project was largely unactionable anyway, the one direct case being the Kotlin Gradle
-  plugin that detekt pins to an exact version.
-
 ## [Unreleased]
 
 ### Security
@@ -51,6 +40,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the activity filter chips actually narrowing the table. The last one gates the wiring at both ends, the
   chips writing the filter and the table reading the filtered view, which a spec driving the signal directly
   would miss; pointing the table at the unfiltered rows turns it red.
+
+- Vitest specs for the three untested pages that carry logic, 59 tests in all. Each one was checked by
+  breaking the production line it covers and confirming it goes red: 81 single-line mutations across the
+  three pages, every one of them caught, and no test that catches nothing.
+
+  - `admin-security` (14): the three-state enrollment status, the object-URL lifecycle behind the setup QR
+    code, the server's own reason for a refused code, and one request per tap for each of enrol, activate
+    and deactivate.
+  - `bean-ratings` (22): the three sort orders and the half-bean rounding, the rename and merge editors
+    acting on the bean whose editor is open rather than on a row position, the merge direction, and a
+    catalog re-read that fails without taking the loaded rows down with it.
+  - `profile` (23): the guards that keep one user's save, panel change or retried profile off another
+    user's page after a switch, the coffee link and landing-panel preference surviving a save, and Cancel
+    reverting from a snapshot the form cannot edit in place.
 
 ### Fixed
 
@@ -89,21 +92,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   render, and the three layout rules behind it moved to the global stylesheet, so the rows still have one
   definition.
 
-### Added
+### Security
 
-- Vitest specs for the three untested pages that carry logic, 59 tests in all. Each one was checked by
-  breaking the production line it covers and confirming it goes red: 81 single-line mutations across the
-  three pages, every one of them caught, and no test that catches nothing.
-
-  - `admin-security` (14): the three-state enrollment status, the object-URL lifecycle behind the setup QR
-    code, the server's own reason for a refused code, and one request per tap for each of enrol, activate
-    and deactivate.
-  - `bean-ratings` (22): the three sort orders and the half-bean rounding, the rename and merge editors
-    acting on the bean whose editor is open rather than on a row position, the merge direction, and a
-    catalog re-read that fails without taking the loaded rows down with it.
-  - `profile` (23): the guards that keep one user's save, panel change or retried profile off another
-    user's page after a switch, the coffee link and landing-panel preference surviving a save, and Cancel
-    reverting from a snapshot the form cannot edit in place.
+- The Gradle dependency graph submitted to GitHub now covers the runtime classpaths only, so an alert
+  describes the artifact that is deployed. Unscoped it resolved every configuration, Gradle's own buildscript
+  classpath included, which filled the alert list with the Kotlin plugin, kapt, detekt and their transitive
+  trees: 16 open alerts, four of them "high", and not one of them present in the running service, whose
+  jackson, logback and commons-lang3 were already newer than the version every advisory asked for. The
+  trade-off is stated in the workflow: a vulnerability reachable only while building is no longer alerted
+  here, which in this project was largely unactionable anyway, the one direct case being the Kotlin Gradle
+  plugin that detekt pins to an exact version.
 
 ## [1.3.0] - 2026-09-09
 
